@@ -51,20 +51,24 @@
 #endif
 
 /* Core */
-static void             RFC_feed_handle_tp          ( rfctx_s *rfctx, value_tuple_s* tp );
-static void             RFC_feed_finalize           ( rfctx_s* rfctx );
-static value_tuple_s *  RFC_tp_next_default         ( rfctx_s *, value_tuple_s *pt );
-static void             RFC_cycle_find_4ptm         ( rfctx_s * );
-static void             RFC_cycle_process           ( rfctx_s *, value_tuple_s *from, value_tuple_s *to, int flags );
+static void             RFC_feed_handle_tp                  ( rfctx_s *rfctx, value_tuple_s* tp );
+static void             RFC_feed_finalize                   ( rfctx_s* rfctx );
+static value_tuple_s *  RFC_tp_next_default                 ( rfctx_s *, value_tuple_s *pt );
+static void             RFC_cycle_find_4ptm                 ( rfctx_s * );
+static void             RFC_cycle_process                   ( rfctx_s *, value_tuple_s *from, value_tuple_s *to, int flags );
 /* Residual methods */
-static bool             RFC_finalize_default        ( rfctx_s * );
-static bool             RFC_finalize_res_default    ( rfctx_s * );
-static bool             RFC_finalize_res_ignore     ( rfctx_s * );
-static bool             RFC_finalize_res_repeated   ( rfctx_s * );
+static bool             RFC_finalize_default                ( rfctx_s * );
+static bool             RFC_finalize_res_default            ( rfctx_s * );
+static bool             RFC_finalize_res_ignore             ( rfctx_s * );
+static bool             RFC_finalize_res_halfcycles         ( rfctx_s * );
+static bool             RFC_finalize_res_fullcycles         ( rfctx_s * );
+static bool             RFC_finalize_res_clormann_seeger    ( rfctx_s * );
+static bool             RFC_finalize_res_din                ( rfctx_s * );
+static bool             RFC_finalize_res_repeated           ( rfctx_s * );
 /* Other */
-static void             RFC_tp_add_default          ( rfctx_s *, value_tuple_s *pt, bool do_lock );
-static double           RFC_damage_calc_default     ( rfctx_s *, unsigned class_from, unsigned class_to );
-static RFC_value_type   value_delta                 ( RFC_value_type from, RFC_value_type to, int *sign_ptr );
+static void             RFC_tp_add_default                  ( rfctx_s *, value_tuple_s *pt, bool do_lock );
+static double           RFC_damage_calc_default             ( rfctx_s *, unsigned class_from, unsigned class_to );
+static RFC_value_type   value_delta                         ( RFC_value_type from, RFC_value_type to, int *sign_ptr );
 
 
 #define QUANTIZE( r, v )   ( (unsigned)( ((v) - (r)->class_offset) / (r)->class_width ) )
@@ -416,13 +420,15 @@ bool RFC_finalize_res_default( rfctx_s *rfctx )
         case RFC_RES_IGNORE:
             return RFC_finalize_res_ignore( rfctx );
         case RFC_RES_HALFCYCLES:
+            return RFC_finalize_res_halfcycles( rfctx );
         case RFC_RES_FULLCYCLES:
+            return RFC_finalize_res_fullcycles( rfctx );
         case RFC_RES_CLORMANN_SEEGER:
-            return false;
+            return RFC_finalize_res_clormann_seeger( rfctx );
         case RFC_RES_REPEATED:
             return RFC_finalize_res_repeated( rfctx );
         case RFC_RES_RP_DIN:
-            return false;
+            return RFC_finalize_res_din( rfctx );
         default:
             assert( false );
             return false;
@@ -440,6 +446,70 @@ bool RFC_finalize_res_ignore( rfctx_s *rfctx )
 {
     /* Just include interim turning point */
     RFC_finalize_default( rfctx );
+}
+
+
+/**
+ * @brief      Finalize pending counts, half cycles method.
+ *
+ * @param      rfctx  The rainflow context
+ */
+static
+bool RFC_finalize_res_halfcycles( rfctx_s *rfctx )
+{
+    assert( rfctx && rfctx->state == RFC_STATE_FINALIZE );
+
+    if( rfctx->residue && rfctx->residue_cnt )
+    {
+    }
+}
+
+
+/**
+ * @brief      Finalize pending counts, full cycles method.
+ *
+ * @param      rfctx  The rainflow context
+ */
+static
+bool RFC_finalize_res_fullcycles( rfctx_s *rfctx )
+{
+    assert( rfctx && rfctx->state == RFC_STATE_FINALIZE );
+
+    if( rfctx->residue && rfctx->residue_cnt )
+    {
+    }
+}
+
+
+/**
+ * @brief      Finalize pending counts, Clormann/Seeger method.
+ *
+ * @param      rfctx  The rainflow context
+ */
+static
+bool RFC_finalize_res_clormann_seeger( rfctx_s *rfctx )
+{
+    assert( rfctx && rfctx->state == RFC_STATE_FINALIZE );
+
+    if( rfctx->residue && rfctx->residue_cnt )
+    {
+    }
+}
+
+
+/**
+ * @brief      Finalize pending counts, DIN method.
+ *
+ * @param      rfctx  The rainflow context
+ */
+static
+bool RFC_finalize_res_din( rfctx_s *rfctx )
+{
+    assert( rfctx && rfctx->state == RFC_STATE_FINALIZE );
+
+    if( rfctx->residue && rfctx->residue_cnt )
+    {
+    }
 }
 
 
