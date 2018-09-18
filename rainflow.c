@@ -115,9 +115,11 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
     rfctx->hysteresis           = ( hysteresis < 0.0 ) ? class_width : hysteresis;
 
     /* Woehler curve (fictive) */
-    rfctx->wl_sd                =  1e3;
-    rfctx->wl_nd                =  1e7;
-    rfctx->wl_k                 = -5.0;
+    rfctx->wl_sd                =  1e3;          /* Fictive value */
+    rfctx->wl_nd                =  1e7;          /* Fictive value */
+    rfctx->wl_k                 = -5.0;          /* Fictive value */
+    rfctx->wl_k2                =  rfctx->wl_k;  /* Miner elementar */
+    rfctx->wl_omission          =  0.0;          /* No omission per default */
 
     /* Memory allocation functions */
     rfctx->mem_alloc            = calloc;
@@ -357,14 +359,14 @@ void RFC_feed_finalize( rfctx_s* rfctx )
 
 
 /**
- * @brief      Finalize pending counting, ignoring residue.
+ * @brief      Finalize pending counts, handling interim turning point.
  *             There is still one unhandled turning point left.
  *             "Finalizing" takes this into account.
  *
  * @param      rfctx  The rainflow context
  */
 static
-bool RFC_finalize_res_ignore( rfctx_s *rfctx )
+bool RFC_finalize_default( rfctx_s *rfctx )
 {
     assert( rfctx && rfctx->state == RFC_STATE_FINALIZE );
 
@@ -397,9 +399,20 @@ bool RFC_finalize_res_ignore( rfctx_s *rfctx )
 
 
 /**
- * @brief      Finalize pending counting, repeated residue method.
- *             There is still one unhandled turning point left.
- *             "Finalizing" takes this into account.
+ * @brief      Finalize pending counts, ignoring residue.
+ *
+ * @param      rfctx  The rainflow context
+ */
+static
+bool RFC_finalize_res_ignore( rfctx_s *rfctx )
+{
+    /* Just include interim turning point */
+    RFC_finalize_default( rfctx );
+}
+
+
+/**
+ * @brief      Finalize pending counts, repeated residue method.
  *
  * @param      rfctx  The rainflow context
  */
@@ -441,7 +454,7 @@ bool RFC_finalize_res_repeated( rfctx_s *rfctx )
         else return false;
 
         /* Handle interim turning point */
-        return RFC_finalize_res_ignore( rfctx );
+        return RFC_finalize_default( rfctx );
     }
     return true;
 }
@@ -465,22 +478,35 @@ double RFC_damage_calc_default( rfctx_s *rfctx, unsigned class_from, unsigned cl
     const double SD_log  = log(rfctx->wl_sd);
     const double ND_log  = log(rfctx->wl_nd);
     const double k       = rfctx->wl_k;
+    const double k2      = rfctx->wl_k2;
+    /* Pseudo damage */
+    double damage = 0.0;
 
-    if( class_from == class_to ) return 0.0;
+    if( class_from != class_to )
+    {
+        /* D_i =           h_i /    ND   *    ( Sa_i /    SD)  ^ ABS(k)   */
+        /* D_i = exp(  log(h_i /    ND)  + log( Sa_i /    SD)  * ABS(k) ) */
+        /* D_i = exp( (log(h_i)-log(ND)) + (log(Sa_i)-log(SD)) * ABS(k) ) */
+        /* D_i = exp(      0   -log(ND)  + (log(Sa_i)-log(SD)) * ABS(k) ) */
 
-    /* D_i =           h_i /    ND   *    ( Sa_i /    SD)  ^ ABS(k)   */
-    /* D_i = exp(  log(h_i /    ND)  + log( Sa_i /    SD)  * ABS(k) ) */
-    /* D_i = exp( (log(h_i)-log(ND)) + (log(Sa_i)-log(SD)) * ABS(k) ) */
-    /* D_i = exp(      0   -log(ND)  + (log(Sa_i)-log(SD)) * ABS(k) ) */
+        double range  = (double)rfctx->class_width * abs( (int)class_to - (int)class_from );
+        double Sa_i   = range / 2.0;  /* amplitude */
 
-    double range  = (double)rfctx->class_width * abs( (int)class_to - (int)class_from );
-    double Sa_i   = range / 2.0;
-    double D_i    = exp( fabs(k) * ( log(Sa_i) - SD_log ) - ND_log );
+        if( Sa_i > rfctx->wl_omission )
+        {
+            if( Sa_i > rfctx->wl_sd )
+            {
+                damage = exp( fabs(k)  * ( log(Sa_i) - SD_log ) - ND_log );
+            }
+            else
+            {
+                damage = exp( fabs(k2) * ( log(Sa_i) - SD_log ) - ND_log );
+            }
+        }
+    }
 
-    return D_i;
+    return damage;
 }
-
-
 
 
 /*** Implementation static functions ***/

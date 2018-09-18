@@ -193,9 +193,11 @@ typedef struct rfctx
     RFC_value_type                  hysteresis;                 /**< Hysteresis Filtering */
 
     /* Woehler curve */
-    double                          wl_sd;                      /**< Fatigue resistance range */
+    double                          wl_sd;                      /**< Fatigue resistance range (amplitude) */
     double                          wl_nd;                      /**< Cycles at wl_sd */
-    double                          wl_k;                       /**< Woehler gradient */
+    double                          wl_k;                       /**< Woehler gradient above wl_sd */
+    double                          wl_k2;                      /**< Woehler gradient below wl_sd */
+    double                          wl_omission;                /**< Omission level */
 
     /* Memory allocation functions */
     rfc_mem_calloc_fcn_t            mem_alloc;                  /**< Allocate initialized memory */
