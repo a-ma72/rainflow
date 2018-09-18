@@ -57,6 +57,8 @@ static value_tuple_s *  RFC_tp_next_default         ( rfctx_s *, value_tuple_s *
 static void             RFC_cycle_find_4ptm         ( rfctx_s * );
 static void             RFC_cycle_process           ( rfctx_s *, value_tuple_s *from, value_tuple_s *to, int flags );
 /* Residual methods */
+static bool             RFC_finalize_default        ( rfctx_s * );
+static bool             RFC_finalize_res_default    ( rfctx_s * );
 static bool             RFC_finalize_res_ignore     ( rfctx_s * );
 static bool             RFC_finalize_res_repeated   ( rfctx_s * );
 /* Other */
@@ -353,7 +355,7 @@ void RFC_feed_finalize( rfctx_s* rfctx )
         rfctx->state = rfctx->finalize_fcn( rfctx ) ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
     }
 #else
-    rfctx->state = RFC_finalize_res_ignore( rfctx ) ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
+    rfctx->state = RFC_finalize_res_default( rfctx ) ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
 #endif
 }
 
@@ -395,6 +397,36 @@ bool RFC_finalize_default( rfctx_s *rfctx )
 #endif
     }
     return true;
+}
+
+
+/**
+ * @brief      Finalize pending counts, ignoring residue.
+ *
+ * @param      rfctx  The rainflow context
+ */
+static
+bool RFC_finalize_res_default( rfctx_s *rfctx )
+{
+    assert( rfctx && rfctx->state == RFC_STATE_FINALIZE );
+
+    switch( rfctx->residual_method )
+    {
+        case RFC_RES_NONE:
+        case RFC_RES_IGNORE:
+            return RFC_finalize_res_ignore( rfctx );
+        case RFC_RES_HALFCYCLES:
+        case RFC_RES_FULLCYCLES:
+        case RFC_RES_CLORMANN_SEEGER:
+            return false;
+        case RFC_RES_REPEATED:
+            return RFC_finalize_res_repeated( rfctx );
+        case RFC_RES_RP_DIN:
+            return false;
+        default:
+            assert( false );
+            return false;
+    }
 }
 
 
@@ -480,7 +512,7 @@ double RFC_damage_calc_default( rfctx_s *rfctx, unsigned class_from, unsigned cl
     const double k       = rfctx->wl_k;
     const double k2      = rfctx->wl_k2;
     /* Pseudo damage */
-    double damage = 0.0;
+    double D_i = 0.0;
 
     if( class_from != class_to )
     {
@@ -496,16 +528,16 @@ double RFC_damage_calc_default( rfctx_s *rfctx, unsigned class_from, unsigned cl
         {
             if( Sa_i > rfctx->wl_sd )
             {
-                damage = exp( fabs(k)  * ( log(Sa_i) - SD_log ) - ND_log );
+                D_i = exp( fabs(k)  * ( log(Sa_i) - SD_log ) - ND_log );
             }
             else
             {
-                damage = exp( fabs(k2) * ( log(Sa_i) - SD_log ) - ND_log );
+                D_i = exp( fabs(k2) * ( log(Sa_i) - SD_log ) - ND_log );
             }
         }
     }
 
-    return damage;
+    return D_i;
 }
 
 
