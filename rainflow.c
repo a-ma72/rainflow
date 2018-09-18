@@ -54,7 +54,7 @@ static value_tuple_s *  RFC_tp_next_default         ( rfctx_s *, value_tuple_s *
 static void             RFC_cycle_find_4ptm         ( rfctx_s * );
 static void             RFC_cycle_process           ( rfctx_s *, value_tuple_s *from, value_tuple_s *to, int flags );
 /* Residual methods */
-static bool             RFC_finalize_res_ignore     ( rfctx_s * );
+static bool             RFC_finalize_default        ( rfctx_s * );
 /* Other */
 static double           RFC_damage_calc_default     ( rfctx_s *, unsigned class_from, unsigned class_to );
 static RFC_value_type   value_delta                 ( RFC_value_type from, RFC_value_type to, int *sign_ptr );
@@ -103,9 +103,9 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
     rfctx->hysteresis           = ( hysteresis < 0.0 ) ? class_width : hysteresis;
 
     /* Woehler curve (fictive) */
-    rfctx->wl_sd                =  1e3;
-    rfctx->wl_nd                =  1e7;
-    rfctx->wl_k                 = -5.0;
+    rfctx->wl_sd                =  1e3;          /* Fictive value */
+    rfctx->wl_nd                =  1e7;          /* Fictive value */
+    rfctx->wl_k                 = -5.0;          /* Fictive value */
 
     /* Memory allocation functions */
     rfctx->mem_alloc            = calloc;
@@ -197,8 +197,9 @@ void RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count, bool d
     {
         value_tuple_s tp = { (RFC_value_type)*data++ };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
 
-        /* Assign class */
+        /* Assign class and global position (base 1) */
         tp.class = QUANTIZE( rfctx, tp.value );
+
         RFC_feed_handle_tp( rfctx, &tp );
     }
 
@@ -244,19 +245,19 @@ void RFC_feed_finalize( rfctx_s* rfctx )
     rfctx->residue_cnt++;
 
     /* Finalizing (process last turning point */
-    rfctx->state = RFC_finalize_res_ignore( rfctx ) ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
+    rfctx->state = RFC_finalize_default( rfctx ) ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
 }
 
 
 /**
- * @brief      Finalize pending counting, ignoring residue.
+ * @brief      Finalize pending counts, handling interim turning point.
  *             There is still one unhandled turning point left.
  *             "Finalizing" takes this into account.
  *
  * @param      rfctx  The rainflow context
  */
 static
-bool RFC_finalize_res_ignore( rfctx_s *rfctx )
+bool RFC_finalize_default( rfctx_s *rfctx )
 {
     assert( rfctx && rfctx->state == RFC_STATE_FINALIZE );
 
@@ -287,22 +288,24 @@ double RFC_damage_calc_default( rfctx_s *rfctx, unsigned class_from, unsigned cl
     const double SD_log  = log(rfctx->wl_sd);
     const double ND_log  = log(rfctx->wl_nd);
     const double k       = rfctx->wl_k;
+    /* Pseudo damage */
+    double D_i = 0.0;
 
-    if( class_from == class_to ) return 0.0;
+    if( class_from != class_to )
+    {
+        /* D_i =           h_i /    ND   *    ( Sa_i /    SD)  ^ ABS(k)   */
+        /* D_i = exp(  log(h_i /    ND)  + log( Sa_i /    SD)  * ABS(k) ) */
+        /* D_i = exp( (log(h_i)-log(ND)) + (log(Sa_i)-log(SD)) * ABS(k) ) */
+        /* D_i = exp(      0   -log(ND)  + (log(Sa_i)-log(SD)) * ABS(k) ) */
 
-    /* D_i =           h_i /    ND   *    ( Sa_i /    SD)  ^ ABS(k)   */
-    /* D_i = exp(  log(h_i /    ND)  + log( Sa_i /    SD)  * ABS(k) ) */
-    /* D_i = exp( (log(h_i)-log(ND)) + (log(Sa_i)-log(SD)) * ABS(k) ) */
-    /* D_i = exp(      0   -log(ND)  + (log(Sa_i)-log(SD)) * ABS(k) ) */
+        double range  = (double)rfctx->class_width * abs( (int)class_to - (int)class_from );
+        double Sa_i   = range / 2.0;  /* amplitude */
 
-    double range  = (double)rfctx->class_width * abs( (int)class_to - (int)class_from );
-    double Sa_i   = range / 2.0;
-    double D_i    = exp( fabs(k) * ( log(Sa_i) - SD_log ) - ND_log );
+        D_i = exp( fabs(k)  * ( log(Sa_i) - SD_log ) - ND_log );
+    }
 
     return D_i;
 }
-
-
 
 
 /*** Implementation static functions ***/
