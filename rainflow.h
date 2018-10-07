@@ -101,7 +101,7 @@ typedef struct value_tuple      value_tuple_s;   /** Tuple of value and index po
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis,
                                            int residual_method,
-                                           value_tuple_s *tp, size_t tp_size );
+                                           value_tuple_s *tp, size_t tp_cap );
 void RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count, bool do_finalize );
 void RFC_feed_tuple           ( void *ctx, value_tuple_s *data, size_t count, bool do_finalize );
 void RFC_finalize             ( void *ctx );
@@ -154,7 +154,10 @@ typedef struct rfctx
         RFC_FLAGS_COUNT_LC_DN       = 1 << 3,                   /**< Count into level crossing (only falling slopes) */
         RFC_FLAGS_COUNT_LC          = RFC_FLAGS_COUNT_LC_UP     /**< Count into level crossing (all slopes) */
                                     | RFC_FLAGS_COUNT_LC_DN,
-        RFC_FLAGS_COUNT_ALL         = -1                        /** Count all */
+        RFC_FLAGS_COUNT_ALL         = RFC_FLAGS_COUNT_MATRIX    /** Count all */
+                                    | RFC_FLAGS_COUNT_RP
+                                    | RFC_FLAGS_COUNT_LC,
+        RFC_FLAGS_ENFORCE_MARGIN    = 1 << 8,                   /**< Enforce first and last data point are turning points */
     }
                                     flags;                      /**< Flags */
     enum 
@@ -214,8 +217,8 @@ typedef struct rfctx
     
     /* Residue */
     value_tuple_s                  *residue;                    /**< Buffer for residue */
-    size_t                          residue_size;               /**< Buffer size (max. 2*class_count) */
-    size_t                          residue_cnt;                /**< Buffer content size */
+    size_t                          residue_cap;                /**< Buffer capacity in number of elements (max. 2*class_count) */
+    size_t                          residue_cnt;                /**< Number of value tuples in buffer */
 
     /* Non-sparse storages (optional, may be NULL) */
     RFC_counts_type                *matrix;                     /**< Rainflow matrix */
@@ -224,7 +227,7 @@ typedef struct rfctx
 
     /* Turning points storage (optional, may be NULL) */
     value_tuple_s                  *tp;                         /**< Buffer for turning points */
-    size_t                          tp_size;                    /**< Buffer size */
+    size_t                          tp_cap;                     /**< Buffer capacity (number of elements) */
     size_t                          tp_cnt;                     /**< Number of turning points in buffer */
     bool                            tp_locked;                  /**< If tp_locked, tp is freezed */
 
@@ -236,6 +239,7 @@ typedef struct rfctx
     {
         int                         slope;                      /**< Current signal slope */
         value_tuple_s               extrema[2];                 /**< Local extrema */
+        value_tuple_s               margin[2];                  /**< First and last data point */
         size_t                      pos;                        /**< Absolute position in data input stream, base 1 */
     } internal;
 } rfctx_s;
