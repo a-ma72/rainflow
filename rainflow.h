@@ -114,7 +114,7 @@ typedef void   ( *rfc_mem_free_fcn_t )      ( void * );
 #if RFC_USE_DELEGATES
 /* Delegates typedef */
 typedef  double          ( *rfc_damage_calc_fcn_t )   ( rfctx_s *, unsigned from_class, unsigned to_class );
-typedef  value_tuple_s * ( *rfc_tp_next_fcn_t )       ( rfctx_s *, value_tuple_s * );
+typedef  value_tuple_s * ( *rfc_tp_next_fcn_t )       ( rfctx_s *, value_tuple_s *, bool is_last );
 typedef  void            ( *rfc_tp_add_fcn_t )        ( rfctx_s *, value_tuple_s *, bool do_lock );
 typedef  bool            ( *rfc_finalize_fcn_t )      ( rfctx_s * );
 typedef  void            ( *rfc_cycle_find_fcn_t )    ( rfctx_s * );

@@ -53,7 +53,7 @@
 /* Core */
 static void             RFC_feed_handle_tp                  ( rfctx_s *rfctx, value_tuple_s* tp, bool is_last );
 static void             RFC_feed_finalize                   ( rfctx_s* rfctx );
-static value_tuple_s *  RFC_tp_next_default                 ( rfctx_s *, value_tuple_s *pt );
+static value_tuple_s *  RFC_tp_next_default                 ( rfctx_s *, value_tuple_s *pt, bool is_last );
 static void             RFC_cycle_find_4ptm                 ( rfctx_s * );
 static void             RFC_cycle_process                   ( rfctx_s *, value_tuple_s *from, value_tuple_s *to, int flags );
 /* Residual methods */
@@ -313,14 +313,9 @@ void RFC_feed_handle_tp( rfctx_s *rfctx, value_tuple_s* tp, bool is_last )
 {
     value_tuple_s *tp_residue;
 
-    if( is_last )
-    {
-        rfctx->margin[1] = *tp;
-    }
-
 #if RFC_USE_DELEGATES
     /* Test if a new turning point exists */
-    if( rfctx->tp_next_fcn && ( tp_residue = rfctx->tp_next_fcn( rfctx, tp ) ) )
+    if( rfctx->tp_next_fcn && ( tp_residue = rfctx->tp_next_fcn( rfctx, tp, is_last ) ) )
     {
         if( rfctx->tp_add_fcn )
         {
@@ -336,7 +331,7 @@ void RFC_feed_handle_tp( rfctx_s *rfctx, value_tuple_s* tp, bool is_last )
     }
 #else
     /* Test if a new turning point exists */
-    if( tp_residue = RFC_tp_next_default( rfctx, tp ) )
+    if( tp_residue = RFC_tp_next_default( rfctx, tp, is_last ) )
     {
         /* Add new turning point */
         RFC_tp_add_default( rfctx, tp_residue, false /* do_lock */ );
@@ -657,15 +652,17 @@ RFC_value_type value_delta( RFC_value_type from, RFC_value_type to, int *sign_pt
  * @return     Returns pointer to new turning point in residue or NULL
  */
 static
-value_tuple_s * RFC_tp_next_default( rfctx_s *rfctx, value_tuple_s *pt )
+value_tuple_s * RFC_tp_next_default( rfctx_s *rfctx, value_tuple_s *pt, bool is_last )
 {
     int             slope;
     RFC_value_type  delta;
+    value_tuple_s  *new_tp = NULL;
 
     assert( rfctx );
 
     slope = rfctx->internal.slope;
 
+    /* Handle first turing point(s) */
     if( !rfctx->residue_cnt )
     {
         /* Residue is empty, still searching the first turning point(s) */
@@ -678,13 +675,16 @@ value_tuple_s * RFC_tp_next_default( rfctx_s *rfctx, value_tuple_s *pt )
             rfctx->internal.extrema[0] = 
             rfctx->internal.extrema[1] =
             rfctx->internal.margin[0]  = *pt;
-            rfctx->state               = RFC_STATE_BUSY;
+            rfctx->state               =  RFC_STATE_BUSY;
 
             if( rfctx->flags & RFC_FLAGS_ENFORCE_MARGIN )
             {
                 /* Enforce margin at the beginning */
                 assert( rfctx->residue_cnt < rfctx->residue_cap );
                 rfctx->residue[rfctx->residue_cnt++] = rfctx->internal.margin[0];
+
+                /* Have new turning point */
+                new_tp = &rfctx->residue[rfctx->residue_cnt - 1];
             }
         }
         else
@@ -704,76 +704,112 @@ value_tuple_s * RFC_tp_next_default( rfctx_s *rfctx, value_tuple_s *pt )
                 i_first_point = 0;
                 rfctx->internal.extrema[1] = *pt;
             }
+
+            /* Local hysteresis filtering */
+            delta = value_delta( rfctx->internal.extrema[0].value, rfctx->internal.extrema[1].value, NULL /* sign_ptr */ );
+
+            if( delta > rfctx->hysteresis )
+            {
+                /* Criteria met, first turning point found */
+                bool skip_first = false;
+
+                if( rfctx->flags & RFC_FLAGS_ENFORCE_MARGIN )
+                {
+                    assert( rfctx->residue_cnt == 1 );
+
+                    /* Check if first data point equals turning point */
+                    if( rfctx->residue->value == rfctx->internal.extrema[i_first_point].value )
+                    {
+                        skip_first = true;
+                    }
+                }            
+
+                if( !skip_first )
+                {
+                    assert( rfctx->residue_cnt < rfctx->residue_cap );
+                    rfctx->residue[rfctx->residue_cnt++] = rfctx->internal.extrema[i_first_point];
+                }
+
+                /* Append interim turning point */
+                assert( rfctx->residue_cnt < rfctx->residue_cap );
+                rfctx->residue[rfctx->residue_cnt] = *pt;
+
+                rfctx->internal.slope = i_first_point ? -1 : 1;
+
+                /* Have new turning point */
+                new_tp = &rfctx->residue[rfctx->residue_cnt - 1];
+            }
         }
+    }
+    else  /* if( !rfctx->residue_cnt ) */
+    {
+        /* Consecutive search for turning points */
+        bool do_append = false;
 
-        /* Local hysteresis filtering */
-        delta = value_delta( rfctx->internal.extrema[0].value, rfctx->internal.extrema[1].value, NULL /* sign_ptr */ );
+        /* Hysteresis Filtering, check against interim turning point */
+        delta = value_delta( rfctx->residue[rfctx->residue_cnt].value, pt->value, &slope /* sign_ptr */ );
 
-        if( delta > rfctx->hysteresis )
+        /* There are three scenarios possible here:
+         *   1. Previous slope is continued
+         *      "delta" is ignored whilst hysteresis is exceeded already.
+         *      Interim turning point has just to be adjusted.
+         *   2. Slope reversal, slope is greater than hysteresis
+         *      Interim turning point becomes real turning point.
+         *      Current point becomes new interim turning point
+         *   3. Slope reversal, slope is less than or equal hysteresis
+         *      Nothing to do.
+         */
+
+        /* Peak-Valley Filtering */
+        /* Justify interim turning point, or add a new one (2) */
+        if( slope == rfctx->internal.slope )
         {
-            /* Criteria met, first turning point found */
-            assert( rfctx->residue_cnt < rfctx->residue_cap );
-            rfctx->residue[rfctx->residue_cnt++] = rfctx->internal.extrema[i_first_point];
+            /* Scenario (1), Continuous slope */
 
-            /* Append interim turning point */
-            assert( rfctx->residue_cnt < rfctx->residue_cap );
+            /* Replace interim turning point with new extrema */
             rfctx->residue[rfctx->residue_cnt] = *pt;
-
-            rfctx->internal.slope = i_first_point ? -1 : 1;
-
-            return rfctx->residue;
         }
-        
-        return NULL;
+        else
+        {
+            if( delta > rfctx->hysteresis )
+            {
+                /* Scenario (2), Criteria met: slope != rfctx->internal.slope && delta > rfctx->hysteresis */
+
+                /* Handle new turning point */
+                do_append = true;
+            }
+            else
+            {
+                /* Scenario (3), Turning point found, but still in hysteresis band */
+
+                /* Only add, if is_last and RFC_FLAGS_ENFORCE_MARGIN is set */
+                if( rfctx->flags & RFC_FLAGS_ENFORCE_MARGIN )
+                {
+                    if( is_last )
+                    {
+                        /* Handle new turning point */
+                        do_append = true;
+                    }
+                }
+            }
+
+        }
+
+        /* Handle new turning point */
+        if( do_append )
+        {
+            /* New interim turning point */
+            assert( rfctx->residue_cnt < rfctx->residue_cap );
+            rfctx->residue[++rfctx->residue_cnt] = *pt;
+
+            rfctx->internal.slope = slope;
+
+            /* Have new turning point */
+            new_tp = &rfctx->residue[rfctx->residue_cnt - 1];
+        }
     }
 
-    /* Consecutive search for turning points */
-
-    /* Hysteresis Filtering, check against interim turning point */
-    delta = value_delta( rfctx->residue[rfctx->residue_cnt].value, pt->value, &slope /* sign_ptr */ );
-
-    /* There are three scenarios possible here:
-     *   1. Slope reversal, slope is less than or equal hysteresis
-     *      Nothing to do.
-     *   2. Previous slope is continued
-     *      "delta" is ignored whilst hysteresis is exceeded already.
-     *      Interim turning point has just to be adjusted.
-     *   3. Slope reversal, slope is greater than hysteresis
-     *      Interim turning point becomes real turning point.
-     *      Current point becomes new interim turning point
-     */
-
-    /* Peak-Valley Filtering */
-    if( slope != rfctx->internal.slope && delta <= rfctx->hysteresis )
-    {
-        /* Scenario (1), Turning point found, but still in hysteresis band */
-        return NULL;
-    }
-
-    /* Justify interim turning point, or add a new one (2) */
-    if( slope == rfctx->internal.slope )
-    {
-        /* Scenario (2), Continuous slope */
-
-        /* Replace interim turning point with new extrema */
-        rfctx->residue[rfctx->residue_cnt] = *pt;
-
-        /* No new turning point */
-        return NULL;
-    }
-    else
-    {
-        /* Scenario (3), Criteria met: slope != rfctx->internal.slope && delta > rfctx->hysteresis */
-
-        /* New interim turning point */
-        assert( rfctx->residue_cnt < rfctx->residue_cap );
-        rfctx->residue[++rfctx->residue_cnt] = *pt;
-
-        rfctx->internal.slope = slope;
-
-        /* Have new turning point */
-        return &rfctx->residue[rfctx->residue_cnt - 1];
-    }
+    return new_tp;
 }
 
 
