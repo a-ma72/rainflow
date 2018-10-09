@@ -91,19 +91,19 @@
 #endif
 
 
-typedef RFC_VALUE_TYPE          RFC_value_type;  /** Input data value type */
-typedef RFC_COUNTS_VALUE_TYPE   RFC_counts_type; /** Type of counting values */
-typedef struct rfctx            rfctx_s;         /** Forward declaration (rainflow context) */
-typedef struct value_tuple      value_tuple_s;   /** Tuple of value and index position */
+typedef RFC_VALUE_TYPE          RFC_value_type;      /** Input data value type */
+typedef RFC_COUNTS_VALUE_TYPE   RFC_counts_type;     /** Type of counting values */
+typedef struct rfc_ctx          rfc_ctx_s;           /** Forward declaration (rainflow context) */
+typedef struct rfc_value_tuple  rfc_value_tuple_s;   /** Tuple of value and index position */
 
 
 /* Core */
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis,
                                            int residual_method,
-                                           value_tuple_s *tp, size_t tp_cap );
+                                           rfc_value_tuple_s *tp, size_t tp_cap );
 void RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count, bool do_finalize );
-void RFC_feed_tuple           ( void *ctx, value_tuple_s *data, size_t count, bool do_finalize );
+void RFC_feed_tuple           ( void *ctx, rfc_value_tuple_s *data, size_t count, bool do_finalize );
 void RFC_finalize             ( void *ctx );
 void RFC_deinit               ( void *ctx );
 
@@ -113,20 +113,20 @@ typedef void   ( *rfc_mem_free_fcn_t )      ( void * );
 
 #if RFC_USE_DELEGATES
 /* Delegates typedef */
-typedef  double          ( *rfc_damage_calc_fcn_t )   ( rfctx_s *, unsigned from_class, unsigned to_class );
-typedef  value_tuple_s * ( *rfc_tp_next_fcn_t )       ( rfctx_s *, value_tuple_s *, bool is_last );
-typedef  void            ( *rfc_tp_add_fcn_t )        ( rfctx_s *, value_tuple_s *, bool do_lock );
-typedef  bool            ( *rfc_finalize_fcn_t )      ( rfctx_s * );
-typedef  void            ( *rfc_cycle_find_fcn_t )    ( rfctx_s * );
+typedef  double          ( *rfc_damage_calc_fcn_t )   ( rfc_ctx_s *, unsigned from_class, unsigned to_class );
+typedef  rfc_value_tuple_s * ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, rfc_value_tuple_s *, bool is_last );
+typedef  void            ( *rfc_tp_add_fcn_t )        ( rfc_ctx_s *, rfc_value_tuple_s *, bool do_lock );
+typedef  bool            ( *rfc_finalize_fcn_t )      ( rfc_ctx_s * );
+typedef  void            ( *rfc_cycle_find_fcn_t )    ( rfc_ctx_s * );
 #endif
 
 /* Value info struct */
-typedef struct value_tuple
+typedef struct rfc_value_tuple
 {
     RFC_value_type                  value;                      /**< Value. Don't change order, value field must be first! */
     unsigned                        class;                      /**< Class number, base 0 */
     size_t                          pos;                        /**< Absolute position in input data stream, base 1 */
-} value_tuple_s;
+} rfc_value_tuple_s;
 
 
 /**
@@ -216,7 +216,7 @@ typedef struct rfctx
 #endif
     
     /* Residue */
-    value_tuple_s                  *residue;                    /**< Buffer for residue */
+    rfc_value_tuple_s                  *residue;                    /**< Buffer for residue */
     size_t                          residue_cap;                /**< Buffer capacity in number of elements (max. 2*class_count) */
     size_t                          residue_cnt;                /**< Number of value tuples in buffer */
 
@@ -226,7 +226,7 @@ typedef struct rfctx
     RFC_counts_type                *lc;                         /**< Level crossing counts */
 
     /* Turning points storage (optional, may be NULL) */
-    value_tuple_s                  *tp;                         /**< Buffer for turning points */
+    rfc_value_tuple_s                  *tp;                         /**< Buffer for turning points */
     size_t                          tp_cap;                     /**< Buffer capacity (number of elements) */
     size_t                          tp_cnt;                     /**< Number of turning points in buffer */
     bool                            tp_locked;                  /**< If tp_locked, tp is freezed */
@@ -238,8 +238,8 @@ typedef struct rfctx
     struct internal
     {
         int                         slope;                      /**< Current signal slope */
-        value_tuple_s               extrema[2];                 /**< Local extrema */
-        value_tuple_s               margin[2];                  /**< First and last data point */
+        rfc_value_tuple_s               extrema[2];                 /**< Local extrema */
+        rfc_value_tuple_s               margin[2];                  /**< First and last data point */
         size_t                      pos;                        /**< Absolute position in data input stream, base 1 */
     } internal;
-} rfctx_s;
+} rfc_ctx_s;
