@@ -75,7 +75,7 @@
 #endif
 
 #ifdef RFC_USE_INTEGRAL_COUNTS
-#define RFC_COUNTS_VALUE_TYPE    (unsigned long long)
+#define RFC_COUNTS_VALUE_TYPE    unsigned long long
 #define RFC_FULL_CYCLE_INCREMENT (2)
 #define RFC_HALF_CYCLE_INCREMENT (1)
 #define RFC_COUNTS_LIMIT         (ULLONG_MAX - RFC_FULL_CYCLE_INCREMENT) /* ~18e18 (eff. ~9e18)*/
@@ -87,7 +87,7 @@
 #endif
 
 #ifndef RFC_USE_DELEGATES
-#define RFC_USE_DELEGATES 1
+#define RFC_USE_DELEGATES 0
 #endif
 
 
@@ -104,11 +104,10 @@ typedef struct rfc_value_tuple  rfc_value_tuple_s;   /** Tuple of value and inde
 /* Core */
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis, int residual_method,
-                                           rfc_mem_alloc_fcn_t mem_alloc,
                                            rfc_value_tuple_s *tp, size_t tp_cap );
-void RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count, bool do_finalize );
-void RFC_feed_tuple           ( void *ctx, rfc_value_tuple_s *data, size_t count, bool do_finalize );
-void RFC_finalize             ( void *ctx );
+void RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count );
+void RFC_feed_tuple           ( void *ctx, const rfc_value_tuple_s *data, size_t count );
+void RFC_feed_finalize        ( void *ctx );
 void RFC_deinit               ( void *ctx );
 
 #if RFC_USE_DELEGATES
@@ -141,6 +140,7 @@ typedef struct rfc_ctx
         RFC_STATE_INIT0,                                        /**< Initialized with zeros */
         RFC_STATE_INIT,                                         /**< Initialized, memory allocated */
         RFC_STATE_BUSY,                                         /**< In counting state */
+        RFC_STATE_BUSY_INTERIM,                                 /**< In counting state, having interim turning point */
         RFC_STATE_FINALIZE,                                     /**< Finalizing */
         RFC_STATE_FINISHED,                                     /**< Counting finished, memory still allocated */
         RFC_STATE_ERROR,                                        /**< An error occured */
