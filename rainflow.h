@@ -140,7 +140,7 @@ typedef struct rfc_ctx
         RFC_STATE_INIT0,                                        /**< Initialized with zeros */
         RFC_STATE_INIT,                                         /**< Initialized, memory allocated */
         RFC_STATE_BUSY,                                         /**< In counting state */
-        RFC_STATE_BUSY_INTERIM,                                 /**< In counting state, having interim turning point */
+        RFC_STATE_BUSY_INTERIM,                                 /**< In counting state, having still one interim turning point (not included) */
         RFC_STATE_FINALIZE,                                     /**< Finalizing */
         RFC_STATE_FINISHED,                                     /**< Counting finished, memory still allocated */
         RFC_STATE_ERROR,                                        /**< An error occured */

@@ -661,8 +661,12 @@ rfc_value_tuple_s * RFC_tp_next_default( rfc_ctx_s *rfc_ctx, const rfc_value_tup
 {
     int                 slope;
     RFC_value_type      delta;
-    rfc_value_tuple_s  *new_tp = NULL;
-    int                 do_append = 0;
+    rfc_value_tuple_s  *new_tp    = NULL;
+    int                 do_append = 0;  /* 0 = Don't append, 
+                                           1 = Set and increment, 
+                                           2 = Set only, 
+                                           3 = Increment and set, 
+                                           4 = Set as right margin */
 
     assert( rfc_ctx && pt );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state <= RFC_STATE_BUSY_INTERIM );
@@ -672,7 +676,7 @@ rfc_value_tuple_s * RFC_tp_next_default( rfc_ctx_s *rfc_ctx, const rfc_value_tup
     /* Handle first turning point(s) */
     if( rfc_ctx->state < RFC_STATE_BUSY_INTERIM )
     {
-        /* Residue is empty, still searching the first turning point(s) */
+        /* Residue is empty, still searching first turning point(s) */
 
         if( rfc_ctx->state == RFC_STATE_INIT )
         {
@@ -682,7 +686,7 @@ rfc_value_tuple_s * RFC_tp_next_default( rfc_ctx_s *rfc_ctx, const rfc_value_tup
             rfc_ctx->state               =  RFC_STATE_BUSY;
 
             /* Enforce left margin, whether is_right_margin or not */
-            do_append = ( rfc_ctx->flags & RFC_FLAGS_ENFORCE_MARGIN ) ? 2 : 0;
+            do_append = ( rfc_ctx->flags & RFC_FLAGS_ENFORCE_MARGIN ) ? 1 : 0;
         }
         else
         {
@@ -727,23 +731,24 @@ rfc_value_tuple_s * RFC_tp_next_default( rfc_ctx_s *rfc_ctx, const rfc_value_tup
                 {
                     /* Emit maximum on falling slope as first interim turning point, 
                      * minimum as second then (and vice versa) 
-                     * 1st point: internal.extrema[is_falling_slope]
-                     * 2nd point: internal.extrema[!is_falling_slope]  ==> that is *pt
+                     * 1st point: internal.extrema[ is_falling_slope]
+                     * 2nd point: internal.extrema[!is_falling_slope]  ==> which is *pt also
                      */
                     assert( rfc_ctx->residue_cnt < rfc_ctx->residue_cap );
-                    rfc_ctx->residue[rfc_ctx->residue_cnt] = rfc_ctx->internal.extrema[is_falling_slope];
-                    rfc_ctx->state = RFC_STATE_BUSY_INTERIM;
+                    rfc_ctx->residue[rfc_ctx->residue_cnt++] = rfc_ctx->internal.extrema[is_falling_slope];
                 }
 
                 slope = is_falling_slope ? -1 : 1;
 
                 /* pt is the new interim turning point */
-                do_append = 1;
+                rfc_ctx->state = RFC_STATE_BUSY_INTERIM;
+                do_append = 2;
             }
             else if( is_right_margin && (rfc_ctx->flags & RFC_FLAGS_ENFORCE_MARGIN) )
             {
                 /* Add as right margin */
-                do_append = 3;
+                rfc_ctx->state = RFC_STATE_BUSY_INTERIM;
+                do_append = 4;
             }
         }
     }
@@ -772,7 +777,7 @@ rfc_value_tuple_s * RFC_tp_next_default( rfc_ctx_s *rfc_ctx, const rfc_value_tup
             /* Scenario (1), Continuous slope */
 
             /* Replace interim turning point with new extrema */
-            rfc_ctx->residue[rfc_ctx->residue_cnt] = *pt;
+            do_append = 2;
         }
         else
         {
@@ -780,8 +785,11 @@ rfc_value_tuple_s * RFC_tp_next_default( rfc_ctx_s *rfc_ctx, const rfc_value_tup
             {
                 /* Scenario (2), Criteria met: slope != rfc_ctx->internal.slope && delta > rfc_ctx->hysteresis */
 
+                /* Storage */
+                rfc_ctx->internal.slope = slope;
+
                 /* Handle new turning point */
-                do_append = 1;
+                do_append = 3;
             }
             else
             {
@@ -790,12 +798,14 @@ rfc_value_tuple_s * RFC_tp_next_default( rfc_ctx_s *rfc_ctx, const rfc_value_tup
                 /* Add only, if is_right_margin and RFC_FLAGS_ENFORCE_MARGIN is set */
                 if( is_right_margin && ( rfc_ctx->flags & RFC_FLAGS_ENFORCE_MARGIN ) )
                 {
+                    /* Storage */
+                    rfc_ctx->internal.slope = slope;
+
                     /* Handle new turning point, if value differs from interim point */
                     assert( rfc_ctx->state == RFC_STATE_BUSY_INTERIM );
-                    do_append = ( pt->value != rfc_ctx->residue[rfc_ctx->residue_cnt].value ) ? 1 : 0;
+                    do_append = 4;
                 }
             }
-
         }
     }
 
@@ -803,55 +813,45 @@ rfc_value_tuple_s * RFC_tp_next_default( rfc_ctx_s *rfc_ctx, const rfc_value_tup
     switch( do_append )
     {
         case 0:
-            /* Do nothing */
+            /* Don't append */
             break;
+
         case 1:
-            /* Add as new interim turning point, leave prior as new turning point */
+            /* Set new turning point and increment */
             assert( rfc_ctx->residue_cnt < rfc_ctx->residue_cap );
-            if( rfc_ctx->state == RFC_STATE_BUSY )
-            {
-                /* No deal with interim points */
-                rfc_ctx->residue[rfc_ctx->residue_cnt++] = *pt;
-            }
-            else
-            {
-                assert( rfc_ctx->state == RFC_STATE_BUSY_INTERIM );
-                /* Add as new interim turning point */ 
-                rfc_ctx->residue[++rfc_ctx->residue_cnt] = *pt;
-            }
+            rfc_ctx->residue[rfc_ctx->residue_cnt] = *pt;
+
+            /* Return new turning point */
+            new_tp = &rfc_ctx->residue[rfc_ctx->residue_cnt++];
+            break;
+
+        case 2:
+            /* Set only (interim turning point) */
+            assert( rfc_ctx->residue_cnt < rfc_ctx->residue_cap );
+            rfc_ctx->residue[rfc_ctx->residue_cnt] = *pt;
+            break;
+
+        case 3:
+            /* Increment and set new interim turning point */
+            assert( rfc_ctx->residue_cnt < rfc_ctx->residue_cap );
+            rfc_ctx->residue[++rfc_ctx->residue_cnt] = *pt;
 
             /* Return new turning point */
             new_tp = &rfc_ctx->residue[rfc_ctx->residue_cnt - 1];
-
-            /* Storage */
-            rfc_ctx->internal.slope = slope;
-
             break;
-        case 2:
-            /* Add as left margin turning point */
+
+        case 4:
+            /* Set new turning point as right margin */
             assert( rfc_ctx->residue_cnt < rfc_ctx->residue_cap );
             rfc_ctx->residue[rfc_ctx->residue_cnt] = *pt;
-
-            /* Return new turning point */
-            new_tp = &rfc_ctx->residue[rfc_ctx->residue_cnt++];
-
-            /* Set left margin */
-            rfc_ctx->internal.margin[0] = *pt;
-            break;
-        case 3:
-            /* Add as right margin turning point */
-            assert( rfc_ctx->residue_cnt < rfc_ctx->residue_cap );
-            rfc_ctx->residue[rfc_ctx->residue_cnt] = *pt;
-
-            /* Return new turning point */
-            new_tp = &rfc_ctx->residue[rfc_ctx->residue_cnt++];
 
             /* Set right margin */
             rfc_ctx->internal.margin[1] = *pt;
 
-            /* No interim turning point */
-            rfc_ctx->state = RFC_STATE_BUSY;
+            /* Return new turning point */
+            new_tp = &rfc_ctx->residue[rfc_ctx->residue_cnt];
             break;
+
         default:
             assert( false );
     }
