@@ -126,10 +126,10 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
     rfc_ctx->hysteresis              = ( hysteresis < 0.0 ) ? class_width : hysteresis;
 
     /* Woehler curve (fictive) */
-    rfc_ctx->wl_sd                   =  1e3;            /* Fictive value */
-    rfc_ctx->wl_nd                   =  1e7;            /* Fictive value */
-    rfc_ctx->wl_k                    = -5.0;            /* Fictive value */
-    rfc_ctx->wl_k2                   =  rfc_ctx->wl_k;  /* Miner elementar, if k == k2 */
+    rfc_ctx->wl_sd                   =  1e3;            /* Fictive amplitude */
+    rfc_ctx->wl_nd                   =  1e7;            /* Fictive count */
+    rfc_ctx->wl_k                    = -5.0;            /* Fictive gradient */
+    rfc_ctx->wl_k2                   =  rfc_ctx->wl_k;  /* "Miner elementar", if k == k2 */
     rfc_ctx->wl_omission             =  0.0;            /* No omission per default */
 
     /* Memory allocator */
@@ -231,7 +231,7 @@ void RFC_deinit( void *ctx )
 
 
 /**
- * @brief      Feed counting algorithm with data samples.
+ * @brief      "Feed" counting algorithm with data samples.
  *
  * @param      ctx          The rainflow context
  * @param[in]  data         The data
@@ -327,7 +327,7 @@ void RFC_feed_handle_tp( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt, bool i
             rfc_ctx->internal.tp_delayed = *pt;
             tp_residue = NULL;
         }
-        else if( rfc_ctx->internal.tp_delayed.value == tp_residue->value )
+        else if( tp_residue && rfc_ctx->internal.tp_delayed.value == tp_residue->value )
         {
             if( rfc_ctx->internal.tp_delayed.pos > 1 )
             {
@@ -350,7 +350,7 @@ void RFC_feed_handle_tp( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt, bool i
     }
 
     /* Add turning point and check for closed cycles */
-    for( int i = 1; i < 2; i++ )
+    for( int i = 0; i < 2; i++ )
     {
         if( tp_residue )
         {
@@ -1219,19 +1219,31 @@ int greatest_fprintf( FILE* f, const char* fmt, ... )
 }
 
 #define INIT_ARRAY(...) __VA_ARGS__
-#define SIMPLE_RFC(TP,TP_N,X,X_N) \
-    if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, -0.5 /* class_offset */,  \
+#define SIMPLE_RFC(TP,TP_N,OFFS,X,X_N) \
+    if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
                         1 /* hysteresis */,                                                  \
                         RFC_RES_NONE /* residual_method */,                                  \
                         TP /* *tp */, TP_N /* tp_cap */ ) )                                  \
     {                                                                                        \
-        double data[] = {INIT_ARRAY(X)};                                                     \
+        RFC_VALUE_TYPE data[] = {INIT_ARRAY X};                                             \
         RFC_feed( &ctx, data, X_N );                                                         \
         RFC_feed_finalize( &ctx );                                                           \
-        ctx.tp = NULL;                                                                       \
-        RFC_deinit( &ctx );                                                                  \
     }                                                                                        \
     else FAIL();
+
+#define SIMPLE_RFC2(TP,TP_N,OFFS,X,X_N) \
+    if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
+                        1 /* hysteresis */,                                                  \
+                        RFC_RES_NONE /* residual_method */,                                  \
+                        TP /* *tp */, TP_N /* tp_cap */ ) )                                  \
+    {                                                                                        \
+        RFC_VALUE_TYPE data[] = {INIT_ARRAY X};                                             \
+        ctx.flags |= RFC_FLAGS_ENFORCE_MARGIN;                                               \
+        RFC_feed( &ctx, data, X_N );                                                         \
+        RFC_feed_finalize( &ctx );                                                           \
+    }                                                                                        \
+    else FAIL();
+
 
 /*
 
@@ -1241,46 +1253,45 @@ TEST RFC_test_turning_points(void)
     rfc_ctx_s         ctx = {sizeof(ctx)};
     rfc_value_tuple_s tp[10];
 
-    SIMPLE_RFC( tp, 10, (0), 0 );
+    SIMPLE_RFC( tp, 10, 0.0, (0), 0 );
     ASSERT( ctx.tp_cnt == 0 );
+    ctx.tp = NULL;
+    RFC_deinit( &ctx );
 
-    SIMPLE_RFC( tp, 10, (0), 1 );
+    SIMPLE_RFC( tp, 10, 0.0, (0), 1 );
     ASSERT( ctx.tp_cnt == 0 );
+    ctx.tp = NULL;
+    RFC_deinit( &ctx );
 
-    SIMPLE_RFC( tp, 10, (0,0), 2 );
+    SIMPLE_RFC( tp, 10, 0.0, (0,0), 2 );
     ASSERT( ctx.tp_cnt == 0 );
+    ctx.tp = NULL;
+    RFC_deinit( &ctx );
 
-    SIMPLE_RFC( tp, 10, (0,0.1), 2 );
+    SIMPLE_RFC( tp, 10, 0.0, (0,0.1), 2 );
     ASSERT( ctx.tp_cnt == 0 );
+    ctx.tp = NULL;
+    RFC_deinit( &ctx );
 
-    SIMPLE_RFC( tp, 10, (0,1), 2 );
+    SIMPLE_RFC( tp, 10, 0.0, (0,1), 2 );
     ASSERT( ctx.tp_cnt == 0 );
+    ctx.tp = NULL;
+    RFC_deinit( &ctx );
 
+    SIMPLE_RFC( tp, 10, 0.0, (1.0, 1.1, 1.2, 1.1, 1.3, 1.0, 1.98, 1.0), 8 );
+    ASSERT( ctx.tp_cnt == 0 );
+    ctx.tp = NULL;
+    RFC_deinit( &ctx );
+
+    SIMPLE_RFC2( tp, 10, 0.0, (1.0, 1.1, 1.2, 1.1, 1.3, 1.0, 1.98, 1.0), 8 );
+    ASSERT( ctx.tp_cnt == 2 );
+    ASSERT( ctx.tp[0].value == 1.0 && ctx.tp[0].pos == 1 );
+    ASSERT( ctx.tp[1].value == 1.0 && ctx.tp[1].pos == 8 );
+    ASSERT( ctx.residue_cnt == 0 );
+    ctx.tp = NULL;
+    RFC_deinit( &ctx );
 
 #if 0
-
-
-
-    if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, 0.0 /* class_offset */, 
-                        1 /* hysteresis */, 
-                        RFC_RES_NONE /* residual_method */,
-                        tp /* *tp */, 10 /* tp_cap */ ) )
-    {
-        double data[] = { 1.0, 1.1, 1.2, 1.1, 1.3, 1.0, 1.98, 1.0 };
-        ctx.flags = RFC_FLAGS_ENFORCE_MARGIN;
-        RFC_feed( &ctx, data, NUMEL(data) );
-        RFC_feed_finalize( &ctx );
-        ASSERT( ctx.tp_cnt == 2 );
-        ASSERT( ctx.tp[0].value == 1.0 && ctx.tp[0].pos == 1 );
-        ASSERT( ctx.tp[1].value == 1.0 && ctx.tp[1].pos == 8 );
-        ASSERT( ctx.residue_cnt == 2 );
-        ASSERT( ctx.residue[0].value == 1.0 && ctx.residue[0].pos == 1 );
-        ASSERT( ctx.residue[1].value == 1.0 && ctx.residue[1].pos == 8 );
-        ctx.tp = NULL;
-        RFC_deinit( &ctx );
-    }
-    else FAIL();
-
     if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, 0.0 /* class_offset */, 
                         1 /* hysteresis */, 
                         RFC_RES_NONE /* residual_method */,

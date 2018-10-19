@@ -3,7 +3,7 @@ clc
 if 0
     for delegates = 0:1
         for int_counts = 0:1
-            for val_type = {'double', 'float'}
+            for val_type = {'float','double'}
                 s = sprintf( ['mex ', ...
                              '-DRFC_USE_DELEGATES=%d ', ...
                              '-DRFC_USE_INTEGRAL_COUNTS=%d ', ...
@@ -16,5 +16,6 @@ if 0
         end
     end
 else
+%    mex -g -v -c COMPFLAGS='$COMPFLAGS /P' -output rfc rainflow.c
     mex -g -v -output rfc rainflow.c
 end
