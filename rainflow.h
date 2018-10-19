@@ -90,6 +90,10 @@
 #define RFC_USE_DELEGATES 0
 #endif
 
+#ifndef RFC_GLOBAL_EXTREMA
+#define RFC_GLOBAL_EXTREMA 0
+#endif
+
 
 /* Memory allocation functions typedef */
 typedef void * ( *rfc_mem_alloc_fcn_t )( void *, size_t num, size_t size );
@@ -113,7 +117,7 @@ void RFC_deinit               ( void *ctx );
 #if RFC_USE_DELEGATES
 /* Delegates typedef */
 typedef  double              ( *rfc_damage_calc_fcn_t )   ( rfc_ctx_s *, unsigned from_class, unsigned to_class );
-typedef  rfc_value_tuple_s * ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, rfc_value_tuple_s *, bool is_last );
+typedef  rfc_value_tuple_s * ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, rfc_value_tuple_s * );
 typedef  void                ( *rfc_tp_add_fcn_t )        ( rfc_ctx_s *, rfc_value_tuple_s *, bool do_lock );
 typedef  bool                ( *rfc_finalize_fcn_t )      ( rfc_ctx_s * );
 typedef  void                ( *rfc_cycle_find_fcn_t )    ( rfc_ctx_s * );
@@ -239,8 +243,9 @@ typedef struct rfc_ctx
     struct internal
     {
         int                         slope;                      /**< Current signal slope */
-        rfc_value_tuple_s           extrema[2];                 /**< Local extrema */
+        rfc_value_tuple_s           extrema[2];                 /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
         rfc_value_tuple_s           margin[2];                  /**< First and last data point */
         size_t                      pos;                        /**< Absolute position in data input stream, base 1 */
+        rfc_value_tuple_s           tp_delayed;                 /**< Delay stage when RFC_FLAGS_ENFORCE_MARGIN is set */
     } internal;
 } rfc_ctx_s;
