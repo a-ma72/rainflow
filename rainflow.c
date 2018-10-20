@@ -48,20 +48,24 @@
 #endif
 
 /* Core */
-static void             RFC_feed_handle_tp          ( rfctx_s *rfctx, value_tuple_s* tp );
-static void             RFC_feed_finalize           ( rfctx_s* rfctx );
-static value_tuple_s *  RFC_tp_next_default         ( rfctx_s *, value_tuple_s *pt );
-static void             RFC_cycle_find_4ptm         ( rfctx_s * );
-static void             RFC_cycle_process           ( rfctx_s *, value_tuple_s *from, value_tuple_s *to, int flags );
+static bool                 RFC_feed_handle_tp                  ( rfc_ctx_s *, rfc_value_tuple_s* tp );
+static rfc_value_tuple_s *  RFC_tp_next                         ( rfc_ctx_s *, const rfc_value_tuple_s *pt );
+static void                 RFC_cycle_find_4ptm                 ( rfc_ctx_s * );
+static void                 RFC_cycle_process                   ( rfc_ctx_s *, const rfc_value_tuple_s *from, const rfc_value_tuple_s *to, int flags );
 /* Residual methods */
-static bool             RFC_finalize_default        ( rfctx_s * );
+static void                 RFC_finalize_interim                ( rfc_ctx_s * );
+static bool                 RFC_finalize_res                    ( rfc_ctx_s * );
+static bool                 RFC_finalize_res_ignore             ( rfc_ctx_s * );
+/* Memory allocator */
+static void *               RFC_mem_alloc                       ( void *ptr, size_t num, size_t size );
 /* Other */
-static double           RFC_damage_calc_default     ( rfctx_s *, unsigned class_from, unsigned class_to );
-static RFC_value_type   value_delta                 ( RFC_value_type from, RFC_value_type to, int *sign_ptr );
+static double               RFC_damage_calc                     ( rfc_ctx_s *, unsigned class_from, unsigned class_to );
+static RFC_value_type       value_delta                         ( RFC_value_type from, RFC_value_type to, int *sign_ptr );
 
 
 #define QUANTIZE( r, v )   ( (unsigned)( ((v) - (r)->class_offset) / (r)->class_width ) )
 #define CLASS_MEAN( r, c ) ( (double)( (r)->class_width * (0.5 + (c)) + (r)->class_offset ) )
+#define NUMEL( x )         ( sizeof(x) / sizeof(*(x)) )
 
 
 /**
@@ -78,61 +82,63 @@ static RFC_value_type   value_delta                 ( RFC_value_type from, RFC_v
 bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                           RFC_value_type hysteresis )
 {
-    rfctx_s       *rfctx = (rfctx_s*)ctx;
-    value_tuple_s  nil   = { 0.0 };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
+    rfc_ctx_s         *rfc_ctx = (rfc_ctx_s*)ctx;
+    rfc_value_tuple_s  nil   = { 0.0 };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
 
-    if( !rfctx || rfctx->state != RFC_STATE_INIT0 ) return false;
+    if( !rfc_ctx || rfc_ctx->state != RFC_STATE_INIT0 ) return false;
 
-    assert( rfctx->version == sizeof(rfctx_s) );
+    assert( rfc_ctx->version == sizeof(rfc_ctx_s) );
 
     /* Flags */
-    rfctx->flags = RFC_FLAGS_COUNT_ALL;
+    rfc_ctx->flags = RFC_FLAGS_COUNT_ALL;
     
     /* Counter increments */
-    rfctx->full_inc             = RFC_FULL_CYCLE_INCREMENT;
-    rfctx->half_inc             = RFC_HALF_CYCLE_INCREMENT;
-    rfctx->curr_inc             = RFC_FULL_CYCLE_INCREMENT;
+    rfc_ctx->full_inc                = RFC_FULL_CYCLE_INCREMENT;
+    rfc_ctx->half_inc                = RFC_HALF_CYCLE_INCREMENT;
+    rfc_ctx->curr_inc                = RFC_FULL_CYCLE_INCREMENT;
 
     if( !class_count || class_count > 512 ) return false;
     if( class_width <= 0.0 )                return false;
 
     /* Rainflow class parameters */
-    rfctx->class_count          = class_count;
-    rfctx->class_width          = class_width;
-    rfctx->class_offset         = class_offset;
-    rfctx->hysteresis           = ( hysteresis < 0.0 ) ? class_width : hysteresis;
+    rfc_ctx->class_count             = class_count;
+    rfc_ctx->class_width             = class_width;
+    rfc_ctx->class_offset            = class_offset;
+    rfc_ctx->hysteresis              = ( hysteresis < 0.0 ) ? class_width : hysteresis;
 
     /* Woehler curve (fictive) */
-    rfctx->wl_sd                =  1e3;          /* Fictive value */
-    rfctx->wl_nd                =  1e7;          /* Fictive value */
-    rfctx->wl_k                 = -5.0;          /* Fictive value */
+    rfc_ctx->wl_sd                   =  1e3;            /* Fictive amplitude */
+    rfc_ctx->wl_nd                   =  1e7;            /* Fictive count */
+    rfc_ctx->wl_k                    = -5.0;            /* Fictive gradient */
 
-    /* Memory allocation functions */
-    rfctx->mem_alloc            = calloc;
-    rfctx->mem_free             = free;
+    /* Memory allocator */
+    if( !rfc_ctx->mem_alloc )
+    {
+      rfc_ctx->mem_alloc = RFC_mem_alloc;
+    }
 
     /* Residue */
-    rfctx->residue_cnt          = 0;
-    rfctx->residue_size         = 2 * rfctx->class_count; /* max size is 2*n-1 plus interim point = 2*n */
-    rfctx->residue              = (value_tuple_s*)rfctx->mem_alloc( rfctx->residue_size, sizeof(value_tuple_s) );
+    rfc_ctx->residue_cnt             = 0;
+    rfc_ctx->residue_cap             = 2 * rfc_ctx->class_count; /* max size is 2*n-1 plus interim point = 2*n */
+    rfc_ctx->residue                 = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( NULL, rfc_ctx->residue_cap, sizeof(rfc_value_tuple_s) );
 
     /* Non-sparse storages (optional, may be NULL) */
-    rfctx->matrix               = (RFC_counts_type*)rfctx->mem_alloc( class_count * class_count, sizeof(RFC_value_type) );
+    rfc_ctx->matrix                  = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count * class_count, sizeof(RFC_value_type) );
 
     /* Damage */
-    rfctx->pseudo_damage        = 0.0;
+    rfc_ctx->pseudo_damage           = 0.0;
 
-    rfctx->internal.slope       = 0;
-    rfctx->internal.extrema[0]  = nil;
-    rfctx->internal.extrema[1]  = nil;
+    rfc_ctx->internal.slope          = 0;
+    rfc_ctx->internal.extrema[0]     = nil;  /* local minimum */
+    rfc_ctx->internal.extrema[1]     = nil;  /* local maximum */
 
-    if( !rfctx->residue || !rfctx->matrix )
+    if( !rfc_ctx->residue || !rfc_ctx->matrix )
     {
-        RFC_deinit( rfctx );
+        RFC_deinit( rfc_ctx );
         return false;
     }
     
-    rfctx->state = RFC_STATE_INIT;
+    rfc_ctx->state = RFC_STATE_INIT;
     return true;
 }
 
@@ -144,89 +150,95 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
  */
 void RFC_deinit( void *ctx )
 {
-    rfctx_s       *rfctx = (rfctx_s*)ctx;
-    value_tuple_s  nil   = { 0.0 };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
+    rfc_ctx_s         *rfc_ctx = (rfc_ctx_s*)ctx;
+    rfc_value_tuple_s  nil     = { 0.0 };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
 
-    if( !rfctx ) return;
+    if( !rfc_ctx ) return;
 
-    assert( rfctx->version == sizeof( rfctx_s ) );
+    assert( rfc_ctx->version == sizeof( rfc_ctx_s ) );
 
-    if( rfctx->residue )       rfctx->mem_free( rfctx->residue );
-    if( rfctx->matrix )        rfctx->mem_free( rfctx->matrix );
+    if( rfc_ctx->residue )           rfc_ctx->mem_alloc( rfc_ctx->residue, 0, 0 );
+    if( rfc_ctx->matrix )            rfc_ctx->mem_alloc( rfc_ctx->matrix,  0, 0 );
 
-    rfctx->residue             = NULL;
-    rfctx->residue_size        = 0;
-    rfctx->residue_cnt         = 0;
+    rfc_ctx->residue                 = NULL;
+    rfc_ctx->residue_cap             = 0;
+    rfc_ctx->residue_cnt             = 0;
 
-    rfctx->matrix              = NULL;
+    rfc_ctx->matrix                  = NULL;
 
-    rfctx->internal.slope      = 0;
-    rfctx->internal.extrema[0] = nil;
-    rfctx->internal.extrema[1] = nil;
-    rfctx->internal.pos        = 0;
+    rfc_ctx->internal.slope          = 0;
+    rfc_ctx->internal.extrema[0]     = nil;  /* local minimum */
+    rfc_ctx->internal.extrema[1]     = nil;  /* local maximum */
+    rfc_ctx->internal.pos            = 0;
 
-    rfctx->state = RFC_STATE_INIT0;
+
+    rfc_ctx->state = RFC_STATE_INIT0;
 }
 
 
 /**
- * @brief      Feed counting algorithm with data samples.
+ * @brief      "Feed" counting algorithm with data samples.
  *
  * @param      ctx          The rainflow context
  * @param[in]  data         The data
  * @param[in]  data_count   The data count
- * @param[in]  do_finalize  Flag to finalize counting
+ * 
+ * @return     false on error
  */
-void RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count, bool do_finalize )
+bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
 {
-    rfctx_s *rfctx = (rfctx_s*)ctx;
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
-    if( !rfctx ) return;
+    if( !rfc_ctx ) return false;
 
     assert( !data_count || data );
-    assert( rfctx->version == sizeof( rfctx_s ) );
+    assert( rfc_ctx->version == sizeof( rfc_ctx_s ) );
 
-    if( rfctx->state < RFC_STATE_INIT || rfctx->state >= RFC_STATE_FINISHED )
+    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state >= RFC_STATE_FINISHED )
     {
-        assert( false );
-        return;
+        return false;
     }
 
     /* Process data */
     while( data_count-- )
     {
-        value_tuple_s tp = { (RFC_value_type)*data++ };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
+        rfc_value_tuple_s tp = { (RFC_value_type)*data++ };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
 
         /* Assign class and global position (base 1) */
-        tp.class = QUANTIZE( rfctx, tp.value );
+        tp.class = QUANTIZE( rfc_ctx, tp.value );
+        tp.pos   = ++rfc_ctx->internal.pos;
 
-        RFC_feed_handle_tp( rfctx, &tp );
-    }
-
-    /* Last data point? */
-    if( do_finalize )
-    {
-        RFC_feed_finalize( rfctx );
+        if( !RFC_feed_handle_tp( rfc_ctx, &tp ) ) return false;
     }
 }
 
 
 /**
+
+
+/**
  * @brief      Processing data (one data point).
  *             Find turning points and check for closed cycles.
+ *             Locks turning points queue, if is_right_margin.
  *
- * @param      rfctx        The rainflow context
- * @param[in]  tp           The data tuple
+ * @param      rfc_ctx          The rainflow context
+ * @param[in]  pt               The data tuple
+ * 
+ * @return     false on error
  */
 static
-void RFC_feed_handle_tp( rfctx_s *rfctx, value_tuple_s* tp )
+bool RFC_feed_handle_tp( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
 {
-    /* Test if a new turning point exists */
-    if( RFC_tp_next_default( rfctx, tp ) )
+    rfc_value_tuple_s *tp_residue;
+
+    /* Check for next turning point */
+    tp_residue = RFC_tp_next( rfc_ctx, pt );
     {
         /* New turning point, check for closed cycles and count */
-        RFC_cycle_find_4ptm( rfctx );
+        RFC_cycle_find_4ptm( rfc_ctx );
     }
+
+    return true;
 }
 
 
@@ -234,60 +246,88 @@ void RFC_feed_handle_tp( rfctx_s *rfctx, value_tuple_s* tp )
  * @brief      Finalizing.
  *             Take residue into account.
  *
- * @param      rfctx        The rainflow context
+ * @param      rfc_ctx        The rainflow context
  */
-static
-void RFC_feed_finalize( rfctx_s* rfctx )
+void RFC_feed_finalize( rfc_ctx_s* rfc_ctx )
 {
-    rfctx->state = RFC_STATE_FINALIZE;
-
-    /* Adjust residue: Incorporate interim turning point */
-    rfctx->residue_cnt++;
-
     /* Finalizing (process last turning point */
-    rfctx->state = RFC_finalize_default( rfctx ) ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
+    rfc_ctx->state = RFC_finalize_res( rfc_ctx ) ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
 }
 
 
 /**
- * @brief      Finalize pending counts, handling interim turning point.
+ * @brief      Handling interim turning point.
  *             There is still one unhandled turning point left.
- *             "Finalizing" takes this into account.
+ *             "Finalizing" takes this into account for the rainflow algorithm.
  *
- * @param      rfctx  The rainflow context
+ * @param      rfc_ctx  The rainflow context
  */
 static
-bool RFC_finalize_default( rfctx_s *rfctx )
+void RFC_finalize_interim( rfc_ctx_s *rfc_ctx )
 {
-    assert( rfctx && rfctx->state == RFC_STATE_FINALIZE );
+    assert( rfc_ctx && rfc_ctx->state < RFC_STATE_FINALIZE );
 
-    if( rfctx->residue && rfctx->residue_cnt )
+    /* Adjust residue: Incorporate interim turning point */
+    if( rfc_ctx->state == RFC_STATE_BUSY_INTERIM )
     {
+        assert( rfc_ctx->residue && rfc_ctx->residue_cnt );
+
+        rfc_ctx->residue_cnt++;
+
         /* Check if a new cycle is closed now */
-        RFC_cycle_find_4ptm( rfctx );
+        RFC_cycle_find_4ptm( rfc_ctx );
     }
-    return true;
+
+    rfc_ctx->state = RFC_STATE_FINALIZE;
+}
+
+
+/**
+ * @brief      Finalize pending counts, ignoring residue.
+ *
+ * @param      rfc_ctx  The rainflow context
+ */
+static
+bool RFC_finalize_res( rfc_ctx_s *rfc_ctx )
+{
+    assert( rfc_ctx && rfc_ctx->state < RFC_STATE_FINALIZE );
+
+    return RFC_finalize_res_ignore( rfc_ctx );
+}
+
+
+/**
+ * @brief      Finalize pending counts, ignoring residue.
+ *
+ * @param      rfc_ctx  The rainflow context
+ */
+static
+bool RFC_finalize_res_ignore( rfc_ctx_s *rfc_ctx )
+{
+    /* Just include interim turning point */
+    return RFC_finalize_interim( rfc_ctx );
 }
 
 
 /**
  * @brief      Calculate fictive damage for one closed (full) cycle.
  *
- * @param      rfctx       The rainflow context
- * @param[in]  class_from  The starting class
- * @param[in]  class_to    The ending class
+ * @param      rfc_ctx       The rainflow context
+ * @param[in]  class_from    The starting class
+ * @param[in]  class_to      The ending class
  *
  * @return     Pseudo damage value for the closed cycle
  */
 static
-double RFC_damage_calc_default( rfctx_s *rfctx, unsigned class_from, unsigned class_to )
+double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_to )
 {
-    assert( rfctx );
+    assert( rfc_ctx );
 
-    /* Constants for woehler curve */
-    const double SD_log  = log(rfctx->wl_sd);
-    const double ND_log  = log(rfctx->wl_nd);
-    const double k       = rfctx->wl_k;
+
+    /* Constants for the woehler curve */
+    const double SD_log  = log(rfc_ctx->wl_sd);
+    const double ND_log  = log(rfc_ctx->wl_nd);
+    const double k       = rfc_ctx->wl_k;
     /* Pseudo damage */
     double D_i = 0.0;
 
@@ -298,7 +338,7 @@ double RFC_damage_calc_default( rfctx_s *rfctx, unsigned class_from, unsigned cl
         /* D_i = exp( (log(h_i)-log(ND)) + (log(Sa_i)-log(SD)) * ABS(k) ) */
         /* D_i = exp(      0   -log(ND)  + (log(Sa_i)-log(SD)) * ABS(k) ) */
 
-        double range  = (double)rfctx->class_width * abs( (int)class_to - (int)class_from );
+        double range  = (double)rfc_ctx->class_width * abs( (int)class_to - (int)class_from );
         double Sa_i   = range / 2.0;  /* amplitude */
 
         D_i = exp( fabs(k)  * ( log(Sa_i) - SD_log ) - ND_log );
@@ -313,9 +353,9 @@ double RFC_damage_calc_default( rfctx_s *rfctx, unsigned class_from, unsigned cl
 /**
  * @brief      Returns the unsigned difference of two values, sign optionally returned as -1 or 1.
  *
- * @param[in]  from      Left hand value
- * @param[in]  to        Right hand value
- * @param      sign_ptr  Pointer to catch sign (may be NULL)
+ * @param[in]   from      Left hand value
+ * @param[in]   to        Right hand value
+ * @param[out]  sign_ptr  Pointer to catch sign (may be NULL)
  *
  * @return     Returns the absolute difference of given values
  */
@@ -334,145 +374,168 @@ RFC_value_type value_delta( RFC_value_type from, RFC_value_type to, int *sign_pt
 
 
 /**
- * @brief      Add one data sample (turning point) to the residue.
+ * @brief      Test data sample for a new turning point and add to the residue in that case.
  *             1. Hysteresis Filtering
  *             2. Peak-Valley Filtering
  *
- * @param      rfctx  The rainflow context
- * @param      pt     The data point
+ * @param      rfc_ctx          The rainflow context
+ * @param[in]  pt               The data point, must not be NULL
  *
  * @return     Returns pointer to new turning point in residue or NULL
  */
 static
-value_tuple_s * RFC_tp_next_default( rfctx_s *rfctx, value_tuple_s *pt )
+rfc_value_tuple_s * RFC_tp_next( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *pt )
 {
-    int             slope;
-    RFC_value_type  delta;
+    int                 slope;
+    RFC_value_type      delta;
+    rfc_value_tuple_s  *new_tp    = NULL;
+    int                 do_append = 0;
 
-    assert( rfctx );
+    assert( rfc_ctx && pt );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state <= RFC_STATE_BUSY_INTERIM );
 
-    slope  = rfctx->internal.slope;
+    slope = rfc_ctx->internal.slope;
 
-    if( !rfctx->residue_cnt )
+    /* Handle first turning point(s) */
+    if( rfc_ctx->state < RFC_STATE_BUSY_INTERIM )
     {
-        /* Residue is empty */
+        /* Residue is empty, still searching first turning point(s) */
 
-        int i_first_point;  /* Index to internal.extrema indicating 1st point */
-
-        if( rfctx->state == RFC_STATE_INIT )
+        if( rfc_ctx->state == RFC_STATE_INIT )
         {
             /* Very first point, initialize local min-max search */
-            rfctx->internal.extrema[0] = rfctx->internal.extrema[1] = *pt;
-            rfctx->state               = RFC_STATE_BUSY;
+            rfc_ctx->internal.extrema[0] = 
+            rfc_ctx->internal.extrema[1] = *pt;
+            rfc_ctx->state               =  RFC_STATE_BUSY;
         }
         else
         {
-            /* Still searching for first turning point */
+            int is_falling_slope;
+
+            assert( rfc_ctx->state == RFC_STATE_BUSY );
+
+            /* Still searching for first turning point(s) */
 
             /* Update local extrema */
-            if( pt->value < rfctx->internal.extrema[0].value )
+            if( pt->value < rfc_ctx->internal.extrema[0].value )
             {
                 /* Minimum */
-                i_first_point = 1;
-                rfctx->internal.extrema[0] = *pt;
+                is_falling_slope = 1;
+                rfc_ctx->internal.extrema[0] = *pt;
             }
-            else if( pt->value > rfctx->internal.extrema[1].value )
+            else if( pt->value > rfc_ctx->internal.extrema[1].value )
             {
                 /* Maximum */
-                i_first_point = 0;
-                rfctx->internal.extrema[1] = *pt;
+                is_falling_slope = 0;
+                rfc_ctx->internal.extrema[1] = *pt;
+            }
+
+            /* Local hysteresis filtering */
+            delta = value_delta( rfc_ctx->internal.extrema[0].value, rfc_ctx->internal.extrema[1].value, NULL /* sign_ptr */ );
+
+            if( delta > rfc_ctx->hysteresis )
+            {
+                /* Criteria met, new turning point found.
+                 * Emit maximum on falling slope as first interim turning point, 
+                 * minimum as second then (and vice versa) 
+                 * 1st point: internal.extrema[ is_falling_slope]
+                 * 2nd point: internal.extrema[!is_falling_slope]  ==> which is *pt also
+                 */
+                assert( rfc_ctx->residue_cnt < rfc_ctx->residue_cap );
+                rfc_ctx->residue[rfc_ctx->residue_cnt] = rfc_ctx->internal.extrema[is_falling_slope];
+
+                slope = is_falling_slope ? -1 : 1;
+
+                /* pt is the new interim turning point */
+                rfc_ctx->state = RFC_STATE_BUSY_INTERIM;
+                do_append = 1;
             }
         }
+    }
+    else  /* if( rfc_ctx->state < RFC_STATE_BUSY_INTERIM ) */
+    {
+        assert( rfc_ctx->state == RFC_STATE_BUSY_INTERIM );
 
-        /* Hysteresis Filtering */
-        delta = value_delta( rfctx->internal.extrema[0].value, rfctx->internal.extrema[1].value, NULL /* sign_ptr */ );
+        /* Consecutive search for turning points */
 
-        if( delta > rfctx->hysteresis )
+
+        /* Hysteresis Filtering, check against interim turning point */
+        delta = value_delta( rfc_ctx->residue[rfc_ctx->residue_cnt].value, pt->value, &slope /* sign_ptr */ );
+
+        /* There are three scenarios possible here:
+         *   1. Previous slope is continued
+         *      "delta" is ignored whilst hysteresis is exceeded already.
+         *      Interim turning point has just to be adjusted.
+         *   2. Slope reversal, slope is greater than hysteresis
+         *      Interim turning point becomes real turning point.
+         *      Current point becomes new interim turning point
+         *   3. Slope reversal, slope is less than or equal hysteresis
+         *      Nothing to do.
+         */
+
+        /* Peak-Valley Filtering */
+        /* Justify interim turning point, or add a new one (2) */
+        if( slope == rfc_ctx->internal.slope )
         {
-            /* Criteria met, first turning point found */
-            assert( rfctx->residue_cnt < rfctx->residue_size );
-            rfctx->residue[rfctx->residue_cnt++] = rfctx->internal.extrema[i_first_point];
+            /* Scenario (1), Continuous slope */
 
-            /* Append interim turning point */
-            assert( rfctx->residue_cnt < rfctx->residue_size );
-            rfctx->residue[rfctx->residue_cnt] = *pt;
-
-            rfctx->internal.slope = i_first_point ? -1 : 1;
-
-            return rfctx->residue;
+            /* Replace interim turning point with new extrema */
+            do_append = 1;
         }
-        
-        return NULL;
+        else
+        {
+            if( delta > rfc_ctx->hysteresis )
+            {
+                /* Scenario (2), Criteria met: slope != rfc_ctx->internal.slope && delta > rfc_ctx->hysteresis */
+
+                /* Storage */
+                rfc_ctx->internal.slope = slope;
+
+                /* Handle new turning point */
+                do_append = 1;
+            }
+            else
+            {
+                /* Scenario (3), Turning point found, but still in hysteresis band, nothing to do */
+            }
+        }
     }
 
-    /* Consecutive search for turning points */
-
-    /* Hysteresis Filtering, check against interim turning point */
-    delta = value_delta( rfctx->residue[rfctx->residue_cnt].value, pt->value, &slope /* sign_ptr */ );
-
-    /* There are three scenarios possible here:
-     *   1. Slope reversal, slope is less than or equal hysteresis
-     *      Nothing to do.
-     *   2. Previous slope is continued
-     *      "delta" is ignored whilst hysteresis is exceeded already.
-     *      Interim turning point has just to be adjusted.
-     *   3. Slope reversal, slope is greater than hysteresis
-     *      Interim turning point becomes real turning point.
-     *      Current point becomes new interim turning point
-     */
-
-    /* Peak-Valley Filtering */
-    if( slope != rfctx->internal.slope && delta <= rfctx->hysteresis )
+    /* Handle new turning point, that is the current last point in residue */
+    if( do_append )
     {
-        /* Scenario (1), Turning point found, but still in hysteresis band */
-        return NULL;
+        assert( rfc_ctx->state == RFC_STATE_BUSY_INTERIM );
+
+        /* Increment and set new interim turning point */
+        assert( rfc_ctx->residue_cnt < rfc_ctx->residue_cap );
+        rfc_ctx->residue[++rfc_ctx->residue_cnt] = *pt;
+
+        /* Return new turning point */
+        new_tp = &rfc_ctx->residue[rfc_ctx->residue_cnt - 1];
     }
 
-    /* Justify interim turning point, or add a new one (2) */
-    if( slope == rfctx->internal.slope )
-    {
-        /* Scenario (2), Continuous slope */
-
-        /* Replace interim turning point with new extrema */
-        rfctx->residue[rfctx->residue_cnt] = *pt;
-
-        /* No new turning point */
-        return NULL;
-    }
-    else
-    {
-        /* Scenario (3), Criteria met: slope != rfctx->internal.slope && delta > rfctx->hysteresis */
-
-        /* New interim turning point */
-        assert( rfctx->residue_cnt < rfctx->residue_size );
-        rfctx->residue[++rfctx->residue_cnt] = *pt;
-
-        rfctx->internal.slope = slope;
-
-        /* Have new turning point */
-        return &rfctx->residue[rfctx->residue_cnt - 1];
-    }
+    return new_tp;
 }
 
 
 /**
  * @brief      Rainflow counting core (4-point-method).
  *
- * @param      rfctx  The rainflow context
+ * @param      rfc_ctx  The rainflow context
  */
 static
-void RFC_cycle_find_4ptm( rfctx_s *rfctx )
+void RFC_cycle_find_4ptm( rfc_ctx_s *rfc_ctx )
 {
-    assert( rfctx );
+    assert( rfc_ctx );
 
-    while( rfctx->residue_cnt >= 4 )
+    while( rfc_ctx->residue_cnt >= 4 )
     {
-        size_t idx = rfctx->residue_cnt - 4;
+        size_t idx = rfc_ctx->residue_cnt - 4;
 
-        RFC_value_type A = rfctx->residue[idx+0].value;
-        RFC_value_type B = rfctx->residue[idx+1].value;
-        RFC_value_type C = rfctx->residue[idx+2].value;
-        RFC_value_type D = rfctx->residue[idx+3].value;
+        RFC_value_type A = rfc_ctx->residue[idx+0].value;
+        RFC_value_type B = rfc_ctx->residue[idx+1].value;
+        RFC_value_type C = rfc_ctx->residue[idx+2].value;
+        RFC_value_type D = rfc_ctx->residue[idx+3].value;
 
         if( B > C )
         {
@@ -490,15 +553,15 @@ void RFC_cycle_find_4ptm( rfctx_s *rfctx )
 
         if( A <= B && C <= D )
         {
-            value_tuple_s *from = &rfctx->residue[idx+1];
-            value_tuple_s *to   = &rfctx->residue[idx+2];
+            rfc_value_tuple_s *from = &rfc_ctx->residue[idx+1];
+            rfc_value_tuple_s *to   = &rfc_ctx->residue[idx+2];
 
-            RFC_cycle_process( rfctx, from, to, rfctx->flags );
+            RFC_cycle_process( rfc_ctx, from, to, rfc_ctx->flags );
 
-            /* Remove two inner turning points (idx+1 and idx+2)*/
-            rfctx->residue[idx+1] = rfctx->residue[idx+3];  /* Move last turning point */
-            rfctx->residue[idx+2] = rfctx->residue[idx+4];  /* Move interim turning point */
-            rfctx->residue_cnt -= 2;
+            /* Remove two inner turning points (idx+1 and idx+2) */
+            rfc_ctx->residue[idx+1] = rfc_ctx->residue[idx+3];  /* Move last turning point */
+            rfc_ctx->residue[idx+2] = rfc_ctx->residue[idx+4];  /* Move interim turning point */
+            rfc_ctx->residue_cnt -= 2;
         }
         else break;
     }
@@ -508,41 +571,42 @@ void RFC_cycle_find_4ptm( rfctx_s *rfctx )
 /**
  * @brief      Processes counts on a closing cycle
  *
- * @param      rfctx  The rainflow context
- * @param      from   The starting data point
- * @param      to     The ending data point
+ * @param      rfc_ctx  The rainflow context
+ * @param[in]  from     The starting data point
+ * @param[in]  to       The ending data point
+ * @param[in]  flags    Control flags
  */
 static
-void RFC_cycle_process( rfctx_s *rfctx, value_tuple_s *from, value_tuple_s *to, int flags )
+void RFC_cycle_process( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *from, const rfc_value_tuple_s *to, int flags )
 {
     unsigned class_from, class_to;
 
-    assert( rfctx );
-    assert( from->value > rfctx->class_offset && to->value > rfctx->class_offset );
+    assert( rfc_ctx );
+    assert( from->value > rfc_ctx->class_offset && to->value > rfc_ctx->class_offset );
 
     /* Quantize "from" */
-    class_from = QUANTIZE( rfctx, from->value );
+    class_from = QUANTIZE( rfc_ctx, from->value );
 
-    if( class_from >= rfctx->class_count ) class_from = rfctx->class_count - 1;
+    if( class_from >= rfc_ctx->class_count ) class_from = rfc_ctx->class_count - 1;
 
     /* Quantize "to" */
-    class_to = QUANTIZE( rfctx, to->value );
+    class_to = QUANTIZE( rfc_ctx, to->value );
 
-    if( class_to >= rfctx->class_count ) class_to = rfctx->class_count - 1;
+    if( class_to >= rfc_ctx->class_count ) class_to = rfc_ctx->class_count - 1;
     
     /* class_from and class_to are base 0 now */
 
-    /* Do several countings */
+    /* Do several counts, according to "flags" */
     if( class_from != class_to )
     {
         /* Cumulate pseudo damage */
-        double damage;
-        damage = RFC_damage_calc_default( rfctx, class_from, class_to );
+        double damage = RFC_damage_calc( rfc_ctx, class_from, class_to );
+
         /* Adding damage due to current cycle weight */
-        rfctx->pseudo_damage += damage * rfctx->curr_inc / rfctx->full_inc;
+        rfc_ctx->pseudo_damage += damage * rfc_ctx->curr_inc / rfc_ctx->full_inc;
 
         /* Rainflow matrix */
-        if( rfctx->matrix && ( flags & RFC_FLAGS_COUNT_MATRIX ) )
+        if( rfc_ctx->matrix && ( flags & RFC_FLAGS_COUNT_MATRIX ) )
         {
             /* Matrix (row-major storage):
              *          t o
@@ -554,14 +618,39 @@ void RFC_cycle_process( rfctx_s *rfctx, value_tuple_s *from, value_tuple_s *to, 
              *  m | # # # # # #
              *    | # # # # # #<-(6x6-1)
              */
-            size_t idx = rfctx->class_count * class_from + class_to;
+            size_t idx = rfc_ctx->class_count * class_from + class_to;
             
-            assert( rfctx->matrix[idx] <= RFC_COUNTS_LIMIT );
-            rfctx->matrix[idx] += rfctx->curr_inc;
+            assert( rfc_ctx->matrix[idx] <= RFC_COUNTS_LIMIT );
+            rfc_ctx->matrix[idx] += rfc_ctx->curr_inc;
         }
     }
 }
 
+
+/**
+ * @brief       (Re-)Allocate or free memory
+ * @param       ptr     Previous data pointer, or NULL, if unset
+ * @param[in]   num     The number of elements
+ * @param[in]   size    The size of one element in bytes
+ * @returns     New memory pointer or NULL if either num or size is 0
+ * 
+ */
+static
+void * RFC_mem_alloc( void *ptr, size_t num, size_t size )
+{
+    if( !num || !size )
+    {
+        if( ptr )
+        {
+            free( ptr );
+        }
+        return NULL;
+    }
+    else
+    {
+        return ptr ? realloc( ptr, num * size ) : calloc( num, size );
+    }
+}
 
 
 /*********************************************************************************************************/
@@ -593,7 +682,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
     }
     else
     {
-        rfctx_s rfctx = { sizeof(rfctx_s) };
+        rfc_ctx_s rfc_ctx = { sizeof(rfc_ctx_s) };
     
         const mxArray *mxData        = prhs[0];
         const mxArray *mxClassCount  = prhs[1];
@@ -601,54 +690,74 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         const mxArray *mxClassOffset = prhs[3];
         const mxArray *mxHysteresis  = prhs[4];
 
-        double   *data         = mxGetPr( mxData );
-        size_t    data_len     = mxGetNumberOfElements( mxData );
-        unsigned  class_count  = (unsigned)( mxGetScalar( mxClassCount ) + 0.5 );
-        double    class_width  = mxGetScalar( mxClassWidth );
-        double    class_offset = mxGetScalar( mxClassOffset );
-        double    hysteresis   = mxGetScalar( mxHysteresis );
+        RFC_VALUE_TYPE *buffer       = NULL;
+        double         *data         = mxGetPr( mxData );
+        size_t          data_len     = mxGetNumberOfElements( mxData );
+        unsigned        class_count  = (unsigned)( mxGetScalar( mxClassCount ) + 0.5 );
+        double          class_width  = mxGetScalar( mxClassWidth );
+        double          class_offset = mxGetScalar( mxClassOffset );
+        double          hysteresis   = mxGetScalar( mxHysteresis );
+        size_t          i;
 
-        if( !RFC_init( &rfctx, class_count, class_width, class_offset, hysteresis ) )
+        if( !RFC_init( &rfc_ctx, 
+                       class_count, (RFC_VALUE_TYPE)class_width, (RFC_VALUE_TYPE)class_offset, (RFC_VALUE_TYPE)hysteresis ) );
         {
             mexErrMsgTxt( "Error during initialization!" );
         }
 
-        /* rfctx.residue_final_method = 0; */
+        if( sizeof( RFC_VALUE_TYPE ) != sizeof(double) )
+        {
+            RFC_VALUE_TYPE *buffer = (RFC_VALUE_TYPE *)RFC_mem_alloc( NULL, data_len, sizeof(RFC_VALUE_TYPE) );
+            for( i = 0 ; i < data_len; i++ )
+            {
+                buffer[i] = (RFC_VALUE_TYPE)data[i];
+            }
+        }
+        else buffer = (RFC_VALUE_TYPE*)data;
 
-        RFC_feed( &rfctx, data, data_len, 1 /*do_finalize*/  );
+        /* rfc_ctx.residue_final_method = 0; */
+
+        RFC_feed( &rfc_ctx, buffer, data_len  );
+        RFC_feed_finalize( &rfc_ctx );
+
+        if( (void*)buffer != (void*)data )
+        {
+            RFC_mem_alloc( buffer, 0, 0 );
+            buffer = NULL;
+        }
 
         if( plhs )
         {
-            plhs[0] = mxCreateDoubleScalar( rfctx.pseudo_damage );
+            plhs[0] = mxCreateDoubleScalar( rfc_ctx.pseudo_damage );
 
-            if( nlhs > 1 && rfctx.residue )
+            if( nlhs > 1 && rfc_ctx.residue )
             {
-                mxArray* re = mxCreateDoubleMatrix( rfctx.residue_cnt, 1, mxREAL );
+                mxArray* re = mxCreateDoubleMatrix( rfc_ctx.residue_cnt, 1, mxREAL );
                 if( re )
                 {
                     size_t i;
                     double *val = mxGetPr(re);
 
-                    for( i = 0; i < rfctx.residue_cnt; i++ )
+                    for( i = 0; i < rfc_ctx.residue_cnt; i++ )
                     {
-                        *val++ = (double)rfctx.residue[i].value;
+                        *val++ = (double)rfc_ctx.residue[i].value;
                     }
                     plhs[1] = re;
                 }
             }
 
-            if( nlhs > 2 && rfctx.matrix )
+            if( nlhs > 2 && rfc_ctx.matrix )
             {
                 mxArray* matrix = mxCreateDoubleMatrix( class_count, class_count, mxREAL );
                 if( matrix )
                 {
-                    memcpy( mxGetPr(matrix), rfctx.matrix, sizeof(double) * class_count * class_count );
+                    memcpy( mxGetPr(matrix), rfc_ctx.matrix, sizeof(double) * class_count * class_count );
                     plhs[2] = matrix;
                 }
             }
         }
 
-        RFC_deinit( &rfctx );
+        RFC_deinit( &rfc_ctx );
     }
 }
 #endif

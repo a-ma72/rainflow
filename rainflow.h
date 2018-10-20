@@ -75,7 +75,7 @@
 #endif
 
 #ifdef RFC_USE_INTEGRAL_COUNTS
-#define RFC_COUNTS_VALUE_TYPE    (unsigned long long)
+#define RFC_COUNTS_VALUE_TYPE    unsigned long long
 #define RFC_FULL_CYCLE_INCREMENT (2)
 #define RFC_HALF_CYCLE_INCREMENT (1)
 #define RFC_COUNTS_LIMIT         (ULLONG_MAX - RFC_FULL_CYCLE_INCREMENT) /* ~18e18 (eff. ~9e18)*/
@@ -86,35 +86,39 @@
 #define RFC_COUNTS_LIMIT         (4.5e15 - RFC_FULL_CYCLE_INCREMENT)
 #endif
 
-typedef RFC_VALUE_TYPE          RFC_value_type;  /** Input data value type */
-typedef RFC_COUNTS_VALUE_TYPE   RFC_counts_type; /** Type of counting values */
-typedef struct rfctx            rfctx_s;         /** Forward declaration (rainflow context) */
-typedef struct value_tuple      value_tuple_s;   /** Tuple of value and index position */
+
+
+/* Memory allocation functions typedef */
+typedef void * ( *rfc_mem_alloc_fcn_t )( void *, size_t num, size_t size );
+
+/* Typedefs */
+typedef RFC_VALUE_TYPE          RFC_value_type;      /** Input data value type */
+typedef RFC_COUNTS_VALUE_TYPE   RFC_counts_type;     /** Type of counting values */
+typedef struct rfc_ctx          rfc_ctx_s;           /** Forward declaration (rainflow context) */
+typedef struct rfc_value_tuple  rfc_value_tuple_s;   /** Tuple of value and index position */
 
 
 /* Core */
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis );
-void RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count, bool do_finalize );
-void RFC_finalize             ( void *ctx );
+bool RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count );
+void RFC_feed_finalize        ( void *ctx );
 void RFC_deinit               ( void *ctx );
 
-/* Memory allocation functions typedef */
-typedef void * ( *rfc_mem_calloc_fcn_t )    ( size_t num, size_t size );
-typedef void   ( *rfc_mem_free_fcn_t )      ( void * );
 
 /* Value info struct */
-typedef struct value_tuple
+typedef struct rfc_value_tuple
 {
     RFC_value_type                  value;                      /**< Value. Don't change order, value field must be first! */
     unsigned                        class;                      /**< Class number, base 0 */
-} value_tuple_s;
+    size_t                          pos;                        /**< Absolute position in input data stream, base 1 */
+} rfc_value_tuple_s;
 
 
 /**
  * Rainflow context
  */
-typedef struct rfctx
+typedef struct rfc_ctx
 {
     size_t                          version;                    /**< Version number as sizeof(struct rfctx..), must be 1st field! */
 
@@ -123,10 +127,16 @@ typedef struct rfctx
         RFC_STATE_INIT0,                                        /**< Initialized with zeros */
         RFC_STATE_INIT,                                         /**< Initialized, memory allocated */
         RFC_STATE_BUSY,                                         /**< In counting state */
+        RFC_STATE_BUSY_INTERIM,                                 /**< In counting state, having still one interim turning point (not included) */
         RFC_STATE_FINALIZE,                                     /**< Finalizing */
         RFC_STATE_FINISHED,                                     /**< Counting finished, memory still allocated */
         RFC_STATE_ERROR,                                        /**< An error occured */
     }                               state;                      /**< Current counting state */
+
+    enum
+    {
+        RFC_ERROR_MEMORY,
+    }                               error;                      /**< Error code */
 
     enum
     {
@@ -136,9 +146,14 @@ typedef struct rfctx
         RFC_FLAGS_COUNT_LC_DN       = 1 << 3,                   /**< Count into level crossing (only falling slopes) */
         RFC_FLAGS_COUNT_LC          = RFC_FLAGS_COUNT_LC_UP     /**< Count into level crossing (all slopes) */
                                     | RFC_FLAGS_COUNT_LC_DN,
-        RFC_FLAGS_COUNT_ALL         = -1                        /** Count all */
+        RFC_FLAGS_COUNT_ALL         = RFC_FLAGS_COUNT_MATRIX    /**< Count all */
+                                    | RFC_FLAGS_COUNT_RP
+                                    | RFC_FLAGS_COUNT_LC,
     }
                                     flags;                      /**< Flags */
+
+    /* Memory allocation functions */
+    rfc_mem_alloc_fcn_t             mem_alloc;                  /**< Allocate initialized memory */
 
     /* Counter increments */
     RFC_counts_type                 full_inc;                   /**< Increment for a full cycle */
@@ -149,21 +164,17 @@ typedef struct rfctx
     unsigned                        class_count;                /**< Class count */
     RFC_value_type                  class_width;                /**< Class width */
     RFC_value_type                  class_offset;               /**< Lower bound of first class */
-    RFC_value_type                  hysteresis;                 /**< Hysteresis Filtering */
+    RFC_value_type                  hysteresis;                 /**< Hysteresis filtering */
 
     /* Woehler curve */
-    double                          wl_sd;                      /**< Fatigue resistance range */
+    double                          wl_sd;                      /**< Fatigue resistance range (amplitude) */
     double                          wl_nd;                      /**< Cycles at wl_sd */
-    double                          wl_k;                       /**< Woehler gradient */
-
-    /* Memory allocation functions */
-    rfc_mem_calloc_fcn_t            mem_alloc;                  /**< Allocate initialized memory */
-    rfc_mem_free_fcn_t              mem_free;                   /**< Free memory, allocated by mem_alloc */
+    double                          wl_k;                       /**< Woehler gradient above wl_sd */
 
     /* Residue */
-    value_tuple_s                  *residue;                    /**< Buffer for residue */
-    size_t                          residue_size;               /**< Buffer size (max. 2*class_count) */
-    size_t                          residue_cnt;                /**< Buffer content size */
+    rfc_value_tuple_s              *residue;                    /**< Buffer for residue */
+    size_t                          residue_cap;                /**< Buffer capacity in number of elements (max. 2*class_count) */
+    size_t                          residue_cnt;                /**< Number of value tuples in buffer */
 
     /* Non-sparse storages (optional, may be NULL) */
     RFC_counts_type                *matrix;                     /**< Rainflow matrix */
@@ -175,7 +186,7 @@ typedef struct rfctx
     struct internal
     {
         int                         slope;                      /**< Current signal slope */
-        value_tuple_s               extrema[2];                 /**< Local extrema */
+        rfc_value_tuple_s           extrema[2];                 /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
         size_t                      pos;                        /**< Absolute position in data input stream, base 1 */
     } internal;
-} rfctx_s;
+} rfc_ctx_s;
