@@ -723,7 +723,7 @@ rfc_value_tuple_s * RFC_tp_next( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *pt
 
         if( rfc_ctx->state == RFC_STATE_INIT )
         {
-            /* Very first point, initialize local min-max search, save left margin */
+            /* Very first point, initialize local min-max search */
             rfc_ctx->internal.extrema[0] = 
             rfc_ctx->internal.extrema[1] = *pt;
             rfc_ctx->state               =  RFC_STATE_BUSY;
