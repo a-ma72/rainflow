@@ -109,16 +109,16 @@ typedef struct rfc_value_tuple  rfc_value_tuple_s;   /** Tuple of value and inde
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis, int residual_method,
                                            rfc_value_tuple_s *tp, size_t tp_cap );
-void RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count );
-void RFC_feed_tuple           ( void *ctx, const rfc_value_tuple_s *data, size_t count );
+bool RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count );
+bool RFC_feed_tuple           ( void *ctx, rfc_value_tuple_s *data, size_t count );
 void RFC_feed_finalize        ( void *ctx );
 void RFC_deinit               ( void *ctx );
 
 #if RFC_USE_DELEGATES
 /* Delegates typedef */
 typedef  double              ( *rfc_damage_calc_fcn_t )   ( rfc_ctx_s *, unsigned from_class, unsigned to_class );
-typedef  rfc_value_tuple_s * ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, rfc_value_tuple_s * );
-typedef  void                ( *rfc_tp_add_fcn_t )        ( rfc_ctx_s *, rfc_value_tuple_s *, bool do_lock );
+typedef  rfc_value_tuple_s * ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, const rfc_value_tuple_s * );
+typedef  bool                ( *rfc_tp_add_fcn_t )        ( rfc_ctx_s *, rfc_value_tuple_s * );
 typedef  bool                ( *rfc_finalize_fcn_t )      ( rfc_ctx_s * );
 typedef  void                ( *rfc_cycle_find_fcn_t )    ( rfc_ctx_s * );
 #endif
@@ -149,6 +149,11 @@ typedef struct rfc_ctx
         RFC_STATE_FINISHED,                                     /**< Counting finished, memory still allocated */
         RFC_STATE_ERROR,                                        /**< An error occured */
     }                               state;                      /**< Current counting state */
+
+    enum
+    {
+        RFC_ERROR_MEMORY,
+    }                               error;                      /**< Error code */
 
     enum
     {
