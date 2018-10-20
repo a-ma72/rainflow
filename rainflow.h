@@ -100,7 +100,7 @@ typedef struct rfc_value_tuple  rfc_value_tuple_s;   /** Tuple of value and inde
 
 /* Core */
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
-                                           RFC_value_type hysteresis );
+                                           RFC_value_type hysteresis, int residual_method );
 bool RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count );
 void RFC_feed_finalize        ( void *ctx );
 void RFC_deinit               ( void *ctx );
@@ -151,6 +151,17 @@ typedef struct rfc_ctx
                                     | RFC_FLAGS_COUNT_LC,
     }
                                     flags;                      /**< Flags */
+    enum 
+    {
+        RFC_RES_NONE                = 0,                        /**< No residual method */
+        RFC_RES_IGNORE,                                         /**< Ignore residue (same as RFC_RES_NONE) */
+        RFC_RES_HALFCYCLES,                                     /**< ASTM */
+        RFC_RES_FULLCYCLES,                                     /**< Count half cycles as full cycles */
+        RFC_RES_CLORMANN_SEEGER,                                /**< Clormann-Seeger method */
+        RFC_RES_REPEATED,                                       /**< Repeat residue and count closed cycles */
+        RFC_RES_RP_DIN,                                         /**< Count residue according to range pair in DIN-45667 */
+    }
+                                    residual_method;
 
     /* Memory allocation functions */
     rfc_mem_alloc_fcn_t             mem_alloc;                  /**< Allocate initialized memory */

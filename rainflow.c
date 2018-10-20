@@ -80,7 +80,7 @@ static RFC_value_type       value_delta                         ( RFC_value_type
  * @return     true on success
  */
 bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
-                          RFC_value_type hysteresis )
+                          RFC_value_type hysteresis, int residual_method )
 {
     rfc_ctx_s         *rfc_ctx = (rfc_ctx_s*)ctx;
     rfc_value_tuple_s  nil   = { 0.0 };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
@@ -92,6 +92,9 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
     /* Flags */
     rfc_ctx->flags = RFC_FLAGS_COUNT_ALL;
     
+    /* Residual method */
+    rfc_ctx->residual_method         = residual_method;
+
     /* Counter increments */
     rfc_ctx->full_inc                = RFC_FULL_CYCLE_INCREMENT;
     rfc_ctx->half_inc                = RFC_HALF_CYCLE_INCREMENT;
@@ -292,7 +295,20 @@ bool RFC_finalize_res( rfc_ctx_s *rfc_ctx )
 {
     assert( rfc_ctx && rfc_ctx->state < RFC_STATE_FINALIZE );
 
-    return RFC_finalize_res_ignore( rfc_ctx );
+    switch( rfc_ctx->residual_method )
+    {
+        case RFC_RES_NONE:
+        case RFC_RES_IGNORE:
+            return RFC_finalize_res_ignore( rfc_ctx );
+        case RFC_RES_HALFCYCLES:
+        case RFC_RES_FULLCYCLES:
+        case RFC_RES_CLORMANN_SEEGER:
+        case RFC_RES_REPEATED:
+        case RFC_RES_RP_DIN:
+        default:
+            assert( false );
+            return false;
+    }
 }
 
 
@@ -700,7 +716,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         size_t          i;
 
         if( !RFC_init( &rfc_ctx, 
-                       class_count, (RFC_VALUE_TYPE)class_width, (RFC_VALUE_TYPE)class_offset, (RFC_VALUE_TYPE)hysteresis ) );
+                       class_count, (RFC_VALUE_TYPE)class_width, (RFC_VALUE_TYPE)class_offset, (RFC_VALUE_TYPE)hysteresis, RFC_RES_IGNORE ) );
         {
             mexErrMsgTxt( "Error during initialization!" );
         }
