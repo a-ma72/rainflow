@@ -1,6 +1,6 @@
 clear rfc
 clc
-if 1
+if 0
     for delegates = 0:1
         for int_counts = 0:1
             for val_type = {'float','double'}
@@ -16,6 +16,5 @@ if 1
         end
     end
 else
-%    mex -g -v -c COMPFLAGS='$COMPFLAGS /P' -output rfc rainflow.c
     mex -g -v -output rfc rainflow.c
 end
