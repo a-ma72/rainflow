@@ -100,9 +100,9 @@ typedef struct rfc_value_tuple  rfc_value_tuple_s;   /** Tuple of value and inde
 
 /* Core */
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
-                                           RFC_value_type hysteresis, int residual_method );
+                                           RFC_value_type hysteresis );
 bool RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count );
-void RFC_feed_finalize        ( void *ctx );
+void RFC_feed_finalize        ( void *ctx, int residual_method );
 void RFC_deinit               ( void *ctx );
 
 
