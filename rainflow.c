@@ -393,7 +393,7 @@ bool RFC_feed_handle_tp( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt, bool is_righ
             }
         }
  
-        if( do_margin )
+        if( do_margin && rfc_ctx->internal.pos > 1)
         {
             if( !RFC_tp_add( rfc_ctx, pt ) ) return false;
         }
@@ -1284,6 +1284,18 @@ int greatest_fprintf( FILE* f, const char* fmt, ... )
     }                                                                                        \
     else FAIL();
 
+#define SIMPLE_RFC_MARGIN_0(TP,TP_N,OFFS,X) \
+    if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
+                        1 /* hysteresis */,                                                  \
+                        TP /* *tp */, TP_N /* tp_cap */ ) )                                  \
+    {                                                                                        \
+        RFC_VALUE_TYPE data[] = {0};                                                         \
+        ctx.flags |= RFC_FLAGS_ENFORCE_MARGIN;                                               \
+        RFC_feed( &ctx, data, 0 );                                                           \
+        RFC_feed_finalize( &ctx, RFC_RES_NONE /* residual_method */ );                       \
+    }                                                                                        \
+    else FAIL();
+
 #define SIMPLE_RFC_MARGIN(TP,TP_N,OFFS,X) \
     if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
                         1 /* hysteresis */,                                                  \
@@ -1305,6 +1317,9 @@ TEST RFC_test_turning_points(void)
     rfc_ctx_s         ctx = {sizeof(ctx)};
     rfc_value_tuple_s tp[10];
 
+    /*******************************************/
+    /*        Test 0, 1 or 2 samples           */
+    /*******************************************/
     SIMPLE_RFC_0( tp, 10, 0.0 );
     ASSERT( ctx.tp_cnt == 0 );
     ctx.tp = NULL;
@@ -1320,13 +1335,49 @@ TEST RFC_test_turning_points(void)
     ctx.tp = NULL;
     RFC_deinit( &ctx );
 
-    SIMPLE_RFC( tp, 10, 0.0, (0.0f,0.1f) );
+    SIMPLE_RFC( tp, 10, 0.0, (0.0f, 0.1f) );
     ASSERT( ctx.tp_cnt == 0 );
     ctx.tp = NULL;
     RFC_deinit( &ctx );
 
-    SIMPLE_RFC( tp, 10, 0.0, (0.0f,1.0f) );
+    SIMPLE_RFC( tp, 10, 0.0, (0.0f, 1.0f) );
     ASSERT( ctx.tp_cnt == 0 );
+    ctx.tp = NULL;
+    RFC_deinit( &ctx );
+
+    /**************** Test margin *******************/
+    SIMPLE_RFC_MARGIN_0( tp, 10, 0.0 );
+    ASSERT( ctx.tp_cnt == 0 );
+    ctx.tp = NULL;
+    RFC_deinit( &ctx );
+
+    SIMPLE_RFC_MARGIN( tp, 10, 0.0, (0) );
+    ASSERT( ctx.tp_cnt == 1 );
+    ctx.tp = NULL;
+    RFC_deinit( &ctx );
+
+    SIMPLE_RFC_MARGIN( tp, 10, 0.0, (0, 0) );
+    ASSERT( ctx.tp_cnt == 2 );
+    ctx.tp = NULL;
+    RFC_deinit( &ctx );
+
+    SIMPLE_RFC_MARGIN( tp, 10, 0.0, (0.0f, 0.1f) );
+    ASSERT( ctx.tp_cnt == 2 );
+    ctx.tp = NULL;
+    RFC_deinit( &ctx );
+
+    SIMPLE_RFC_MARGIN( tp, 10, 0.0, (0.0f, 1.0f) );
+    ASSERT( ctx.tp_cnt == 2 );
+    ctx.tp = NULL;
+    RFC_deinit( &ctx );
+
+    /*******************************************/
+    /*           Test longer series            */
+    /*******************************************/
+    /* Still in hysteresis band */
+    SIMPLE_RFC( tp, 10, 0.0, (0.0f, 0.0f, 1.0f, 1.0f) );
+    ASSERT( ctx.tp_cnt == 0 );
+    ASSERT( ctx.residue_cnt == 0 );
     ctx.tp = NULL;
     RFC_deinit( &ctx );
 
@@ -1335,6 +1386,7 @@ TEST RFC_test_turning_points(void)
     ctx.tp = NULL;
     RFC_deinit( &ctx );
 
+    /* Series with 3 turning points */
     SIMPLE_RFC( tp, 10, 0.0, (1.0f, 1.1f, 1.2f, 2.0f, 2.1f, 1.1f, 1.3f, 1.0f, 1.98f, 1.0f) );
     ASSERT( ctx.tp_cnt == 3 );
     ASSERT( ctx.tp[0].value == 1.0f && ctx.tp[0].pos == 1 );
@@ -1347,7 +1399,16 @@ TEST RFC_test_turning_points(void)
     ctx.tp = NULL;
     RFC_deinit( &ctx );
 
-    /* Test margin */
+    /**************** Test margin *******************/
+    /* Still in hysteresis band */
+    SIMPLE_RFC_MARGIN( tp, 10, 0.0, (0.0f, 0.0f, 1.0f, 1.0f) );
+    ASSERT( ctx.tp_cnt == 2 );
+    ASSERT( ctx.tp[0].value == 0.0f && ctx.tp[0].pos == 1 );
+    ASSERT( ctx.tp[1].value == 1.0f && ctx.tp[1].pos == 4 );
+    ASSERT( ctx.residue_cnt == 0 );
+    ctx.tp = NULL;
+    RFC_deinit( &ctx );
+
     SIMPLE_RFC_MARGIN( tp, 10, 0.0, (1.0f, 1.1f, 1.2f, 1.1f, 1.3f, 1.0f, 1.98f, 1.0f) );
     ASSERT( ctx.tp_cnt == 2 );
     ASSERT( ctx.tp[0].value == 1.0f && ctx.tp[0].pos == 1 );
@@ -1356,15 +1417,16 @@ TEST RFC_test_turning_points(void)
     ctx.tp = NULL;
     RFC_deinit( &ctx );
 
+    /* Series with 3 turning points */
     SIMPLE_RFC_MARGIN( tp, 10, 0.0, (1.0f, 1.0f, 2.1f, 2.1f, 1.0f, 1.0f) );
     ASSERT( ctx.tp_cnt == 3 );
     ASSERT( ctx.tp[0].value == 1.0f && ctx.tp[0].pos == 1 );
     ASSERT( ctx.tp[1].value == 2.1f && ctx.tp[1].pos == 3 );
-    ASSERT( ctx.tp[2].value == 1.0f && ctx.tp[2].pos == 6 );
+    ASSERT( ctx.tp[2].value == 1.0f && ctx.tp[2].pos == 6 ); /* Turning point at right margin! */
     ASSERT( ctx.residue_cnt == 3 );
     ASSERT( ctx.residue[0].value == 1.0f && ctx.residue[0].pos == 1 );
     ASSERT( ctx.residue[1].value == 2.1f && ctx.residue[1].pos == 3 );
-    ASSERT( ctx.residue[2].value == 1.0f && ctx.residue[2].pos == 5 );
+    ASSERT( ctx.residue[2].value == 1.0f && ctx.residue[2].pos == 5 );  /* In residue, turning point at original position! */
     ctx.tp = NULL;
     RFC_deinit( &ctx );
 
