@@ -60,7 +60,7 @@ static void                 RFC_cycle_find_4ptm                 ( rfc_ctx_s * );
 static void                 RFC_cycle_process                   ( rfc_ctx_s *, const rfc_value_tuple_s *from, const rfc_value_tuple_s *to, int flags );
 /* Residual methods */
 static void                 RFC_finalize_interim                ( rfc_ctx_s * );
-static bool                 RFC_finalize_res                    ( rfc_ctx_s * );
+static bool                 RFC_finalize_res                    ( rfc_ctx_s *, int residual_method );
 static bool                 RFC_finalize_res_ignore             ( rfc_ctx_s * );
 static bool                 RFC_finalize_res_halfcycles         ( rfc_ctx_s * );
 static bool                 RFC_finalize_res_fullcycles         ( rfc_ctx_s * );
@@ -92,10 +92,10 @@ static RFC_value_type       value_delta                         ( RFC_value_type
  * @param[in]  tp            Pointer to turning points buffer
  * @param[in]  tp_cap        Number of turning points in buffer
  *
- * @return     true on success
+ * @return     false on error
  */
 bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
-                          RFC_value_type hysteresis, int residual_method,
+                          RFC_value_type hysteresis,
                           rfc_value_tuple_s *tp, size_t tp_cap )
 {
     rfc_ctx_s         *rfc_ctx = (rfc_ctx_s*)ctx;
@@ -103,14 +103,15 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
 
     if( !rfc_ctx || rfc_ctx->state != RFC_STATE_INIT0 ) return false;
 
-    assert( rfc_ctx->version == sizeof(rfc_ctx_s) );
+    if( rfc_ctx->version != sizeof(rfc_ctx_s) )
+    {
+        assert( false );
+        return false;
+    }
 
     /* Flags */
     rfc_ctx->flags = RFC_FLAGS_COUNT_ALL;
     
-    /* Residual method */
-    rfc_ctx->residual_method         = residual_method;
-
     /* Counter increments */
     rfc_ctx->full_inc                = RFC_FULL_CYCLE_INCREMENT;
     rfc_ctx->half_inc                = RFC_HALF_CYCLE_INCREMENT;
@@ -135,7 +136,7 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
     /* Memory allocator */
     if( !rfc_ctx->mem_alloc )
     {
-      rfc_ctx->mem_alloc = RFC_mem_alloc;
+        rfc_ctx->mem_alloc = RFC_mem_alloc;
     }
     
 #if RFC_USE_DELEGATES
@@ -186,7 +187,6 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
 
 /**
  * @brief      De-initialization (freeing memory).
- *             Turning points must be freed before!
  *
  * @param      ctx  The rainflow context
  */
@@ -197,7 +197,11 @@ void RFC_deinit( void *ctx )
 
     if( !rfc_ctx ) return;
 
-    assert( rfc_ctx->version == sizeof( rfc_ctx_s ) );
+    if( rfc_ctx->version != sizeof(rfc_ctx_s) )
+    {
+        assert( false );
+        return;
+    }
 
     if( rfc_ctx->residue )           rfc_ctx->mem_alloc( rfc_ctx->residue, 0, 0 );
     if( rfc_ctx->matrix )            rfc_ctx->mem_alloc( rfc_ctx->matrix,  0, 0 );
@@ -246,7 +250,12 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
     if( !rfc_ctx ) return false;
 
     assert( !data_count || data );
-    assert( rfc_ctx->version == sizeof( rfc_ctx_s ) );
+
+    if( rfc_ctx->version != sizeof(rfc_ctx_s) )
+    {
+        assert( false );
+        return false;
+    }
 
     if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state >= RFC_STATE_FINISHED )
     {
@@ -264,6 +273,8 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
 
         if( !RFC_feed_handle_tp( rfc_ctx, &tp, !data_count /* is_right_margin */ ) ) return false;
     }
+
+    return true;
 }
 
 
@@ -393,15 +404,15 @@ bool RFC_feed_handle_tp( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt, bool is_righ
 
 
 /**
- * @brief      Finalizing.
- *             Take residue into account.
+ * @brief      Finalizing, taking residue into account.
  *
- * @param      rfc_ctx        The rainflow context
+ * @param      rfc_ctx            The rainflow context
+ * @param[in]  residual_method    Method to apply to residue
  */
-void RFC_feed_finalize( rfc_ctx_s* rfc_ctx )
+void RFC_feed_finalize( rfc_ctx_s* rfc_ctx, int residual_method )
 {
     /* Finalizing (process last turning point */
-    rfc_ctx->state = RFC_finalize_res( rfc_ctx ) ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
+    rfc_ctx->state = RFC_finalize_res( rfc_ctx, residual_method ) ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
 }
 
 
@@ -433,23 +444,25 @@ void RFC_finalize_interim( rfc_ctx_s *rfc_ctx )
 
 
 /**
- * @brief      Finalize pending counts, ignoring residue.
+ * @brief       Finalize pending counts, ignoring residue.
  *
- * @param      rfc_ctx  The rainflow context
+ * @param       rfc_ctx  The rainflow context
+ * 
+ * @return      false on error
  */
 static
-bool RFC_finalize_res( rfc_ctx_s *rfc_ctx )
+bool RFC_finalize_res( rfc_ctx_s *rfc_ctx, int residual_method )
 {
     assert( rfc_ctx && rfc_ctx->state < RFC_STATE_FINALIZE );
 
 #if RFC_USE_DELEGATES
     if( rfc_ctx->finalize_fcn )
     {
-        return rfc_ctx->finalize_fcn( rfc_ctx );
+        return rfc_ctx->finalize_fcn( rfc_ctx, residual_method );
     }
 #endif
 
-    switch( rfc_ctx->residual_method )
+    switch( residual_method )
     {
         case RFC_RES_NONE:
         case RFC_RES_IGNORE:
@@ -472,9 +485,11 @@ bool RFC_finalize_res( rfc_ctx_s *rfc_ctx )
 
 
 /**
- * @brief      Finalize pending counts, ignoring residue.
+ * @brief       Finalize pending counts, ignoring residue.
  *
- * @param      rfc_ctx  The rainflow context
+ * @param       rfc_ctx  The rainflow context
+ * 
+ * @return      false on error
  */
 static
 bool RFC_finalize_res_ignore( rfc_ctx_s *rfc_ctx )
@@ -664,13 +679,13 @@ double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_
 /*** Implementation static functions ***/
 
 /**
- * @brief      Returns the unsigned difference of two values, sign optionally returned as -1 or 1.
+ * @brief       Returns the unsigned difference of two values, sign optionally returned as -1 or 1.
  *
  * @param[in]   from      Left hand value
  * @param[in]   to        Right hand value
  * @param[out]  sign_ptr  Pointer to catch sign (may be NULL)
  *
- * @return     Returns the absolute difference of given values
+ * @return      Returns the absolute difference of given values
  */
 static
 RFC_value_type value_delta( RFC_value_type from, RFC_value_type to, int *sign_ptr )
@@ -764,7 +779,7 @@ rfc_value_tuple_s * RFC_tp_next( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *pt
                 assert( rfc_ctx->residue_cnt < rfc_ctx->residue_cap );
                 rfc_ctx->residue[rfc_ctx->residue_cnt] = rfc_ctx->internal.extrema[is_falling_slope];
 
-                slope = is_falling_slope ? -1 : 1;
+                rfc_ctx->internal.slope = is_falling_slope ? -1 : 1;
 
                 /* pt is the new interim turning point */
                 rfc_ctx->state = RFC_STATE_BUSY_INTERIM;
@@ -813,7 +828,10 @@ rfc_value_tuple_s * RFC_tp_next( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *pt
             /* Scenario (1), Continuous slope */
 
             /* Replace interim turning point with new extrema */
-            do_append = 1;
+            if( rfc_ctx->residue[rfc_ctx->residue_cnt].value != pt->value )
+            {
+                rfc_ctx->residue[rfc_ctx->residue_cnt] = *pt;
+            }
         }
         else
         {
@@ -1075,8 +1093,8 @@ bool RFC_tp_add( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *tp )
             }
             /* Append turning point */
             rfc_ctx->tp[ rfc_ctx->tp_cnt++ ] = *tp;
-            return true;
         }
+        return true;
     }
 }
 
@@ -1099,6 +1117,7 @@ void RFC_tp_lock( rfc_ctx_s *rfc_ctx, bool do_lock )
  * @param       ptr     Previous data pointer, or NULL, if unset
  * @param[in]   num     The number of elements
  * @param[in]   size    The size of one element in bytes
+ *
  * @returns     New memory pointer or NULL if either num or size is 0
  * 
  */
@@ -1245,12 +1264,11 @@ int greatest_fprintf( FILE* f, const char* fmt, ... )
 #define SIMPLE_RFC_0(TP,TP_N,OFFS) \
     if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
                         1 /* hysteresis */,                                                  \
-                        RFC_RES_NONE /* residual_method */,                                  \
                         TP /* *tp */, TP_N /* tp_cap */ ) )                                  \
     {                                                                                        \
         RFC_VALUE_TYPE data[] = {0};                                                         \
         RFC_feed( &ctx, data, 0 );                                                           \
-        RFC_feed_finalize( &ctx );                                                           \
+        RFC_feed_finalize( &ctx, RFC_RES_NONE /* residual_method */ );                       \
     }                                                                                        \
     else FAIL();
 
@@ -1258,25 +1276,23 @@ int greatest_fprintf( FILE* f, const char* fmt, ... )
 #define SIMPLE_RFC(TP,TP_N,OFFS,X) \
     if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
                         1 /* hysteresis */,                                                  \
-                        RFC_RES_NONE /* residual_method */,                                  \
                         TP /* *tp */, TP_N /* tp_cap */ ) )                                  \
     {                                                                                        \
         RFC_VALUE_TYPE data[] = {INIT_ARRAY X};                                              \
         RFC_feed( &ctx, data, sizeof(data)/sizeof(RFC_VALUE_TYPE) );                         \
-        RFC_feed_finalize( &ctx );                                                           \
+        RFC_feed_finalize( &ctx, RFC_RES_NONE /* residual_method */ );                       \
     }                                                                                        \
     else FAIL();
 
 #define SIMPLE_RFC_MARGIN(TP,TP_N,OFFS,X) \
     if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
                         1 /* hysteresis */,                                                  \
-                        RFC_RES_NONE /* residual_method */,                                  \
                         TP /* *tp */, TP_N /* tp_cap */ ) )                                  \
     {                                                                                        \
         RFC_VALUE_TYPE data[] = {INIT_ARRAY X};                                              \
         ctx.flags |= RFC_FLAGS_ENFORCE_MARGIN;                                               \
         RFC_feed( &ctx, data, sizeof(data)/sizeof(RFC_VALUE_TYPE) );                         \
-        RFC_feed_finalize( &ctx );                                                           \
+        RFC_feed_finalize( &ctx, RFC_RES_NONE /* residual_method */ );                       \
     }                                                                                        \
     else FAIL();
 
@@ -1407,12 +1423,16 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         double          class_offset = mxGetScalar( mxClassOffset );
         double          hysteresis   = mxGetScalar( mxHysteresis );
         size_t          i;
+        bool            ok;
 
-        rfc_ctx.tp = (rfc_value_tuple_s*)RFC_mem_alloc( NULL, data_len, sizeof(rfc_value_tuple_s) );
+        rfc_ctx.tp_cap = 128;
+        rfc_ctx.tp     = (rfc_value_tuple_s*)RFC_mem_alloc( NULL, rfc_ctx.tp_cap, sizeof(rfc_value_tuple_s) );
 
-        if( !RFC_init( &rfc_ctx, 
+        ok = RFC_init( &rfc_ctx, 
                        class_count, (RFC_VALUE_TYPE)class_width, (RFC_VALUE_TYPE)class_offset, (RFC_VALUE_TYPE)hysteresis, 
-                       RFC_RES_NONE, rfc_ctx.tp, data_len ) )
+                       rfc_ctx.tp, rfc_ctx.tp_cap );
+
+        if( !ok )
         {
             mexErrMsgTxt( "Error during initialization!" );
         }
@@ -1429,8 +1449,9 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 
         /* rfc_ctx.residue_final_method = 0; */
 
+        rfc_ctx.flags |= RFC_FLAGS_ENFORCE_MARGIN;
         RFC_feed( &rfc_ctx, buffer, data_len  );
-        RFC_feed_finalize( &rfc_ctx );
+        RFC_feed_finalize( &rfc_ctx, RFC_RES_IGNORE );
 
         if( (void*)buffer != (void*)data )
         {

@@ -107,11 +107,11 @@ typedef struct rfc_value_tuple  rfc_value_tuple_s;   /** Tuple of value and inde
 
 /* Core */
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
-                                           RFC_value_type hysteresis, int residual_method,
+                                           RFC_value_type hysteresis,
                                            rfc_value_tuple_s *tp, size_t tp_cap );
 bool RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count );
 bool RFC_feed_tuple           ( void *ctx, rfc_value_tuple_s *data, size_t count );
-void RFC_feed_finalize        ( void *ctx );
+void RFC_feed_finalize        ( void *ctx, int residual_method );
 void RFC_deinit               ( void *ctx );
 
 #if RFC_USE_DELEGATES
@@ -119,7 +119,7 @@ void RFC_deinit               ( void *ctx );
 typedef  double              ( *rfc_damage_calc_fcn_t )   ( rfc_ctx_s *, unsigned from_class, unsigned to_class );
 typedef  rfc_value_tuple_s * ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, const rfc_value_tuple_s * );
 typedef  bool                ( *rfc_tp_add_fcn_t )        ( rfc_ctx_s *, rfc_value_tuple_s * );
-typedef  bool                ( *rfc_finalize_fcn_t )      ( rfc_ctx_s * );
+typedef  bool                ( *rfc_finalize_fcn_t )      ( rfc_ctx_s *, int residual_methods );
 typedef  void                ( *rfc_cycle_find_fcn_t )    ( rfc_ctx_s * );
 #endif
 
