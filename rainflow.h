@@ -116,9 +116,10 @@ typedef struct rfc_value_tuple  rfc_value_tuple_s;   /** Tuple of value and inde
 /* Core */
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis );
-bool RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count );
-void RFC_feed_finalize        ( void *ctx, int residual_method );
 void RFC_deinit               ( void *ctx );
+bool RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count );
+bool RFC_feed_tuple           ( void *ctx, rfc_value_tuple_s *data, size_t count );
+bool RFC_finalize             ( void *ctx, int residual_method );
 
 
 /* Value info struct */
@@ -150,6 +151,7 @@ typedef struct rfc_ctx
 
     enum
     {
+        RFC_ERROR_INVARG,
         RFC_ERROR_MEMORY,
     }                               error;                      /**< Error code */
 
@@ -170,11 +172,6 @@ typedef struct rfc_ctx
     {
         RFC_RES_NONE                = 0,                        /**< No residual method */
         RFC_RES_IGNORE,                                         /**< Ignore residue (same as RFC_RES_NONE) */
-        RFC_RES_HALFCYCLES,                                     /**< ASTM */
-        RFC_RES_FULLCYCLES,                                     /**< Count half cycles as full cycles */
-        RFC_RES_CLORMANN_SEEGER,                                /**< Clormann-Seeger method */
-        RFC_RES_REPEATED,                                       /**< Repeat residue and count closed cycles */
-        RFC_RES_RP_DIN,                                         /**< Count residue according to range pair in DIN-45667 */
     }
                                     residual_method;
 

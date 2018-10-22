@@ -97,13 +97,12 @@
 #endif
 
 /* Core functions */
-static bool                 RFC_feed_handle_tp                  ( rfc_ctx_s *, rfc_value_tuple_s* tp );
+static bool                 RFC_feed_once                       ( rfc_ctx_s *, rfc_value_tuple_s* tp );
+static bool                 RFC_feed_finalize                   ( rfc_ctx_s *rfc_ctx );
 static rfc_value_tuple_s *  RFC_tp_next                         ( rfc_ctx_s *, const rfc_value_tuple_s *pt );
 static void                 RFC_cycle_find_4ptm                 ( rfc_ctx_s * );
 static void                 RFC_cycle_process                   ( rfc_ctx_s *, const rfc_value_tuple_s *from, const rfc_value_tuple_s *to, int flags );
 /* Residual methods */
-static void                 RFC_finalize_interim                ( rfc_ctx_s * );
-static bool                 RFC_finalize_res                    ( rfc_ctx_s *, int residual_method );
 static bool                 RFC_finalize_res_ignore             ( rfc_ctx_s * );
 /* Memory allocator */
 static void *               RFC_mem_alloc                       ( void *ptr, size_t num, size_t size );
@@ -135,24 +134,29 @@ bool RFC_init( void *ctx,
     rfc_ctx_s         *rfc_ctx = (rfc_ctx_s*)ctx;
     rfc_value_tuple_s  nil   = { 0.0 };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
 
-    if( !rfc_ctx || rfc_ctx->state != RFC_STATE_INIT0 ) return false;
-
-    if( rfc_ctx->version != sizeof(rfc_ctx_s) )
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
     {
         assert( false );
+        rfc_ctx->error = RFC_ERROR_INVARG;
         return false;
     }
 
+    if( rfc_ctx->state != RFC_STATE_INIT0 ) return false;
+
     /* Flags */
-    rfc_ctx->flags = RFC_FLAGS_COUNT_ALL;
+    rfc_ctx->flags                   = RFC_FLAGS_COUNT_ALL;
     
     /* Counter increments */
     rfc_ctx->full_inc                = RFC_FULL_CYCLE_INCREMENT;
     rfc_ctx->half_inc                = RFC_HALF_CYCLE_INCREMENT;
     rfc_ctx->curr_inc                = RFC_FULL_CYCLE_INCREMENT;
 
-    if( !class_count || class_count > 512 ) return false;
-    if( class_width <= 0.0 )                return false;
+    if( !class_count || class_count > 512 ||
+         class_width <= 0.0 )
+    {
+        rfc_ctx->error = RFC_ERROR_INVARG;
+        return false;
+    }
 
     /* Rainflow class parameters */
     rfc_ctx->class_count             = class_count;
@@ -189,6 +193,8 @@ bool RFC_init( void *ctx,
     if( !rfc_ctx->residue || !rfc_ctx->matrix )
     {
         RFC_deinit( rfc_ctx );
+        rfc_ctx->error = RFC_ERROR_INVARG;
+
         return false;
     }
     
@@ -207,11 +213,11 @@ void RFC_deinit( void *ctx )
     rfc_ctx_s         *rfc_ctx = (rfc_ctx_s*)ctx;
     rfc_value_tuple_s  nil     = { 0.0 };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
 
-    if( !rfc_ctx ) return;
-
-    if( rfc_ctx->version != sizeof(rfc_ctx_s) )
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
     {
         assert( false );
+        rfc_ctx->error = RFC_ERROR_INVARG;
+
         return;
     }
 
@@ -247,13 +253,13 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
 {
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
-    if( !rfc_ctx ) return false;
+    if( data_count && !data ) return false;
 
-    assert( !data_count || data );
-
-    if( rfc_ctx->version != sizeof(rfc_ctx_s) )
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
     {
         assert( false );
+        rfc_ctx->error = RFC_ERROR_INVARG;
+
         return false;
     }
 
@@ -271,7 +277,7 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
         tp.class = QUANTIZE( rfc_ctx, tp.value );
         tp.pos   = ++rfc_ctx->internal.pos;
 
-        if( !RFC_feed_handle_tp( rfc_ctx, &tp ) ) return false;
+        if( !RFC_feed_once( rfc_ctx, &tp ) ) return false;
     }
 
     return true;
@@ -282,9 +288,39 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
 
 
 /**
- * @brief      Processing data (one data point).
+ * @brief       Finalize pending counts and turning point storage.
+ *
+ * @param       rfc_ctx  The rainflow context
+ * 
+ * @return      false on error
+ */
+bool RFC_finalize( rfc_ctx_s *rfc_ctx, int residual_method )
+{
+    bool ok;
+
+    assert( rfc_ctx && rfc_ctx->state < RFC_STATE_FINALIZE );
+
+    switch( residual_method )
+    {
+        case RFC_RES_NONE:
+            /* fallthrough */
+        case RFC_RES_IGNORE:
+            ok = RFC_finalize_res_ignore( rfc_ctx );
+            break;
+        default:
+            assert( false );
+            rfc_ctx->error = RFC_ERROR_INVARG;
+            ok = false;
+    }
+
+    rfc_ctx->state = ok ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
+    return ok;
+}
+
+
+/**
+ * @brief      Processing one data point.
  *             Find turning points and check for closed cycles.
- *             Locks turning points queue, if is_right_margin.
  *
  * @param      rfc_ctx          The rainflow context
  * @param[in]  pt               The data tuple
@@ -292,13 +328,19 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
  * @return     false on error
  */
 static
-bool RFC_feed_handle_tp( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
+bool RFC_feed_once( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
 {
     rfc_value_tuple_s *tp_residue;
 
-    /* Check for next turning point */
+    assert( rfc_ctx && pt );
+
+    /* Check for next turning point and update residue */
+    /* (tp_residue refers member residue in rfc_ctx) */
     tp_residue = RFC_tp_next( rfc_ctx, pt );
 
+    /* Rainflow counting */
+
+    /* Check for closed cycles */
     if( tp_residue )
     {
         /* New turning point, check for closed cycles and count */
@@ -310,71 +352,44 @@ bool RFC_feed_handle_tp( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
 
 
 /**
- * @brief      Finalizing, taking residue into account.
- *
- * @param      rfc_ctx            The rainflow context
- * @param[in]  residual_method    Method to apply to residue
- */
-void RFC_feed_finalize( rfc_ctx_s* rfc_ctx, int residual_method )
-{
-    /* Finalizing (process last turning point */
-    rfc_ctx->state = RFC_finalize_res( rfc_ctx, residual_method ) ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
-}
-
-
-/**
- * @brief      Handling interim turning point.
- *             There is still one unhandled turning point left.
+ * @brief      Handling interim turning point and margin.
+ *             There are still unhandled turning point left.
  *             "Finalizing" takes this into account for the rainflow algorithm.
  *
  * @param      rfc_ctx  The rainflow context
+ *
+ * @return     false on error
  */
 static
-void RFC_finalize_interim( rfc_ctx_s *rfc_ctx )
+bool RFC_feed_finalize( rfc_ctx_s *rfc_ctx )
 {
-    assert( rfc_ctx && rfc_ctx->state < RFC_STATE_FINALIZE );
+    rfc_value_tuple_s *tp_interim = NULL;
+
+    assert( rfc_ctx );
+    
+    if( rfc_ctx->state >= RFC_STATE_FINALIZE )
+    {
+        return false;
+    }
 
     /* Adjust residue: Incorporate interim turning point */
     if( rfc_ctx->state == RFC_STATE_BUSY_INTERIM )
     {
         assert( rfc_ctx->residue && rfc_ctx->residue_cnt );
 
+        tp_interim = &rfc_ctx->residue[rfc_ctx->residue_cnt];
         rfc_ctx->residue_cnt++;
+    }
 
-        /* Check if a new cycle is closed now */
+    if( tp_interim )
+    {
+        /* Check once more if a new cycle is closed now */
         RFC_cycle_find_4ptm( rfc_ctx );
     }
 
     rfc_ctx->state = RFC_STATE_FINALIZE;
-}
 
-
-/**
- * @brief       Finalize pending counts, ignoring residue.
- *
- * @param       rfc_ctx  The rainflow context
- * 
- * @return      false on error
- */
-static
-bool RFC_finalize_res( rfc_ctx_s *rfc_ctx, int residual_method )
-{
-    assert( rfc_ctx && rfc_ctx->state < RFC_STATE_FINALIZE );
-
-    switch( residual_method )
-    {
-        case RFC_RES_NONE:
-        case RFC_RES_IGNORE:
-            return RFC_finalize_res_ignore( rfc_ctx, residual_method );
-        case RFC_RES_HALFCYCLES:
-        case RFC_RES_FULLCYCLES:
-        case RFC_RES_CLORMANN_SEEGER:
-        case RFC_RES_REPEATED:
-        case RFC_RES_RP_DIN:
-        default:
-            assert( false );
-            return false;
-    }
+    return true;
 }
 
 
@@ -389,8 +404,9 @@ static
 bool RFC_finalize_res_ignore( rfc_ctx_s *rfc_ctx )
 {
     /* Just include interim turning point */
-    return RFC_finalize_interim( rfc_ctx );
+    return RFC_feed_finalize( rfc_ctx );
 }
+
 
 
 /**
@@ -475,8 +491,10 @@ rfc_value_tuple_s * RFC_tp_next( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *pt
     rfc_value_tuple_s  *new_tp    = NULL;
     int                 do_append = 0;
 
-    assert( rfc_ctx && pt );
+    assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state <= RFC_STATE_BUSY_INTERIM );
+
+    if( !pt ) return NULL;
 
     slope = rfc_ctx->internal.slope;
 
@@ -564,7 +582,10 @@ rfc_value_tuple_s * RFC_tp_next( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *pt
             /* Scenario (1), Continuous slope */
 
             /* Replace interim turning point with new extrema */
-            rfc_ctx->residue[rfc_ctx->residue_cnt] = *pt;
+            if( rfc_ctx->residue[rfc_ctx->residue_cnt].value != pt->value )
+            {
+                rfc_ctx->residue[rfc_ctx->residue_cnt] = *pt;
+            }
         }
         else
         {
@@ -783,9 +804,11 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         double          class_offset = mxGetScalar( mxClassOffset );
         double          hysteresis   = mxGetScalar( mxHysteresis );
         size_t          i;
+        bool            ok;
 
-        bool ok = RFC_init( &rfc_ctx, class_count, (RFC_VALUE_TYPE)class_width, (RFC_VALUE_TYPE)class_offset, 
-                                 (RFC_VALUE_TYPE)hysteresis );
+        ok = RFC_init( &rfc_ctx, 
+                       class_count, (RFC_VALUE_TYPE)class_width, (RFC_VALUE_TYPE)class_offset, 
+                       (RFC_VALUE_TYPE)hysteresis );
 
         if( !ok )
         {
@@ -805,7 +828,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         /* rfc_ctx.residue_final_method = 0; */
 
         RFC_feed( &rfc_ctx, buffer, data_len  );
-        RFC_feed_finalize( &rfc_ctx, RFC_RES_IGNORE );
+        RFC_finalize( &rfc_ctx, RFC_RES_IGNORE );
 
         if( (void*)buffer != (void*)data )
         {
