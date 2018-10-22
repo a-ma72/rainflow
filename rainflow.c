@@ -128,8 +128,9 @@ static RFC_value_type       value_delta                         ( RFC_value_type
  *
  * @return     false on error
  */
-bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
-                          RFC_value_type hysteresis )
+bool RFC_init( void *ctx, 
+               unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
+               RFC_value_type hysteresis )
 {
     rfc_ctx_s         *rfc_ctx = (rfc_ctx_s*)ctx;
     rfc_value_tuple_s  nil   = { 0.0 };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
@@ -234,7 +235,7 @@ void RFC_deinit( void *ctx )
 
 
 /**
- * @brief      "Feed" counting algorithm with data samples.
+ * @brief      "Feed" counting algorithm with data samples (consecutive calls allowed).
  *
  * @param      ctx          The rainflow context
  * @param[in]  data         The data
