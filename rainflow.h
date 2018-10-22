@@ -113,12 +113,11 @@ typedef struct rfc_ctx          rfc_ctx_s;           /** Forward declaration (ra
 typedef struct rfc_value_tuple  rfc_value_tuple_s;   /** Tuple of value and index position */
 
 
-/* Core */
+/* Core functions */
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis );
 void RFC_deinit               ( void *ctx );
 bool RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count );
-bool RFC_feed_tuple           ( void *ctx, rfc_value_tuple_s *data, size_t count );
 bool RFC_finalize             ( void *ctx, int residual_method );
 
 
@@ -132,7 +131,7 @@ typedef struct rfc_value_tuple
 
 
 /**
- * Rainflow context
+ * Rainflow context (ctx)
  */
 typedef struct rfc_ctx
 {
@@ -158,14 +157,7 @@ typedef struct rfc_ctx
     enum
     {
         RFC_FLAGS_COUNT_MATRIX      = 1 << 0,                   /**< Count into matrix */
-        RFC_FLAGS_COUNT_RP          = 1 << 1,                   /**< Count into range pair */
-        RFC_FLAGS_COUNT_LC_UP       = 1 << 2,                   /**< Count into level crossing (only rising slopes) */
-        RFC_FLAGS_COUNT_LC_DN       = 1 << 3,                   /**< Count into level crossing (only falling slopes) */
-        RFC_FLAGS_COUNT_LC          = RFC_FLAGS_COUNT_LC_UP     /**< Count into level crossing (all slopes) */
-                                    | RFC_FLAGS_COUNT_LC_DN,
-        RFC_FLAGS_COUNT_ALL         = RFC_FLAGS_COUNT_MATRIX    /**< Count all */
-                                    | RFC_FLAGS_COUNT_RP
-                                    | RFC_FLAGS_COUNT_LC,
+        RFC_FLAGS_COUNT_ALL         = RFC_FLAGS_COUNT_MATRIX,   /**< Count all */
     }
                                     flags;                      /**< Flags */
     enum 

@@ -318,6 +318,13 @@ bool RFC_finalize( rfc_ctx_s *rfc_ctx, int residual_method )
 }
 
 
+
+
+
+
+
+/*** Implementation static functions ***/
+
 /**
  * @brief      Processing one data point.
  *             Find turning points and check for closed cycles.
@@ -447,8 +454,6 @@ double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_
     return D_i;
 }
 
-
-/*** Implementation static functions ***/
 
 /**
  * @brief       Returns the unsigned difference of two values, sign optionally returned as -1 or 1.
@@ -815,6 +820,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
             mexErrMsgTxt( "Error during initialization!" );
         }
 
+        /* Casting values from double type to RFC_VALUE_TYPE type */ 
         if( sizeof( RFC_VALUE_TYPE ) != sizeof(double) )
         {
             RFC_VALUE_TYPE *buffer = (RFC_VALUE_TYPE *)RFC_mem_alloc( NULL, data_len, sizeof(RFC_VALUE_TYPE) );
@@ -825,21 +831,24 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         }
         else buffer = (RFC_VALUE_TYPE*)data;
 
-        /* rfc_ctx.residue_final_method = 0; */
-
+        /* Rainflow counting */
         RFC_feed( &rfc_ctx, buffer, data_len  );
         RFC_finalize( &rfc_ctx, RFC_RES_IGNORE );
 
+        /* Free temporary buffer (cast) */
         if( (void*)buffer != (void*)data )
         {
             RFC_mem_alloc( buffer, 0, 0 );
             buffer = NULL;
         }
 
+        /* Return results */
         if( plhs )
         {
+            /* Pseudo damage */
             plhs[0] = mxCreateDoubleScalar( rfc_ctx.pseudo_damage );
 
+            /* Residue */
             if( nlhs > 1 && rfc_ctx.residue )
             {
                 mxArray* re = mxCreateDoubleMatrix( rfc_ctx.residue_cnt, 1, mxREAL );
@@ -856,6 +865,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                 }
             }
 
+            /* Rainflow matrix */
             if( nlhs > 2 && rfc_ctx.matrix )
             {
                 mxArray* matrix = mxCreateDoubleMatrix( class_count, class_count, mxREAL );
@@ -867,6 +877,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
             }
         }
 
+        /* Deinitialize rainflow context */
         RFC_deinit( &rfc_ctx );
     }
 }

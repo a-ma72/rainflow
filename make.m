@@ -1,6 +1,7 @@
 clear rfc
 clc
-if 1
+if 0
+    % Check all permutations
     for delegates = 0:1
         for int_counts = 0:1
             for val_type = {'float','double'}
