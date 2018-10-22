@@ -1,4 +1,19 @@
-/** Rainflow Counting Algorithm (4-point-method), C89 compliant
+/*
+ *   |     .-.
+ *   |    /   \         .-.
+ *   |   /     \       /   \       .-.     .-.     _   _
+ *   +--/-------\-----/-----\-----/---\---/---\---/-\-/-\/\/---
+ *   | /         \   /       \   /     '-'     '-'
+ *   |/           '-'         '-'
+ *
+ *          ____  ___    _____   __________    ____ _       __
+ *         / __ \/   |  /  _/ | / / ____/ /   / __ \ |     / /
+ *        / /_/ / /| |  / //  |/ / /_  / /   / / / / | /| / / 
+ *       / _, _/ ___ |_/ // /|  / __/ / /___/ /_/ /| |/ |/ /  
+ *      /_/ |_/_/  |_/___/_/ |_/_/   /_____/\____/ |__/|__/   
+ *
+ *    Rainflow Counting Algorithm (4-point-method), C99 compliant
+ * 
  * 
  * "Rainflow Counting" consists of four main steps:
  *    1. Hysteresis Filtering
@@ -109,10 +124,10 @@ typedef struct rfc_value_tuple  rfc_value_tuple_s;   /** Tuple of value and inde
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis,
                                            rfc_value_tuple_s *tp, size_t tp_cap );
+void RFC_deinit               ( void *ctx );
 bool RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count );
 bool RFC_feed_tuple           ( void *ctx, rfc_value_tuple_s *data, size_t count );
-void RFC_feed_finalize        ( void *ctx, int residual_method );
-void RFC_deinit               ( void *ctx );
+bool RFC_finalize             ( void *ctx, int residual_method );
 
 #if RFC_USE_DELEGATES
 /* Delegates typedef */
@@ -152,6 +167,7 @@ typedef struct rfc_ctx
 
     enum
     {
+        RFC_ERROR_INVARG,
         RFC_ERROR_MEMORY,
     }                               error;                      /**< Error code */
 
