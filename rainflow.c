@@ -871,8 +871,16 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                 mxArray* matrix = mxCreateDoubleMatrix( class_count, class_count, mxREAL );
                 if( matrix )
                 {
+                    mxArray* transposed = NULL;
+
                     memcpy( mxGetPr(matrix), rfc_ctx.matrix, sizeof(double) * class_count * class_count );
-                    plhs[2] = matrix;
+                    mexCallMATLAB(1, &transposed, 1, &matrix, "transpose")
+                    mxDestroyArray( matrix );
+
+                    if( transposed )
+                    {
+                        plhs[2] = transposed;
+                    }
                 }
             }
         }
