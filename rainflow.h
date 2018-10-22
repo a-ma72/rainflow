@@ -1,4 +1,19 @@
-/** Rainflow Counting Algorithm (4-point-method), C89 compliant
+/*
+ *   |     .-.
+ *   |    /   \         .-.
+ *   |   /     \       /   \       .-.     .-.     _   _
+ *   +--/-------\-----/-----\-----/---\---/---\---/-\-/-\/\/---
+ *   | /         \   /       \   /     '-'     '-'
+ *   |/           '-'         '-'
+ *
+ *          ____  ___    _____   __________    ____ _       __
+ *         / __ \/   |  /  _/ | / / ____/ /   / __ \ |     / /
+ *        / /_/ / /| |  / //  |/ / /_  / /   / / / / | /| / / 
+ *       / _, _/ ___ |_/ // /|  / __/ / /___/ /_/ /| |/ |/ /  
+ *      /_/ |_/_/  |_/___/_/ |_/_/   /_____/\____/ |__/|__/   
+ *
+ *    Rainflow Counting Algorithm (4-point-method), C99 compliant
+ * 
  * 
  * "Rainflow Counting" consists of four main steps:
  *    1. Hysteresis Filtering
