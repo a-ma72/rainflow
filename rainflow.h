@@ -120,7 +120,7 @@ typedef struct rfc_ctx          rfc_ctx_s;           /** Forward declaration (ra
 typedef struct rfc_value_tuple  rfc_value_tuple_s;   /** Tuple of value and index position */
 
 
-/* Core */
+/* Core functions */
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis,
                                            rfc_value_tuple_s *tp, size_t tp_cap );
@@ -148,7 +148,7 @@ typedef struct rfc_value_tuple
 
 
 /**
- * Rainflow context
+ * Rainflow context (ctx)
  */
 typedef struct rfc_ctx
 {

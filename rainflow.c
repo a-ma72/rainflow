@@ -427,6 +427,13 @@ bool RFC_finalize( rfc_ctx_s *rfc_ctx, int residual_method )
 }
 
 
+
+
+
+
+
+/*** Implementation static functions ***/
+
 /**
  * @brief      Processing one data point.
  *             Find turning points and check for closed cycles.
@@ -759,8 +766,6 @@ double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_
     return D_i;
 }
 
-
-/*** Implementation static functions ***/
 
 /**
  * @brief       Returns the unsigned difference of two values, sign optionally returned as -1 or 1.
@@ -1586,6 +1591,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
             mexErrMsgTxt( "Error during initialization!" );
         }
 
+        /* Casting values from double type to RFC_VALUE_TYPE type */ 
         if( sizeof( RFC_VALUE_TYPE ) != sizeof(double) )
         {
             RFC_VALUE_TYPE *buffer = (RFC_VALUE_TYPE *)RFC_mem_alloc( NULL, data_len, sizeof(RFC_VALUE_TYPE) );
@@ -1596,22 +1602,26 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         }
         else buffer = (RFC_VALUE_TYPE*)data;
 
-        /* rfc_ctx.residue_final_method = 0; */
+        /* Rainflow counting */
 
         rfc_ctx.flags |= RFC_FLAGS_ENFORCE_MARGIN;
         RFC_feed( &rfc_ctx, buffer, data_len  );
         RFC_finalize( &rfc_ctx, RFC_RES_IGNORE );
 
+        /* Free temporary buffer (cast) */
         if( (void*)buffer != (void*)data )
         {
             RFC_mem_alloc( buffer, 0, 0 );
             buffer = NULL;
         }
 
+        /* Return results */
         if( plhs )
         {
+            /* Pseudo damage */
             plhs[0] = mxCreateDoubleScalar( rfc_ctx.pseudo_damage );
 
+            /* Residue */
             if( nlhs > 1 && rfc_ctx.residue )
             {
                 mxArray* re = mxCreateDoubleMatrix( rfc_ctx.residue_cnt, 1, mxREAL );
@@ -1628,16 +1638,25 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                 }
             }
 
+            /* Rainflow matrix */
             if( nlhs > 2 && rfc_ctx.matrix )
             {
                 mxArray* matrix = mxCreateDoubleMatrix( class_count, class_count, mxREAL );
                 if( matrix )
                 {
+                    mxArray* transposed = NULL;
+
                     memcpy( mxGetPr(matrix), rfc_ctx.matrix, sizeof(double) * class_count * class_count );
-                    plhs[2] = matrix;
+                    mexCallMATLAB(1, &transposed, 1, &matrix, "transpose")
+                    mxDestroyArray( matrix );
+
+                    if( transposed )
+                    {
+                        plhs[2] = transposed;
                 }
             }
             
+            /* Range pair */
             if( nlhs > 3 && rfc_ctx.rp )
             {
                 mxArray* rp = mxCreateDoubleMatrix( class_count, 1, mxREAL );
@@ -1648,6 +1667,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                 }
             }
 
+            /* Level crossing */
             if( nlhs > 4 && rfc_ctx.lc )
             {
                 mxArray* lc = mxCreateDoubleMatrix( class_count, 1, mxREAL );
@@ -1658,6 +1678,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                 }
             }
 
+            /* Turning points */
             if( nlhs > 5 && rfc_ctx.tp )
             {
                 mxArray* tp = mxCreateDoubleMatrix( rfc_ctx.tp_cnt, 2, mxREAL );
@@ -1678,6 +1699,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 
         }
 
+        /* Deinitialize rainflow context */
         RFC_deinit( &rfc_ctx );
     }
 }
