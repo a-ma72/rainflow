@@ -340,7 +340,7 @@ bool RFC_feed_handle_tp( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt, bool is_righ
         if( rfc_ctx->internal.pos == 1 )
         {
             /* Save left margin */
-            rfc_ctx->internal.margin[1]  =
+            rfc_ctx->internal.margin[0]  =
             rfc_ctx->internal.tp_delayed = *pt;
             tp_residue = NULL;
         }
