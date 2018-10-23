@@ -41,7 +41,7 @@
  *     West Conshohocken, PA: ASTM International, 2011.
  * [2] [https://community.plm.automation.siemens.com/t5/Testing-Knowledge-Base/Rainflow-Counting/ta-p/383093]
  * [3] G.Marsh on: "Review and application of Rainflow residue processing techniques for accurate fatigue damage estimation"
- *     International Journal of Fatigue 82 (2016) 757–765,
+ *     International Journal of Fatigue 82 (2016) 757-765,
  *     [https://doi.org/10.1016/j.ijfatigue.2015.10.007]
  * []  Hack, M: Schaedigungsbasierte Hysteresefilter; D386 (Diss Univ. Kaiserslautern), Shaker Verlag Aachen, 1998, ISBN 3-8265-3936-2
  * []  Brokate, M; Sprekels, J, Hysteresis and Phase Transition, Applied Mathematical Sciences 121, Springer,  New York, 1996
@@ -208,9 +208,9 @@ bool RFC_init( void *ctx,
     rfc_ctx->residue                 = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( NULL, rfc_ctx->residue_cap, sizeof(rfc_value_tuple_s) );
 
     /* Non-sparse storages (optional, may be NULL) */
-    rfc_ctx->matrix                  = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count * class_count, sizeof(RFC_value_type) );
-    rfc_ctx->rp                      = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count,               sizeof(RFC_value_type) );
-    rfc_ctx->lc                      = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count,               sizeof(RFC_value_type) );
+    rfc_ctx->matrix                  = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count * class_count, sizeof(RFC_counts_type) );
+    rfc_ctx->rp                      = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count,               sizeof(RFC_counts_type) );
+    rfc_ctx->lc                      = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count,               sizeof(RFC_counts_type) );
 
     /* Damage */
     rfc_ctx->pseudo_damage           = 0.0;
@@ -321,7 +321,7 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
     /* Process data */
     while( data_count-- )
     {
-        rfc_value_tuple_s tp = { (RFC_value_type)*data++ };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
+        rfc_value_tuple_s tp = { *data++ };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
 
         /* Assign class and global position (base 1) */
         tp.class = QUANTIZE( rfc_ctx, tp.value );
@@ -375,15 +375,25 @@ bool RFC_feed_tuple( void *ctx, rfc_value_tuple_s *data, size_t data_count )
 /**
  * @brief       Finalize pending counts and turning point storage.
  *
- * @param       rfc_ctx  The rainflow context
+ * @param       ctx              The rainflow context
+ * @param       residual_method  The residual method (RFC_RES_...)
  * 
  * @return      false on error
  */
-bool RFC_finalize( rfc_ctx_s *rfc_ctx, int residual_method )
+bool RFC_finalize( void *ctx, int residual_method )
 {
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
     bool ok;
 
-    assert( rfc_ctx && rfc_ctx->state < RFC_STATE_FINALIZE );
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
+    {
+        assert( false );
+        rfc_ctx->error = RFC_ERROR_INVARG;
+
+        return false;
+    }
+    
+    assert( rfc_ctx->state < RFC_STATE_FINALIZE );
 
 #if RFC_USE_DELEGATES
     if( rfc_ctx->finalize_fcn )
@@ -420,6 +430,7 @@ bool RFC_finalize( rfc_ctx_s *rfc_ctx, int residual_method )
                 rfc_ctx->error = RFC_ERROR_INVARG;
                 ok = false;
         }
+    	assert( rfc_ctx->state == RFC_STATE_FINALIZE );
     }
 
     rfc_ctx->state = ok ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
@@ -1568,7 +1579,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         const mxArray *mxClassOffset = prhs[3];
         const mxArray *mxHysteresis  = prhs[4];
 
-        RFC_VALUE_TYPE *buffer       = NULL;
+        RFC_value_type *buffer       = NULL;
         double         *data         = mxGetPr( mxData );
         size_t          data_len     = mxGetNumberOfElements( mxData );
         unsigned        class_count  = (unsigned)( mxGetScalar( mxClassCount ) + 0.5 );
@@ -1582,8 +1593,8 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         rfc_ctx.tp     = (rfc_value_tuple_s*)RFC_mem_alloc( NULL, rfc_ctx.tp_cap, sizeof(rfc_value_tuple_s) );
 
         ok = RFC_init( &rfc_ctx, 
-                       class_count, (RFC_VALUE_TYPE)class_width, (RFC_VALUE_TYPE)class_offset, 
-                       (RFC_VALUE_TYPE)hysteresis, 
+                       class_count, (RFC_value_type)class_width, (RFC_value_type)class_offset, 
+                       (RFC_value_type)hysteresis, 
                        rfc_ctx.tp, rfc_ctx.tp_cap );
 
         if( !ok )
@@ -1591,16 +1602,23 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
             mexErrMsgTxt( "Error during initialization!" );
         }
 
-        /* Casting values from double type to RFC_VALUE_TYPE type */ 
-        if( sizeof( RFC_VALUE_TYPE ) != sizeof(double) )
+        /* Casting values from double type to RFC_value_type */ 
+        if( sizeof( RFC_value_type ) != sizeof(double) && data_len )  /* maybe unsafe! */
         {
-            RFC_VALUE_TYPE *buffer = (RFC_VALUE_TYPE *)RFC_mem_alloc( NULL, data_len, sizeof(RFC_VALUE_TYPE) );
-            for( i = 0 ; i < data_len; i++ )
+            buffer = (RFC_value_type *)RFC_mem_alloc( NULL, data_len, sizeof(RFC_value_type) );
+
+            if( !buffer )
             {
-                buffer[i] = (RFC_VALUE_TYPE)data[i];
+                RFC_deinit( &rfc_ctx );
+                mexErrMsgTxt( "Error during initialization!" );
+            }
+
+            for( i = 0; i < data_len; i++ )
+            {
+                buffer[i] = (RFC_value_type)data[i];
             }
         }
-        else buffer = (RFC_VALUE_TYPE*)data;
+        else buffer = (RFC_value_type*)data;
 
         /* Rainflow counting */
 
@@ -1638,7 +1656,6 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                 }
             }
 
-            /* Rainflow matrix */
             if( nlhs > 2 && rfc_ctx.matrix )
             {
                 mxArray* matrix = mxCreateDoubleMatrix( class_count, class_count, mxREAL );
@@ -1646,13 +1663,30 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                 {
                     mxArray* transposed = NULL;
 
-                    memcpy( mxGetPr(matrix), rfc_ctx.matrix, sizeof(double) * class_count * class_count );
-                    mexCallMATLAB(1, &transposed, 1, &matrix, "transpose")
-                    mxDestroyArray( matrix );
+                    if( sizeof( RFC_counts_type ) == sizeof(double) )  /* maybe unsafe! */
+                    {
+                        memcpy( mxGetPr(matrix), rfc_ctx.matrix, sizeof(double) * class_count * class_count );
+                        mexCallMATLAB( 1, &transposed, 1, &matrix, "transpose" );
+                        mxDestroyArray( matrix );
+                    }
+                    else
+                    {
+                        double *ptr = mxGetPr(matrix);
+                        size_t from, to;
+                        for( to = 0; to < class_count; to++ )
+                        {
+                            for( from = 0; from < class_count; from++ )
+                            {
+                                *ptr++ = (double)rfc_ctx.matrix[ from * class_count + to ];
+                            }
+                        }
+                        transposed = matrix;
+                    }
 
                     if( transposed )
                     {
                         plhs[2] = transposed;
+                    }
                 }
             }
             
@@ -1662,7 +1696,12 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                 mxArray* rp = mxCreateDoubleMatrix( class_count, 1, mxREAL );
                 if( rp )
                 {
-                    memcpy( mxGetPr(rp), rfc_ctx.rp, sizeof(double) * class_count );
+					double *ptr = mxGetPr(rp);
+					size_t i;
+					for( i = 0; i < class_count; i++ )
+					{
+						*ptr++ = (double)rfc_ctx.rp[i];
+					}
                     plhs[3] = rp;
                 }
             }
@@ -1673,7 +1712,12 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                 mxArray* lc = mxCreateDoubleMatrix( class_count, 1, mxREAL );
                 if( lc )
                 {
-                    memcpy( mxGetPr(lc), rfc_ctx.lc, sizeof(double) * class_count );
+					double *ptr = mxGetPr(lc);
+					size_t i;
+					for( i = 0; i < class_count; i++ )
+					{
+						*ptr++ = (double)rfc_ctx.lc[i];
+					}
                     plhs[4] = lc;
                 }
             }
@@ -1696,7 +1740,6 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                     plhs[5] = tp;
                 }
             }
-
         }
 
         /* Deinitialize rainflow context */
