@@ -181,7 +181,7 @@ bool RFC_init( void *ctx,
     rfc_ctx->residue                 = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( NULL, rfc_ctx->residue_cap, sizeof(rfc_value_tuple_s) );
 
     /* Non-sparse storages (optional, may be NULL) */
-    rfc_ctx->matrix                  = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count * class_count, sizeof(RFC_value_type) );
+    rfc_ctx->matrix                  = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count * class_count, sizeof(RFC_counts_type) );
 
     /* Damage */
     rfc_ctx->pseudo_damage           = 0.0;
@@ -271,7 +271,7 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
     /* Process data */
     while( data_count-- )
     {
-        rfc_value_tuple_s tp = { (RFC_value_type)*data++ };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
+        rfc_value_tuple_s tp = { *data++ };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
 
         /* Assign class and global position (base 1) */
         tp.class = QUANTIZE( rfc_ctx, tp.value );
@@ -813,7 +813,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         const mxArray *mxClassOffset = prhs[3];
         const mxArray *mxHysteresis  = prhs[4];
 
-        RFC_VALUE_TYPE *buffer       = NULL;
+        RFC_value_type *buffer       = NULL;
         double         *data         = mxGetPr( mxData );
         size_t          data_len     = mxGetNumberOfElements( mxData );
         unsigned        class_count  = (unsigned)( mxGetScalar( mxClassCount ) + 0.5 );
@@ -824,24 +824,31 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         bool            ok;
 
         ok = RFC_init( &rfc_ctx, 
-                       class_count, (RFC_VALUE_TYPE)class_width, (RFC_VALUE_TYPE)class_offset, 
-                       (RFC_VALUE_TYPE)hysteresis );
+                       class_count, (RFC_value_type)class_width, (RFC_value_type)class_offset, 
+                       (RFC_value_type)hysteresis );
 
         if( !ok )
         {
             mexErrMsgTxt( "Error during initialization!" );
         }
 
-        /* Casting values from double type to RFC_VALUE_TYPE type */ 
-        if( sizeof( RFC_VALUE_TYPE ) != sizeof(double) )  /* maybe unsafe! */
+        /* Casting values from double type to RFC_value_type */ 
+        if( sizeof( RFC_value_type ) != sizeof(double) && data_len )  /* maybe unsafe! */
         {
-            RFC_VALUE_TYPE *buffer = (RFC_VALUE_TYPE *)RFC_mem_alloc( NULL, data_len, sizeof(RFC_VALUE_TYPE) );
-            for( i = 0 ; i < data_len; i++ )
+            buffer = (RFC_value_type *)RFC_mem_alloc( NULL, data_len, sizeof(RFC_value_type) );
+
+            if( !buffer )
             {
-                buffer[i] = (RFC_VALUE_TYPE)data[i];
+                RFC_deinit( &rfc_ctx );
+                mexErrMsgTxt( "Error during initialization!" );
+            }
+
+            for( i = 0; i < data_len; i++ )
+            {
+                buffer[i] = (RFC_value_type)data[i];
             }
         }
-        else buffer = (RFC_VALUE_TYPE*)data;
+        else buffer = (RFC_value_type*)data;
 
         /* Rainflow counting */
         RFC_feed( &rfc_ctx, buffer, data_len  );
@@ -885,7 +892,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                 {
                     mxArray* transposed = NULL;
 
-                    if( sizeof( RFC_VALUE_TYPE ) == sizeof(double) )  /* maybe unsafe! */
+                    if( sizeof( RFC_value_type ) == sizeof(double) )  /* maybe unsafe! */
                     {
                         memcpy( mxGetPr(matrix), rfc_ctx.matrix, sizeof(double) * class_count * class_count );
                         mexCallMATLAB( 1, &transposed, 1, &matrix, "transpose" );
@@ -899,7 +906,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                         {
                             for( from = 0; from < class_count; from++ )
                             {
-                                *ptr++ = rfc_ctx.matrix[ from * class_count + to ];
+                                *ptr++ = (double)rfc_ctx.matrix[ from * class_count + to ];
                             }
                         }
                         transposed = matrix;
