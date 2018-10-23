@@ -894,11 +894,12 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                     else
                     {
                         double *ptr = mxGetPr(matrix);
-                        for( size_t to = 0; to < class_count; to++ )
+                        size_t from, to;
+                        for( to = 0; to < class_count; to++ )
                         {
-                            for( size_t from = 0; from < class_count; from++ )
+                            for( from = 0; from < class_count; from++ )
                             {
-                                *ptr++ = rfc_ctx->matrix( from * class_count + to );
+                                *ptr++ = rfc_ctx.matrix[ from * class_count + to ];
                             }
                         }
                         transposed = matrix;
@@ -908,8 +909,8 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                     {
                         plhs[2] = transposed;
                     }
-                }
-            }
+                 }
+             }
         }
 
         /* Deinitialize rainflow context */
