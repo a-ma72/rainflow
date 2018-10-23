@@ -157,7 +157,6 @@ typedef struct rfc_ctx
     enum
     {
         RFC_FLAGS_COUNT_MATRIX      = 1 << 0,                   /**< Count into matrix */
-        RFC_FLAGS_COUNT_ALL         = RFC_FLAGS_COUNT_MATRIX,   /**< Count all */
     }
                                     flags;                      /**< Flags */
     enum 
