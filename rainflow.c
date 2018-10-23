@@ -833,7 +833,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         }
 
         /* Casting values from double type to RFC_VALUE_TYPE type */ 
-        if( sizeof( RFC_VALUE_TYPE ) != sizeof(double) )
+        if( sizeof( RFC_VALUE_TYPE ) != sizeof(double) )  /* maybe unsafe! */
         {
             RFC_VALUE_TYPE *buffer = (RFC_VALUE_TYPE *)RFC_mem_alloc( NULL, data_len, sizeof(RFC_VALUE_TYPE) );
             for( i = 0 ; i < data_len; i++ )
@@ -885,9 +885,24 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                 {
                     mxArray* transposed = NULL;
 
-                    memcpy( mxGetPr(matrix), rfc_ctx.matrix, sizeof(double) * class_count * class_count );
-                    mexCallMATLAB( 1, &transposed, 1, &matrix, "transpose" );
-                    mxDestroyArray( matrix );
+                    if( sizeof( RFC_VALUE_TYPE ) == sizeof(double) )  /* maybe unsafe! */
+                    {
+                        memcpy( mxGetPr(matrix), rfc_ctx.matrix, sizeof(double) * class_count * class_count );
+                        mexCallMATLAB( 1, &transposed, 1, &matrix, "transpose" );
+                        mxDestroyArray( matrix );
+                    }
+                    else
+                    {
+                        double *ptr = mxGetPr(matrix);
+                        for( size_t to = 0; to < class_count; to++ )
+                        {
+                            for( size_t from = 0; from < class_count; from++ )
+                            {
+                                *ptr++ = rfc_ctx->matrix( from * class_count + to );
+                            }
+                        }
+                        transposed = matrix;
+                    }
 
                     if( transposed )
                     {
