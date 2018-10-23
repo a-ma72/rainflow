@@ -1,3 +1,3 @@
 clear rfc
 clc
-mex -g -v -output rfc rainflow.c
+mex -v -output rfc rainflow.c

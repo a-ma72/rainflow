@@ -41,7 +41,7 @@
  *     West Conshohocken, PA: ASTM International, 2011.
  * [2] [https://community.plm.automation.siemens.com/t5/Testing-Knowledge-Base/Rainflow-Counting/ta-p/383093]
  * [3] G.Marsh on: "Review and application of Rainflow residue processing techniques for accurate fatigue damage estimation"
- *     International Journal of Fatigue 82 (2016) 757–765,
+ *     International Journal of Fatigue 82 (2016) 757ï¿½765,
  *     [https://doi.org/10.1016/j.ijfatigue.2015.10.007]
  * []  Hack, M: Schaedigungsbasierte Hysteresefilter; D386 (Diss Univ. Kaiserslautern), Shaker Verlag Aachen, 1998, ISBN 3-8265-3936-2
  * []  Brokate, M; Sprekels, J, Hysteresis and Phase Transition, Applied Mathematical Sciences 121, Springer,  New York, 1996
@@ -290,15 +290,25 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
 /**
  * @brief       Finalize pending counts and turning point storage.
  *
- * @param       rfc_ctx  The rainflow context
+ * @param       ctx              The rainflow context
+ * @param       residual_method  The residual method (RFC_RES_...)
  * 
  * @return      false on error
  */
-bool RFC_finalize( rfc_ctx_s *rfc_ctx, int residual_method )
+bool RFC_finalize( void *ctx, int residual_method )
 {
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
     bool ok;
 
-    assert( rfc_ctx && rfc_ctx->state < RFC_STATE_FINALIZE );
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
+    {
+        assert( false );
+        rfc_ctx->error = RFC_ERROR_INVARG;
+
+        return false;
+    }
+    
+    assert( rfc_ctx->state < RFC_STATE_FINALIZE );
 
     switch( residual_method )
     {
@@ -312,6 +322,8 @@ bool RFC_finalize( rfc_ctx_s *rfc_ctx, int residual_method )
             rfc_ctx->error = RFC_ERROR_INVARG;
             ok = false;
     }
+    
+    assert( rfc_ctx->state == RFC_STATE_FINALIZE );
 
     rfc_ctx->state = ok ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
     return ok;
