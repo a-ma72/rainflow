@@ -896,7 +896,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                 {
                     mxArray* transposed = NULL;
 
-                    if( sizeof( RFC_value_type ) == sizeof(double) )  /* maybe unsafe! */
+                    if( sizeof( RFC_counts_type ) == sizeof(double) )  /* maybe unsafe! */
                     {
                         memcpy( mxGetPr(matrix), rfc_ctx.matrix, sizeof(double) * class_count * class_count );
                         mexCallMATLAB( 1, &transposed, 1, &matrix, "transpose" );
@@ -920,8 +920,8 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                     {
                         plhs[2] = transposed;
                     }
-                 }
-             }
+                }
+            }
         }
 
         /* Deinitialize rainflow context */
