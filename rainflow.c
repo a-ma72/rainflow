@@ -31,7 +31,7 @@
  *
  * These steps are fully documented in standards such as 
  * ASTM E1049 "Standard Practices for Cycle Counting in Fatigue Analysis" [1].
- * This implementation uses the 4-point algorithm mentioned in [2].
+ * This implementation uses the 4-point algorithm mentioned in [2] and [3].
  * To take the residue into account, you may implement a custom method or use some
  * predefined functions.
  * 
@@ -39,9 +39,13 @@
  * [1] ASTM Standard E 1049, 1985 (2011). 
  *     "Standard Practices for Cycle Counting in Fatigue Analysis."
  *     West Conshohocken, PA: ASTM International, 2011.
- * [2] [https://community.plm.automation.siemens.com/t5/Testing-Knowledge-Base/Rainflow-Counting/ta-p/383093]
- * [3] G.Marsh on: "Review and application of Rainflow residue processing techniques for accurate fatigue damage estimation"
- *     International Journal of Fatigue 82 (2016) 757-765,
+ * [2] FVA-Richtlinie, 2010.
+ *     "Zaehlverfahren zur Bildung von Kollektiven und Matrizen aus Zeitfunktionen"
+ *     [https://fva-net.de/fileadmin/content/Richtlinien/FVA-Richtlinie_Zaehlverfahren_2010.pdf]
+ * [3] Siemens Product Lifecycle Management Software Inc., 2018. 
+ *     [https://community.plm.automation.siemens.com/t5/Testing-Knowledge-Base/Rainflow-Counting/ta-p/383093]
+ * [4] G.Marsh on: "Review and application of Rainflow residue processing techniques for accurate fatigue damage estimation"
+ *     International Journal of Fatigue 82 (2016) 757–765,
  *     [https://doi.org/10.1016/j.ijfatigue.2015.10.007]
  * []  Hack, M: Schaedigungsbasierte Hysteresefilter; D386 (Diss Univ. Kaiserslautern), Shaker Verlag Aachen, 1998, ISBN 3-8265-3936-2
  * []  Brokate, M; Sprekels, J, Hysteresis and Phase Transition, Applied Mathematical Sciences 121, Springer,  New York, 1996
@@ -1656,6 +1660,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                 }
             }
 
+            /* Rainflow matrix (column major order) */
             if( nlhs > 2 && rfc_ctx.matrix )
             {
                 mxArray* matrix = mxCreateDoubleMatrix( class_count, class_count, mxREAL );
