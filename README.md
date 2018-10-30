@@ -23,7 +23,7 @@ To take the residue into account, you may implement a custom method or use some 
 ---
 ### References:
 [1] ASTM Standard E 1049, 1985 (2011). "Standard Practices for Cycle Counting in Fatigue Analysis", West Conshohocken, PA: ASTM International, 2011.  
-[2] FVA-Richtlinie, 2010. "Zaehlverfahren zur Bildung von Kollektiven und Matrizen aus Zeitfunktionen", [https://fva-net.de/fileadmin/content/Richtlinien/FVA-Richtlinie_Zaehlverfahren_2010.pdf]
+[2] FVA-Richtlinie, 2010. "Zaehlverfahren zur Bildung von Kollektiven und Matrizen aus Zeitfunktionen", [https://fva-net.de/fileadmin/content/Richtlinien/FVA-Richtlinie_Zaehlverfahren_2010.pdf]  
 [3] Siemens Product Lifecycle Management Software Inc., 2018. [https://community.plm.automation.siemens.com/t5/Testing-Knowledge-Base/Rainflow-Counting/ta-p/383093]  
 [4] G.Marsh on: "Review and application of Rainflow residue processing techniques for accurate fatigue damage estimation", International Journal of Fatigue 82 (2016) 757–765,  
 [https://doi.org/10.1016/j.ijfatigue.2015.10.007]  
