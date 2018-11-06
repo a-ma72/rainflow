@@ -625,7 +625,7 @@ bool RFC_feed_finalize( rfc_ctx_s *rfc_ctx )
 static
 bool RFC_finalize_res_ignore( rfc_ctx_s *rfc_ctx )
 {
-    /* Just include interim turning point */
+    /* Include interim turning point only */
     return RFC_feed_finalize( rfc_ctx );
 }
 
@@ -638,7 +638,35 @@ bool RFC_finalize_res_ignore( rfc_ctx_s *rfc_ctx )
 static
 bool RFC_finalize_res_halfcycles( rfc_ctx_s *rfc_ctx )
 {
-    return RFC_finalize_res_ignore( rfc_ctx );
+    RFC_counts_type old_inc = rfc_ctx->curr_inc;
+    
+    /* Include interim turning point */
+    if( !RFC_feed_finalize( rfc_ctx ) )
+    {
+        return false;
+    }
+
+    if(  rfc_ctx->residue && rfc_ctx->residue_cnt >= 2 )
+    {
+        size_t             i;
+        int                flags = rfc_ctx->flags;
+        rfc_value_tuple_s *from  = rfc_ctx->residue;
+
+        rfc_ctx->curr_inc = rfc_ctx->half_inc;
+
+        for( i = 1; i < rfc_ctx->residue_cnt; i++ )
+        {
+            rfc_value_tuple_s *to = from + 1;
+
+            RFC_cycle_process( rfc_ctx, from, to, flags );
+
+            from = to;
+        }
+
+        rfc_ctx->curr_inc = old_inc;
+    }
+
+    return true;
 }
 
 
@@ -650,7 +678,35 @@ bool RFC_finalize_res_halfcycles( rfc_ctx_s *rfc_ctx )
 static
 bool RFC_finalize_res_fullcycles( rfc_ctx_s *rfc_ctx )
 {
-    return RFC_finalize_res_ignore( rfc_ctx );
+    RFC_counts_type old_inc = rfc_ctx->curr_inc;
+    
+    /* Include interim turning point */
+    if( !RFC_feed_finalize( rfc_ctx ) )
+    {
+        return false;
+    }
+
+    if(  rfc_ctx->residue && rfc_ctx->residue_cnt >= 2 )
+    {
+        size_t             i;
+        int                flags = rfc_ctx->flags;
+        rfc_value_tuple_s *from  = rfc_ctx->residue;
+
+        rfc_ctx->curr_inc = rfc_ctx->full_inc;
+
+        for( i = 1; i < rfc_ctx->residue_cnt; i++ )
+        {
+            rfc_value_tuple_s *to = from + 1;
+
+            RFC_cycle_process( rfc_ctx, from, to, flags );
+
+            from = to;
+        }
+
+        rfc_ctx->curr_inc = old_inc;
+    }
+
+    return true;
 }
 
 
@@ -662,7 +718,76 @@ bool RFC_finalize_res_fullcycles( rfc_ctx_s *rfc_ctx )
 static
 bool RFC_finalize_res_clormann_seeger( rfc_ctx_s *rfc_ctx )
 {
-    return RFC_finalize_res_ignore( rfc_ctx );
+#if 0
+    /* Include interim turning point */
+    if( !RFC_feed_finalize( rfc_ctx ) )
+    {
+        return false;
+    }
+
+    /* Count cycles from memory 1 with alternating sign */
+    if(  rfc_ctx->residue && rfc_ctx->residue_cnt >= 3 )
+    {
+        size_t             i;
+        int                flags = rfc_ctx->flags;
+        rfc_value_tuple_s *from  = rfc_ctx->residue;
+
+
+            if( Residuum.size() >= 3 ) 
+            {
+                VectorResiduum res, stack;
+                t_res first;
+                size_t i, tail;
+
+                // Die tatsaechlichen Werte in first sind irrelevant, da dieser nachfolgend niemals verrechnet wird
+                first.iCno      = ClassNo( static_cast<T>( 0.0 ) );
+                first.ClassMean = ( static_cast<T>( first.iCno ) + 0.5 ) * m_class_width + m_range_min;
+
+                res.push_back( first );
+                res.insert( res.end(), Residuum.begin(), Residuum.end() );
+                
+                for ( i = 0; i < res.size(); i++ ) 
+                {
+                    bool do_loop;
+                    stack.push_back( res[ i ] );
+                    tail = stack.size();
+
+                    do 
+                    {
+                        do_loop = tail >= 4;
+                        if( do_loop ) 
+                        {
+                            double y1 = stack[ tail - 4 ].ClassMean;
+                            double y2 = stack[ tail - 3 ].ClassMean;
+                            double y3 = stack[ tail - 2 ].ClassMean;
+                            double y4 = stack[ tail - 1 ].ClassMean;
+                            t_res y4s = stack[ tail - 1 ];
+
+                            do_loop = y2 * y3 < 0 && Abs( y4 ) >= Abs( y2 ) && Abs( y2 ) >= Abs( y3 );
+                            if( do_loop ) 
+                            {
+                                t_res from = stack[ tail - 3 ]; /* y2 */
+                                t_res to   = stack[ tail - 2 ]; /* y3 */
+                                AddCycles( from.iCno, to.iCno, 1 );
+                    
+                                //size_t idx;
+                                double dAmplitude  = Abs( from.iCno - to.iCno )     * m_class_width / 2.0;
+                                double dAvrg       = Abs( from.iCno + to.iCno + 1 ) * m_class_width / 2.0 + m_range_min;
+                                double dHalfDamage = CalcDamage( dAmplitude, 0.5 );
+                    
+                                YieldDamageOverTurningPoints( from.nIdx_TP, to.nIdx_TP, dHalfDamage, dAvrg );
+                    
+                                stack[ tail - 3 ] = y4s;
+                                stack.pop_back();
+                                stack.pop_back();
+                                tail -= 2;
+                            } /* end if */
+                        } /* end if */
+                    } while( do_loop );
+                } /* end for */
+            } /* end if */
+            break;
+#endif
 }
 
 
