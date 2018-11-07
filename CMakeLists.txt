@@ -1,5 +1,6 @@
 # First set Matlab_ROOT_DIR environment variable to your installed matlab path,
 # such as 'export Matlab_ROOT_DIR=/usr/local/MATLAB/R2017b'!
+# (GNUC: gcc for C file, g++ for CXX files)
 
 # Building makefiles:
 # mkdir build
@@ -10,39 +11,78 @@
 cmake_minimum_required( VERSION 3.2 )
 set( CMAKE_CONFIGURATION_TYPES Release Debug )
 project( Rainflow )
+set( RFC_VERSION_MAJOR "0" )
+set( RFC_VERSION_MINOR "1" )
 
 option( RFC_USE_INTEGRAL_COUNTS "Use integral (not floating) data type for counts" OFF )
 option( RFC_USE_DELEGATES       "Use delegates (functors)" OFF )
 option( RFC_GLOBAL_EXTREMA      "Always calculate global extrema" OFF )
+option( RFC_HAVING_HCM          "Include HCM (Clormann/Seeger) algorithm" ON )
 
-set( CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/build )
+
+set( CMAKE_POSITION_INDEPENDENT_CODE ON )
+
+if( MSVC )
+    # Turn off misguided "secure CRT" warnings in MSVC.
+    # Microsoft wants people to use the MS-specific <function>_s
+    # versions of certain C functions but this is difficult to do
+    # in platform-independent code.
+    add_definitions( -D_CRT_SECURE_NO_WARNINGS )
+endif( MSVC )
 
 set( MATLAB_FIND_DEBUG 1 )
 find_package( Matlab REQUIRED COMPONENTS MX_LIBRARY )
 
-IF( MATLAB_FOUND )
+if( MATLAB_FOUND )
     message( STATUS "MATLAB Found, MATLAB MEX will be compiled." )
-    message( STATUS ${Matlab_LIBRARIES} )
-ELSE( MATLAB_FOUND )
-    MESSAGE( "MATLAB not found...nothing will be built." )
-ENDIF( MATLAB_FOUND )
+    # message( STATUS ${Matlab_LIBRARIES} )
+else()
+    message( FATAL_ERROR "MATLAB not found...nothing will be built." )
+endif()
 
 add_definitions( -DMATLAB_MEX_FILE )
 
 # set up matlab libraries
-INCLUDE_DIRECTORIES( ${Matlab_INCLUDE_DIRS} )
+include_directories( ${Matlab_INCLUDE_DIRS} )
+configure_file( ${CMAKE_SOURCE_DIR}/config.h.in ${CMAKE_SOURCE_DIR}/config.h )
 
-matlab_add_mex( NAME Rainflow SRC rainflow.c OUTPUT_NAME rfc )
-target_link_libraries( Rainflow ${Matlab_LIBRARIES} )
+matlab_add_mex( NAME ${CMAKE_PROJECT_NAME} SRC rainflow.c OUTPUT_NAME rfc )
+target_link_libraries( ${CMAKE_PROJECT_NAME} ${Matlab_LIBRARIES} )
 
-SET_TARGET_PROPERTIES( Rainflow PROPERTIES SUFFIX .${Matlab_MEX_EXTENSION})
-
-add_definitions( -DRFC_USE_INTEGRAL_COUNTS=$<BOOL:${RFC_USE_INTEGRAL_COUNTS}> )
-add_definitions( -DRFC_USE_DELEGATES=$<BOOL:${RFC_USE_DELEGATES}> )
-add_definitions( -DRFC_GLOBAL_EXTREMA=$<BOOL:${RFC_GLOBAL_EXTREMA}> )
+# install to /bin and /share by default
+install( TARGETS ${CMAKE_PROJECT_NAME} RUNTIME DESTINATION bin LIBRARY DESTINATION bin )
 
 
-# install to /mex by default
-add_custom_command( TARGET Rainflow POST_BUILD 
-                    COMMAND ${CMAKE_COMMAND} -E make_directory               ${CMAKE_INSTALL_PREFIX}/mex/$<CONFIG>/
-                    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:Rainflow> ${CMAKE_INSTALL_PREFIX}/mex/$<CONFIG>/ )
+# CPack
+include( InstallRequiredSystemLibraries )
+
+set( CPACK_GENERATOR TGZ ZIP )
+set( CPACK_SOURCE_GENERATOR TGZ ZIP )
+set( CPACK_PACKAGE_DIRECTORY ${CMAKE_BINARY_DIR}/package )
+set( CPACK_PACKAGE_VERSION_MAJOR ${RFC_VERSION_MAJOR} )
+set( CPACK_PACKAGE_VERSION_MINOR ${RFC_VERSION_MINOR} )
+set( CPACK_PACKAGE_VERSION_PATCH "" )
+set( CPACK_PACKAGE_VERSION ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR} )
+set( CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README.MD" )
+set( CPACK_PACKAGE_DESCRIPTION_SUMMARY "Fast rainflow counting written in C (C99)" )
+set( CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE" )
+set( CPACK_SOURCE_IGNORE_FILES 
+     # Files specific to version control.
+     "/\\\\.git/"
+     "/\\\\.gitattributes$"
+     "/\\\\.github/"
+     "/\\\\.gitignore$"
+     "/\\\\.hooks-config$"
+
+     # Package build.
+     "/\\\\.build/"
+
+     # Temporary files.
+     "\\\\.#"
+     "/#"
+     "~$"
+    )
+set( CPACK_STRIP_FILES TRUE )
+set( CPACK_SOURCE_STRIP_FILES TRUE )
+
+include( CPack )

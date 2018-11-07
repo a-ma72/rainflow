@@ -31,7 +31,7 @@
  *
  * These steps are fully documented in standards such as 
  * ASTM E1049 "Standard Practices for Cycle Counting in Fatigue Analysis" [1].
- * This implementation uses the 4-point algorithm mentioned in [2] and [3].
+ * This implementation uses the 4-point algorithm mentioned in [3,4] and the 3-point HCM method proposed in [2].
  * To take the residue into account, you may implement a custom method or use some
  * predefined functions.
  * 
@@ -39,13 +39,17 @@
  * [1] ASTM Standard E 1049, 1985 (2011). 
  *     "Standard Practices for Cycle Counting in Fatigue Analysis."
  *     West Conshohocken, PA: ASTM International, 2011.
- * [2] FVA-Richtlinie, 2010.
+ * [2] Rainflow - HCM
+ *     "Ein Hysteresisschleifen-Zaehlalgorithmus auf werkstoffmechanischer Grundlage"
+ *     U.H. Clormann, T. Seeger
+ *     1985 TU Darmstadt, Fachgebiet Werkstoffmechanik
+ * [3] FVA-Richtlinie, 2010.
  *     "Zaehlverfahren zur Bildung von Kollektiven und Matrizen aus Zeitfunktionen"
  *     [https://fva-net.de/fileadmin/content/Richtlinien/FVA-Richtlinie_Zaehlverfahren_2010.pdf]
- * [3] Siemens Product Lifecycle Management Software Inc., 2018. 
+ * [4] Siemens Product Lifecycle Management Software Inc., 2018. 
  *     [https://community.plm.automation.siemens.com/t5/Testing-Knowledge-Base/Rainflow-Counting/ta-p/383093]
- * [4] G.Marsh on: "Review and application of Rainflow residue processing techniques for accurate fatigue damage estimation"
- *     International Journal of Fatigue 82 (2016) 757–765,
+ * [5] G.Marsh on: "Review and application of Rainflow residue processing techniques for accurate fatigue damage estimation"
+ *     International Journal of Fatigue 82 (2016) 757-765,
  *     [https://doi.org/10.1016/j.ijfatigue.2015.10.007]
  * []  Hack, M: Schaedigungsbasierte Hysteresefilter; D386 (Diss Univ. Kaiserslautern), Shaker Verlag Aachen, 1998, ISBN 3-8265-3936-2
  * []  Brokate, M; Sprekels, J, Hysteresis and Phase Transition, Applied Mathematical Sciences 121, Springer,  New York, 1996
@@ -87,6 +91,7 @@
 #include <stdint.h>  /* ULLONG_MAX */
 #include <stddef.h>  /* size_t, NULL */
 #include <stdlib.h>  /* calloc(), free(), abs() */
+#include "config.h"  /* Configuration */
 
 
 #ifndef RFC_VALUE_TYPE
@@ -107,6 +112,10 @@
 
 #ifndef RFC_USE_DELEGATES
 #define RFC_USE_DELEGATES 0
+#endif
+
+#ifndef RFC_HAVING_HCM
+#define RFC_HAVING_HCM 0
 #endif
 
 #ifndef RFC_GLOBAL_EXTREMA
@@ -177,42 +186,51 @@ typedef struct rfc_ctx
 
     enum
     {
-        RFC_FLAGS_COUNT_MATRIX      = 1 << 0,                   /**< Count into matrix */
-        RFC_FLAGS_COUNT_RP          = 1 << 1,                   /**< Count into range pair */
-        RFC_FLAGS_COUNT_LC_UP       = 1 << 2,                   /**< Count into level crossing (only rising slopes) */
-        RFC_FLAGS_COUNT_LC_DN       = 1 << 3,                   /**< Count into level crossing (only falling slopes) */
-        RFC_FLAGS_COUNT_LC          = RFC_FLAGS_COUNT_LC_UP     /**< Count into level crossing (all slopes) */
-                                    | RFC_FLAGS_COUNT_LC_DN,
-        RFC_FLAGS_COUNT_ALL         = RFC_FLAGS_COUNT_MATRIX    /**< Count all */
-                                    | RFC_FLAGS_COUNT_RP
-                                    | RFC_FLAGS_COUNT_LC,
-        RFC_FLAGS_ENFORCE_MARGIN    = 1 << 8,                   /**< Enforce first and last data point are turning points */
+        RFC_FLAGS_COUNT_MATRIX          = 1 << 0,                   /**< Count into matrix */
+        RFC_FLAGS_COUNT_RP              = 1 << 1,                   /**< Count into range pair */
+        RFC_FLAGS_COUNT_LC_UP           = 1 << 2,                   /**< Count into level crossing (only rising slopes) */
+        RFC_FLAGS_COUNT_LC_DN           = 1 << 3,                   /**< Count into level crossing (only falling slopes) */
+        RFC_FLAGS_COUNT_LC              = RFC_FLAGS_COUNT_LC_UP     /**< Count into level crossing (all slopes) */
+                                        | RFC_FLAGS_COUNT_LC_DN,
+        RFC_FLAGS_COUNT_ALL             = RFC_FLAGS_COUNT_MATRIX    /**< Count all */
+                                        | RFC_FLAGS_COUNT_RP
+                                        | RFC_FLAGS_COUNT_LC,
+        RFC_FLAGS_ENFORCE_MARGIN        = 1 << 8,                   /**< Enforce first and last data point are turning points */
     }
-                                    flags;                      /**< Flags */
+                                        flags;                      /**< Flags */
+    enum
+    {
+        RFC_COUNTING_METHOD_UNKNOWN     = -1,                       /**< Method is unknown */
+        RFC_COUNTING_METHOD_4PTM        =  0,                       /**< 4 point algorithm (default) */
+#if RFC_HAVING_HCM
+        RFC_COUNTING_METHOD_HCM         =  1,                       /**< 3 point algorithm, Clormann/Seeger (HCM) method */
+#endif
+    }
+                                        counting_method;
     enum 
     {
-        RFC_RES_NONE                = 0,                        /**< No residual method */
+        RFC_RES_NONE                    = 0,                        /**< No residual method */
         RFC_RES_IGNORE,                                         /**< Ignore residue (same as RFC_RES_NONE) */
         RFC_RES_HALFCYCLES,                                     /**< ASTM */
         RFC_RES_FULLCYCLES,                                     /**< Count half cycles as full cycles */
-        RFC_RES_CLORMANN_SEEGER,                                /**< Clormann-Seeger method */
+        RFC_RES_CLORMANN_SEEGER,                                /**< Clormann/Seeger method */
         RFC_RES_REPEATED,                                       /**< Repeat residue and count closed cycles */
         RFC_RES_RP_DIN,                                         /**< Count residue according to range pair in DIN-45667 */
     }
-                                    residual_method;
+                                        residual_method;
 
     enum
     {
-        RFC_SD_NONE                 = -1,                       /**< No spread damage calculation */
-        RFC_SD_HALF_23              =  0,                       /**< Equally split damage between P2 and P3 */
-        RFC_SD_RAMP_AMPLITUDE_23    =  1,                       /**< Spread damage according to amplitude over points between P2 and P3 */
-        RFC_SD_RAMP_DAMAGE_23       =  2,                       /**< Spread damage linearly over points between P2 and P3 */
-        RFC_SD_RAMP_AMPLITUDE_24    =  3,                       /**< Spread damage according to amplitude over points between P2 and P4 */  
-        RFC_SD_RAMP_DAMAGE_24       =  4,                       /**< Spread damage linearly over points between P2 and P4 */
-        RFC_SD_FULL_P2              =  5,                       /**< Assign damage to P2 */
-        RFC_SD_FULL_P3              =  6,                       /**< Assign damage to P3 */
-        RFC_SD_TRANSIENT_23         =  7,                       /**< Spread damage transient according to amplitude over points between P2 and P3 */
-        RFC_SD_TRANSIENT_23c        =  7,                       /**< Spread damage transient according to amplitude over points between P2 and P4 only until cycle is closed */
+        RFC_SD_NONE                     = -1,                       /**< No spread damage calculation */
+        RFC_SD_HALF_23                  =  0,                       /**< Equally split damage between P2 and P3 */
+        RFC_SD_RAMP_AMPLITUDE_23        =  1,                       /**< Spread damage according to amplitude over points between P2 and P3 */
+        RFC_SD_RAMP_DAMAGE_23           =  2,                       /**< Spread damage linearly over points between P2 and P3 */
+        RFC_SD_RAMP_AMPLITUDE_24        =  3,                       /**< Spread damage according to amplitude over points between P2 and P4 */  
+        RFC_SD_RAMP_DAMAGE_24           =  4,                       /**< Spread damage linearly over points between P2 and P4 */
+        RFC_SD_FULL_P2                  =  5,                       /**< Assign damage to P2 */
+        RFC_SD_FULL_P3                  =  6,                       /**< Assign damage to P3 */
+        RFC_SD_TRANSIENT_23             =  7,                       /**< Spread damage transient according to amplitude over points between P2 and P3 */
+        RFC_SD_TRANSIENT_23c            =  7,                       /**< Spread damage transient according to amplitude over points between P2 and P4 only until cycle is closed */
     } e_spread_damage;
 
     /* Memory allocation functions */
@@ -272,5 +290,16 @@ typedef struct rfc_ctx
         rfc_value_tuple_s           margin[2];                  /**< First and last data point */
         size_t                      pos;                        /**< Absolute position in data input stream, base 1 */
         rfc_value_tuple_s           tp_delayed;                 /**< Delay stage when RFC_FLAGS_ENFORCE_MARGIN is set */
+#if RFC_HAVING_HCM
+        struct hcm
+        {
+            /* Residue */
+            rfc_value_tuple_s      *stack;                      /**< Stack */
+            size_t                  stack_cap;                  /**< Stack capacity in number of elements (max. 2*class_count) */
+            rfc_value_tuple_s       K;                          /**< New value for HCM method */
+            int                     IR;                         /**< Pointer to residue stack, first turning point of cycles able to close, base 1 */
+            int                     IZ;                         /**< Pointer to residue stack, last turning point of cycles able to close, base 1 */
+        }                           hcm;
+#endif
     } internal;
 } rfc_ctx_s;
