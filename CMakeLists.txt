@@ -17,7 +17,8 @@ set( RFC_VERSION_MINOR "1" )
 option( RFC_USE_INTEGRAL_COUNTS "Use integral (not floating) data type for counts" OFF )
 option( RFC_USE_DELEGATES       "Use delegates (functors)" OFF )
 option( RFC_GLOBAL_EXTREMA      "Always calculate global extrema" OFF )
-option( RFC_HAVING_HCM          "Include HCM (Clormann/Seeger) algorithm" ON )
+option( RFC_HCM_SUPPORT         "Support HCM (Clormann/Seeger) algorithm" ON )
+option( RFC_TP_SUPPORT          "Support turning points" ON )
 
 
 set( CMAKE_POSITION_INDEPENDENT_CODE ON )

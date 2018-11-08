@@ -1,0 +1,3 @@
+/datadisk/git/rainflow/build/CMakeFiles/rebuild_cache.dir
+/datadisk/git/rainflow/build/CMakeFiles/Rainflow.dir
+/datadisk/git/rainflow/build/CMakeFiles/edit_cache.dir

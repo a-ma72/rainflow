@@ -114,8 +114,12 @@
 #define RFC_USE_DELEGATES 0
 #endif
 
-#ifndef RFC_HAVING_HCM
-#define RFC_HAVING_HCM 0
+#ifndef RFC_HCM_SUPPORT
+#define RFC_HCM_SUPPORT 0
+#endif
+
+#ifndef RFC_TP_SUPPORT
+#define RFC_TP_SUPPORT 1
 #endif
 
 #ifndef RFC_GLOBAL_EXTREMA
@@ -134,9 +138,14 @@ typedef struct rfc_value_tuple  rfc_value_tuple_s;   /** Tuple of value and inde
 
 
 /* Core functions */
+#if RFC_TP_SUPPORT
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis,
                                            rfc_value_tuple_s *tp, size_t tp_cap );
+#else
+bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
+                                           RFC_value_type hysteresis );
+#endif
 void RFC_deinit               ( void *ctx );
 bool RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count );
 bool RFC_feed_tuple           ( void *ctx, rfc_value_tuple_s *data, size_t count );
@@ -144,11 +153,13 @@ bool RFC_finalize             ( void *ctx, int residual_method );
 
 #if RFC_USE_DELEGATES
 /* Delegates typedef */
+typedef  void                ( *rfc_cycle_find_fcn_t )    ( rfc_ctx_s * );
 typedef  double              ( *rfc_damage_calc_fcn_t )   ( rfc_ctx_s *, unsigned from_class, unsigned to_class );
+typedef  bool                ( *rfc_finalize_fcn_t )      ( rfc_ctx_s *, int residual_methods );
+#if RFC_TP_SUPPORT
 typedef  rfc_value_tuple_s * ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, const rfc_value_tuple_s * );
 typedef  bool                ( *rfc_tp_add_fcn_t )        ( rfc_ctx_s *, rfc_value_tuple_s * );
-typedef  bool                ( *rfc_finalize_fcn_t )      ( rfc_ctx_s *, int residual_methods );
-typedef  void                ( *rfc_cycle_find_fcn_t )    ( rfc_ctx_s * );
+#endif
 #endif
 
 /* Value info struct */
@@ -203,7 +214,7 @@ typedef struct rfc_ctx
         RFC_COUNTING_METHOD_UNKNOWN     = -1,                       /**< Method is unknown */
         RFC_COUNTING_METHOD_NONE        =  0,                       /**< No counting */
         RFC_COUNTING_METHOD_4PTM        =  1,                       /**< 4 point algorithm (default) */
-#if RFC_HAVING_HCM
+#if RFC_HCM_SUPPORT
         RFC_COUNTING_METHOD_HCM         =  2,                       /**< 3 point algorithm, Clormann/Seeger (HCM) method */
 #endif
     }
@@ -211,15 +222,16 @@ typedef struct rfc_ctx
     enum 
     {
         RFC_RES_NONE                    = 0,                        /**< No residual method */
-        RFC_RES_DISCARD,                                            /**< Ignore residue (same as RFC_RES_NONE) */
+        RFC_RES_IGNORE,                                             /**< Ignore residue (same as RFC_RES_NONE) */
+        RFC_RES_DISCARD,                                            /**< Discard residue (empty residue) */
         RFC_RES_HALFCYCLES,                                         /**< ASTM */
         RFC_RES_FULLCYCLES,                                         /**< Count half cycles as full cycles */
         RFC_RES_CLORMANN_SEEGER,                                    /**< Clormann/Seeger method */
         RFC_RES_REPEATED,                                           /**< Repeat residue and count closed cycles */
-        RFC_RES_RP_DIN,                                             /**< Count residue according to range pair in DIN-45667 */
+        RFC_RES_RP_DIN45667,                                        /**< Count residue according to range pair in DIN-45667 */
     }
                                         residual_method;
-
+#if RFC_SD_SUPPORT
     enum
     {
         RFC_SD_NONE                     = -1,                       /**< No spread damage calculation */
@@ -233,6 +245,7 @@ typedef struct rfc_ctx
         RFC_SD_TRANSIENT_23             =  7,                       /**< Spread damage transient according to amplitude over points between P2 and P3 */
         RFC_SD_TRANSIENT_23c            =  7,                       /**< Spread damage transient according to amplitude over points between P2 and P4 only until cycle is closed */
     } e_spread_damage;
+#endif
 
     /* Memory allocation functions */
     rfc_mem_alloc_fcn_t             mem_alloc;                      /**< Allocate initialized memory */
@@ -274,11 +287,13 @@ typedef struct rfc_ctx
     RFC_counts_type                *rp;                             /**< Range pair counts */
     RFC_counts_type                *lc;                             /**< Level crossing counts */
 
+#if RFC_TP_SUPPORT
     /* Turning points storage (optional, may be NULL) */
     rfc_value_tuple_s              *tp;                             /**< Buffer for turning points */
     size_t                          tp_cap;                         /**< Buffer capacity (number of elements) */
     size_t                          tp_cnt;                         /**< Number of turning points in buffer */
     bool                            tp_locked;                      /**< If tp_locked, tp is freezed */
+#endif
 
     /* Damage */
     double                          pseudo_damage;                  /**< Cumulated pseudo damage */
@@ -291,7 +306,7 @@ typedef struct rfc_ctx
         rfc_value_tuple_s           margin[2];                      /**< First and last data point */
         size_t                      pos;                            /**< Absolute position in data input stream, base 1 */
         rfc_value_tuple_s           tp_delayed;                     /**< Delay stage when RFC_FLAGS_ENFORCE_MARGIN is set */
-#if RFC_HAVING_HCM
+#if RFC_HCM_SUPPORT
         struct hcm
         {
             /* Residue */
