@@ -219,8 +219,10 @@ bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type 
     
 #if RFC_USE_DELEGATES
     /* Delegates (optional, set to NULL for standard or to your own functions! ) */
+#if RFC_TP_SUPPORT
     rfc_ctx->tp_next_fcn             = NULL;
     rfc_ctx->tp_add_fcn              = NULL;
+#endif /*RFC_TP_SUPPORT*/
     rfc_ctx->cycle_find_fcn          = NULL;
     rfc_ctx->finalize_fcn            = NULL;
     rfc_ctx->damage_calc_fcn         = NULL;
@@ -1141,12 +1143,12 @@ rfc_value_tuple_s * RFC_tp_next( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *pt
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state <= RFC_STATE_BUSY_INTERIM );
 
-#if RFC_USE_DELEGATES
+#if RFC_USE_DELEGATES && RFC_TP_SUPPORT
     if( rfc_ctx->tp_next_fcn )
     {
         return rfc_ctx->tp_next_fcn( rfc_ctx, pt );
     }
-#endif /*RFC_USE_DELEGATES*/
+#endif /*RFC_USE_DELEGATES && RFC_TP_SUPPORT*/
 
     if( !pt ) return NULL;
 
@@ -1830,9 +1832,13 @@ void RFC_rp_from_matrix( rfc_ctx_s *rfc_ctx, RFC_counts_type* buffer, size_t buf
 /*********************************************************************************************************/
 
 
-#if MATLAB_MEX_FILE && RFC_TP_SUPPORT && RFC_COUNTING_METHOD_HCM
-
-
+#if MATLAB_MEX_FILE
+#if !RFC_TP_SUPPORT || !RFC_COUNTING_METHOD_HCM
+void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
+{
+    mexErrMsgTxt( "Unsupported configuration!" );
+}
+#else
 int greatest_fprintf( FILE* f, const char* fmt, ... )
 {
     va_list al;
@@ -2254,5 +2260,6 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         RFC_deinit( &rfc_ctx );
     }
 }
-#endif /*MATLAB_MEX_FILE && RFC_TP_SUPPORT && RFC_COUNTING_METHOD_HCM*/
+#endif /*!RFC_TP_SUPPORT || !RFC_COUNTING_METHOD_HCM*/
+#endif /*MATLAB_MEX_FILE*/
 

@@ -270,11 +270,13 @@ typedef struct rfc_ctx
 
 #if RFC_USE_DELEGATES
     /* Delegates (optional, may be NULL) */
-    rfc_damage_calc_fcn_t           damage_calc_fcn;                /**< Damage calculating function */
+#if RFC_TP_SUPPORT
     rfc_tp_next_fcn_t               tp_next_fcn;                    /**< Test if new turning point exists */
     rfc_tp_add_fcn_t                tp_add_fcn;                     /**< Handling new turning points */
+#endif /*RFC_TP_SUPPORT*/
     rfc_finalize_fcn_t              finalize_fcn;                   /**< Finalizing function */
     rfc_cycle_find_fcn_t            cycle_find_fcn;                 /**< Find next cycle(s) and process */
+    rfc_damage_calc_fcn_t           damage_calc_fcn;                /**< Damage calculating function */
 #endif
     
     /* Residue */
@@ -319,5 +321,6 @@ typedef struct rfc_ctx
             int                     IZ;                             /**< Pointer to residue stack, last turning point of cycles able to close, base 1 */
         }                           hcm;
 #endif
-    } internal;
+    }
+                                    internal;
 } rfc_ctx_s;
