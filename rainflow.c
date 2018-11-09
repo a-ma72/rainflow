@@ -435,31 +435,6 @@ bool RFC_finalize_res_ignore( rfc_ctx_s *rfc_ctx )
 }
 
 
-/**
- * @brief       Finalize pending counts, discard residue.
- *
- * @param       rfc_ctx  The rainflow context
- * 
- * @return      false on error
- */
-static
-bool RFC_finalize_res_discard( rfc_ctx_s *rfc_ctx )
-{
-    assert( rfc_ctx && rfc_ctx->state < RFC_STATE_FINALIZE );
-
-    /* Include interim turning point */
-    if( !RFC_feed_finalize( rfc_ctx ) )
-    {
-        return false;
-    }
-
-    /* Empty residue */
-    rfc_ctx->residue_cnt = 0;
-
-    return true;
-}
-
-
 
 /**
  * @brief      Calculate fictive damage for one closed (full) cycle.
