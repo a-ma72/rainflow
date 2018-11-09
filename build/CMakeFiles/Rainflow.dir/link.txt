@@ -1,1 +1,0 @@
-/usr/bin/cc -fPIC   -shared -Wl,-soname,rfc.mexa64 -o rfc.mexa64 CMakeFiles/Rainflow.dir/rainflow.c.o  -L/usr/local/MATLAB/R2017b/bin/glnxa64 -Wl,-rpath,/usr/local/MATLAB/R2017b/bin/glnxa64 -lmx -lmex -lmex -lmx 
