@@ -138,13 +138,13 @@ typedef struct rfc_value_tuple  rfc_value_tuple_s;   /** Tuple of value and inde
 
 
 /* Core functions */
-#if RFC_TP_SUPPORT
+#if !RFC_TP_SUPPORT
+bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
+                                           RFC_value_type hysteresis );
+#else
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis,
                                            rfc_value_tuple_s *tp, size_t tp_cap );
-#else
-bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
-                                           RFC_value_type hysteresis );
 #endif
 void RFC_deinit               ( void *ctx );
 bool RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count );
@@ -159,8 +159,8 @@ typedef  bool                ( *rfc_finalize_fcn_t )      ( rfc_ctx_s *, int res
 #if RFC_TP_SUPPORT
 typedef  rfc_value_tuple_s * ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, const rfc_value_tuple_s * );
 typedef  bool                ( *rfc_tp_add_fcn_t )        ( rfc_ctx_s *, rfc_value_tuple_s * );
-#endif
-#endif
+#endif /*RFC_TP_SUPPORT*/
+#endif /*RFC_USE_DELEGATES*/
 
 /* Value info struct */
 typedef struct rfc_value_tuple
@@ -303,9 +303,11 @@ typedef struct rfc_ctx
     {
         int                         slope;                          /**< Current signal slope */
         rfc_value_tuple_s           extrema[2];                     /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
-        rfc_value_tuple_s           margin[2];                      /**< First and last data point */
         size_t                      pos;                            /**< Absolute position in data input stream, base 1 */
+#if RFC_TP_SUPPORT
+        rfc_value_tuple_s           margin[2];                      /**< First and last data point */
         rfc_value_tuple_s           tp_delayed;                     /**< Delay stage when RFC_FLAGS_ENFORCE_MARGIN is set */
+#endif /*RFC_TP_SUPPORT*/
 #if RFC_HCM_SUPPORT
         struct hcm
         {

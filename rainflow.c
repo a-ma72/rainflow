@@ -155,8 +155,10 @@ static RFC_value_type       value_delta                         ( RFC_value_type
  * @param[in]  class_width   The class width
  * @param[in]  class_offset  The class offset
  * @param[in]  hysteresis    The hysteresis
+#if RFC_TP_SUPPORT 
  * @param[in]  tp            Pointer to turning points buffer
  * @param[in]  tp_cap        Number of turning points in buffer
+#endif
  *
  * @return     false on error
  */
@@ -245,9 +247,11 @@ bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type 
     rfc_ctx->internal.slope          = 0;
     rfc_ctx->internal.extrema[0]     = nil;  /* local minimum */
     rfc_ctx->internal.extrema[1]     = nil;  /* local maximum */
+#if RFC_TP_SUPPORT
+    rfc_ctx->internal.tp_delayed     = nil;
     rfc_ctx->internal.margin[0]      = nil;  /* left  margin */
     rfc_ctx->internal.margin[1]      = nil;  /* right margin */
-    rfc_ctx->internal.tp_delayed     = nil;
+#endif /*RFC_TP_SUPPORT*/
 
     if( !rfc_ctx->residue || !rfc_ctx->matrix || !rfc_ctx->rp || !rfc_ctx->lc )
     {
@@ -317,10 +321,12 @@ void RFC_deinit( void *ctx )
     rfc_ctx->internal.slope             = 0;
     rfc_ctx->internal.extrema[0]        = nil;  /* local minimum */
     rfc_ctx->internal.extrema[1]        = nil;  /* local maximum */
+    rfc_ctx->internal.pos               = 0;
+#if RFC_TP_SUPPORT
     rfc_ctx->internal.margin[0]         = nil;  /* left margin */
     rfc_ctx->internal.margin[1]         = nil;  /* right margin */
-    rfc_ctx->internal.pos               = 0;
     rfc_ctx->internal.tp_delayed        = nil;
+#endif
 
 #if RFC_TP_SUPPORT
     rfc_ctx->tp                         = NULL;
@@ -456,6 +462,9 @@ bool RFC_finalize( void *ctx, int residual_method )
         {
             case RFC_RES_NONE:
                 /* fallthrough */
+            case RFC_RES_IGNORE:
+                ok = RFC_finalize_res_ignore( rfc_ctx );
+                break;
             case RFC_RES_DISCARD:
                 ok = RFC_finalize_res_discard( rfc_ctx );
                 break;
@@ -507,8 +516,10 @@ static
 bool RFC_feed_once( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
 {
     rfc_value_tuple_s *tp_residue;
+#if RFC_TP_SUPPORT
     rfc_value_tuple_s  tp_delayed;
     bool               do_margin;
+#endif
 
     assert( rfc_ctx && pt );
 
@@ -582,7 +593,9 @@ static
 bool RFC_feed_finalize( rfc_ctx_s *rfc_ctx )
 {
     rfc_value_tuple_s *tp_interim = NULL;
+#if RFC_TP_SUPPORT
     bool               do_margin;
+#endif
 
     assert( rfc_ctx );
     
@@ -794,15 +807,8 @@ void RFC_residue_remove_item( rfc_ctx_s *rfc_ctx, size_t index, size_t count )
 static
 bool RFC_finalize_res_ignore( rfc_ctx_s *rfc_ctx )
 {
-    assert( rfc_ctx && rfc_ctx->state < RFC_STATE_FINALIZE );
-
     /* Include interim turning point */
-    if( !RFC_feed_finalize( rfc_ctx ) )
-    {
-        return false;
-    }
-
-    return true;
+    return RFC_feed_finalize( rfc_ctx );
 }
 
 
@@ -1492,6 +1498,7 @@ void RFC_cycle_process( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *from, const
     assert( rfc_ctx );
     assert( from->value > rfc_ctx->class_offset && to->value > rfc_ctx->class_offset );
 
+#if RFC_TP_SUPPORT
     /* If flag RFC_FLAGS_ENFORCE_MARGIN is set, cycles less than hysteresis are possible */
     if( flags & RFC_FLAGS_ENFORCE_MARGIN )
     {
@@ -1500,6 +1507,7 @@ void RFC_cycle_process( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *from, const
             return;
         }
     }
+#endif /*RFC_TP_SUPPORT*/
 
     /* Quantize "from" */
     class_from = QUANTIZE( rfc_ctx, from->value );
