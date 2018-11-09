@@ -1,15 +1,20 @@
 function validate
+  if isempty( which( 'rfc' ) )
+    addpath( 'build/Debug' );
+  end
   %% Empty series
-  name         = 'empty';
-  x            = export_series( name, [] );
-  x_max        = 1;
-  x_min        = -1;
-  class_count  = 100;
-  class_width  = round( (x_max - x_min) / (class_count - 1), 2 );
-  class_offset = x_min - class_width / 2;
-  hysteresis   = class_width;
+  name            = 'empty';
+  x               = export_series( name, [] );
+  x_max           = 1;
+  x_min           = -1;
+  class_count     = 100;
+  class_width     = round( (x_max - x_min) / (class_count - 1), 2 );
+  class_offset    = x_min - class_width / 2;
+  hysteresis      = class_width;
+  enforce_margin  = 0;
+  use_hcm         = 1;
 
-  [~,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis );
+  [~,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis, use_hcm );
 
   assert( sum( sum( rm ) ) == 0 );
 
@@ -28,7 +33,7 @@ function validate
   class_offset = x_min - class_width / 2;
   hysteresis   = class_width * 0.99;
 
-  [~,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis );
+  [~,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis, use_hcm );
 
   assert( sum( sum( rm ) ) == 1 );
   assert( rm( 3,2 ) == 1 );
@@ -48,7 +53,7 @@ function validate
   class_offset = x_min - class_width / 2;
   hysteresis   = class_width * 0.99;
 
-  [~,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis );
+  [~,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis, use_hcm );
 
   assert( sum( sum( rm ) ) == 1 );
   assert( rm( 2,3 ) == 1 );
@@ -69,7 +74,7 @@ function validate
   class_offset = x_min - class_width / 2;
   hysteresis   = class_width;
 
-  [~,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis );
+  [~,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis, use_hcm );
 
   assert( sum( sum( rm ) ) == 7 );
   assert( rm( 5,3 ) == 2 );
@@ -94,7 +99,7 @@ function validate
   class_offset = x_min - class_width / 2;
   hysteresis   = class_width;
 
-  [pd,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis );
+  [pd,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis, enforce_margin, use_hcm );
 
   save( name, 'rm', 're' );
 

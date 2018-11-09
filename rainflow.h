@@ -110,6 +110,25 @@
 #define RFC_COUNTS_LIMIT         (4.5e15 - RFC_FULL_CYCLE_INCREMENT)
 #endif
 
+#ifndef RFC_USE_DELEGATES
+#define RFC_USE_DELEGATES 0
+#endif
+
+#ifndef RFC_HCM_SUPPORT
+#define RFC_HCM_SUPPORT 0
+#endif
+
+#ifndef RFC_TP_SUPPORT
+#define RFC_TP_SUPPORT 1
+#endif
+
+#ifndef RFC_DH_SUPPORT
+#define RFC_DH_SUPPORT 0
+#endif
+
+#ifndef RFC_GLOBAL_EXTREMA
+#define RFC_GLOBAL_EXTREMA 0
+#endif
 
 
 /* Memory allocation functions typedef */
@@ -120,14 +139,33 @@ typedef RFC_VALUE_TYPE          RFC_value_type;      /** Input data value type *
 typedef RFC_COUNTS_VALUE_TYPE   RFC_counts_type;     /** Type of counting values */
 typedef struct rfc_ctx          rfc_ctx_s;           /** Forward declaration (rainflow context) */
 typedef struct rfc_value_tuple  rfc_value_tuple_s;   /** Tuple of value and index position */
+typedef struct rfc_class_param  rfc_class_param_s;   /** Class parameters (width, offset, count) */
 
 
 /* Core functions */
+#if !RFC_TP_SUPPORT
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis );
+#else
+bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
+                                           RFC_value_type hysteresis,
+                                           rfc_value_tuple_s *tp, size_t tp_cap );
+#endif
 void RFC_deinit               ( void *ctx );
 bool RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count );
+bool RFC_feed_tuple           ( void *ctx, rfc_value_tuple_s *data, size_t count );
 bool RFC_finalize             ( void *ctx, int residual_method );
+
+#if RFC_USE_DELEGATES
+/* Delegates typedef */
+typedef  void                ( *rfc_cycle_find_fcn_t )    ( rfc_ctx_s * );
+typedef  double              ( *rfc_damage_calc_fcn_t )   ( rfc_ctx_s *, unsigned from_class, unsigned to_class );
+typedef  bool                ( *rfc_finalize_fcn_t )      ( rfc_ctx_s *, int residual_methods );
+#if RFC_TP_SUPPORT
+typedef  rfc_value_tuple_s * ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, const rfc_value_tuple_s * );
+typedef  bool                ( *rfc_tp_add_fcn_t )        ( rfc_ctx_s *, rfc_value_tuple_s * );
+#endif /*RFC_TP_SUPPORT*/
+#endif /*RFC_USE_DELEGATES*/
 
 
 /* Value info struct */
@@ -137,6 +175,13 @@ typedef struct rfc_value_tuple
     unsigned                        class;                      /**< Class number, base 0 */
     size_t                          pos;                        /**< Absolute position in input data stream, base 1 */
 } rfc_value_tuple_s;
+
+typedef struct rfc_class_param
+{
+    unsigned                        count;                    /**< Class count */
+    RFC_value_type                  width;                    /**< Class width */
+    RFC_value_type                  offset;                   /**< Lower bound of first class */
+} rfc_class_param_s;
 
 
 /**
@@ -159,6 +204,7 @@ typedef struct rfc_ctx
 
     enum
     {
+        RFC_ERROR_NONE = 0,
         RFC_ERROR_INVARG,
         RFC_ERROR_MEMORY,
     }                               error;                          /**< Error code */
@@ -166,14 +212,54 @@ typedef struct rfc_ctx
     enum
     {
         RFC_FLAGS_COUNT_MATRIX          = 1 << 0,                   /**< Count into matrix */
+        RFC_FLAGS_COUNT_RP              = 1 << 1,                   /**< Count into range pair */
+        RFC_FLAGS_COUNT_LC_UP           = 1 << 2,                   /**< Count into level crossing (only rising slopes) */
+        RFC_FLAGS_COUNT_LC_DN           = 1 << 3,                   /**< Count into level crossing (only falling slopes) */
+        RFC_FLAGS_COUNT_LC              = RFC_FLAGS_COUNT_LC_UP     /**< Count into level crossing (all slopes) */
+                                        | RFC_FLAGS_COUNT_LC_DN,
+        RFC_FLAGS_COUNT_ALL             = RFC_FLAGS_COUNT_MATRIX    /**< Count all */
+                                        | RFC_FLAGS_COUNT_RP
+                                        | RFC_FLAGS_COUNT_LC,
+        RFC_FLAGS_ENFORCE_MARGIN        = 1 << 8,                   /**< Enforce first and last data point are turning points */
     }
                                         flags;                      /**< Flags */
+    enum
+    {
+        RFC_COUNTING_METHOD_UNKNOWN     = -1,                       /**< Method is unknown */
+        RFC_COUNTING_METHOD_NONE        =  0,                       /**< No counting */
+        RFC_COUNTING_METHOD_4PTM        =  1,                       /**< 4 point algorithm (default) */
+#if RFC_HCM_SUPPORT
+        RFC_COUNTING_METHOD_HCM         =  2,                       /**< 3 point algorithm, Clormann/Seeger (HCM) method */
+#endif
+    }
+                                        counting_method;
     enum 
     {
         RFC_RES_NONE                    = 0,                        /**< No residual method */
         RFC_RES_IGNORE,                                             /**< Ignore residue (same as RFC_RES_NONE) */
+        RFC_RES_DISCARD,                                            /**< Discard residue (empty residue) */
+        RFC_RES_HALFCYCLES,                                         /**< ASTM */
+        RFC_RES_FULLCYCLES,                                         /**< Count half cycles as full cycles */
+        RFC_RES_CLORMANN_SEEGER,                                    /**< Clormann/Seeger method */
+        RFC_RES_REPEATED,                                           /**< Repeat residue and count closed cycles */
+        RFC_RES_RP_DIN45667,                                        /**< Count residue according to range pair in DIN-45667 */
     }
                                         residual_method;
+#if RFC_SD_SUPPORT
+    enum
+    {
+        RFC_SD_NONE                     = -1,                       /**< No spread damage calculation */
+        RFC_SD_HALF_23                  =  0,                       /**< Equally split damage between P2 and P3 */
+        RFC_SD_RAMP_AMPLITUDE_23        =  1,                       /**< Spread damage according to amplitude over points between P2 and P3 */
+        RFC_SD_RAMP_DAMAGE_23           =  2,                       /**< Spread damage linearly over points between P2 and P3 */
+        RFC_SD_RAMP_AMPLITUDE_24        =  3,                       /**< Spread damage according to amplitude over points between P2 and P4 */  
+        RFC_SD_RAMP_DAMAGE_24           =  4,                       /**< Spread damage linearly over points between P2 and P4 */
+        RFC_SD_FULL_P2                  =  5,                       /**< Assign damage to P2 */
+        RFC_SD_FULL_P3                  =  6,                       /**< Assign damage to P3 */
+        RFC_SD_TRANSIENT_23             =  7,                       /**< Spread damage transient according to amplitude over points between P2 and P3 */
+        RFC_SD_TRANSIENT_23c            =  7,                       /**< Spread damage transient according to amplitude over points between P2 and P4 only until cycle is closed */
+    } e_spread_damage;
+#endif
 
     /* Memory allocation functions */
     rfc_mem_alloc_fcn_t             mem_alloc;                      /**< Allocate initialized memory */
@@ -184,16 +270,26 @@ typedef struct rfc_ctx
     RFC_counts_type                 curr_inc;                       /**< Current increment, used by counting algorithms */
 
     /* Rainflow class parameters */
-    unsigned                        class_count;                    /**< Class count */
-    RFC_value_type                  class_width;                    /**< Class width */
-    RFC_value_type                  class_offset;                   /**< Lower bound of first class */
+    rfc_class_param_s               class_info;                     /**< Class parameters */
     RFC_value_type                  hysteresis;                     /**< Hysteresis filtering */
 
     /* Woehler curve */
     double                          wl_sd;                          /**< Fatigue resistance range (amplitude) */
     double                          wl_nd;                          /**< Cycles at wl_sd */
     double                          wl_k;                           /**< Woehler gradient above wl_sd */
+    double                          wl_k2;                          /**< Woehler gradient below wl_sd */
+    double                          wl_omission;                    /**< Omission level */
 
+#if RFC_USE_DELEGATES
+    /* Delegates (optional, may be NULL) */
+#if RFC_TP_SUPPORT
+    rfc_tp_next_fcn_t               tp_next_fcn;                    /**< Test if new turning point exists */
+    rfc_tp_add_fcn_t                tp_add_fcn;                     /**< Handling new turning points */
+#endif /*RFC_TP_SUPPORT*/
+    rfc_finalize_fcn_t              finalize_fcn;                   /**< Finalizing function */
+    rfc_cycle_find_fcn_t            cycle_find_fcn;                 /**< Find next cycle(s) and process */
+    rfc_damage_calc_fcn_t           damage_calc_fcn;                /**< Damage calculating function */
+#endif
     
     /* Residue */
     rfc_value_tuple_s              *residue;                        /**< Buffer for residue */
@@ -202,6 +298,22 @@ typedef struct rfc_ctx
 
     /* Non-sparse storages (optional, may be NULL) */
     RFC_counts_type                *matrix;                         /**< Rainflow matrix */
+    RFC_counts_type                *rp;                             /**< Range pair counts */
+    RFC_counts_type                *lc;                             /**< Level crossing counts */
+
+#if RFC_TP_SUPPORT
+    /* Turning points storage (optional, may be NULL) */
+    rfc_value_tuple_s              *tp;                             /**< Buffer for turning points */
+    size_t                          tp_cap;                         /**< Buffer capacity (number of elements) */
+    size_t                          tp_cnt;                         /**< Number of turning points in buffer */
+    bool                            tp_locked;                      /**< If tp_locked, tp is freezed */
+#endif
+
+#if RFC_DH_SUPPORT
+    double                          dh;                             /**< Damage history */
+    size_t                          dh_cap;                         /**< Capacity of dh */
+    size_t                          dh_cnt;                         /**< Number of values in dh */
+#endif
 
     /* Damage */
     double                          pseudo_damage;                  /**< Cumulated pseudo damage */
@@ -211,7 +323,22 @@ typedef struct rfc_ctx
     {
         int                         slope;                          /**< Current signal slope */
         rfc_value_tuple_s           extrema[2];                     /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
+        bool                        extrema_changed;                /**< True if one extrema has changed */
         size_t                      pos;                            /**< Absolute position in data input stream, base 1 */
+#if RFC_TP_SUPPORT
+        rfc_value_tuple_s           margin[2];                      /**< First and last data point */
+        rfc_value_tuple_s           tp_delayed;                     /**< Delay stage when RFC_FLAGS_ENFORCE_MARGIN is set */
+#endif /*RFC_TP_SUPPORT*/
+#if RFC_HCM_SUPPORT
+        struct hcm
+        {
+            /* Residue */
+            rfc_value_tuple_s      *stack;                          /**< Stack */
+            size_t                  stack_cap;                      /**< Stack capacity in number of elements (max. 2*class_count) */
+            int                     IR;                             /**< Pointer to residue stack, first turning point of cycles able to close, base 1 */
+            int                     IZ;                             /**< Pointer to residue stack, last turning point of cycles able to close, base 1 */
+        }                           hcm;
+#endif
     }
                                     internal;
 } rfc_ctx_s;
