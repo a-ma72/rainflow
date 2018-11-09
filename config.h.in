@@ -7,7 +7,7 @@
   #define RFC_GLOBAL_EXTREMA      ${RFC_GLOBAL_EXTREMA}
   #define RFC_HCM_SUPPORT         ${RFC_HCM_SUPPORT}
   #define RFC_TP_SUPPORT          ${RFC_TP_SUPPORT}
-  #define RFC_SD_SUPPORT          ${RFC_SD_SUPPORT}
+  #define RFC_DH_SUPPORT          ${RFC_DH_SUPPORT}
   #define RFC_VERSION_MAJOR       "${RFC_VERSION_MAJOR}"
   #define RFC_VERSION_MINOR       "${RFC_VERSION_MINOR}"
 #endif /*RFC_VERSION_MAJOR*/

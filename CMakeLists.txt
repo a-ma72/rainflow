@@ -19,7 +19,7 @@ option( RFC_USE_DELEGATES       "Use delegates (functors)" OFF )
 option( RFC_GLOBAL_EXTREMA      "Always calculate global extrema" OFF )
 option( RFC_HCM_SUPPORT         "Support HCM (Clormann/Seeger) algorithm" ON )
 option( RFC_TP_SUPPORT          "Support turning points" ON )
-option( RFC_SD_SUPPORT          "Support damage timeseries (\"spread damage\")" ON )
+option( RFC_DH_SUPPORT          "Support damage history (\"spread damage\")" OFF )
 
 
 set( CMAKE_POSITION_INDEPENDENT_CODE ON )

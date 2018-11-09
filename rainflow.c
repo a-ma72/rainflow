@@ -121,7 +121,7 @@ static void                 RFC_cycle_find_4ptm                 ( rfc_ctx_s * );
 #if RFC_HCM_SUPPORT
 static void                 RFC_cycle_find_hcm                  ( rfc_ctx_s * );
 #endif /*RFC_HCM_SUPPORT*/
-static void                 RFC_cycle_process                   ( rfc_ctx_s *, const rfc_value_tuple_s *from, const rfc_value_tuple_s *to, int flags );
+static void                 RFC_cycle_process                   ( rfc_ctx_s *, const rfc_value_tuple_s *from, const rfc_value_tuple_s *to, const rfc_value_tuple_s *next, int flags );
 /* Methods on residue */
 static bool                 RFC_residue_exchange                ( rfc_ctx_s *, rfc_value_tuple_s **residue, size_t *residue_cap, size_t *residue_cnt, bool restore );
 static void                 RFC_residue_remove_item             ( rfc_ctx_s *, size_t index, size_t count );
@@ -139,6 +139,9 @@ static bool                 RFC_tp_add                          ( rfc_ctx_s *, r
 static void                 RFC_tp_lock                         ( rfc_ctx_s *, bool do_lock );
 static void                 RFC_tp_refeed                       ( rfc_ctx_s * );
 #endif /*RFC_TP_SUPPORT*/
+#if RFC_DH_SUPPORT
+static void                 RFC_dh_spread_damage                ( rfc_ctx_s *, const rfc_value_tuple_s *from, const rfc_value_tuple_s *to, const rfc_value_tuple_s *next, int flags );
+#endif
 static bool                 RFC_error_raise                     ( rfc_ctx_s *, int );
 static double               RFC_damage_calc                     ( rfc_ctx_s *, unsigned class_from, unsigned class_to );
 static RFC_value_type       value_delta                         ( RFC_value_type from, RFC_value_type to, int *sign_ptr );
@@ -516,7 +519,7 @@ bool RFC_finalize( void *ctx, int residual_method )
 /*** Implementation static functions ***/
 
 /**
- * brief       Reset data processing information
+ * brief       Reset data processing information (empty containers)
  *
  * @param      rfc_ctx          The rainflow context
  *
@@ -589,6 +592,23 @@ bool RFC_feed_once( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
 #endif
 
     assert( rfc_ctx && pt );
+
+#if RFC_DH_SUPPORT
+    if( rfc_ctx->dh_cnt++ > rfc_ctx->dh_cap )
+    {
+        size_t new_cap = rfc_ctx->dh_cap + 1024;
+
+        rfc_ctx->dh = (RFC_value_type)rfc_ctx->mem_alloc( rfc_ctx->dh, new_cap, sizeof(RFC_value_type) );
+
+        if( !rfc_ctx->dh )
+        {
+            return RFC_error_raise( rfc_ctx, RFC_ERROR_MEMORY );
+        }
+
+        memset( rfc_ctx->dh + rfc_ctx->dh_cnt, 0, sizeof(RFC_value_type) * ( new_cap - rfc_ctx->dh_cap ) );
+        rfc_ctx->dh_cap = new_cap;
+    }
+#endif /*RFC_DH_SUPPORT*/
 
     /* Check for next turning point and update residue */
     /* (tp_residue refers member residue in rfc_ctx) */
@@ -935,7 +955,7 @@ bool RFC_finalize_res_weight_cycles( rfc_ctx_s *rfc_ctx, RFC_counts_type weight 
         {
             rfc_value_tuple_s *to = from + 1;
 
-            RFC_cycle_process( rfc_ctx, from, to, flags );
+            RFC_cycle_process( rfc_ctx, from, to, to + 1, flags );
 
             from = to;
         }
@@ -986,7 +1006,7 @@ bool RFC_finalize_res_clormann_seeger( rfc_ctx_s *rfc_ctx )
                 rfc_value_tuple_s *from = &rfc_ctx->residue[idx+1];
                 rfc_value_tuple_s *to   = &rfc_ctx->residue[idx+2];
 
-                RFC_cycle_process( rfc_ctx, from, to, rfc_ctx->flags );
+                RFC_cycle_process( rfc_ctx, from, to, to + 1, rfc_ctx->flags );
 
                 /* Remove two inner turning points (idx+1 and idx+2) */
                 RFC_residue_remove_item( rfc_ctx, i + 1, 2 );
@@ -1047,7 +1067,7 @@ bool RFC_finalize_res_rp_DIN45667( rfc_ctx_s *rfc_ctx )
                 if( srange_i == -srange_j )
                 {
                     /* Do the countings for the matching slope */
-                    RFC_cycle_process( rfc_ctx, from_j, to_j, rfc_ctx->flags & (RFC_FLAGS_COUNT_LC | RFC_FLAGS_COUNT_RP) );
+                    RFC_cycle_process( rfc_ctx, from_j, to_j, to_j + 1, rfc_ctx->flags & (RFC_FLAGS_COUNT_LC | RFC_FLAGS_COUNT_RP) );
 
                     /* Remove "left hand slope" */
                     RFC_residue_remove_item( rfc_ctx, /*index*/ j, /*count*/ 2 );
@@ -1057,7 +1077,7 @@ bool RFC_finalize_res_rp_DIN45667( rfc_ctx_s *rfc_ctx )
             /* Do the countings for the "left hand slope" */
 
             /* Only level crossing counting affected */
-            RFC_cycle_process( rfc_ctx, from_i, to_i, rfc_ctx->flags & RFC_FLAGS_COUNT_LC );
+            RFC_cycle_process( rfc_ctx, from_i, to_i, to_i + 1, rfc_ctx->flags & RFC_FLAGS_COUNT_LC );
 
             /* Remove first point */
             RFC_residue_remove_item( rfc_ctx, /*index*/ 0, /*count*/ 1 );
@@ -1439,7 +1459,7 @@ void RFC_cycle_find_4ptm( rfc_ctx_s *rfc_ctx )
             rfc_value_tuple_s *from = &rfc_ctx->residue[idx+1];
             rfc_value_tuple_s *to   = &rfc_ctx->residue[idx+2];
 
-            RFC_cycle_process( rfc_ctx, from, to, rfc_ctx->flags );
+            RFC_cycle_process( rfc_ctx, from, to, to + 1, rfc_ctx->flags );
 
             /* Remove two inner turning points (idx+1 and idx+2) */
             /* Move last turning point */
@@ -1505,7 +1525,7 @@ label_2:
                 if( fabs( (double)K->value - (double)J->value ) >= fabs( (double)J->value - (double)I->value) )
                 {
                     /* Cycle range is greater or equal to previous, register closed cycle */
-                    RFC_cycle_process( rfc_ctx, I, J, rfc_ctx->flags );
+                    RFC_cycle_process( rfc_ctx, I, J, NULL, rfc_ctx->flags );
                     IZ -= 2;
                     /* Test further closed cycles */
                     goto label_2;
@@ -1562,7 +1582,7 @@ label_2:
  * @param[in]  flags    Control flags
  */
 static
-void RFC_cycle_process( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *from, const rfc_value_tuple_s *to, int flags )
+void RFC_cycle_process( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *from, const rfc_value_tuple_s *to, const rfc_value_tuple_s *next, int flags )
 {
     unsigned class_from, class_to;
 
@@ -1663,6 +1683,12 @@ void RFC_cycle_process( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *from, const
                 }
             }
         }
+#if RFC_DH_SUPPORT
+        if( rfc_ctx->dh )
+        {
+            RFC_dh_spread_damage( rfc_ctx, from, to, next );
+        }
+#endif        
     }
 }
 
@@ -1769,7 +1795,7 @@ void RFC_tp_refeed( rfc_ctx_s *rfc_ctx, rfc_class_param_s *new_class_param )
         tp.pos = pos;
         tp.class = QUANTIZE( rfc_ctx->class_info, tp.value );
 
-        RFC_feed_tuple( rfc_ctx, &tp, 1 );
+        RFC_feed_once( rfc_ctx, &tp );
     }
 }
 #endif /*RFC_TP_SUPPORT*/

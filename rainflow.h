@@ -122,6 +122,10 @@
 #define RFC_TP_SUPPORT 1
 #endif
 
+#ifndef RFC_DH_SUPPORT
+#define RFC_DH_SUPPORT 0
+#endif
+
 #ifndef RFC_GLOBAL_EXTREMA
 #define RFC_GLOBAL_EXTREMA 0
 #endif
@@ -303,6 +307,12 @@ typedef struct rfc_ctx
     size_t                          tp_cap;                         /**< Buffer capacity (number of elements) */
     size_t                          tp_cnt;                         /**< Number of turning points in buffer */
     bool                            tp_locked;                      /**< If tp_locked, tp is freezed */
+#endif
+
+#if RFC_DH_SUPPORT
+    double                          dh;                             /**< Damage history */
+    size_t                          dh_cap;                         /**< Capacity of dh */
+    size_t                          dh_cnt;                         /**< Number of values in dh */
 #endif
 
     /* Damage */
