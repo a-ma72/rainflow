@@ -135,6 +135,7 @@ typedef RFC_VALUE_TYPE          RFC_value_type;      /** Input data value type *
 typedef RFC_COUNTS_VALUE_TYPE   RFC_counts_type;     /** Type of counting values */
 typedef struct rfc_ctx          rfc_ctx_s;           /** Forward declaration (rainflow context) */
 typedef struct rfc_value_tuple  rfc_value_tuple_s;   /** Tuple of value and index position */
+typedef struct rfc_class_param  rfc_class_param_s;   /** Class parameters (width, offset, count) */
 
 
 /* Core functions */
@@ -162,6 +163,7 @@ typedef  bool                ( *rfc_tp_add_fcn_t )        ( rfc_ctx_s *, rfc_val
 #endif /*RFC_TP_SUPPORT*/
 #endif /*RFC_USE_DELEGATES*/
 
+
 /* Value info struct */
 typedef struct rfc_value_tuple
 {
@@ -169,6 +171,13 @@ typedef struct rfc_value_tuple
     unsigned                        class;                      /**< Class number, base 0 */
     size_t                          pos;                        /**< Absolute position in input data stream, base 1 */
 } rfc_value_tuple_s;
+
+typedef struct rfc_class_param
+{
+    unsigned                        count;                    /**< Class count */
+    RFC_value_type                  width;                    /**< Class width */
+    RFC_value_type                  offset;                   /**< Lower bound of first class */
+} rfc_class_param_s;
 
 
 /**
@@ -191,6 +200,7 @@ typedef struct rfc_ctx
 
     enum
     {
+        RFC_ERROR_NONE = 0,
         RFC_ERROR_INVARG,
         RFC_ERROR_MEMORY,
     }                               error;                          /**< Error code */
@@ -256,9 +266,7 @@ typedef struct rfc_ctx
     RFC_counts_type                 curr_inc;                       /**< Current increment, used by counting algorithms */
 
     /* Rainflow class parameters */
-    unsigned                        class_count;                    /**< Class count */
-    RFC_value_type                  class_width;                    /**< Class width */
-    RFC_value_type                  class_offset;                   /**< Lower bound of first class */
+    rfc_class_param_s               class_info;                     /**< Class parameters */
     RFC_value_type                  hysteresis;                     /**< Hysteresis filtering */
 
     /* Woehler curve */
@@ -305,6 +313,7 @@ typedef struct rfc_ctx
     {
         int                         slope;                          /**< Current signal slope */
         rfc_value_tuple_s           extrema[2];                     /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
+        bool                        extrema_changed;                /**< True if one extrema has changed */
         size_t                      pos;                            /**< Absolute position in data input stream, base 1 */
 #if RFC_TP_SUPPORT
         rfc_value_tuple_s           margin[2];                      /**< First and last data point */
@@ -316,7 +325,6 @@ typedef struct rfc_ctx
             /* Residue */
             rfc_value_tuple_s      *stack;                          /**< Stack */
             size_t                  stack_cap;                      /**< Stack capacity in number of elements (max. 2*class_count) */
-            rfc_value_tuple_s       K;                              /**< New value for HCM method */
             int                     IR;                             /**< Pointer to residue stack, first turning point of cycles able to close, base 1 */
             int                     IZ;                             /**< Pointer to residue stack, last turning point of cycles able to close, base 1 */
         }                           hcm;
