@@ -212,5 +212,6 @@ typedef struct rfc_ctx
         int                         slope;                          /**< Current signal slope */
         rfc_value_tuple_s           extrema[2];                     /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
         size_t                      pos;                            /**< Absolute position in data input stream, base 1 */
-    } internal;
+    }
+                                    internal;
 } rfc_ctx_s;
