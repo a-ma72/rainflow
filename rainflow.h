@@ -31,7 +31,7 @@
  *
  * These steps are fully documented in standards such as 
  * ASTM E1049 "Standard Practices for Cycle Counting in Fatigue Analysis" [1].
- * This implementation uses the 4-point algorithm mentioned in [2] and [3].
+ * This implementation uses the 4-point algorithm mentioned in [3,4] and the 3-point HCM method proposed in [2].
  * To take the residue into account, you may implement a custom method or use some
  * predefined functions.
  * 
@@ -39,13 +39,17 @@
  * [1] ASTM Standard E 1049, 1985 (2011). 
  *     "Standard Practices for Cycle Counting in Fatigue Analysis."
  *     West Conshohocken, PA: ASTM International, 2011.
- * [2] FVA-Richtlinie, 2010.
+ * [2] Rainflow - HCM
+ *     "Ein Hysteresisschleifen-Zaehlalgorithmus auf werkstoffmechanischer Grundlage"
+ *     U.H. Clormann, T. Seeger
+ *     1985 TU Darmstadt, Fachgebiet Werkstoffmechanik
+ * [3] FVA-Richtlinie, 2010.
  *     "Zaehlverfahren zur Bildung von Kollektiven und Matrizen aus Zeitfunktionen"
  *     [https://fva-net.de/fileadmin/content/Richtlinien/FVA-Richtlinie_Zaehlverfahren_2010.pdf]
- * [3] Siemens Product Lifecycle Management Software Inc., 2018. 
+ * [4] Siemens Product Lifecycle Management Software Inc., 2018. 
  *     [https://community.plm.automation.siemens.com/t5/Testing-Knowledge-Base/Rainflow-Counting/ta-p/383093]
- * [4] G.Marsh on: "Review and application of Rainflow residue processing techniques for accurate fatigue damage estimation"
- *     International Journal of Fatigue 82 (2016) 757–765,
+ * [5] G.Marsh on: "Review and application of Rainflow residue processing techniques for accurate fatigue damage estimation"
+ *     International Journal of Fatigue 82 (2016) 757-765,
  *     [https://doi.org/10.1016/j.ijfatigue.2015.10.007]
  * []  Hack, M: Schaedigungsbasierte Hysteresefilter; D386 (Diss Univ. Kaiserslautern), Shaker Verlag Aachen, 1998, ISBN 3-8265-3936-2
  * []  Brokate, M; Sprekels, J, Hysteresis and Phase Transition, Applied Mathematical Sciences 121, Springer,  New York, 1996
@@ -87,6 +91,7 @@
 #include <stdint.h>  /* ULLONG_MAX */
 #include <stddef.h>  /* size_t, NULL */
 #include <stdlib.h>  /* calloc(), free(), abs() */
+#include "config.h"  /* Configuration */
 
 
 #ifndef RFC_VALUE_TYPE
@@ -139,72 +144,73 @@ typedef struct rfc_value_tuple
  */
 typedef struct rfc_ctx
 {
-    size_t                          version;                    /**< Version number as sizeof(struct rfctx..), must be 1st field! */
+    size_t                          version;                        /**< Version number as sizeof(struct rfctx..), must be 1st field! */
 
     enum
     {
-        RFC_STATE_INIT0,                                        /**< Initialized with zeros */
-        RFC_STATE_INIT,                                         /**< Initialized, memory allocated */
-        RFC_STATE_BUSY,                                         /**< In counting state */
-        RFC_STATE_BUSY_INTERIM,                                 /**< In counting state, having still one interim turning point (not included) */
-        RFC_STATE_FINALIZE,                                     /**< Finalizing */
-        RFC_STATE_FINISHED,                                     /**< Counting finished, memory still allocated */
-        RFC_STATE_ERROR,                                        /**< An error occured */
-    }                               state;                      /**< Current counting state */
+        RFC_STATE_INIT0,                                            /**< Initialized with zeros */
+        RFC_STATE_INIT,                                             /**< Initialized, memory allocated */
+        RFC_STATE_BUSY,                                             /**< In counting state */
+        RFC_STATE_BUSY_INTERIM,                                     /**< In counting state, having still one interim turning point (not included) */
+        RFC_STATE_FINALIZE,                                         /**< Finalizing */
+        RFC_STATE_FINISHED,                                         /**< Counting finished, memory still allocated */
+        RFC_STATE_ERROR,                                            /**< An error occured */
+    }                               state;                          /**< Current counting state */
 
     enum
     {
         RFC_ERROR_INVARG,
         RFC_ERROR_MEMORY,
-    }                               error;                      /**< Error code */
+    }                               error;                          /**< Error code */
 
     enum
     {
-        RFC_FLAGS_COUNT_MATRIX      = 1 << 0,                   /**< Count into matrix */
+        RFC_FLAGS_COUNT_MATRIX          = 1 << 0,                   /**< Count into matrix */
     }
-                                    flags;                      /**< Flags */
+                                        flags;                      /**< Flags */
     enum 
     {
-        RFC_RES_NONE                = 0,                        /**< No residual method */
-        RFC_RES_IGNORE,                                         /**< Ignore residue (same as RFC_RES_NONE) */
+        RFC_RES_NONE                    = 0,                        /**< No residual method */
+        RFC_RES_IGNORE,                                             /**< Ignore residue (same as RFC_RES_NONE) */
     }
-                                    residual_method;
+                                        residual_method;
 
     /* Memory allocation functions */
-    rfc_mem_alloc_fcn_t             mem_alloc;                  /**< Allocate initialized memory */
+    rfc_mem_alloc_fcn_t             mem_alloc;                      /**< Allocate initialized memory */
 
     /* Counter increments */
-    RFC_counts_type                 full_inc;                   /**< Increment for a full cycle */
-    RFC_counts_type                 half_inc;                   /**< Increment for a half cycle, used by some residual algorithms */
-    RFC_counts_type                 curr_inc;                   /**< Current increment, used by counting algorithms */
+    RFC_counts_type                 full_inc;                       /**< Increment for a full cycle */
+    RFC_counts_type                 half_inc;                       /**< Increment for a half cycle, used by some residual algorithms */
+    RFC_counts_type                 curr_inc;                       /**< Current increment, used by counting algorithms */
 
     /* Rainflow class parameters */
-    unsigned                        class_count;                /**< Class count */
-    RFC_value_type                  class_width;                /**< Class width */
-    RFC_value_type                  class_offset;               /**< Lower bound of first class */
-    RFC_value_type                  hysteresis;                 /**< Hysteresis filtering */
+    unsigned                        class_count;                    /**< Class count */
+    RFC_value_type                  class_width;                    /**< Class width */
+    RFC_value_type                  class_offset;                   /**< Lower bound of first class */
+    RFC_value_type                  hysteresis;                     /**< Hysteresis filtering */
 
     /* Woehler curve */
-    double                          wl_sd;                      /**< Fatigue resistance range (amplitude) */
-    double                          wl_nd;                      /**< Cycles at wl_sd */
-    double                          wl_k;                       /**< Woehler gradient above wl_sd */
+    double                          wl_sd;                          /**< Fatigue resistance range (amplitude) */
+    double                          wl_nd;                          /**< Cycles at wl_sd */
+    double                          wl_k;                           /**< Woehler gradient above wl_sd */
 
+    
     /* Residue */
-    rfc_value_tuple_s              *residue;                    /**< Buffer for residue */
-    size_t                          residue_cap;                /**< Buffer capacity in number of elements (max. 2*class_count) */
-    size_t                          residue_cnt;                /**< Number of value tuples in buffer */
+    rfc_value_tuple_s              *residue;                        /**< Buffer for residue */
+    size_t                          residue_cap;                    /**< Buffer capacity in number of elements (max. 2*class_count) */
+    size_t                          residue_cnt;                    /**< Number of value tuples in buffer */
 
     /* Non-sparse storages (optional, may be NULL) */
-    RFC_counts_type                *matrix;                     /**< Rainflow matrix */
+    RFC_counts_type                *matrix;                         /**< Rainflow matrix */
 
     /* Damage */
-    double                          pseudo_damage;              /**< Cumulated pseudo damage */
+    double                          pseudo_damage;                  /**< Cumulated pseudo damage */
     
     /* Internal usage */
     struct internal
     {
-        int                         slope;                      /**< Current signal slope */
-        rfc_value_tuple_s           extrema[2];                 /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
-        size_t                      pos;                        /**< Absolute position in data input stream, base 1 */
+        int                         slope;                          /**< Current signal slope */
+        rfc_value_tuple_s           extrema[2];                     /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
+        size_t                      pos;                            /**< Absolute position in data input stream, base 1 */
     } internal;
 } rfc_ctx_s;

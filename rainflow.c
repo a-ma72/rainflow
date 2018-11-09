@@ -31,7 +31,7 @@
  *
  * These steps are fully documented in standards such as 
  * ASTM E1049 "Standard Practices for Cycle Counting in Fatigue Analysis" [1].
- * This implementation uses the 4-point algorithm mentioned in [2] and [3].
+ * This implementation uses the 4-point algorithm mentioned in [3,4] and the 3-point HCM method proposed in [2].
  * To take the residue into account, you may implement a custom method or use some
  * predefined functions.
  * 
@@ -39,13 +39,17 @@
  * [1] ASTM Standard E 1049, 1985 (2011). 
  *     "Standard Practices for Cycle Counting in Fatigue Analysis."
  *     West Conshohocken, PA: ASTM International, 2011.
- * [2] FVA-Richtlinie, 2010.
+ * [2] Rainflow - HCM
+ *     "Ein Hysteresisschleifen-Zaehlalgorithmus auf werkstoffmechanischer Grundlage"
+ *     U.H. Clormann, T. Seeger
+ *     1985 TU Darmstadt, Fachgebiet Werkstoffmechanik
+ * [3] FVA-Richtlinie, 2010.
  *     "Zaehlverfahren zur Bildung von Kollektiven und Matrizen aus Zeitfunktionen"
  *     [https://fva-net.de/fileadmin/content/Richtlinien/FVA-Richtlinie_Zaehlverfahren_2010.pdf]
- * [3] Siemens Product Lifecycle Management Software Inc., 2018. 
+ * [4] Siemens Product Lifecycle Management Software Inc., 2018. 
  *     [https://community.plm.automation.siemens.com/t5/Testing-Knowledge-Base/Rainflow-Counting/ta-p/383093]
- * [4] G.Marsh on: "Review and application of Rainflow residue processing techniques for accurate fatigue damage estimation"
- *     International Journal of Fatigue 82 (2016) 757–765,
+ * [5] G.Marsh on: "Review and application of Rainflow residue processing techniques for accurate fatigue damage estimation"
+ *     International Journal of Fatigue 82 (2016) 757-765,
  *     [https://doi.org/10.1016/j.ijfatigue.2015.10.007]
  * []  Hack, M: Schaedigungsbasierte Hysteresefilter; D386 (Diss Univ. Kaiserslautern), Shaker Verlag Aachen, 1998, ISBN 3-8265-3936-2
  * []  Brokate, M; Sprekels, J, Hysteresis and Phase Transition, Applied Mathematical Sciences 121, Springer,  New York, 1996
@@ -82,6 +86,7 @@
  *================================================================================
  */
 
+
 #include "rainflow.h"
 
 #include <assert.h>  /* assert() */
@@ -98,7 +103,7 @@
 #pragma message(RFC_MEX_USAGE)
 #include <string.h>
 #include <mex.h>
-#endif
+#endif /*MATLAB_MEX_FILE*/
 
 /* Core functions */
 static bool                 RFC_feed_once                       ( rfc_ctx_s *, rfc_value_tuple_s* tp );
@@ -106,11 +111,12 @@ static bool                 RFC_feed_finalize                   ( rfc_ctx_s *rfc
 static rfc_value_tuple_s *  RFC_tp_next                         ( rfc_ctx_s *, const rfc_value_tuple_s *pt );
 static void                 RFC_cycle_find_4ptm                 ( rfc_ctx_s * );
 static void                 RFC_cycle_process                   ( rfc_ctx_s *, const rfc_value_tuple_s *from, const rfc_value_tuple_s *to, int flags );
-/* Residual methods */
+/* Methods on residue */
 static bool                 RFC_finalize_res_ignore             ( rfc_ctx_s * );
 /* Memory allocator */
 static void *               RFC_mem_alloc                       ( void *ptr, size_t num, size_t size );
 /* Other */
+static bool                 RFC_error_raise                     ( rfc_ctx_s *, int );
 static double               RFC_damage_calc                     ( rfc_ctx_s *, unsigned class_from, unsigned class_to );
 static RFC_value_type       value_delta                         ( RFC_value_type from, RFC_value_type to, int *sign_ptr );
 
@@ -225,19 +231,19 @@ void RFC_deinit( void *ctx )
         return;
     }
 
-    if( rfc_ctx->residue )           rfc_ctx->mem_alloc( rfc_ctx->residue, 0, 0 );
-    if( rfc_ctx->matrix )            rfc_ctx->mem_alloc( rfc_ctx->matrix,  0, 0 );
+    if( rfc_ctx->residue )              rfc_ctx->mem_alloc( rfc_ctx->residue, 0, 0 );
+    if( rfc_ctx->matrix )               rfc_ctx->mem_alloc( rfc_ctx->matrix,  0, 0 );
 
-    rfc_ctx->residue                 = NULL;
-    rfc_ctx->residue_cap             = 0;
-    rfc_ctx->residue_cnt             = 0;
+    rfc_ctx->residue                    = NULL;
+    rfc_ctx->residue_cap                = 0;
+    rfc_ctx->residue_cnt                = 0;
 
-    rfc_ctx->matrix                  = NULL;
+    rfc_ctx->matrix                     = NULL;
 
-    rfc_ctx->internal.slope          = 0;
-    rfc_ctx->internal.extrema[0]     = nil;  /* local minimum */
-    rfc_ctx->internal.extrema[1]     = nil;  /* local maximum */
-    rfc_ctx->internal.pos            = 0;
+    rfc_ctx->internal.slope             = 0;
+    rfc_ctx->internal.extrema[0]        = nil;  /* local minimum */
+    rfc_ctx->internal.extrema[1]        = nil;  /* local maximum */
+    rfc_ctx->internal.pos               = 0;
 
 
     rfc_ctx->state = RFC_STATE_INIT0;
@@ -363,7 +369,7 @@ bool RFC_feed_once( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
 
     /* Rainflow counting */
 
-    /* Check for closed cycles */
+    /* Add turning point and check for closed cycles */
     if( tp_residue )
     {
         /* New turning point, check for closed cycles and count */
@@ -398,8 +404,6 @@ bool RFC_feed_finalize( rfc_ctx_s *rfc_ctx )
     /* Adjust residue: Incorporate interim turning point */
     if( rfc_ctx->state == RFC_STATE_BUSY_INTERIM )
     {
-        assert( rfc_ctx->residue && rfc_ctx->residue_cnt );
-
         tp_interim = &rfc_ctx->residue[rfc_ctx->residue_cnt];
         rfc_ctx->residue_cnt++;
     }
@@ -417,7 +421,7 @@ bool RFC_feed_finalize( rfc_ctx_s *rfc_ctx )
 
 
 /**
- * @brief       Finalize pending counts, ignoring residue.
+ * @brief       Finalize pending counts, ignore residue.
  *
  * @param       rfc_ctx  The rainflow context
  * 
@@ -426,8 +430,33 @@ bool RFC_feed_finalize( rfc_ctx_s *rfc_ctx )
 static
 bool RFC_finalize_res_ignore( rfc_ctx_s *rfc_ctx )
 {
-    /* Just include interim turning point */
+    /* Include interim turning point */
     return RFC_feed_finalize( rfc_ctx );
+}
+
+
+/**
+ * @brief       Finalize pending counts, discard residue.
+ *
+ * @param       rfc_ctx  The rainflow context
+ * 
+ * @return      false on error
+ */
+static
+bool RFC_finalize_res_discard( rfc_ctx_s *rfc_ctx )
+{
+    assert( rfc_ctx && rfc_ctx->state < RFC_STATE_FINALIZE );
+
+    /* Include interim turning point */
+    if( !RFC_feed_finalize( rfc_ctx ) )
+    {
+        return false;
+    }
+
+    /* Empty residue */
+    rfc_ctx->residue_cnt = 0;
+
+    return true;
 }
 
 
@@ -468,29 +497,6 @@ double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_
     }
 
     return D_i;
-}
-
-
-/**
- * @brief       Returns the unsigned difference of two values, sign optionally returned as -1 or 1.
- *
- * @param[in]   from      Left hand value
- * @param[in]   to        Right hand value
- * @param[out]  sign_ptr  Pointer to catch sign (may be NULL)
- *
- * @return      Returns the absolute difference of given values
- */
-static
-RFC_value_type value_delta( RFC_value_type from, RFC_value_type to, int *sign_ptr )
-{
-    double delta = (double)to - (double)from;
-
-    if( sign_ptr )
-    {
-        *sign_ptr = ( delta < 0.0 ) ? -1 : 1;
-    }
-
-    return (RFC_value_type)fabs( delta );
 }
 
 
@@ -652,8 +658,6 @@ rfc_value_tuple_s * RFC_tp_next( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *pt
 static
 void RFC_cycle_find_4ptm( rfc_ctx_s *rfc_ctx )
 {
-    assert( rfc_ctx );
-
     while( rfc_ctx->residue_cnt >= 4 )
     {
         size_t idx = rfc_ctx->residue_cnt - 4;
@@ -685,8 +689,13 @@ void RFC_cycle_find_4ptm( rfc_ctx_s *rfc_ctx )
             RFC_cycle_process( rfc_ctx, from, to, rfc_ctx->flags );
 
             /* Remove two inner turning points (idx+1 and idx+2) */
-            rfc_ctx->residue[idx+1] = rfc_ctx->residue[idx+3];  /* Move last turning point */
-            rfc_ctx->residue[idx+2] = rfc_ctx->residue[idx+4];  /* Move interim turning point */
+            /* Move last turning point */
+            rfc_ctx->residue[idx+1] = rfc_ctx->residue[idx+3];
+            /* Move interim turning point */
+            if( rfc_ctx->state == RFC_STATE_BUSY_INTERIM )
+            {
+                rfc_ctx->residue[idx+2] = rfc_ctx->residue[idx+4];
+            }
             rfc_ctx->residue_cnt -= 2;
         }
         else break;
@@ -754,6 +763,47 @@ void RFC_cycle_process( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *from, const
 
 
 /**
+ * @brief       Returns the unsigned difference of two values, sign optionally returned as -1 or 1.
+ *
+ * @param[in]   from      Left hand value
+ * @param[in]   to        Right hand value
+ * @param[out]  sign_ptr  Pointer to catch sign (may be NULL)
+ *
+ * @return      Returns the absolute difference of given values
+ */
+static
+RFC_value_type value_delta( RFC_value_type from, RFC_value_type to, int *sign_ptr )
+{
+    double delta = (double)to - (double)from;
+
+    if( sign_ptr )
+    {
+        *sign_ptr = ( delta < 0.0 ) ? -1 : 1;
+    }
+
+    return (RFC_value_type)fabs( delta );
+}
+
+
+/**
+ * @brief           Raises an error
+ *
+ * @param           rfc_ctx     The rainflow context
+ * @param           error       The error identifier
+ * 
+ * @return          Always false
+ */
+static
+bool RFC_error_raise( rfc_ctx_s *rfc_ctx, int error )
+{
+    rfc_ctx->state = RFC_STATE_ERROR;
+    rfc_ctx->error = error;
+
+    return false;
+}
+
+
+/**
  * @brief       (Re-)Allocate or free memory
  * @param       ptr     Previous data pointer, or NULL, if unset
  * @param[in]   num     The number of elements
@@ -811,19 +861,19 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
     {
         rfc_ctx_s rfc_ctx = { sizeof(rfc_ctx_s) };
     
-        const mxArray *mxData        = prhs[0];
-        const mxArray *mxClassCount  = prhs[1];
-        const mxArray *mxClassWidth  = prhs[2];
-        const mxArray *mxClassOffset = prhs[3];
-        const mxArray *mxHysteresis  = prhs[4];
+        const mxArray *mxData           = prhs[0];
+        const mxArray *mxClassCount     = prhs[1];
+        const mxArray *mxClassWidth     = prhs[2];
+        const mxArray *mxClassOffset    = prhs[3];
+        const mxArray *mxHysteresis     = prhs[4];
 
-        RFC_value_type *buffer       = NULL;
-        double         *data         = mxGetPr( mxData );
-        size_t          data_len     = mxGetNumberOfElements( mxData );
-        unsigned        class_count  = (unsigned)( mxGetScalar( mxClassCount ) + 0.5 );
-        double          class_width  = mxGetScalar( mxClassWidth );
-        double          class_offset = mxGetScalar( mxClassOffset );
-        double          hysteresis   = mxGetScalar( mxHysteresis );
+        RFC_value_type *buffer          = NULL;
+        double         *data            = mxGetPr( mxData );
+        size_t          data_len        = mxGetNumberOfElements( mxData );
+        unsigned        class_count     = (unsigned)( mxGetScalar( mxClassCount ) + 0.5 );
+        double          class_width     = mxGetScalar( mxClassWidth );
+        double          class_offset    = mxGetScalar( mxClassOffset );
+        double          hysteresis      = mxGetScalar( mxHysteresis );
         size_t          i;
         bool            ok;
 
@@ -894,32 +944,16 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                 mxArray* matrix = mxCreateDoubleMatrix( class_count, class_count, mxREAL );
                 if( matrix )
                 {
-                    mxArray* transposed = NULL;
-
-                    if( sizeof( RFC_counts_type ) == sizeof(double) )  /* maybe unsafe! */
+                    double *ptr = mxGetPr(matrix);
+                    size_t from, to;
+                    for( to = 0; to < class_count; to++ )
                     {
-                        memcpy( mxGetPr(matrix), rfc_ctx.matrix, sizeof(double) * class_count * class_count );
-                        mexCallMATLAB( 1, &transposed, 1, &matrix, "transpose" );
-                        mxDestroyArray( matrix );
-                    }
-                    else
-                    {
-                        double *ptr = mxGetPr(matrix);
-                        size_t from, to;
-                        for( to = 0; to < class_count; to++ )
+                        for( from = 0; from < class_count; from++ )
                         {
-                            for( from = 0; from < class_count; from++ )
-                            {
-                                *ptr++ = (double)rfc_ctx.matrix[ from * class_count + to ];
-                            }
+                            *ptr++ = (double)rfc_ctx.matrix[ from * class_count + to ] / rfc_ctx.full_inc;
                         }
-                        transposed = matrix;
                     }
-
-                    if( transposed )
-                    {
-                        plhs[2] = transposed;
-                    }
+                    plhs[2] = matrix;
                 }
             }
         }
@@ -928,4 +962,4 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         RFC_deinit( &rfc_ctx );
     }
 }
-#endif
+#endif /*MATLAB_MEX_FILE*/
