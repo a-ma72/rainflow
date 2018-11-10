@@ -121,7 +121,7 @@ static void                 RFC_cycle_find_4ptm                 ( rfc_ctx_s * );
 #if RFC_HCM_SUPPORT
 static void                 RFC_cycle_find_hcm                  ( rfc_ctx_s * );
 #endif /*RFC_HCM_SUPPORT*/
-static void                 RFC_cycle_process                   ( rfc_ctx_s *, const rfc_value_tuple_s *from, const rfc_value_tuple_s *to, const rfc_value_tuple_s *next, int flags );
+static void                 RFC_cycle_process                   ( rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags );
 /* Methods on residue */
 static bool                 RFC_residue_exchange                ( rfc_ctx_s *, rfc_value_tuple_s **residue, size_t *residue_cap, size_t *residue_cnt, bool restore );
 static void                 RFC_residue_remove_item             ( rfc_ctx_s *, size_t index, size_t count );
@@ -140,7 +140,7 @@ static void                 RFC_tp_lock                         ( rfc_ctx_s *, b
 static void                 RFC_tp_refeed                       ( rfc_ctx_s *, RFC_value_type new_hysteresis, const rfc_class_param_s *new_class_param );
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT
-static void                 RFC_dh_spread_damage                ( rfc_ctx_s *, const rfc_value_tuple_s *from, const rfc_value_tuple_s *to, const rfc_value_tuple_s *next, int flags );
+static void                 RFC_dh_spread_damage                ( rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags );
 #endif /*RFC_DH_SUPPORT*/
 static bool                 RFC_error_raise                     ( rfc_ctx_s *, int );
 static void                 RFC_init_damage_lut                 ( rfc_ctx_s * );
@@ -1524,7 +1524,7 @@ void RFC_cycle_find_hcm( rfc_ctx_s *rfc_ctx )
         rfc_value_tuple_s *I, *J, *K;
 
         /* Translation from "RAINFLOW.F" */
-label_1:
+/*label_1:*/
         K = rfc_ctx->residue;  /* Recent value (turning point) */
 
         /* Place first turning point into stack */
@@ -1607,13 +1607,14 @@ label_2:
 /**
  * @brief      Processes counts on a closing cycle
  *
- * @param      rfc_ctx  The rainflow context
- * @param[in]  from     The starting data point
- * @param[in]  to       The ending data point
- * @param[in]  flags    Control flags
+ * @param           rfc_ctx  The rainflow context
+ * @param[in,out]   from     The starting data point
+ * @param[in,out]   to       The ending data point
+ * @param[in,out]   next     The point next after "to"
+ * @param[in]       flags    Control flags
  */
 static
-void RFC_cycle_process( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *from, const rfc_value_tuple_s *to, const rfc_value_tuple_s *next, int flags )
+void RFC_cycle_process( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags )
 {
     unsigned class_from, class_to;
 
@@ -1873,7 +1874,7 @@ void RFC_init_damage_lut( rfc_ctx_s *rfc_ctx )
 }
 
 
-#if RFC_DH_SUPPORT
+#if RFC_TP_SUPPORT
 static 
 void RFC_dh_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, 
                                                rfc_value_tuple_s *to, 
@@ -1882,11 +1883,6 @@ void RFC_dh_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
     double damage = 0.0;
 
     assert( rfc_ctx && from && to );
-
-    if( start >= end )
-    {
-        end += rfc_ctx->tp_cnt;
-    }
 
     switch( rfc_ctx->spread_damage_method )
     {
@@ -1910,45 +1906,66 @@ void RFC_dh_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
         case RFC_SD_RAMP_AMPLITUDE_24:
         case RFC_SD_RAMP_DAMAGE_24:
         {
-            size_t  i, j, 
+            size_t  i,
                     start, end, width, 
                     tp_start, tp_end;
             int     range;
 
+            /* Care about possible wrapping, caused by RFC_RES_REPEATED:
+                0         1
+                01234567890123 (14 points)
+                ...E....S.....
+                   ^End ^Start
+                   =3   =8
+
+                Results in:
+                0         1         2
+                0123456789012345678901234567
+                ...E....S....,...E....S.....
+                        ^Start   ^End
+                        =8       =17
+            */
+
             /* Absolute position (input stream) */
             start    = from->pos;
             end      = to->pos;
-            end     += ( start >= end ) ? rfc_ctx->pos : 0;
+            end     += ( start >= end ) ? rfc_ctx->internal.pos : 0;
             width    = end - start;
-#if RFC_TP_SUPPORT
             /* Position in turning point storage */
             tp_start = from->tp_pos;
             tp_end   = to->tp_pos;
             tp_end  += ( tp_start >= tp_end ) ? rfc_ctx->tp_cnt : 0;
 
-            range = abs( (int)to.class - (int)from.class );
+            range    = abs( (int)to->class - (int)from->class );
+            damage   = 0.0;
 
             /* Iterate over turning points */
             for( i = tp_start; i <= tp_end; i++ )
             {
                 size_t tp_pos, pos;
-                double weight;
+                double weight, new_damage;
 
                 tp_pos = i % rfc_ctx->tp_cnt;
-                pos    = rfc_ctx->tp[tp_pos]->pos;
-                pos   += ( start >= pos ) ? rfc_ctx.pos : 0;
+                pos    = rfc_ctx->tp[tp_pos].pos;
+                pos   += ( start >= pos ) ? rfc_ctx->internal.pos : 0;
                 weight = (double)( pos - start ) / width;
 
                 switch( rfc_ctx->spread_damage_method )
                 {
                     case RFC_SD_RAMP_AMPLITUDE_23:
                     case RFC_SD_RAMP_AMPLITUDE_24:
-                        dNewDamage = RFC_damage_calc_fast( rfc_ctx, 0, (int)( weight * range + 0.5 ) );
+						new_damage = RFC_damage_calc_fast( rfc_ctx, 0, (int)( weight * range + 0.5 ) );
                         break;
                     case RFC_SD_RAMP_DAMAGE_23:
                     case RFC_SD_RAMP_DAMAGE_24:
-                        dNewDamage = RFC_damage_calc_fast( rfc_ctx, 0, range ) * weight;
+						new_damage = RFC_damage_calc_fast( rfc_ctx, 0, range ) * weight;
                         break;
+                }
+
+                if( new_damage > damage )
+                {
+                    rfc_ctx->tp[tp_pos].damage += new_damage - damage;
+                    damage= new_damage;
                 }
             }
         }
@@ -1964,7 +1981,7 @@ void RFC_dh_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
             break;
     }
 }
-#endif /*RFC_DH_SUPPORT*/
+#endif /*RFC_TP_SUPPORT*/
 
 /**
  * @brief       Returns the unsigned difference of two values, sign optionally returned as -1 or 1.

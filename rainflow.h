@@ -261,7 +261,7 @@ typedef struct rfc_ctx
         RFC_SD_FULL_P2                  =  5,                       /**< Assign damage to P2 */
         RFC_SD_FULL_P3                  =  6,                       /**< Assign damage to P3 */
         RFC_SD_TRANSIENT_23             =  7,                       /**< Spread damage transient according to amplitude over points between P2 and P3 */
-        RFC_SD_TRANSIENT_23c            =  7,                       /**< Spread damage transient according to amplitude over points between P2 and P4 only until cycle is closed */
+        RFC_SD_TRANSIENT_23c            =  8,                       /**< Spread damage transient according to amplitude over points between P2 and P4 only until cycle is closed */
     }
                                         spread_damage_method;
 #endif /*RFC_DH_SUPPORT*/
