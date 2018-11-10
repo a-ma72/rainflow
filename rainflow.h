@@ -146,11 +146,11 @@ typedef struct rfc_class_param  rfc_class_param_s;   /** Class parameters (width
 #if !RFC_TP_SUPPORT
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis );
-#else
+#else /*RFC_TP_SUPPORT*/
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis,
                                            rfc_value_tuple_s *tp, size_t tp_cap );
-#endif
+#endif /*RFC_TP_SUPPORT*/
 void RFC_deinit               ( void *ctx );
 bool RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count );
 bool RFC_feed_tuple           ( void *ctx, rfc_value_tuple_s *data, size_t count );
@@ -171,16 +171,20 @@ typedef  bool                ( *rfc_tp_add_fcn_t )        ( rfc_ctx_s *, rfc_val
 /* Value info struct */
 typedef struct rfc_value_tuple
 {
-    RFC_value_type                  value;                      /**< Value. Don't change order, value field must be first! */
-    unsigned                        class;                      /**< Class number, base 0 */
-    size_t                          pos;                        /**< Absolute position in input data stream, base 1 */
+    RFC_value_type                  value;                          /**< Value. Don't change order, value field must be first! */
+    unsigned                        class;                          /**< Class number, base 0 */
+    size_t                          pos;                            /**< Absolute position in input data stream, base 1 */
+#if RFC_TP_SUPPORT
+    size_t                          tp_pos;                         /**< Position in tp storage, base 0 */
+    double                          damage;                         /**< Damage accumulated to this turning point */
+#endif /*RFC_TP_SUPPORT*/
 } rfc_value_tuple_s;
 
 typedef struct rfc_class_param
 {
-    unsigned                        count;                    /**< Class count */
-    RFC_value_type                  width;                    /**< Class width */
-    RFC_value_type                  offset;                   /**< Lower bound of first class */
+    unsigned                        count;                          /**< Class count */
+    RFC_value_type                  width;                          /**< Class width */
+    RFC_value_type                  offset;                         /**< Lower bound of first class */
 } rfc_class_param_s;
 
 
@@ -230,7 +234,7 @@ typedef struct rfc_ctx
         RFC_COUNTING_METHOD_4PTM        =  1,                       /**< 4 point algorithm (default) */
 #if RFC_HCM_SUPPORT
         RFC_COUNTING_METHOD_HCM         =  2,                       /**< 3 point algorithm, Clormann/Seeger (HCM) method */
-#endif
+#endif /*RFC_HCM_SUPPORT*/
     }
                                         counting_method;
     enum 
@@ -245,7 +249,7 @@ typedef struct rfc_ctx
         RFC_RES_RP_DIN45667,                                        /**< Count residue according to range pair in DIN-45667 */
     }
                                         residual_method;
-#if RFC_SD_SUPPORT
+#if RFC_DH_SUPPORT
     enum
     {
         RFC_SD_NONE                     = -1,                       /**< No spread damage calculation */
@@ -258,8 +262,9 @@ typedef struct rfc_ctx
         RFC_SD_FULL_P3                  =  6,                       /**< Assign damage to P3 */
         RFC_SD_TRANSIENT_23             =  7,                       /**< Spread damage transient according to amplitude over points between P2 and P3 */
         RFC_SD_TRANSIENT_23c            =  7,                       /**< Spread damage transient according to amplitude over points between P2 and P4 only until cycle is closed */
-    } e_spread_damage;
-#endif
+    }
+                                        spread_damage_method;
+#endif /*RFC_DH_SUPPORT*/
 
     /* Memory allocation functions */
     rfc_mem_alloc_fcn_t             mem_alloc;                      /**< Allocate initialized memory */
@@ -289,7 +294,7 @@ typedef struct rfc_ctx
     rfc_finalize_fcn_t              finalize_fcn;                   /**< Finalizing function */
     rfc_cycle_find_fcn_t            cycle_find_fcn;                 /**< Find next cycle(s) and process */
     rfc_damage_calc_fcn_t           damage_calc_fcn;                /**< Damage calculating function */
-#endif
+#endif /*RFC_USE_DELEGATES*/
     
     /* Residue */
     rfc_value_tuple_s              *residue;                        /**< Buffer for residue */
@@ -307,15 +312,16 @@ typedef struct rfc_ctx
     size_t                          tp_cap;                         /**< Buffer capacity (number of elements) */
     size_t                          tp_cnt;                         /**< Number of turning points in buffer */
     bool                            tp_locked;                      /**< If tp_locked, tp is freezed */
-#endif
+#endif /*RFC_TP_SUPPORT*/
 
 #if RFC_DH_SUPPORT
-    double                          dh;                             /**< Damage history */
+    double                         *dh;                             /**< Damage history */
     size_t                          dh_cap;                         /**< Capacity of dh */
     size_t                          dh_cnt;                         /**< Number of values in dh */
-#endif
+#endif /*RFC_DH_SUPPORT*/
 
     /* Damage */
+    double                         *damage_lut;                     /**< Damage look-up table */
     double                          pseudo_damage;                  /**< Cumulated pseudo damage */
     
     /* Internal usage */
@@ -338,7 +344,7 @@ typedef struct rfc_ctx
             int                     IR;                             /**< Pointer to residue stack, first turning point of cycles able to close, base 1 */
             int                     IZ;                             /**< Pointer to residue stack, last turning point of cycles able to close, base 1 */
         }                           hcm;
-#endif
+#endif /*RFC_HCM_SUPPORT*/
     }
                                     internal;
 } rfc_ctx_s;
