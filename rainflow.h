@@ -275,7 +275,9 @@ typedef struct rfc_ctx
     RFC_counts_type                 curr_inc;                       /**< Current increment, used by counting algorithms */
 
     /* Rainflow class parameters */
-    rfc_class_param_s               class_info;                     /**< Class parameters */
+    unsigned                        class_count;                    /**< Class count */
+    RFC_value_type                  class_width;                    /**< Class width */
+    RFC_value_type                  class_offset;                   /**< Lower bound of first class */
     RFC_value_type                  hysteresis;                     /**< Hysteresis filtering */
 
     /* Woehler curve */
@@ -308,14 +310,14 @@ typedef struct rfc_ctx
 
 #if RFC_TP_SUPPORT
     /* Turning points storage (optional, may be NULL) */
-    rfc_value_tuple_s              *tp;                             /**< Buffer for turning points */
+    rfc_value_tuple_s              *tp;                             /**< Buffer for turning points, pointer may be changed thru memory reallocation! */
     size_t                          tp_cap;                         /**< Buffer capacity (number of elements) */
     size_t                          tp_cnt;                         /**< Number of turning points in buffer */
     bool                            tp_locked;                      /**< If tp_locked, tp is freezed */
 #endif /*RFC_TP_SUPPORT*/
 
 #if RFC_DH_SUPPORT
-    double                         *dh;                             /**< Damage history */
+    double                         *dh;                             /**< Damage history, pointer may be changed thru memory reallocation! */
     size_t                          dh_cap;                         /**< Capacity of dh */
     size_t                          dh_cnt;                         /**< Number of values in dh */
 #endif /*RFC_DH_SUPPORT*/
