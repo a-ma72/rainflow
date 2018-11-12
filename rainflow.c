@@ -138,6 +138,7 @@ static void *               RFC_mem_alloc                       ( void *ptr, siz
 static bool                 RFC_tp_add                          ( rfc_ctx_s *, rfc_value_tuple_s *pt );
 static void                 RFC_tp_lock                         ( rfc_ctx_s *, bool do_lock );
 static void                 RFC_tp_refeed                       ( rfc_ctx_s *, RFC_value_type new_hysteresis, const rfc_class_param_s *new_class_param );
+static void                 RFC_tp_prune                        ( rfc_ctx_s *, size_t count );
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT
 static void                 RFC_dh_spread_damage                ( rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags );
@@ -1836,6 +1837,48 @@ void RFC_tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc
 
     RFC_feed_tuple( rfc_ctx, ctx_tp, ctx_tp_cnt );
 
+}
+
+
+/**
+ * @brief   Drop turning points from storage, to avoid memory excesses 
+ *          or overflow (pos)
+ *
+ * @param       rfc_ctx     The rainflow context
+ * @param       limit       The upper limit
+ */
+static 
+void RFC_tp_prune( rfc_ctx_s *rfc_ctx, size_t limit )
+{
+    assert( rfc_ctx );
+
+    if( rfc_ctx->tp_cnt > limit )
+    {
+        size_t removal = rfc_ctx->tp_cnt - limit;
+
+        rfc_ctx->tp_cnt = limit;
+
+        if( rfc_ctx->tp_cnt )
+        {
+            rfc_value_tuple_s  *tp      = rfc_ctx->tp;
+            size_t              offset  = tp->pos;
+            size_t              i;
+
+            /* Potentially slow! */
+            memmove( tp, tp + count, sizeof(rfc_value_tuple_s) * rfc_ctx->tp_cnt );
+
+            for( i = 0; i < rfc_ctx->tp_cnt; i++, tp++ )
+            {
+                tp->pos -= offset;
+            }
+
+            rfc_ctx->internal.pos -= offset;
+        }
+        else
+        {
+            rfc_ctx->internal.pos = 0;
+        }
+    }
 }
 #endif /*RFC_TP_SUPPORT*/
 
