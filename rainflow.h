@@ -172,20 +172,20 @@ typedef  bool                ( *rfc_tp_add_fcn_t )        ( rfc_ctx_s *, rfc_val
 /* Value info struct */
 typedef struct rfc_value_tuple
 {
-    RFC_value_type                  value;                          /**< Value. Don't change order, value field must be first! */
-    unsigned                        class;                          /**< Class number, base 0 */
-    size_t                          pos;                            /**< Absolute position in input data stream, base 1 */
+    RFC_value_type                      value;                      /**< Value. Don't change order, value field must be first! */
+    unsigned                            class;                      /**< Class number, base 0 */
+    size_t                              pos;                        /**< Absolute position in input data stream, base 1 */
 #if RFC_TP_SUPPORT
-    size_t                          tp_pos;                         /**< Position in tp storage, base 0 */
-    double                          damage;                         /**< Damage accumulated to this turning point */
+    size_t                              tp_pos;                     /**< Position in tp storage, base 0 */
+    double                              damage;                     /**< Damage accumulated to this turning point */
 #endif /*RFC_TP_SUPPORT*/
 } rfc_value_tuple_s;
 
 typedef struct rfc_class_param
 {
-    unsigned                        count;                          /**< Class count */
-    RFC_value_type                  width;                          /**< Class width */
-    RFC_value_type                  offset;                         /**< Lower bound of first class */
+    unsigned                            count;                      /**< Class count */
+    RFC_value_type                      width;                      /**< Class width */
+    RFC_value_type                      offset;                     /**< Lower bound of first class */
 } rfc_class_param_s;
 
 
