@@ -55,12 +55,14 @@ target_compile_definitions( ${CMAKE_PROJECT_NAME} PRIVATE -DMATLAB_MEX_FILE )
 target_link_libraries( ${CMAKE_PROJECT_NAME} ${Matlab_LIBRARIES} ${MATH_LIB} )
 
 # Test application, start project for MSVC
-add_executable( rfc_test rainflow.c rfc_test.c )
+add_executable( rfc_test rainflow.c test/rfc_test.c )
 target_link_libraries( rfc_test ${MATH_LIB} )
-set_property( DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT rfc_test )
+target_sources( rfc_test PUBLIC greatest/greatest.h )
+set_property( DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT test/rfc_test )
 
-# install to /bin and /share by default
-install( TARGETS ${CMAKE_PROJECT_NAME} RUNTIME DESTINATION bin LIBRARY DESTINATION bin )
+# install to /bin by default
+install( TARGETS ${CMAKE_PROJECT_NAME} rfc_test RUNTIME DESTINATION bin LIBRARY DESTINATION bin )
+install( FILES test/long_series.csv matlab/validate.m DESTINATION bin )
 
 
 # CPack
@@ -85,7 +87,8 @@ set( CPACK_SOURCE_IGNORE_FILES
      "/\\\\.hooks-config$"
 
      # Package build.
-     "/\\\\.build/"
+     "/build"
+     "/.git*"
 
      # Temporary files.
      "\\\\.#"
