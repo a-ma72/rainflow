@@ -208,7 +208,6 @@ typedef struct rfc_ctx
 
     enum
     {
-        RFC_ERROR_NONE = 0,
         RFC_ERROR_INVARG,
         RFC_ERROR_MEMORY,
     }                               error;                          /**< Error code */
