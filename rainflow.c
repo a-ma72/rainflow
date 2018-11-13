@@ -105,9 +105,6 @@
 "    lc = Level crossings\n"\
 "    tp = Turning points\n"
 #pragma message(RFC_MEX_USAGE)
-#define GREATEST_FPRINTF greatest_fprintf
-#include "greatest/greatest.h"
-#include <stdarg.h>
 #include <string.h>
 #include <mex.h>
 #endif /*MATLAB_MEX_FILE*/
@@ -319,17 +316,19 @@ void RFC_deinit( void *ctx )
         return;
     }
 
-    if( rfc_ctx->damage_lut )           rfc_ctx->damage_lut = rfc_ctx->mem_alloc( rfc_ctx->damage_lut, 0, 0 );
-    if( rfc_ctx->residue )              rfc_ctx->residue    = rfc_ctx->mem_alloc( rfc_ctx->residue,    0, 0 );
-    if( rfc_ctx->matrix )               rfc_ctx->matrix     = rfc_ctx->mem_alloc( rfc_ctx->matrix,     0, 0 );
-    if( rfc_ctx->rp )                   rfc_ctx->rp         = rfc_ctx->mem_alloc( rfc_ctx->rp,         0, 0 );
-    if( rfc_ctx->lc )                   rfc_ctx->lc         = rfc_ctx->mem_alloc( rfc_ctx->lc,         0, 0 );
+    if( rfc_ctx->damage_lut )           rfc_ctx->mem_alloc( rfc_ctx->damage_lut, 0, 0 );
+    if( rfc_ctx->residue )              rfc_ctx->mem_alloc( rfc_ctx->residue,    0, 0 );
+    if( rfc_ctx->matrix )               rfc_ctx->mem_alloc( rfc_ctx->matrix,     0, 0 );
+    if( rfc_ctx->rp )                   rfc_ctx->mem_alloc( rfc_ctx->rp,         0, 0 );
+    if( rfc_ctx->lc )                   rfc_ctx->mem_alloc( rfc_ctx->lc,         0, 0 );
 #if RFC_TP_SUPPORT
-    if( rfc_ctx->tp )                   rfc_ctx->tp         = rfc_ctx->mem_alloc( rfc_ctx->tp,         0, 0 );
+    if( rfc_ctx->tp )                   rfc_ctx->mem_alloc( rfc_ctx->tp,         0, 0 );
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT
-    if( rfc_ctx->dh )                   rfc_ctx->dh         = rfc_ctx->mem_alloc( rfc_ctx->dh,         0, 0 );
+    if( rfc_ctx->dh )                   rfc_ctx->mem_alloc( rfc_ctx->dh,         0, 0 );
 #endif /*RFC_DH_SUPPORT*/
+
+    rfc_ctx->damage_lut                 = NULL;
 
     rfc_ctx->residue                    = NULL;
     rfc_ctx->residue_cap                = 0;
@@ -338,7 +337,7 @@ void RFC_deinit( void *ctx )
     rfc_ctx->matrix                     = NULL;
     rfc_ctx->rp                         = NULL;
     rfc_ctx->lc                         = NULL;
-
+    
     rfc_ctx->internal.slope             = 0;
     rfc_ctx->internal.extrema[0]        = nil;  /* local minimum */
     rfc_ctx->internal.extrema[1]        = nil;  /* local maximum */
@@ -2274,217 +2273,6 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
     mexErrMsgTxt( "Unsupported configuration!" );
 }
 #else /*!RFC_TP_SUPPORT || !RFC_COUNTING_METHOD_HCM*/
-int greatest_fprintf( FILE* f, const char* fmt, ... )
-{
-    va_list al;
-    char *buffer = NULL;
-    int len;
-
-    va_start( al, fmt ); 
-    len = vsnprintf( buffer, 0, fmt, al );
-    if( len > 0 )
-    {
-        buffer = (char*)calloc( len + 1, 1 );
-        if( buffer )
-        {
-            va_start( al, fmt );
-            (void)vsnprintf( buffer, len + 1, fmt, al );
-            mexPrintf( "%s", buffer );
-            free( buffer );
-        }
-    }
-    va_end( al );
-
-    return len;
-}
-
-#define INIT_ARRAY(...) __VA_ARGS__
-#define SIMPLE_RFC_0(TP,TP_N,OFFS) \
-    if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
-                        1 /* hysteresis */,                                                  \
-                        TP /* *tp */, TP_N /* tp_cap */ ) )                                  \
-    {                                                                                        \
-        RFC_VALUE_TYPE data[] = {0};                                                         \
-        RFC_feed( &ctx, data, 0 );                                                           \
-        RFC_finalize( &ctx, RFC_RES_NONE /* residual_method */ );                            \
-    }                                                                                        \
-    else FAIL();
-
-#define INIT_ARRAY(...) __VA_ARGS__
-#define SIMPLE_RFC(TP,TP_N,OFFS,X) \
-    if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
-                        1 /* hysteresis */,                                                  \
-                        TP /* *tp */, TP_N /* tp_cap */ ) )                                  \
-    {                                                                                        \
-        RFC_VALUE_TYPE data[] = {INIT_ARRAY X};                                              \
-        RFC_feed( &ctx, data, sizeof(data)/sizeof(RFC_VALUE_TYPE) );                         \
-        RFC_finalize( &ctx, RFC_RES_NONE /* residual_method */ );                            \
-    }                                                                                        \
-    else FAIL();
-
-#define SIMPLE_RFC_MARGIN_0(TP,TP_N,OFFS) \
-    if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
-                        1 /* hysteresis */,                                                  \
-                        TP /* *tp */, TP_N /* tp_cap */ ) )                                  \
-    {                                                                                        \
-        RFC_VALUE_TYPE data[] = {0};                                                         \
-        ctx.flags |= RFC_FLAGS_ENFORCE_MARGIN;                                               \
-        RFC_feed( &ctx, data, 0 );                                                           \
-        RFC_finalize( &ctx, RFC_RES_NONE /* residual_method */ );                            \
-    }                                                                                        \
-    else FAIL();
-
-#define SIMPLE_RFC_MARGIN(TP,TP_N,OFFS,X) \
-    if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
-                        1 /* hysteresis */,                                                  \
-                        TP /* *tp */, TP_N /* tp_cap */ ) )                                  \
-    {                                                                                        \
-        RFC_VALUE_TYPE data[] = {INIT_ARRAY X};                                              \
-        ctx.flags |= RFC_FLAGS_ENFORCE_MARGIN;                                               \
-        RFC_feed( &ctx, data, sizeof(data)/sizeof(RFC_VALUE_TYPE) );                         \
-        RFC_finalize( &ctx, RFC_RES_NONE /* residual_method */ );                            \
-    }                                                                                        \
-    else FAIL();
-
-
-/*
-
-*/
-TEST RFC_test_turning_points(void)
-{
-    rfc_ctx_s         ctx = {sizeof(ctx)};
-    rfc_value_tuple_s tp[10];
-
-    /*******************************************/
-    /*        Test 0, 1 or 2 samples           */
-    /*******************************************/
-    SIMPLE_RFC_0( tp, 10, 0.0 );
-    ASSERT( ctx.tp_cnt == 0 );
-    ctx.tp = NULL;
-    RFC_deinit( &ctx );
-
-    SIMPLE_RFC( tp, 10, 0.0, (0) );
-    ASSERT( ctx.tp_cnt == 0 );
-    ctx.tp = NULL;
-    RFC_deinit( &ctx );
-
-    SIMPLE_RFC( tp, 10, 0.0, (0,0) );
-    ASSERT( ctx.tp_cnt == 0 );
-    ctx.tp = NULL;
-    RFC_deinit( &ctx );
-
-    SIMPLE_RFC( tp, 10, 0.0, (0.0f, 0.1f) );
-    ASSERT( ctx.tp_cnt == 0 );
-    ctx.tp = NULL;
-    RFC_deinit( &ctx );
-
-    SIMPLE_RFC( tp, 10, 0.0, (0.0f, 1.0f) );
-    ASSERT( ctx.tp_cnt == 0 );
-    ctx.tp = NULL;
-    RFC_deinit( &ctx );
-
-    /**************** Test margin *******************/
-    SIMPLE_RFC_MARGIN_0( tp, 10, 0.0 );
-    ASSERT( ctx.tp_cnt == 0 );
-    ctx.tp = NULL;
-    RFC_deinit( &ctx );
-
-    SIMPLE_RFC_MARGIN( tp, 10, 0.0, (0) );
-    ASSERT( ctx.tp_cnt == 1 );
-    ctx.tp = NULL;
-    RFC_deinit( &ctx );
-
-    SIMPLE_RFC_MARGIN( tp, 10, 0.0, (0, 0) );
-    ASSERT( ctx.tp_cnt == 2 );
-    ctx.tp = NULL;
-    RFC_deinit( &ctx );
-
-    SIMPLE_RFC_MARGIN( tp, 10, 0.0, (0.0f, 0.1f) );
-    ASSERT( ctx.tp_cnt == 2 );
-    ctx.tp = NULL;
-    RFC_deinit( &ctx );
-
-    SIMPLE_RFC_MARGIN( tp, 10, 0.0, (0.0f, 1.0f) );
-    ASSERT( ctx.tp_cnt == 2 );
-    ctx.tp = NULL;
-    RFC_deinit( &ctx );
-
-    /*******************************************/
-    /*           Test longer series            */
-    /*******************************************/
-    /* Still in hysteresis band */
-    SIMPLE_RFC( tp, 10, 0.0, (0.0f, 0.0f, 1.0f, 1.0f) );
-    ASSERT( ctx.tp_cnt == 0 );
-    ASSERT( ctx.residue_cnt == 0 );
-    ctx.tp = NULL;
-    RFC_deinit( &ctx );
-
-    SIMPLE_RFC( tp, 10, 0.0, (1.0f, 1.1f, 1.2f, 1.1f, 1.3f, 1.0f, 1.98f, 1.0f) );
-    ASSERT( ctx.tp_cnt == 0 );
-    ctx.tp = NULL;
-    RFC_deinit( &ctx );
-
-    /* Series with 3 turning points */
-    SIMPLE_RFC( tp, 10, 0.0, (1.0f, 1.1f, 1.2f, 2.0f, 2.1f, 1.1f, 1.3f, 1.0f, 1.98f, 1.0f) );
-    ASSERT( ctx.tp_cnt == 3 );
-    ASSERT( ctx.tp[0].value == 1.0f && ctx.tp[0].pos == 1 );
-    ASSERT( ctx.tp[1].value == 2.1f && ctx.tp[1].pos == 5 );
-    ASSERT( ctx.tp[2].value == 1.0f && ctx.tp[2].pos == 8 );
-    ASSERT( ctx.residue_cnt == 3 );
-    ASSERT( ctx.residue[0].value == 1.0f && ctx.residue[0].pos == 1 );
-    ASSERT( ctx.residue[1].value == 2.1f && ctx.residue[1].pos == 5 );
-    ASSERT( ctx.residue[2].value == 1.0f && ctx.residue[2].pos == 8 );
-    ctx.tp = NULL;
-    RFC_deinit( &ctx );
-
-    /**************** Test margin *******************/
-    /* Still in hysteresis band */
-    SIMPLE_RFC_MARGIN( tp, 10, 0.0, (0.0f, 0.0f, 1.0f, 1.0f) );
-    ASSERT( ctx.tp_cnt == 2 );
-    ASSERT( ctx.tp[0].value == 0.0f && ctx.tp[0].pos == 1 );
-    ASSERT( ctx.tp[1].value == 1.0f && ctx.tp[1].pos == 4 );
-    ASSERT( ctx.residue_cnt == 0 );
-    ctx.tp = NULL;
-    RFC_deinit( &ctx );
-
-    SIMPLE_RFC_MARGIN( tp, 10, 0.0, (1.0f, 1.1f, 1.2f, 1.1f, 1.3f, 1.0f, 1.98f, 1.0f) );
-    ASSERT( ctx.tp_cnt == 2 );
-    ASSERT( ctx.tp[0].value == 1.0f && ctx.tp[0].pos == 1 );
-    ASSERT( ctx.tp[1].value == 1.0f && ctx.tp[1].pos == 8 );
-    ASSERT( ctx.residue_cnt == 0 );
-    ctx.tp = NULL;
-    RFC_deinit( &ctx );
-
-    /* Series with 3 turning points */
-    SIMPLE_RFC_MARGIN( tp, 10, 0.0, (1.0f, 1.0f, 2.1f, 2.1f, 1.0f, 1.0f) );
-    ASSERT( ctx.tp_cnt == 3 );
-    ASSERT( ctx.tp[0].value == 1.0f && ctx.tp[0].pos == 1 );
-    ASSERT( ctx.tp[1].value == 2.1f && ctx.tp[1].pos == 3 );
-    ASSERT( ctx.tp[2].value == 1.0f && ctx.tp[2].pos == 6 ); /* Turning point at right margin! */
-    ASSERT( ctx.residue_cnt == 3 );
-    ASSERT( ctx.residue[0].value == 1.0f && ctx.residue[0].pos == 1 );
-    ASSERT( ctx.residue[1].value == 2.1f && ctx.residue[1].pos == 3 );
-    ASSERT( ctx.residue[2].value == 1.0f && ctx.residue[2].pos == 5 );  /* In residue, turning point at original position! */
-    ctx.tp = NULL;
-    RFC_deinit( &ctx );
-
-    PASS();
-}
-
-/* local suite (greatest) */
-SUITE(RFC_TURNING_POINTS)
-{
-    RUN_TEST( RFC_test_turning_points );
-}
-
-GREATEST_MAIN_DEFS();
-
-int RFC_test_main( int argc, char* argv[] )
-{
-    GREATEST_MAIN_BEGIN();      /* init & parse command-line args */
-    RUN_SUITE( RFC_TURNING_POINTS );
-    GREATEST_MAIN_END();        /* display results */        
-}
 
 /**
  * MATLAB wrapper for the rainflow algorithm
@@ -2494,10 +2282,6 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
     if( !nrhs )
     {
         mexPrintf( "%s", RFC_MEX_USAGE );
-        mexPrintf( "%s\n", "Running self tests..." );
-
-        RFC_test_main( 0, NULL );
-
         return;
     }
     
