@@ -348,5 +348,5 @@ typedef struct rfc_ctx
         }                               hcm;
 #endif /*RFC_HCM_SUPPORT*/
     }
-                                    internal;
+                                        internal;
 } rfc_ctx_s;
