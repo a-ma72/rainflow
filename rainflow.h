@@ -89,6 +89,7 @@
 
 #include <stdbool.h> /* bool, true, false */
 #include <stdint.h>  /* ULLONG_MAX */
+#include <limits.h>  /* ULLONG_MAX */
 #include <stddef.h>  /* size_t, NULL */
 #include <stdlib.h>  /* calloc(), free(), abs() */
 #include "config.h"  /* Configuration */
@@ -193,7 +194,7 @@ typedef struct rfc_class_param
  */
 typedef struct rfc_ctx
 {
-    size_t                          version;                        /**< Version number as sizeof(struct rfctx..), must be 1st field! */
+    size_t                              version;                    /**< Version number as sizeof(struct rfctx..), must be 1st field! */
 
     enum
     {
@@ -204,13 +205,13 @@ typedef struct rfc_ctx
         RFC_STATE_FINALIZE,                                         /**< Finalizing */
         RFC_STATE_FINISHED,                                         /**< Counting finished, memory still allocated */
         RFC_STATE_ERROR,                                            /**< An error occured */
-    }                               state;                          /**< Current counting state */
+    }                                   state;                      /**< Current counting state */
 
     enum
     {
         RFC_ERROR_INVARG,
         RFC_ERROR_MEMORY,
-    }                               error;                          /**< Error code */
+    }                                   error;                      /**< Error code */
 
     enum
     {
@@ -266,85 +267,85 @@ typedef struct rfc_ctx
 #endif /*RFC_DH_SUPPORT*/
 
     /* Memory allocation functions */
-    rfc_mem_alloc_fcn_t             mem_alloc;                      /**< Allocate initialized memory */
+    rfc_mem_alloc_fcn_t             	mem_alloc;                  /**< Allocate initialized memory */
 
     /* Counter increments */
-    RFC_counts_type                 full_inc;                       /**< Increment for a full cycle */
-    RFC_counts_type                 half_inc;                       /**< Increment for a half cycle, used by some residual algorithms */
-    RFC_counts_type                 curr_inc;                       /**< Current increment, used by counting algorithms */
+    RFC_counts_type                 	full_inc;                   /**< Increment for a full cycle */
+    RFC_counts_type                 	half_inc;                   /**< Increment for a half cycle, used by some residual algorithms */
+    RFC_counts_type                 	curr_inc;                   /**< Current increment, used by counting algorithms */
 
     /* Rainflow class parameters */
-    unsigned                        class_count;                    /**< Class count */
-    RFC_value_type                  class_width;                    /**< Class width */
-    RFC_value_type                  class_offset;                   /**< Lower bound of first class */
-    RFC_value_type                  hysteresis;                     /**< Hysteresis filtering */
+    unsigned                        	class_count;                /**< Class count */
+    RFC_value_type                  	class_width;                /**< Class width */
+    RFC_value_type                  	class_offset;               /**< Lower bound of first class */
+    RFC_value_type                  	hysteresis;                 /**< Hysteresis filtering */
 
     /* Woehler curve */
-    double                          wl_sd;                          /**< Fatigue resistance range (amplitude) */
-    double                          wl_nd;                          /**< Cycles at wl_sd */
-    double                          wl_k;                           /**< Woehler gradient above wl_sd */
-    double                          wl_k2;                          /**< Woehler gradient below wl_sd */
-    double                          wl_omission;                    /**< Omission level */
+    double                          	wl_sd;                      /**< Fatigue resistance range (amplitude) */
+    double                          	wl_nd;                      /**< Cycles at wl_sd */
+    double                          	wl_k;                       /**< Woehler gradient above wl_sd */
+    double                          	wl_k2;                      /**< Woehler gradient below wl_sd */
+    double                          	wl_omission;                /**< Omission level */
 
 #if RFC_USE_DELEGATES
     /* Delegates (optional, may be NULL) */
 #if RFC_TP_SUPPORT
-    rfc_tp_next_fcn_t               tp_next_fcn;                    /**< Test if new turning point exists */
-    rfc_tp_add_fcn_t                tp_add_fcn;                     /**< Handling new turning points */
+    rfc_tp_next_fcn_t               	tp_next_fcn;                /**< Test if new turning point exists */
+    rfc_tp_add_fcn_t                	tp_add_fcn;                 /**< Handling new turning points */
 #endif /*RFC_TP_SUPPORT*/
-    rfc_finalize_fcn_t              finalize_fcn;                   /**< Finalizing function */
-    rfc_cycle_find_fcn_t            cycle_find_fcn;                 /**< Find next cycle(s) and process */
-    rfc_damage_calc_fcn_t           damage_calc_fcn;                /**< Damage calculating function */
+    rfc_finalize_fcn_t              	finalize_fcn;               /**< Finalizing function */
+    rfc_cycle_find_fcn_t            	cycle_find_fcn;             /**< Find next cycle(s) and process */
+    rfc_damage_calc_fcn_t           	damage_calc_fcn;            /**< Damage calculating function */
 #endif /*RFC_USE_DELEGATES*/
     
     /* Residue */
-    rfc_value_tuple_s              *residue;                        /**< Buffer for residue */
-    size_t                          residue_cap;                    /**< Buffer capacity in number of elements (max. 2*class_count) */
-    size_t                          residue_cnt;                    /**< Number of value tuples in buffer */
+    rfc_value_tuple_s              	   *residue;                    /**< Buffer for residue */
+    size_t                          	residue_cap;                /**< Buffer capacity in number of elements (max. 2*class_count) */
+    size_t                          	residue_cnt;                /**< Number of value tuples in buffer */
 
     /* Non-sparse storages (optional, may be NULL) */
-    RFC_counts_type                *matrix;                         /**< Rainflow matrix */
-    RFC_counts_type                *rp;                             /**< Range pair counts */
-    RFC_counts_type                *lc;                             /**< Level crossing counts */
+    RFC_counts_type                   *matrix;                      /**< Rainflow matrix */
+    RFC_counts_type                   *rp;                          /**< Range pair counts */
+    RFC_counts_type                   *lc;                          /**< Level crossing counts */
 
 #if RFC_TP_SUPPORT
     /* Turning points storage (optional, may be NULL) */
-    rfc_value_tuple_s              *tp;                             /**< Buffer for turning points, pointer may be changed thru memory reallocation! */
-    size_t                          tp_cap;                         /**< Buffer capacity (number of elements) */
-    size_t                          tp_cnt;                         /**< Number of turning points in buffer */
-    bool                            tp_locked;                      /**< If tp_locked, tp is freezed */
+    rfc_value_tuple_s                  *tp;                         /**< Buffer for turning points, pointer may be changed thru memory reallocation! */
+    size_t                          	tp_cap;                     /**< Buffer capacity (number of elements) */
+    size_t                          	tp_cnt;                     /**< Number of turning points in buffer */
+    bool                            	tp_locked;                  /**< If tp_locked, tp is freezed */
 #endif /*RFC_TP_SUPPORT*/
 
 #if RFC_DH_SUPPORT
-    double                         *dh;                             /**< Damage history, pointer may be changed thru memory reallocation! */
-    size_t                          dh_cap;                         /**< Capacity of dh */
-    size_t                          dh_cnt;                         /**< Number of values in dh */
+    double                             *dh;                         /**< Damage history, pointer may be changed thru memory reallocation! */
+    size_t                              dh_cap;                     /**< Capacity of dh */
+    size_t                              dh_cnt;                     /**< Number of values in dh */
 #endif /*RFC_DH_SUPPORT*/
 
     /* Damage */
-    double                         *damage_lut;                     /**< Damage look-up table */
-    double                          pseudo_damage;                  /**< Cumulated pseudo damage */
+    double                             *damage_lut;                 /**< Damage look-up table */
+    double                              pseudo_damage;              /**< Cumulated pseudo damage */
     
     /* Internal usage */
     struct internal
     {
-        int                         slope;                          /**< Current signal slope */
-        rfc_value_tuple_s           extrema[2];                     /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
-        bool                        extrema_changed;                /**< True if one extrema has changed */
-        size_t                      pos;                            /**< Absolute position in data input stream, base 1 */
+        int                             slope;                      /**< Current signal slope */
+        rfc_value_tuple_s               extrema[2];                 /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
+        bool                            extrema_changed;            /**< True if one extrema has changed */
+        size_t                          pos;                        /**< Absolute position in data input stream, base 1 */
 #if RFC_TP_SUPPORT
-        rfc_value_tuple_s           margin[2];                      /**< First and last data point */
-        rfc_value_tuple_s           tp_delayed;                     /**< Delay stage when RFC_FLAGS_ENFORCE_MARGIN is set */
+        rfc_value_tuple_s               margin[2];                  /**< First and last data point */
+        rfc_value_tuple_s               tp_delayed;                 /**< Delay stage when RFC_FLAGS_ENFORCE_MARGIN is set */
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_HCM_SUPPORT
         struct hcm
         {
             /* Residue */
-            rfc_value_tuple_s      *stack;                          /**< Stack */
-            size_t                  stack_cap;                      /**< Stack capacity in number of elements (max. 2*class_count) */
-            int                     IR;                             /**< Pointer to residue stack, first turning point of cycles able to close, base 1 */
-            int                     IZ;                             /**< Pointer to residue stack, last turning point of cycles able to close, base 1 */
-        }                           hcm;
+            rfc_value_tuple_s          *stack;                      /**< Stack */
+            size_t                      stack_cap;                  /**< Stack capacity in number of elements (max. 2*class_count) */
+            int                         IR;                         /**< Pointer to residue stack, first turning point of cycles able to close, base 1 */
+            int                         IZ;                         /**< Pointer to residue stack, last turning point of cycles able to close, base 1 */
+        }                               hcm;
 #endif /*RFC_HCM_SUPPORT*/
     }
                                     internal;

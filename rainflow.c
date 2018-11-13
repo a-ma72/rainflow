@@ -91,6 +91,7 @@
 
 #include <assert.h>  /* assert() */
 #include <math.h>    /* exp(), log(), fabs() */
+#include <string.h>  /* memset() */
 
 
 #ifdef MATLAB_MEX_FILE
@@ -519,7 +520,7 @@ bool RFC_finalize( void *ctx, int residual_method )
                 rfc_ctx->error = RFC_ERROR_INVARG;
                 ok = false;
         }
-    	assert( rfc_ctx->state == RFC_STATE_FINALIZE );
+        assert( rfc_ctx->state == RFC_STATE_FINALIZE );
     }
 
     rfc_ctx->state = ok ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
@@ -1948,7 +1949,7 @@ void RFC_init_damage_lut( rfc_ctx_s *rfc_ctx )
         else
 #endif /*RFC_USE_DELEGATES*/
         {
-			damage = RFC_damage_calc_fast( rfc_ctx, from, /*to*/ (int)i );
+            damage = RFC_damage_calc_fast( rfc_ctx, from, /*to*/ (int)i );
         }
 
         rfc_ctx->damage_lut[i] = damage;
@@ -2036,11 +2037,11 @@ void RFC_dh_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
                 {
                     case RFC_SD_RAMP_AMPLITUDE_23:
                     case RFC_SD_RAMP_AMPLITUDE_24:
-						new_damage = RFC_damage_calc_fast( rfc_ctx, 0, (int)( weight * range + 0.5 ) );
+                    new_damage = RFC_damage_calc_fast( rfc_ctx, 0, (int)( weight * range + 0.5 ) );
                         break;
                     case RFC_SD_RAMP_DAMAGE_23:
                     case RFC_SD_RAMP_DAMAGE_24:
-						new_damage = RFC_damage_calc_fast( rfc_ctx, 0, range ) * weight;
+                        new_damage = RFC_damage_calc_fast( rfc_ctx, 0, range ) * weight;
                         break;
                 }
 
@@ -2644,12 +2645,12 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                 mxArray* rp = mxCreateDoubleMatrix( class_count, 1, mxREAL );
                 if( rp )
                 {
-					double *ptr = mxGetPr(rp);
-					size_t i;
-					for( i = 0; i < class_count; i++ )
-					{
-						*ptr++ = (double)rfc_ctx.rp[i];
-					}
+                    double *ptr = mxGetPr(rp);
+                    size_t i;
+                    for( i = 0; i < class_count; i++ )
+                    {
+                        *ptr++ = (double)rfc_ctx.rp[i];
+                    }
                     plhs[3] = rp;
                 }
             }
@@ -2660,12 +2661,12 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                 mxArray* lc = mxCreateDoubleMatrix( class_count, 1, mxREAL );
                 if( lc )
                 {
-					double *ptr = mxGetPr(lc);
-					size_t i;
-					for( i = 0; i < class_count; i++ )
-					{
-						*ptr++ = (double)rfc_ctx.lc[i];
-					}
+                    double *ptr = mxGetPr(lc);
+                    size_t i;
+                    for( i = 0; i < class_count; i++ )
+                    {
+                        *ptr++ = (double)rfc_ctx.lc[i];
+                    }
                     plhs[4] = lc;
                 }
             }

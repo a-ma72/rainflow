@@ -8,7 +8,7 @@
 # cmake -G "Visual Studio 14 2015 Win64" ..
 
 
-cmake_minimum_required( VERSION 3.2 )
+cmake_minimum_required( VERSION 3.6 )
 set( CMAKE_CONFIGURATION_TYPES Release Debug )
 project( Rainflow )
 set( RFC_VERSION_MAJOR "0" )
@@ -30,7 +30,11 @@ if( MSVC )
     # versions of certain C functions but this is difficult to do
     # in platform-independent code.
     add_definitions( -D_CRT_SECURE_NO_WARNINGS )
-endif( MSVC )
+endif()
+
+if( UNIX )
+    set( MATH_LIB m )
+endif()
 
 set( MATLAB_FIND_DEBUG 1 )
 find_package( Matlab REQUIRED COMPONENTS MX_LIBRARY )
@@ -42,14 +46,18 @@ else()
     message( FATAL_ERROR "MATLAB not found...nothing will be built." )
 endif()
 
-add_definitions( -DMATLAB_MEX_FILE )
-
 # set up matlab libraries
 include_directories( ${Matlab_INCLUDE_DIRS} )
 configure_file( ${CMAKE_SOURCE_DIR}/config.h.in ${CMAKE_SOURCE_DIR}/config.h )
 
 matlab_add_mex( NAME ${CMAKE_PROJECT_NAME} SRC rainflow.c OUTPUT_NAME rfc )
-target_link_libraries( ${CMAKE_PROJECT_NAME} ${Matlab_LIBRARIES} )
+target_compile_definitions( ${CMAKE_PROJECT_NAME} PRIVATE -DMATLAB_MEX_FILE )
+target_link_libraries( ${CMAKE_PROJECT_NAME} ${Matlab_LIBRARIES} ${MATH_LIB} )
+
+# Test application, start project for MSVC
+add_executable( rfc_test rainflow.c rfc_test.c )
+target_link_libraries( rfc_test ${MATH_LIB} )
+set_property( DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT rfc_test )
 
 # install to /bin and /share by default
 install( TARGETS ${CMAKE_PROJECT_NAME} RUNTIME DESTINATION bin LIBRARY DESTINATION bin )
