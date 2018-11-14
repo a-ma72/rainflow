@@ -1885,8 +1885,6 @@ void RFC_tp_prune( rfc_ctx_s *rfc_ctx, size_t limit, bool preserve_residuals )
 
         if( !preserve_residuals )
         {
-            size_t j;
-
             for( res_i = 0; res_i < rfc_ctx->residue_cnt; res_ptr++, res_i++ )
             {
                 res_ptr->tp_pos = 0;
