@@ -62,7 +62,7 @@ set_property( DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT 
 
 # install to /bin by default
 install( TARGETS ${CMAKE_PROJECT_NAME} rfc_test RUNTIME DESTINATION bin LIBRARY DESTINATION bin )
-install( FILES test/long_series.csv matlab/validate.m DESTINATION bin )
+install( FILES test/long_series.csv test/long_series.c matlab/validate.m DESTINATION bin )
 
 
 # CPack
