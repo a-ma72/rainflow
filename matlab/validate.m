@@ -93,8 +93,10 @@ function validate
   class_width  = round( (x_max - x_min) / (class_count - 1), 2 );
   class_offset = x_min - class_width / 2;
   hysteresis   = class_width;
+  enforce_margin = 0;
+  use_hcm = 0;
 
-  [pd,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis );
+  [pd,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis, enforce_margin, use_hcm );
 
   save( name, 'rm', 're' );
 
@@ -120,5 +122,27 @@ function rounded_data = export_series( filename, data )
   if fid ~= -1
     fprintf( fid, '%.2f\n', rounded_data );
     fclose( fid );
+  end
+  
+  % Build include file
+  fid = fopen( [filename, '.c'], 'wt' );
+  if fid ~= -1
+      fprintf( fid, 'static double data_export[] = {\n' );
+      s = '';
+      left = numel(rounded_data);
+      i = 1;
+      while left
+          s = [s,sprintf('%.2f', rounded_data(i))];
+          left = left - 1;
+          i = i + 1;
+          if left
+            s = [s,', '];
+          end
+          if mod(i,16)==0 || ~left
+            fprintf( fid, '    %s\n', s );
+            s= '';
+          end 
+      end
+      fprintf( fid, '};\n' );
   end
 end

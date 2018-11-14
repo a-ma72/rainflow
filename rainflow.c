@@ -2265,12 +2265,12 @@ void RFC_rp_from_matrix( rfc_ctx_s *rfc_ctx, RFC_counts_type* buffer, size_t buf
 
 
 #if MATLAB_MEX_FILE
-#if !RFC_TP_SUPPORT || !RFC_COUNTING_METHOD_HCM
+#if !RFC_TP_SUPPORT || !RFC_HCM_SUPPORT
 void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 {
     mexErrMsgTxt( "Unsupported configuration!" );
 }
-#else /*!RFC_TP_SUPPORT || !RFC_COUNTING_METHOD_HCM*/
+#else /*!RFC_TP_SUPPORT || !RFC_HCM_SUPPORT*/
 
 /**
  * MATLAB wrapper for the rainflow algorithm

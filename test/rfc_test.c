@@ -427,7 +427,6 @@ TEST RFC_small_example(void)
 
 TEST RFC_long_series(void)
 {
-    FILE*               file            =  NULL;
     RFC_VALUE_TYPE      data[10000];
     size_t              data_len        =  NUMEL( data );
     RFC_VALUE_TYPE      x_max;
@@ -437,26 +436,49 @@ TEST RFC_long_series(void)
     RFC_VALUE_TYPE      class_offset;
     RFC_VALUE_TYPE      hysteresis;
     rfc_value_tuple_s   tp[10000];
-    size_t              i;
+	size_t              i;
 
-    file = fopen( "long_series.csv", "rt" );
-    ASSERT( file );
-    for( i = 0; i < data_len; i++ )
+    if(1)
     {
-        double value;
-        fscanf( file, "%lf\n", &value );
-        data[i] = value;
-        if( !i )
+#include "long_series.c"
+        for( i = 0; i < data_len; i++ )
         {
-            x_max = x_min = value;
-        }
-        else
-        {
-            if( value > x_max ) x_max = data[i];
-            if( value < x_min ) x_min = data[i];
+            double value = data_export[i];
+            data[i] = value;
+            if( !i )
+            {
+                x_max = x_min = value;
+            }
+            else
+            {
+                if( value > x_max ) x_max = value;
+                if( value < x_min ) x_min = value;
+            }
         }
     }
-    fclose( file );
+    else        
+    {
+        FILE*   file = NULL;
+
+        file = fopen( "long_series.csv", "rt" );
+        ASSERT( file );
+        for( i = 0; i < data_len; i++ )
+        {
+            double value;
+            fscanf( file, "%lf\n", &value );
+            data[i] = value;
+            if( !i )
+            {
+                x_max = x_min = value;
+            }
+            else
+            {
+                if( value > x_max ) x_max = value;
+                if( value < x_min ) x_min = value;
+            }
+        }
+        fclose( file );
+    }
 
     class_width   =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
     class_offset  =  x_min - class_width / 2;
