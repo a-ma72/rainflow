@@ -111,29 +111,71 @@
 #define RFC_COUNTS_LIMIT         (4.5e15 - RFC_FULL_CYCLE_INCREMENT)
 #endif
 
+#if RFC_MINIMAL
+#define RFC_USE_DELEGATES    OFF
+#define RFC_HCM_SUPPORT      OFF
+#define RFC_TP_SUPPORT       OFF
+#define RFC_DH_SUPPORT       OFF
+#define RFC_GLOBAL_EXTREMA   OFF
+#define RFC_DAMAGE_FAST      OFF
+#else
 #ifndef RFC_USE_DELEGATES
-#define RFC_USE_DELEGATES 0
-#endif
+#define RFC_USE_DELEGATES OFF
+#endif /*RFC_USE_DELEGATES*/
 
 #ifndef RFC_HCM_SUPPORT
-#define RFC_HCM_SUPPORT 0
-#endif
+#define RFC_HCM_SUPPORT OFF
+#endif /*RFC_HCM_SUPPORT*/
 
 #ifndef RFC_TP_SUPPORT
-#define RFC_TP_SUPPORT 1
-#endif
+#define RFC_TP_SUPPORT ON
+#endif /*RFC_TP_SUPPORT*/
 
 #ifndef RFC_DH_SUPPORT
-#define RFC_DH_SUPPORT 0
-#endif
+#define RFC_DH_SUPPORT OFF
+#endif /*RFC_DH_SUPPORT*/
 
 #ifndef RFC_GLOBAL_EXTREMA
-#define RFC_GLOBAL_EXTREMA 0
-#endif
+#define RFC_GLOBAL_EXTREMA OFF
+#endif /*RFC_GLOBAL_EXTREMA*/
 
+#ifndef RFC_DAMAGE_FAST
+#define RFC_DAMAGE_FAST ON
+#endif /*RFC_DAMAGE_FAST*/
+#endif /*RFC_MINIMAL*/
+
+/* Memory allocation aim info */
+enum
+{
+    RFC_MEM_AIM_TEMP                =  0,
+    RFC_MEM_AIM_RESIDUE             =  1,
+    RFC_MEM_AIM_MATRIX              =  2,
+    RFC_MEM_AIM_RP                  =  3,
+    RFC_MEM_AIM_LC                  =  4,
+#if RFC_TP_SUPPORT
+    RFC_MEM_AIM_TP                  =  5,
+#endif
+#if RFC_DAMAGE_FAST
+    RFC_MEM_AIM_DLUT                =  6,
+#endif
+#if RFC_HCM_SUPPORT
+    RFC_MEM_AIM_HCM                 =  7,
+#endif
+#if RFC_DH_SUPPORT
+    RFC_MEM_AIM_DH                  =  8,
+#endif
+};
+
+
+/* Turning points prune flags */
+enum
+{
+    RFC_FLAGS_TPPRUNE_PRESERVE_RESIDUE, 
+    RFC_FLAGS_TPPRUNE_PRESERVE_POS,
+};
 
 /* Memory allocation functions typedef */
-typedef void * ( *rfc_mem_alloc_fcn_t )( void *, size_t num, size_t size );
+typedef void * ( *rfc_mem_alloc_fcn_t )( void *, size_t num, size_t size, int aim );
 
 /* Typedefs */
 typedef RFC_VALUE_TYPE          RFC_value_type;      /** Input data value type */
@@ -165,7 +207,11 @@ typedef  bool                ( *rfc_finalize_fcn_t )      ( rfc_ctx_s *, int res
 #if RFC_TP_SUPPORT
 typedef  rfc_value_tuple_s * ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, const rfc_value_tuple_s * );
 typedef  bool                ( *rfc_tp_add_fcn_t )        ( rfc_ctx_s *, rfc_value_tuple_s * );
+typedef  bool                ( *rfc_tp_prune_fcn_t )      ( rfc_ctx_s *, size_t, int );
 #endif /*RFC_TP_SUPPORT*/
+#if RFC_TP_SUPPORT || RFC_DH_SUPPORT
+typedef  void                ( *rfc_spread_damage_fcn_t ) ( rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags );
+#endif
 #endif /*RFC_USE_DELEGATES*/
 
 
@@ -225,6 +271,9 @@ typedef struct rfc_ctx
                                         | RFC_FLAGS_COUNT_RP
                                         | RFC_FLAGS_COUNT_LC,
         RFC_FLAGS_ENFORCE_MARGIN        = 1 << 8,                   /**< Enforce first and last data point are turning points */
+#if RFC_TP_SUPPORT
+        RFC_FLAGS_TPAUTOPRUNE           = 1 << 9,                   /**< Automatic prune on tp */
+#endif
     }
                                         flags;                      /**< Flags */
     enum
@@ -292,10 +341,12 @@ typedef struct rfc_ctx
 #if RFC_TP_SUPPORT
     rfc_tp_next_fcn_t                   tp_next_fcn;                /**< Test if new turning point exists */
     rfc_tp_add_fcn_t                    tp_add_fcn;                 /**< Handling new turning points */
+    rfc_tp_prune_fcn_t                  tp_prune_fcn;               /**< Prune turning points */
 #endif /*RFC_TP_SUPPORT*/
     rfc_finalize_fcn_t                  finalize_fcn;               /**< Finalizing function */
     rfc_cycle_find_fcn_t                cycle_find_fcn;             /**< Find next cycle(s) and process */
     rfc_damage_calc_fcn_t               damage_calc_fcn;            /**< Damage calculating function */
+    rfc_spread_damage_fcn_t             spread_damage_fcn;          /**< Spread damage over turning points and damage history */
 #endif /*RFC_USE_DELEGATES*/
     
     /* Residue */
@@ -314,6 +365,7 @@ typedef struct rfc_ctx
     size_t                              tp_cap;                     /**< Buffer capacity (number of elements) */
     size_t                              tp_cnt;                     /**< Number of turning points in buffer */
     bool                                tp_locked;                  /**< If tp_locked, tp is freezed */
+    size_t                              tp_threshold;               /**< Threshold for (auto)pruning */
 #endif /*RFC_TP_SUPPORT*/
 
 #if RFC_DH_SUPPORT

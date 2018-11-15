@@ -14,12 +14,14 @@ project( Rainflow )
 set( RFC_VERSION_MAJOR "0" )
 set( RFC_VERSION_MINOR "1" )
 
+option( RFC_MINIMAL             "(Disable all other flags)" OFF )
 option( RFC_USE_INTEGRAL_COUNTS "Use integral (not floating) data type for counts" OFF )
 option( RFC_USE_DELEGATES       "Use delegates (functors)" OFF )
 option( RFC_GLOBAL_EXTREMA      "Always calculate global extrema" OFF )
 option( RFC_HCM_SUPPORT         "Support HCM (Clormann/Seeger) algorithm" ON )
 option( RFC_TP_SUPPORT          "Support turning points" ON )
 option( RFC_DH_SUPPORT          "Support damage history (\"spread damage\")" OFF )
+option( RFC_DAMAGE_FAST         "Enables fast damage calculation (per look-up table)" ON )
 
 
 set( CMAKE_POSITION_INDEPENDENT_CODE ON )
