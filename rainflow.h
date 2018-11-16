@@ -97,19 +97,19 @@
 
 #ifndef RFC_VALUE_TYPE
 #define RFC_VALUE_TYPE double
-#endif
+#endif /*RFC_VALUE_TYPE*/
 
 #ifdef RFC_USE_INTEGRAL_COUNTS
 #define RFC_COUNTS_VALUE_TYPE    unsigned long long
 #define RFC_FULL_CYCLE_INCREMENT (2)
 #define RFC_HALF_CYCLE_INCREMENT (1)
 #define RFC_COUNTS_LIMIT         (ULLONG_MAX - RFC_FULL_CYCLE_INCREMENT) /* ~18e18 (eff. ~9e18)*/
-#else
+#else /*RFC_USE_INTEGRAL_COUNTS*/
 #define RFC_COUNTS_VALUE_TYPE    double
 #define RFC_FULL_CYCLE_INCREMENT (1.0)
 #define RFC_HALF_CYCLE_INCREMENT (0.5)
 #define RFC_COUNTS_LIMIT         (4.5e15 - RFC_FULL_CYCLE_INCREMENT)
-#endif
+#endif /*RFC_USE_INTEGRAL_COUNTS*/
 
 #if RFC_MINIMAL
 #define RFC_USE_DELEGATES    OFF
@@ -166,13 +166,14 @@ enum
 #endif
 };
 
-
+#if RFC_TP_SUPPORT
 /* Turning points prune flags */
 enum
 {
     RFC_FLAGS_TPPRUNE_PRESERVE_RESIDUE, 
     RFC_FLAGS_TPPRUNE_PRESERVE_POS,
 };
+#endif /*RFC_TP_SUPPORT*/
 
 /* Memory allocation functions typedef */
 typedef void * ( *rfc_mem_alloc_fcn_t )( void *, size_t num, size_t size, int aim );
@@ -182,7 +183,9 @@ typedef RFC_VALUE_TYPE          RFC_value_type;      /** Input data value type *
 typedef RFC_COUNTS_VALUE_TYPE   RFC_counts_type;     /** Type of counting values */
 typedef struct rfc_ctx          rfc_ctx_s;           /** Forward declaration (rainflow context) */
 typedef struct rfc_value_tuple  rfc_value_tuple_s;   /** Tuple of value and index position */
+#if !RFC_MINIMAL
 typedef struct rfc_class_param  rfc_class_param_s;   /** Class parameters (width, offset, count) */
+#endif /*RFC_MINIMAL*/
 
 
 /* Core functions */
@@ -196,7 +199,9 @@ bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type 
 #endif /*RFC_TP_SUPPORT*/
 void RFC_deinit               ( void *ctx );
 bool RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count );
+#if !RFC_MINIMAL
 bool RFC_feed_tuple           ( void *ctx, rfc_value_tuple_s *data, size_t count );
+#endif /*RFC_MINIMAL*/
 bool RFC_finalize             ( void *ctx, int residual_method );
 
 #if RFC_USE_DELEGATES
@@ -227,12 +232,14 @@ typedef struct rfc_value_tuple
 #endif /*RFC_TP_SUPPORT*/
 } rfc_value_tuple_s;
 
+#if !RFC_MINIMAL
 typedef struct rfc_class_param
 {
     unsigned                            count;                      /**< Class count */
     RFC_value_type                      width;                      /**< Class width */
     RFC_value_type                      offset;                     /**< Lower bound of first class */
 } rfc_class_param_s;
+#endif /*RFC_MINIMAL*/
 
 
 /**
@@ -262,6 +269,7 @@ typedef struct rfc_ctx
     enum
     {
         RFC_FLAGS_COUNT_MATRIX          = 1 << 0,                   /**< Count into matrix */
+#if !RFC_MINIMAL
         RFC_FLAGS_COUNT_RP              = 1 << 1,                   /**< Count into range pair */
         RFC_FLAGS_COUNT_LC_UP           = 1 << 2,                   /**< Count into level crossing (only rising slopes) */
         RFC_FLAGS_COUNT_LC_DN           = 1 << 3,                   /**< Count into level crossing (only falling slopes) */
@@ -271,11 +279,13 @@ typedef struct rfc_ctx
                                         | RFC_FLAGS_COUNT_RP
                                         | RFC_FLAGS_COUNT_LC,
         RFC_FLAGS_ENFORCE_MARGIN        = 1 << 8,                   /**< Enforce first and last data point are turning points */
+#endif /*RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
         RFC_FLAGS_TPAUTOPRUNE           = 1 << 9,                   /**< Automatic prune on tp */
 #endif
     }
                                         flags;                      /**< Flags */
+#if !RFC_MINIMAL
     enum
     {
         RFC_COUNTING_METHOD_UNKNOWN     = -1,                       /**< Method is unknown */
@@ -286,16 +296,20 @@ typedef struct rfc_ctx
 #endif /*RFC_HCM_SUPPORT*/
     }
                                         counting_method;
+#endif /*RFC_MINIMAL*/
+
     enum 
     {
         RFC_RES_NONE                    = 0,                        /**< No residual method */
         RFC_RES_IGNORE,                                             /**< Ignore residue (same as RFC_RES_NONE) */
+#if !RFC_MINIMAL
         RFC_RES_DISCARD,                                            /**< Discard residue (empty residue) */
         RFC_RES_HALFCYCLES,                                         /**< ASTM */
         RFC_RES_FULLCYCLES,                                         /**< Count half cycles as full cycles */
         RFC_RES_CLORMANN_SEEGER,                                    /**< Clormann/Seeger method */
         RFC_RES_REPEATED,                                           /**< Repeat residue and count closed cycles */
         RFC_RES_RP_DIN45667,                                        /**< Count residue according to range pair in DIN-45667 */
+#endif /*RFC_MINIMAL*/
     }
                                         residual_method;
 #if RFC_DH_SUPPORT
@@ -333,8 +347,10 @@ typedef struct rfc_ctx
     double                              wl_sd;                      /**< Fatigue resistance range (amplitude) */
     double                              wl_nd;                      /**< Cycles at wl_sd */
     double                              wl_k;                       /**< Woehler gradient above wl_sd */
+#if !RFC_MINIMAL
     double                              wl_k2;                      /**< Woehler gradient below wl_sd */
     double                              wl_omission;                /**< Omission level */
+#endif
 
 #if RFC_USE_DELEGATES
     /* Delegates (optional, may be NULL) */
@@ -356,8 +372,10 @@ typedef struct rfc_ctx
 
     /* Non-sparse storages (optional, may be NULL) */
     RFC_counts_type                    *matrix;                     /**< Rainflow matrix */
+#if !RFC_MINIMAL
     RFC_counts_type                    *rp;                         /**< Range pair counts */
     RFC_counts_type                    *lc;                         /**< Level crossing counts */
+#endif
 
 #if RFC_TP_SUPPORT
     /* Turning points storage (optional, may be NULL) */
@@ -375,7 +393,9 @@ typedef struct rfc_ctx
 #endif /*RFC_DH_SUPPORT*/
 
     /* Damage */
+#if RFC_DAMAGE_FAST
     double                             *damage_lut;                 /**< Damage look-up table */
+#endif /*RFC_DAMAGE_FAST*/
     double                              pseudo_damage;              /**< Cumulated pseudo damage */
     
     /* Internal usage */
@@ -383,7 +403,9 @@ typedef struct rfc_ctx
     {
         int                             slope;                      /**< Current signal slope */
         rfc_value_tuple_s               extrema[2];                 /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
+#if !RFC_MINIMAL
         bool                            extrema_changed;            /**< True if one extrema has changed */
+#endif /*RFC_MINIMAL*/
         size_t                          pos;                        /**< Absolute position in data input stream, base 1 */
 #if RFC_TP_SUPPORT
         rfc_value_tuple_s               margin[2];                  /**< First and last data point */
