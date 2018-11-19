@@ -105,7 +105,7 @@
 "    rp = Range pair counts\n"\
 "    lc = Level crossings\n"\
 "    tp = Turning points\n"
-#else /*RFC_MINIMAL*
+#else /*RFC_MINIMAL*/
 #define RFC_MEX_USAGE \
 "\nUsage:\n"\
 "[pd,re,rm] = rfc( data, class_count, class_width, class_offset, hysteresis )\n"\
@@ -214,7 +214,7 @@ bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type 
     rfc_ctx->flags                      = RFC_FLAGS_COUNT_ALL;
 #else /*RFC_MINIMAL*/
     rfc_ctx->flags                      = RFC_FLAGS_COUNT_MATRIX;
-#end /*!RFC_MINIMAL*/
+#endif /*!RFC_MINIMAL*/
 
     /* Counter increments */
     rfc_ctx->full_inc                   = RFC_FULL_CYCLE_INCREMENT;
@@ -281,16 +281,16 @@ bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type 
     rfc_ctx->pseudo_damage              = 0.0;
 #if RFC_DAMAGE_FAST
     rfc_ctx->damage_lut                 = (double*)rfc_ctx->mem_alloc( rfc_ctx->damage_lut, class_count, sizeof(double), RFC_MEM_AIM_DLUT );
-    RFC_init_damage_lut( rfc_ctx );
+    RFC_damage_lut_init( rfc_ctx );
 #endif /*RFC_DAMAGE_FAST*/
 
     /* Internals */
     rfc_ctx->internal.slope             = 0;
     rfc_ctx->internal.extrema[0]        = nil;  /* local minimum */
     rfc_ctx->internal.extrema[1]        = nil;  /* local maximum */
-#if !RFC_MINIMAL    
+#if RFC_GLOBAL_EXTREMA    
     rfc_ctx->internal.extrema_changed   = false;
-#endif /*!RFC_MINIMAL*/
+#endif /*RFC_GLOBAL_EXTREMA*/
 #if RFC_TP_SUPPORT
     rfc_ctx->internal.tp_delayed        = nil;
     rfc_ctx->internal.margin[0]         = nil;  /* left  margin */
@@ -381,9 +381,9 @@ void RFC_deinit( void *ctx )
     rfc_ctx->internal.slope             = 0;
     rfc_ctx->internal.extrema[0]        = nil;  /* local minimum */
     rfc_ctx->internal.extrema[1]        = nil;  /* local maximum */
-#if !RFC_MINIMAL
+#if RFC_GLOBAL_EXTREMA
     rfc_ctx->internal.extrema_changed   = false;
-#endif /*!RFC_MINIMAL*/
+#endif /*RFC_GLOBAL_EXTREMA*/
     rfc_ctx->internal.pos               = 0;
 #if RFC_TP_SUPPORT
     rfc_ctx->internal.margin[0]         = nil;  /* left margin */
@@ -609,7 +609,9 @@ void RFC_reset( rfc_ctx_s *rfc_ctx )
     rfc_ctx->internal.slope             = 0;
     rfc_ctx->internal.extrema[0]        = nil;  /* local minimum */
     rfc_ctx->internal.extrema[1]        = nil;  /* local maximum */
+#if RFC_GLOBAL_EXTREMA
     rfc_ctx->internal.extrema_changed   = false;
+#endif
     rfc_ctx->internal.pos               = 0;
 #if RFC_TP_SUPPORT
     rfc_ctx->internal.margin[0]         = nil;  /* left margin */
@@ -1363,18 +1365,18 @@ rfc_value_tuple_s * RFC_tp_next( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *pt
                 /* Minimum */
                 is_falling_slope = 1;
                 rfc_ctx->internal.extrema[0] = *pt;
-#if !RFC_MINIMAL
+#if RFC_GLOBAL_EXTREMA
                 rfc_ctx->internal.extrema_changed = true;
-#endif /*!RFC_MINIMAL*/
+#endif /*RFC_GLOBAL_EXTREMA*/
             }
             else if( pt->value > rfc_ctx->internal.extrema[1].value )
             {
                 /* Maximum */
                 is_falling_slope = 0;
                 rfc_ctx->internal.extrema[1] = *pt;
-#if !RFC_MINIMAL
+#if !RFC_GLOBAL_EXTREMA
                 rfc_ctx->internal.extrema_changed = true;
-#endif /*!RFC_MINIMAL*/
+#endif /*RFC_GLOBAL_EXTREMA*/
             }
 
             /* Local hysteresis filtering */
@@ -1831,14 +1833,14 @@ bool RFC_tp_add( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *tp )
             /* Check if buffer needs to be resized */
             if( rfc_ctx->tp_cnt >= rfc_ctx->tp_cap )
             {
-                rfc_value_tuple_s *tp_new;
-                size_t tp_cap_new;
-                size_t tp_cap_increment;
+                rfc_value_tuple_s  *tp_new;
+                size_t              tp_cap_new;
+                size_t              tp_cap_increment;
 
                 /* Increment about a tenth of current size */
                 tp_cap_increment = ( rfc_ctx->tp_cap / 10240 + 1 ) * 1024;
-                tp_cap_new = rfc_ctx->tp_cap + tp_cap_increment;
-                tp_new = rfc_ctx->mem_alloc( rfc_ctx->tp, tp_cap_new, sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TP );
+                tp_cap_new       = rfc_ctx->tp_cap + tp_cap_increment;
+                tp_new           = rfc_ctx->mem_alloc( rfc_ctx->tp, tp_cap_new, sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TP );
 
                 if( tp_new )
                 {
@@ -1851,9 +1853,15 @@ bool RFC_tp_add( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *tp )
                 }
             }
             /* Append turning point */
-            tp->tp_pos = rfc_ctx->tp_cnt;
+            tp->tp_pos = rfc_ctx->tp_cnt; /* Turning point get its position index in tp */
             rfc_ctx->tp[ rfc_ctx->tp_cnt++ ] = *tp;
         }
+
+        if( rfc_ctx->flags & RFC_FLAGS_TPAUTOPRUNE )
+        {
+            return RFC_tp_prune( rfc_ctx, rfc_ctx->tp_threshold, RFC_FLAGS_TPPRUNE_PRESERVE_POS | RFC_FLAGS_TPPRUNE_PRESERVE_RESIDUE );
+        }
+
         return true;
     }
 }
@@ -1900,7 +1908,7 @@ void RFC_tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc
         rfc_ctx->hysteresis = new_hysteresis;
         RFC_class_param_set( rfc_ctx, new_class_param );
 #if RFC_DH_SUPPORT
-        RFC_init_damage_lut( rfc_ctx );
+        RFC_damage_lut_init( rfc_ctx );
 #endif /*RFC_DH_SUPPORT*/
     }
 
@@ -1928,14 +1936,14 @@ void RFC_tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc
 static 
 bool RFC_tp_prune( rfc_ctx_s *rfc_ctx, size_t limit, int flags )
 {
+    assert( rfc_ctx );
+
 #if RFC_USE_DELEGATES
     if( rfc_ctx->tp_prune_fcn )
     {
         return rfc_ctx->tp_prune_fcn( rfc_ctx, limit, flags );
     }
 #endif /*RFC_USE_DELEGATES*/
-
-    assert( rfc_ctx );
 
     if( rfc_ctx->tp && rfc_ctx->tp_cnt > limit )
     {
@@ -1949,47 +1957,81 @@ bool RFC_tp_prune( rfc_ctx_s *rfc_ctx, size_t limit, int flags )
         size_t               removal;       /* Number of turning points to remove */
         size_t               offset;        /* Position justify offset */
 
-        offset   = rfc_ctx->tp->pos;
-        removal  = rfc_ctx->tp_cnt - limit;
-        it_to    = rfc_ctx->tp;
-        it_begin = it_to + removal;
-        it_end   = rfc_ctx->tp + rfc_ctx->tp_cnt
-                   + ( ( rfc_ctx->state == RFC_STATE_BUSY_INTERIM ) ? 1 : 0 );
-        res_ptr  = rfc_ctx->residue;
-        i        = res_i = 0;
+        removal     = rfc_ctx->tp_cnt - limit;
+        dst_it      = rfc_ctx->tp;
+        dst_i       = 0;
+        src_begin   = it_to + removal;
+        src_end     = rfc_ctx->tp + rfc_ctx->tp_cnt
+                      + ( ( rfc_ctx->state == RFC_STATE_BUSY_INTERIM ) ? 1 : 0 );
+        src_i       = removal;
+        res_it      = rfc_ctx->residue;
+        res_i       = 0;
+        offset      = it_begin->pos;
 
-        if( !flags & RFC_FLAGS_TPPRUNE_PRESERVE_POS )
+        if( flags & RFC_FLAGS_TPPRUNE_PRESERVE_POS )
+        {
+            if( offset > res_ptr->pos )
+            {
+                offset = res_ptr->pos;
+            }
+        }
+        else
         {
             offset = 0;
         }
 
-        if( !flags & RFC_FLAGS_TPPRUNE_PRESERVE_RESIDUE )
+        if( (flags & RFC_FLAGS_TPPRUNE_PRESERVE_RESIDUE) == 0 )
         {
-            for( res_i = 0; res_i < rfc_ctx->residue_cnt; res_ptr++, res_i++ )
+            for( res_i = 0; res_i < rfc_ctx->residue_cnt; res_it++, res_i++ )
             {
                 res_ptr->tp_pos = 0;
                 res_ptr->pos   -= offset;
             }
         }
 
-        for( it = it_begin; it < it_end; it_to++, i++ )
+        for( it = src_begin; it < src_end; dst_it++, dst_i++ )
         {
-            if( res_i < rfc_ctx->residue_cnt && res_ptr->tp_pos <= i )
+            if( res_i < rfc_ctx->residue_cnt )
             {
-                res_ptr->tp_pos = i;
-                res_ptr->pos   -= offset;
+                /* There are still residual points to regard */
+                if( res_it->tp_pos <= src_i )
+                {
+                    /* Turning point in removal area, save */
+                    if( !dst_i )
+                    {
+                        /* First new turning point carries new offset */
+                        offset = res_it->pos;
+                    }
 
-                *it_to = *res_ptr++;
-                res_i++;
+                    if( res_it->tp_pos == src_i )
+                    {
+                        /* Residual point is at current source location */
+                        src_i++;
+                    }
+
+                    /* Adjust tp information */
+                    res_it->tp_pos = dst_i;
+                    res_it->pos   -= offset;
+                    *dst_it        = *res_it++;
+                    res_i++;
+
+                    continue;
+                }
             }
-            else
+
+            if( !dst_i )
             {
-                it->pos -= offset;
-                *it_to++ = *it++;
+                /* First new turning point carries new offset */
+                offset = it->pos;
             }
+
+            /* Copy turning point from source */
+            it->tp_pos = dst_i;
+            it->pos   -= offset;
+            *dst_to++  = *it++;
         }
 
-        rfc_ctx->tp_cnt = i;
+        rfc_ctx->tp_cnt = dst_i;
         rfc_ctx->internal.pos -= offset;
     }
     else
@@ -2009,7 +2051,7 @@ bool RFC_tp_prune( rfc_ctx_s *rfc_ctx, size_t limit, int flags )
  * @param   rfc_ctx     The rainflow context
  */
 static 
-void RFC_init_damage_lut( rfc_ctx_s *rfc_ctx )
+void RFC_damage_lut_init( rfc_ctx_s *rfc_ctx )
 {
     size_t i;
 

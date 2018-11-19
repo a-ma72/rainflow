@@ -39,7 +39,7 @@ if( UNIX )
 endif()
 
 set( MATLAB_FIND_DEBUG 1 )
-find_package( Matlab REQUIRED COMPONENTS MX_LIBRARY )
+find_package( Matlab QUIET REQUIRED COMPONENTS MX_LIBRARY )
 
 if( MATLAB_FOUND )
     message( STATUS "MATLAB Found, MATLAB MEX will be compiled." )
