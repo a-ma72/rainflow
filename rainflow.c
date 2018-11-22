@@ -385,6 +385,7 @@ void RFC_deinit( void *ctx )
     rfc_ctx->internal.extrema_changed   = false;
 #endif /*RFC_GLOBAL_EXTREMA*/
     rfc_ctx->internal.pos               = 0;
+    rfc_ctx->internal.global_offset     = 0;
 #if RFC_TP_SUPPORT
     rfc_ctx->internal.margin[0]         = nil;  /* left margin */
     rfc_ctx->internal.margin[1]         = nil;  /* right margin */
@@ -1863,7 +1864,7 @@ bool RFC_tp_add( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *tp )
 
         if( rfc_ctx->flags & RFC_FLAGS_TPAUTOPRUNE )
         {
-            return RFC_tp_prune( rfc_ctx, rfc_ctx->tp_threshold, RFC_FLAGS_TPPRUNE_PRESERVE_POS | RFC_FLAGS_TPPRUNE_PRESERVE_RESIDUE );
+            return RFC_tp_prune( rfc_ctx, rfc_ctx->tp_threshold, RFC_FLAGS_TPPRUNE_PRESERVE_POS );
         }
 
         return true;
@@ -1955,88 +1956,73 @@ bool RFC_tp_prune( rfc_ctx_s *rfc_ctx, size_t limit, int flags )
                             *it_end,        /* Source (end) */
                             *it_to,         /* Destination iterator */
                             *it,            /* Source iterator */
-                            *res_ptr;       /* Residue iterator */
+                            *res_it;        /* Residue iterator */
         size_t               i,             /* Turning point index, base 0 */
-                             res_i;         /* Residue index, base 0 */
+                             res_i,         /* Residue index, base 0 */
+ 		                     src_i;         /* Source index, bast 0 */
         size_t               removal;       /* Number of turning points to remove */
-        size_t               offset;        /* Position justify offset */
+        size_t               offset;        /* Position offset (minuend) */
+        bool                 preserve_pos;  /* Don't justify position */
 
         removal     = rfc_ctx->tp_cnt - limit;
-        dst_it      = rfc_ctx->tp;
-        dst_i       = 0;
-        src_begin   = it_to + removal;
-        src_end     = rfc_ctx->tp + rfc_ctx->tp_cnt
+        it_to       = rfc_ctx->tp;
+        i           = 0;
+		it_begin    = it_to + removal;
+		it_end      = rfc_ctx->tp + rfc_ctx->tp_cnt
                       + ( ( rfc_ctx->state == RFC_STATE_BUSY_INTERIM ) ? 1 : 0 );
         src_i       = removal;
         res_it      = rfc_ctx->residue;
         res_i       = 0;
-        offset      = it_begin->pos;
+        offset      = 0;
 
-        if( flags & RFC_FLAGS_TPPRUNE_PRESERVE_POS )
-        {
-            if( offset > res_ptr->pos )
-            {
-                offset = res_ptr->pos;
-            }
-        }
-        else
-        {
-            offset = 0;
-        }
+        preserve_pos = ( flags & RFC_FLAGS_TPPRUNE_PRESERVE_POS ) > 0;
 
-        if( (flags & RFC_FLAGS_TPPRUNE_PRESERVE_RESIDUE) == 0 )
+        /* Move turning points ahead */
+        for( it = it_begin; it < it_end; it_to++, i++ )
         {
-            for( res_i = 0; res_i < rfc_ctx->residue_cnt; res_it++, res_i++ )
-            {
-                res_ptr->tp_pos = 0;
-                res_ptr->pos   -= offset;
-            }
-        }
-
-        for( it = src_begin; it < src_end; dst_it++, dst_i++ )
-        {
+            /* Check if there are still residual points to consider */
             if( res_i < rfc_ctx->residue_cnt )
             {
-                /* There are still residual points to regard */
+                /* Check if residue refers a turning point from removal area */
                 if( res_it->tp_pos <= src_i )
                 {
-                    /* Turning point in removal area, save */
-                    if( !dst_i )
+                    /* First new turning point delivers new offset */
+                    if( !i && !preserve_pos )
                     {
-                        /* First new turning point carries new offset */
                         offset = res_it->pos;
                     }
 
+                    /* Residual point is at current source position? */
                     if( res_it->tp_pos == src_i )
                     {
-                        /* Residual point is at current source location */
                         src_i++;
                     }
 
-                    /* Adjust tp information */
-                    res_it->tp_pos = dst_i;
+                    /* Adjust residue reference information */
+                    res_it->tp_pos = i;
                     res_it->pos   -= offset;
-                    *dst_it        = *res_it++;
+                    *it_to         = *res_it++;
                     res_i++;
 
                     continue;
                 }
             }
 
-            if( !dst_i )
+            /* First new turning point delivers new offset */
+            if( !i && !preserve_pos )
             {
-                /* First new turning point carries new offset */
                 offset = it->pos;
             }
 
             /* Copy turning point from source */
-            it->tp_pos = dst_i;
+            it->tp_pos = i;
             it->pos   -= offset;
-            *dst_to++  = *it++;
+            *it_to++   = *it++;
         }
 
-        rfc_ctx->tp_cnt = dst_i;
+        rfc_ctx->tp_cnt = i;
         rfc_ctx->internal.pos -= offset;
+        rfc_ctx->internal.global_offset += offset;
     }
     else
     {

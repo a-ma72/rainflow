@@ -128,18 +128,18 @@ function validate
   title( 'Rainflow matrix' );
 
   disp( pd )
-  
+
   assert( strcmp( sprintf( '%.4e', pd ), '4.8703e-16' ) )
   assert( sum( sum(rm) ) == 601 );
   assert( length(re) == 10 );
   test = re ./ [0.538;2.372;-0.448;17.445;-50.901;114.136;-24.851;31.002;-0.646;16.594];
   test = abs( test - 1 );
   assert( all( test < 1e-3 ))
-  
+
   if ~isempty( which( 'ftc2' ) )
       y = ftc2( 'rfc', x, 'classcount', 100, 'classwidth', class_width, 'lbound', class_offset, ...
                 'dilation', 0, 'hysteresis', class_width, 'residuum', 1 );
-            
+
       assert( abs( pd / y.bkz - 1 ) < 1e-10 );
       test = abs( y.residuum ./ re - 1 );
       assert( all( test < 1e-1 ))
@@ -173,7 +173,7 @@ function rounded_data = export_series( filename, data, class_count )
     fprintf( fid, '%.2f\n', rounded_data );
     fclose( fid );
   end
-  
+
   % Build include file
   fid = fopen( [filename, '.c'], 'wt' );
   if fid ~= -1
@@ -191,7 +191,7 @@ function rounded_data = export_series( filename, data, class_count )
           if mod(i,16)==0 || ~left
             fprintf( fid, '    %s\n', s );
             s= '';
-          end 
+          end
       end
       fprintf( fid, '};\n' );
   end

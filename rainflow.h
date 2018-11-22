@@ -166,14 +166,6 @@ enum
 #endif
 };
 
-#if RFC_TP_SUPPORT
-/* Turning points prune flags */
-enum
-{
-    RFC_FLAGS_TPPRUNE_PRESERVE_RESIDUE, 
-    RFC_FLAGS_TPPRUNE_PRESERVE_POS,
-};
-#endif /*RFC_TP_SUPPORT*/
 
 /* Memory allocation functions typedef */
 typedef void * ( *rfc_mem_alloc_fcn_t )( void *, size_t num, size_t size, int aim );
@@ -281,7 +273,8 @@ typedef struct rfc_ctx
         RFC_FLAGS_ENFORCE_MARGIN        = 1 << 8,                   /**< Enforce first and last data point are turning points */
 #endif /*RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
-        RFC_FLAGS_TPAUTOPRUNE           = 1 << 9,                   /**< Automatic prune on tp */
+        RFC_FLAGS_TPPRUNE_PRESERVE_POS  = 1 << 9,
+        RFC_FLAGS_TPAUTOPRUNE           = 1 << 10,                  /**< Automatic prune on tp */
 #endif /*RFC_TP_SUPPORT*/
     }
                                         flags;                      /**< Flags */
@@ -407,6 +400,7 @@ typedef struct rfc_ctx
         bool                            extrema_changed;            /**< True if one extrema has changed */
 #endif /*RFC_MINIMAL*/
         size_t                          pos;                        /**< Absolute position in data input stream, base 1 */
+        size_t                          global_offset;              /**< Offset for pos */
 #if RFC_TP_SUPPORT
         rfc_value_tuple_s               margin[2];                  /**< First and last data point */
         rfc_value_tuple_s               tp_delayed;                 /**< Delay stage when RFC_FLAGS_ENFORCE_MARGIN is set */
