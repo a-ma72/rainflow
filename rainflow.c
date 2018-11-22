@@ -460,6 +460,7 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
 }
 
 
+#if !RFC_MINIMAL
 /**
  * @brief      Feed counting algorithm with data tuples.
  *
@@ -496,6 +497,7 @@ bool RFC_feed_tuple( void *ctx, rfc_value_tuple_s *data, size_t data_count )
 
     return true;
 }
+#endif /*!RFC_MINIMAL*/
 
 
 /**
@@ -576,6 +578,7 @@ bool RFC_finalize( void *ctx, int residual_method )
 
 /*** Implementation static functions ***/
 
+#if !RFC_MINIMAL
 /**
  * brief       Reset data processing information (empty containers)
  *
@@ -631,6 +634,7 @@ void RFC_reset( rfc_ctx_s *rfc_ctx )
 
     rfc_ctx->state = RFC_STATE_INIT0;
 }
+#endif /*!RFC_MINIMAL*/
 
 
 /**

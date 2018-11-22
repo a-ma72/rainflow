@@ -282,7 +282,7 @@ typedef struct rfc_ctx
 #endif /*RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
         RFC_FLAGS_TPAUTOPRUNE           = 1 << 9,                   /**< Automatic prune on tp */
-#endif
+#endif /*RFC_TP_SUPPORT*/
     }
                                         flags;                      /**< Flags */
 #if !RFC_MINIMAL
@@ -350,7 +350,7 @@ typedef struct rfc_ctx
 #if !RFC_MINIMAL
     double                              wl_k2;                      /**< Woehler gradient below wl_sd */
     double                              wl_omission;                /**< Omission level */
-#endif
+#endif /*RFC_MINIMAL*/
 
 #if RFC_USE_DELEGATES
     /* Delegates (optional, may be NULL) */
@@ -375,7 +375,7 @@ typedef struct rfc_ctx
 #if !RFC_MINIMAL
     RFC_counts_type                    *rp;                         /**< Range pair counts */
     RFC_counts_type                    *lc;                         /**< Level crossing counts */
-#endif
+#endif /*RFC_MINIMAL*/
 
 #if RFC_TP_SUPPORT
     /* Turning points storage (optional, may be NULL) */

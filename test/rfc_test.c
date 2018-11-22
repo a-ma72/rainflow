@@ -49,11 +49,13 @@
 
 #include "../rainflow.h"
 #include "../greatest/greatest.h"
+#include <locale.h>
 
 #define ROUND(x) ((x)>=0?(long)((x)+0.5):(long)((x)-0.5))
 #define NUMEL(x) (sizeof(x)/sizeof((x)[0]))
 
-rfc_ctx_s ctx = { sizeof(ctx) };
+rfc_ctx_s  ctx       = { sizeof(ctx) };
+void      *glob_data = NULL;
 
 double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 {
@@ -241,7 +243,9 @@ TEST RFC_empty(void)
     RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
     RFC_VALUE_TYPE      class_offset    =  x_min - class_width / 2;
     RFC_VALUE_TYPE      hysteresis      =  class_width;
+#if RFC_TP_SUPPORT
     rfc_value_tuple_s   tp[10];
+#endif /*RFC_TP_SUPPORT*/
     size_t              i;
 
     do
@@ -249,10 +253,16 @@ TEST RFC_empty(void)
         RFC_VALUE_TYPE data[] = {0};
         RFC_VALUE_TYPE sum = 0.0;
 
+#if RFC_TP_SUPPORT
         ASSERT( NUMEL(tp) >= NUMEL(data) );
+#endif /*RFC_TP_SUPPORT*/
 
-        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, 
-                                tp, NUMEL(tp) ) );
+        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis
+#if RFC_TP_SUPPORT
+                                , tp, NUMEL(tp) ) );
+#else /*!RFC_TP_SUPPORT*/
+                                );
+#endif /*RFC_TP_SUPPORT*/
         ASSERT( RFC_feed( &ctx, data, /* count */ 0 ) );
         ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
 
@@ -266,7 +276,9 @@ TEST RFC_empty(void)
         ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
     } while(0);
 
+#if RFC_TP_SUPPORT
     ctx.tp = NULL;
+#endif /*RFC_TP_SUPPORT*/
 
     if( ctx.state != RFC_STATE_INIT0 )
     {
@@ -285,7 +297,9 @@ TEST RFC_cycle_up(void)
     RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
     RFC_VALUE_TYPE      class_offset    =  x_min - class_width / 2;
     RFC_VALUE_TYPE      hysteresis      =  class_width * 0.99;
+#if RFC_TP_SUPPORT
     rfc_value_tuple_s   tp[10];
+#endif /*RFC_TP_SUPPORT*/
     size_t              i;
 
     do
@@ -293,10 +307,16 @@ TEST RFC_cycle_up(void)
         RFC_VALUE_TYPE data[] = {1,3,2,4};
         RFC_VALUE_TYPE sum = 0.0;
 
+#if RFC_TP_SUPPORT
         ASSERT( NUMEL(tp) >= NUMEL(data) );
+#endif /*RFC_TP_SUPPORT*/
 
-        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis,
-                                tp, NUMEL(tp) ) );
+        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis
+#if RFC_TP_SUPPORT
+                                , tp, NUMEL(tp) ) );
+#else /*!RFC_TP_SUPPORT*/
+                                );
+#endif /*RFC_TP_SUPPORT*/
         ASSERT( RFC_feed( &ctx, data, /* count */ NUMEL( data ) ) );
         ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
 
@@ -313,7 +333,9 @@ TEST RFC_cycle_up(void)
         ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
     } while(0);
 
+#if RFC_TP_SUPPORT
     ctx.tp = NULL;
+#endif /*RFC_TP_SUPPORT*/
 
     if( ctx.state != RFC_STATE_INIT0 )
     {
@@ -332,7 +354,9 @@ TEST RFC_cycle_down(void)
     RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
     RFC_VALUE_TYPE      class_offset    =  x_min - class_width / 2;
     RFC_VALUE_TYPE      hysteresis      =  class_width * 0.99;
+#if RFC_TP_SUPPORT
     rfc_value_tuple_s   tp[10];
+#endif /*RFC_TP_SUPPORT*/
     size_t              i;
 
     do
@@ -340,10 +364,16 @@ TEST RFC_cycle_down(void)
         RFC_VALUE_TYPE data[] = {4,2,3,1};
         RFC_VALUE_TYPE sum = 0.0;
 
+#if RFC_TP_SUPPORT
         ASSERT( NUMEL(tp) >= NUMEL(data) );
+#endif /*RFC_TP_SUPPORT*/
 
-        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis,
-                                tp, NUMEL(tp) ) );
+        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis
+#if RFC_TP_SUPPORT
+                                , tp, NUMEL(tp) ) );
+#else /*!RFC_TP_SUPPORT*/
+                                );
+#endif /*RFC_TP_SUPPORT*/
         ASSERT( RFC_feed( &ctx, data, /* count */ NUMEL( data ) ) );
         ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
 
@@ -360,7 +390,9 @@ TEST RFC_cycle_down(void)
         ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
     } while(0);
 
+#if RFC_TP_SUPPORT
     ctx.tp = NULL;
+#endif /*RFC_TP_SUPPORT*/
 
     if( ctx.state != RFC_STATE_INIT0 )
     {
@@ -379,7 +411,9 @@ TEST RFC_small_example(void)
     RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
     RFC_VALUE_TYPE      class_offset    =  x_min - class_width / 2;
     RFC_VALUE_TYPE      hysteresis      =  class_width;
+#if RFC_TP_SUPPORT
     rfc_value_tuple_s   tp[20];
+#endif /*RFC_TP_SUPPORT*/
     size_t              i;
 
     do
@@ -387,10 +421,16 @@ TEST RFC_small_example(void)
         RFC_VALUE_TYPE data[] = {2,5,3,6,2,4,1,6,1,4,1,5,3,6,3,6,1,5,2};
         RFC_VALUE_TYPE sum = 0.0;
 
+#if RFC_TP_SUPPORT
         ASSERT( NUMEL(tp) >= NUMEL(data) );
+#endif /*RFC_TP_SUPPORT*/
 
-        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis,
-                                tp, NUMEL(tp) ) );
+        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis
+#if RFC_TP_SUPPORT
+                                , tp, NUMEL(tp) ) );
+#else /*!RFC_TP_SUPPORT*/
+                                );
+#endif /*RFC_TP_SUPPORT*/
         ASSERT( RFC_feed( &ctx, data, /* count */ NUMEL( data ) ) );
         ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
 
@@ -414,7 +454,9 @@ TEST RFC_small_example(void)
         ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
     } while(0);
 
+#if RFC_TP_SUPPORT
     ctx.tp = NULL;
+#endif /*RFC_TP_SUPPORT*/
 
     if( ctx.state != RFC_STATE_INIT0 )
     {
@@ -427,20 +469,29 @@ TEST RFC_small_example(void)
 
 TEST RFC_long_series(void)
 {
-    RFC_VALUE_TYPE      data[10000];
-    size_t              data_len        =  NUMEL( data );
+    bool                need_conf           =  false;
+    bool                do_result_check     =  true;
+    RFC_VALUE_TYPE     *data                =  NULL;
+    RFC_VALUE_TYPE      data_static[10000];
+    size_t              data_len            =  NUMEL( data_static );
+    size_t              data_cap            =  0;
     RFC_VALUE_TYPE      x_max;
     RFC_VALUE_TYPE      x_min;
-    unsigned            class_count     =  100;
+    unsigned            class_count         =  100;
     RFC_VALUE_TYPE      class_width;
     RFC_VALUE_TYPE      class_offset;
     RFC_VALUE_TYPE      hysteresis;
-    rfc_value_tuple_s   tp[10000];
-	size_t              i;
+    rfc_value_tuple_s   tp[10000]           = {0};
+    size_t              i;
 
-    if(1)
+    glob_data = NULL;
+
+    if(0)
     {
 #include "long_series.c"
+
+        data = data_static;
+
         for( i = 0; i < data_len; i++ )
         {
             double value = data_export[i];
@@ -459,68 +510,197 @@ TEST RFC_long_series(void)
     else        
     {
         FILE*   file = NULL;
+        char    buf[81] = {0};
+        int     len;
+        int     i;
 
         file = fopen( "long_series.csv", "rt" );
         ASSERT( file );
-        for( i = 0; i < data_len; i++ )
+
+        data_len = 0;
+        for( i = 0; !feof(file); i++ )
         {
             double value;
-            fscanf( file, "%lf\n", &value );
-            data[i] = value;
-            if( !i )
+
+            if( fgets( buf, sizeof(buf), file ) )
             {
-                x_max = x_min = value;
-            }
-            else
-            {
-                if( value > x_max ) x_max = value;
-                if( value < x_min ) x_min = value;
+                if( !i && ( 0 == sscanf( buf, " * %n", &len ) ) && ( strlen(buf) == len ) )
+                {
+                    need_conf = true;
+                }
+                else if( ( 1 == sscanf( buf, "%lf %n", &value, &len ) ) && ( strlen(buf) == len ) )
+                {
+                    if( ++data_len > data_cap )
+                    {
+                        data_cap += 1024;
+                        data      = realloc( data, data_cap * sizeof(double) );
+                        glob_data = data;
+                    }
+
+                    data[data_len-1] = value;
+                    if( data_len == 1 )
+                    {
+                        x_max = x_min = value;
+                    }
+                    else
+                    {
+                        if( value > x_max ) x_max = value;
+                        if( value < x_min ) x_min = value;
+                    }
+                }
             }
         }
         fclose( file );
     }
 
-    class_width   =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
-    class_offset  =  x_min - class_width / 2;
-    hysteresis    =  class_width;
-
-    do
+    if( !need_conf )
     {
-        RFC_VALUE_TYPE sum = 0.0;
+        class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
+        class_offset    =  x_min - class_width / 2;
+        hysteresis      =  class_width;
+    }
+    else
+    {
+        char buf[81];
+        int len;
+        double value;
 
-        ASSERT( NUMEL(tp) >= NUMEL(data) );
+        do_result_check = false;
 
-        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis,
-                                tp, NUMEL(tp) ) );
-        ASSERT( RFC_feed( &ctx, data, /* count */ data_len ) );
-        ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "\n%s", "Test long series:" );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "\nMaximum found at %g", x_max );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "\nMinimum found at %g\n", x_min );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "\nEnter class parameters:" );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "\n" );
 
-        for( i = 0; i < class_count * class_count; i++ )
+        class_count = 100;
+        printf( "Class count (%d): ", class_count );
+        if( fgets( buf, sizeof(buf), stdin ) != NULL )
         {
-            sum += ctx.matrix[i] / ctx.full_inc;
+            if( ( 1 == sscanf( buf, "%lf %n", &value, &len ) ) && ( strlen(buf) == len ) && ( value > 0.0 ) )
+            {
+                class_count = (unsigned)( value + 0.5 );
+            }
         }
 
-        ASSERT_EQ( sum, 602.0 );
-        GREATEST_ASSERT_IN_RANGE( ctx.pseudo_damage, 4.8703e-16, 0.00005e-16 );
-        ASSERT_EQ( ctx.residue_cnt, 10 );
-        ASSERT_EQ_FMT( ctx.residue[0].value,   0.54, "%.2f" );
-        ASSERT_EQ_FMT( ctx.residue[1].value,   2.37, "%.2f" );
-        ASSERT_EQ_FMT( ctx.residue[2].value,  -0.45, "%.2f" );
-        ASSERT_EQ_FMT( ctx.residue[3].value,  17.45, "%.2f" );
-        ASSERT_EQ_FMT( ctx.residue[4].value, -50.90, "%.2f" );
-        ASSERT_EQ_FMT( ctx.residue[5].value, 114.14, "%.2f" );
-        ASSERT_EQ_FMT( ctx.residue[6].value, -24.85, "%.2f" );
-        ASSERT_EQ_FMT( ctx.residue[7].value,  31.00, "%.2f" );
-        ASSERT_EQ_FMT( ctx.residue[8].value,  -0.65, "%.2f" );
-        ASSERT_EQ_FMT( ctx.residue[9].value,  16.59, "%.2f" );
-        ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
-    } while(0);
+        hysteresis = class_width = (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
+        printf( "Class width (%g): ", class_width );
+        if( fgets( buf, sizeof(buf), stdin ) != NULL )
+        {
+            if( ( 1 == sscanf( buf, "%lf %n", &value, &len ) ) && ( strlen(buf) == len ) && ( value > 0.0 ) )
+            {
+                hysteresis = class_width = value;
+            }
+        }
 
-    ctx.tp = NULL;
+        class_offset  =  x_min - class_width / 2;
+        printf( "Class offset (%g): ", class_offset );
+        if( fgets( buf, sizeof(buf), stdin ) != NULL )
+        {
+            if( ( 1 == sscanf( buf, "%lf %n", &value, &len ) ) && ( strlen(buf) == len ) )
+            {
+                class_offset = value;
+            }
+        }
+        printf( "\n" );
+    }
+
+    GREATEST_FPRINTF( GREATEST_STDOUT, "\nTest long series:" );
+    GREATEST_FPRINTF( GREATEST_STDOUT, "\nClass count  = %d", class_count );
+    GREATEST_FPRINTF( GREATEST_STDOUT, "\nClass width  = %g", class_width );
+    GREATEST_FPRINTF( GREATEST_STDOUT, "\nClass offset = %g", class_offset );
+    GREATEST_FPRINTF( GREATEST_STDOUT, "\n" );
+
+    ASSERT( class_width > 0.0 );
+    ASSERT( class_count > 1 );
+    ASSERT( x_min >= class_offset );
+    ASSERT( x_max <  class_offset + class_width * class_count );
+
+    ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis
+#if RFC_TP_SUPPORT
+                            , tp, NUMEL(tp) ) );
+#else /*!RFC_TP_SUPPORT*/
+                            );
+#endif /*RFC_TP_SUPPORT*/
+    ASSERT( RFC_feed( &ctx, data, /* count */ data_len ) );
+    ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
+
+    if(1)
+    {
+        FILE*   file = NULL;
+        int     from, to, i;
+
+        setlocale( LC_ALL, "" );
+
+        file = fopen( "long_series_results.csv", "wt" );
+        ASSERT( file );
+        fprintf( file, "Klassenbreite:  %.5f\n", ctx.class_width );
+        fprintf( file, "Klassenoffset:  %.5f\n", ctx.class_offset );
+        fprintf( file, "Anzahl Klassen: %d\n",   (int)ctx.class_count );
+        fprintf( file, "\nfrom (int base 0);to (int base 0);from (Klassenmitte);to (Klassenmitte);counts\n" );
+
+        for( from = 0; from < (int)ctx.class_count; from++ )
+        {
+            for( to = 0; to < (int)ctx.class_count; to++ )
+            {
+                double value = (double)ctx.matrix[from * (int)ctx.class_count + to] / ctx.full_inc;
+
+                if( value > 0.0 )
+                {
+                    fprintf( file, "%d;",  from );
+                    fprintf( file, "%d;",  to );
+                    fprintf( file, "%g;",  from * ctx.class_width + class_offset );
+                    fprintf( file, "%g;",  to   * ctx.class_width + class_offset );
+                    fprintf( file, "%g\n",  value );
+                }
+            }
+        }
+        fprintf( file, "\n\nResidue (classes base 1):\n" );
+        for( i = 0; i < ctx.residue_cnt; i++ )
+        {
+            fprintf( file, "%s%d", i ? ", " : "", ctx.residue[i].class + 1 );
+        }
+        fprintf( file, "\n" );
+        fclose( file );
+    }
+    
+    if( do_result_check )
+    {
+        do
+        {
+            RFC_VALUE_TYPE sum = 0.0;
+
+            for( i = 0; i < class_count * class_count; i++ )
+            {
+                sum += ctx.matrix[i] / ctx.full_inc;
+            }
+
+            ASSERT_EQ( sum, 602.0 );
+            GREATEST_ASSERT_IN_RANGE( ctx.pseudo_damage, 4.8703e-16, 0.00005e-16 );
+            ASSERT_EQ( ctx.residue_cnt, 10 );
+            ASSERT_EQ_FMT( ctx.residue[0].value,   0.54, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[1].value,   2.37, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[2].value,  -0.45, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[3].value,  17.45, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[4].value, -50.90, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[5].value, 114.14, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[6].value, -24.85, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[7].value,  31.00, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[8].value,  -0.65, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[9].value,  16.59, "%.2f" );
+            ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
+        } while(0);
+    }
 
     if( ctx.state != RFC_STATE_INIT0 )
     {
         RFC_deinit( &ctx );
+    }
+
+    if( glob_data )
+    {
+        free( glob_data );
+        glob_data = NULL;
     }
 
     PASS();
@@ -555,5 +735,11 @@ int main( int argc, char *argv[] )
     if( ctx.state != RFC_STATE_INIT0 )
     {
         RFC_deinit( &ctx );
+    }
+
+    if( glob_data )
+    {
+        free( glob_data );
+        glob_data = NULL;
     }
 }
