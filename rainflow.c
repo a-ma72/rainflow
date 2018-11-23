@@ -149,7 +149,6 @@ static void *               RFC_mem_alloc                       ( void *ptr, siz
 static bool                 RFC_tp_add                          ( rfc_ctx_s *, rfc_value_tuple_s *pt );
 static void                 RFC_tp_lock                         ( rfc_ctx_s *, bool do_lock );
 static void                 RFC_tp_refeed                       ( rfc_ctx_s *, RFC_value_type new_hysteresis, const rfc_class_param_s *new_class_param );
-static bool                 RFC_tp_prune                        ( rfc_ctx_s *, size_t count, int flags );
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT || RFC_TP_SUPPORT
 static void                 RFC_spread_damage                   ( rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags );
@@ -188,14 +187,8 @@ static RFC_value_type       value_delta                         ( RFC_value_type
  *
  * @return     false on error
  */
-#if RFC_TP_SUPPORT
-bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
-                                           RFC_value_type hysteresis,
-                                           rfc_value_tuple_s *tp, size_t tp_cap )
-#else /*!RFC_TP_SUPPORT*/
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis )
-#endif /*RFC_TP_SUPPORT*/
 {
     rfc_ctx_s         *rfc_ctx = (rfc_ctx_s*)ctx;
     rfc_value_tuple_s  nil   = { 0.0 };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
@@ -311,8 +304,8 @@ bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type 
     
 #if RFC_TP_SUPPORT
     /* Turning points storage (optional, may be NULL) */
-    rfc_ctx->tp                         = tp;
-    rfc_ctx->tp_cap                     = tp ? tp_cap : 0;
+    rfc_ctx->tp                         = NULL;
+    rfc_ctx->tp_cap                     = 0;
     rfc_ctx->tp_cnt                     = 0;
     rfc_ctx->tp_locked                  = 0;
 #endif /*RFC_TP_SUPPORT*/
@@ -330,6 +323,54 @@ bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type 
     rfc_ctx->state = RFC_STATE_INIT;
     return true;
 }
+
+
+#if RFC_TP_SUPPORT
+bool RFC_tp_init( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static )
+{
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || rfc_ctx->tp )
+    {
+        assert( false );
+        rfc_ctx->error = RFC_ERROR_INVARG;
+
+        return false;
+    }
+
+    rfc_ctx->tp     = tp;
+    rfc_ctx->tp_cap = tp_cap;
+    rfc_ctx->tp_cnt = 0;
+    
+    rfc_ctx->internal.tp_static = is_static;
+
+    return true;
+}
+#endif /*RFC_TP_SUPPORT*/
+
+
+#if RFC_DH_SUPPORT
+bool RFC_tp_init( void *ctx, double *dh, size_t dh_cap, bool is_static )
+{
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || rfc_ctx->dh )
+    {
+        assert( false );
+        rfc_ctx->error = RFC_ERROR_INVARG;
+
+        return false;
+    }
+
+    rfc_ctx->dh     = dh;
+    rfc_ctx->dh_cap = dh_cap;
+    rfc_ctx->dh_cnt = 0;
+
+    rfc_ctx->internal.dh_static = is_static;
+
+    return true;
+}
+#endif /*RFC_DH_SUPPORT*/
 
 
 /**
@@ -350,18 +391,26 @@ void RFC_deinit( void *ctx )
         return;
     }
 
-    if( rfc_ctx->damage_lut )           rfc_ctx->mem_alloc( rfc_ctx->damage_lut, 0, 0, RFC_MEM_AIM_DLUT );
     if( rfc_ctx->residue )              rfc_ctx->mem_alloc( rfc_ctx->residue,    0, 0, RFC_MEM_AIM_RESIDUE );
     if( rfc_ctx->matrix )               rfc_ctx->mem_alloc( rfc_ctx->matrix,     0, 0, RFC_MEM_AIM_MATRIX );
+#if RFC_DAMAGE_FAST
+    if( rfc_ctx->damage_lut )           rfc_ctx->mem_alloc( rfc_ctx->damage_lut, 0, 0, RFC_MEM_AIM_DLUT );
+#endif /*RFC_DAMAGE_FAST*/
 #if !RFC_MINIMAL
     if( rfc_ctx->rp )                   rfc_ctx->mem_alloc( rfc_ctx->rp,         0, 0, RFC_MEM_AIM_RP );
     if( rfc_ctx->lc )                   rfc_ctx->mem_alloc( rfc_ctx->lc,         0, 0, RFC_MEM_AIM_LC );
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
-    if( rfc_ctx->tp )                   rfc_ctx->mem_alloc( rfc_ctx->tp,         0, 0, RFC_MEM_AIM_TP );
+    if( rfc_ctx->tp && !rfc_ctx->internal.tp_static )
+    {
+                                        rfc_ctx->mem_alloc( rfc_ctx->tp,         0, 0, RFC_MEM_AIM_TP );
+    }           
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT
-    if( rfc_ctx->dh )                   rfc_ctx->mem_alloc( rfc_ctx->dh,         0, 0, RFC_MEM_AIM_DH );
+    if( rfc_ctx->dh && !rfc_ctx->internal.dh_static )
+    {               
+                                        rfc_ctx->mem_alloc( rfc_ctx->dh,         0, 0, RFC_MEM_AIM_DH );
+    }
 #endif /*RFC_DH_SUPPORT*/
 
 #if RFC_DAMAGE_FAST
@@ -395,7 +444,15 @@ void RFC_deinit( void *ctx )
     rfc_ctx->tp_cap                     = 0;
     rfc_ctx->tp_cnt                     = 0;
     rfc_ctx->tp_locked                  = 0;
+    rfc_ctx->internal.tp_static         = false;
 #endif /*RFC_TP_SUPPORT*/
+
+#if RFC_DH_SUPPORT
+    rfc_ctx->dh                         = NULL;
+    rfc_ctx->dh_cap                     = 0;
+    rfc_ctx->dh_cnt                     = 0;
+    rfc_ctx->internal.dh_static         = false;
+#endif /*RFC_DH_SUPPORT*/
 
 #if RFC_HCM_SUPPORT
     /* Remove stack */
@@ -1938,10 +1995,22 @@ void RFC_tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc
  *
  * @returns true
  */
-static 
-bool RFC_tp_prune( rfc_ctx_s *rfc_ctx, size_t limit, int flags )
+bool RFC_tp_prune( void *ctx, size_t limit, int flags )
 {
-    assert( rfc_ctx );
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
+    {
+        assert( false );
+        rfc_ctx->error = RFC_ERROR_INVARG;
+
+        return false;
+    }
+
+    if( rfc_ctx->state < RFC_STATE_BUSY )
+    {
+        return true;
+    }
 
 #if RFC_USE_DELEGATES
     if( rfc_ctx->tp_prune_fcn )
@@ -1954,21 +2023,21 @@ bool RFC_tp_prune( rfc_ctx_s *rfc_ctx, size_t limit, int flags )
     {
         rfc_value_tuple_s   *it_begin,      /* Source (begin) */
                             *it_end,        /* Source (end) */
-                            *it_to,         /* Destination iterator */
-                            *it,            /* Source iterator */
+                            *dst_it,        /* Destination iterator */
+                            *src_it,        /* Source iterator */
                             *res_it;        /* Residue iterator */
-        size_t               i,             /* Turning point index, base 0 */
-                             res_i,         /* Residue index, base 0 */
- 		                     src_i;         /* Source index, bast 0 */
+        size_t               src_i,         /* Source index, base 0 */
+                             dst_i,         /* Destination index, base 0 */
+                             res_i;         /* Residue index, base 0 */
         size_t               removal;       /* Number of turning points to remove */
         size_t               offset;        /* Position offset (minuend) */
         bool                 preserve_pos;  /* Don't justify position */
 
         removal     = rfc_ctx->tp_cnt - limit;
-        it_to       = rfc_ctx->tp;
-        i           = 0;
-		it_begin    = it_to + removal;
-		it_end      = rfc_ctx->tp + rfc_ctx->tp_cnt
+        dst_it      = rfc_ctx->tp;
+        dst_i       = 0;
+        it_begin    = dst_it + removal;
+        it_end      = rfc_ctx->tp + rfc_ctx->tp_cnt
                       + ( ( rfc_ctx->state == RFC_STATE_BUSY_INTERIM ) ? 1 : 0 );
         src_i       = removal;
         res_it      = rfc_ctx->residue;
@@ -1978,8 +2047,13 @@ bool RFC_tp_prune( rfc_ctx_s *rfc_ctx, size_t limit, int flags )
         preserve_pos = ( flags & RFC_FLAGS_TPPRUNE_PRESERVE_POS ) > 0;
 
         /* Move turning points ahead */
-        for( it = it_begin; it < it_end; it_to++, i++ )
+        for( src_it = it_begin; src_it <= it_end; )
         {
+            if( src_it < it_end )
+            {
+                assert( src_it->tp_pos = src_i );
+            }
+            
             /* Check if there are still residual points to consider */
             if( res_i < rfc_ctx->residue_cnt )
             {
@@ -1987,7 +2061,7 @@ bool RFC_tp_prune( rfc_ctx_s *rfc_ctx, size_t limit, int flags )
                 if( res_it->tp_pos <= src_i )
                 {
                     /* First new turning point delivers new offset */
-                    if( !i && !preserve_pos )
+                    if( !dst_i && !preserve_pos )
                     {
                         offset = res_it->pos;
                     }
@@ -1995,32 +2069,39 @@ bool RFC_tp_prune( rfc_ctx_s *rfc_ctx, size_t limit, int flags )
                     /* Residual point is at current source position? */
                     if( res_it->tp_pos == src_i )
                     {
+                        src_it++;
                         src_i++;
                     }
 
                     /* Adjust residue reference information */
-                    res_it->tp_pos = i;
+                    res_it->tp_pos = dst_i++;
                     res_it->pos   -= offset;
-                    *it_to         = *res_it++;
+                    *dst_it++       = *res_it++;
                     res_i++;
 
                     continue;
                 }
             }
 
-            /* First new turning point delivers new offset */
-            if( !i && !preserve_pos )
+            if( src_it < it_end )
             {
-                offset = it->pos;
+                /* First new turning point delivers new offset */
+                if( !dst_i && !preserve_pos )
+                {
+                    offset = src_it->pos;
+                }
+
+                /* Copy turning point from source */
+                src_it->tp_pos = dst_i++;
+                src_it->pos   -= offset;
+                *dst_it++   = *src_it;
             }
 
-            /* Copy turning point from source */
-            it->tp_pos = i;
-            it->pos   -= offset;
-            *it_to++   = *it++;
+            src_it++;
+            src_i++;
         }
 
-        rfc_ctx->tp_cnt = i;
+        rfc_ctx->tp_cnt = dst_i;
         rfc_ctx->internal.pos -= offset;
         rfc_ctx->internal.global_offset += offset;
     }
@@ -2412,14 +2493,14 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
     {
         rfc_ctx_s rfc_ctx = { sizeof(rfc_ctx_s) };
     
-        const mxArray *mxData           = prhs[0];
-        const mxArray *mxClassCount     = prhs[1];
-        const mxArray *mxClassWidth     = prhs[2];
-        const mxArray *mxClassOffset    = prhs[3];
-        const mxArray *mxHysteresis     = prhs[4];
+        const mxArray  *mxData           = prhs[0];
+        const mxArray  *mxClassCount     = prhs[1];
+        const mxArray  *mxClassWidth     = prhs[2];
+        const mxArray  *mxClassOffset    = prhs[3];
+        const mxArray  *mxHysteresis     = prhs[4];
 #if !RFC_MINIMAL
-        const mxArray *mxEnforceMargin  = prhs[5];
-        const mxArray *mxUseHCM         = prhs[6];
+        const mxArray  *mxEnforceMargin  = prhs[5];
+        const mxArray  *mxUseHCM         = prhs[6];
 #endif /*!RFC_MINIMAL*/        
 
         RFC_value_type *buffer          = NULL;
@@ -2436,17 +2517,18 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         size_t          i;
         bool            ok;
 
-#if !RFC_MINIMAL
-        rfc_ctx.tp_cap = 128;
-        rfc_ctx.tp     = (rfc_value_tuple_s*)RFC_mem_alloc( NULL, rfc_ctx.tp_cap, sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TP );
-#endif /*!RFC_MINIMAL*/
         ok = RFC_init( &rfc_ctx, 
                        class_count, (RFC_value_type)class_width, (RFC_value_type)class_offset, 
-                       (RFC_value_type)hysteresis
-#if !RFC_MINIMAL
-                       , rfc_ctx.tp, rfc_ctx.tp_cap 
-#endif /*!RFC_MINIMAL*/
-                       );
+                       (RFC_value_type)hysteresis );
+#if RFC_TP_SUPPORT
+        if( ok )
+        {
+            rfc_ctx.tp_cap = 128;
+            rfc_ctx.tp     = (rfc_value_tuple_s*)RFC_mem_alloc( NULL, rfc_ctx.tp_cap, sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TP );
+
+            ok = RFC_tp_init( &rfc_ctx, rfc_ctx.tp, rfc_ctx.tp_cap, /* is_static */ true );
+        }
+#endif /*RFC_TP_SUPPORT*/
 
         if( !ok )
         {
