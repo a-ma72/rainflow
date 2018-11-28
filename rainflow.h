@@ -219,7 +219,7 @@ typedef struct rfc_value_tuple
     unsigned                            class;                      /**< Class number, base 0 */
     size_t                              pos;                        /**< Absolute position in input data stream, base 1 */
 #if RFC_TP_SUPPORT
-    size_t                              tp_pos;                     /**< Position in tp storage, base 0 */
+    size_t                              tp_pos;                     /**< Position in tp storage, base 1 */
     double                              damage;                     /**< Damage accumulated to this turning point */
 #endif /*RFC_TP_SUPPORT*/
 } rfc_value_tuple_s;
@@ -274,14 +274,15 @@ typedef struct rfc_ctx
 #endif /*RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
         RFC_FLAGS_TPPRUNE_PRESERVE_POS  = 1 << 9,
-        RFC_FLAGS_TPAUTOPRUNE           = 1 << 10,                  /**< Automatic prune on tp */
+        RFC_FLAGS_TPPRUNE_PRESERVE_RES  = 1 << 10,
+        RFC_FLAGS_TPAUTOPRUNE           = 1 << 11,                  /**< Automatic prune on tp */
 #endif /*RFC_TP_SUPPORT*/
     }
                                         flags;                      /**< Flags */
 #if !RFC_MINIMAL
     enum
     {
-        RFC_COUNTING_METHOD_UNKNOWN     = -1,                       /**< Method is unknown */
+        RFC_COUNTING_METHOD_DELEGATED   = -1,                       /**< Method must be implemented via delegator, see member cycle_find_fcn */
         RFC_COUNTING_METHOD_NONE        =  0,                       /**< No counting */
         RFC_COUNTING_METHOD_4PTM        =  1,                       /**< 4 point algorithm (default) */
 #if RFC_HCM_SUPPORT
