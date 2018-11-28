@@ -181,20 +181,23 @@ typedef struct rfc_class_param  rfc_class_param_s;   /** Class parameters (width
 
 
 /* Core functions */
-#if !RFC_TP_SUPPORT
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis );
-#else /*RFC_TP_SUPPORT*/
-bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
-                                           RFC_value_type hysteresis,
-                                           rfc_value_tuple_s *tp, size_t tp_cap );
-#endif /*RFC_TP_SUPPORT*/
 void RFC_deinit               ( void *ctx );
 bool RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count );
 #if !RFC_MINIMAL
 bool RFC_feed_tuple           ( void *ctx, rfc_value_tuple_s *data, size_t count );
 #endif /*RFC_MINIMAL*/
 bool RFC_finalize             ( void *ctx, int residual_method );
+
+#if RFC_TP_SUPPORT
+bool RFC_tp_init              ( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
+bool RFC_tp_prune             ( void *ctx, size_t count, int flags );
+#endif /*RFC_TP_SUPPORT*/
+
+#if RFC_DH_SUPPORT
+bool RFC_dh_init              ( void *ctx, double *dh, size_t dh_cap, bool is_static );
+#endif /*RFC_DH_SUPPORT*/
 
 #if RFC_USE_DELEGATES
 /* Delegates typedef */
@@ -365,10 +368,10 @@ typedef struct rfc_ctx
     size_t                              residue_cnt;                /**< Number of value tuples in buffer */
 
     /* Non-sparse storages (optional, may be NULL) */
-    RFC_counts_type                    *matrix;                     /**< Rainflow matrix */
+    RFC_counts_type                    *matrix;                     /**< Rainflow matrix, always class_count^2 elements */
 #if !RFC_MINIMAL
-    RFC_counts_type                    *rp;                         /**< Range pair counts */
-    RFC_counts_type                    *lc;                         /**< Level crossing counts */
+    RFC_counts_type                    *rp;                         /**< Range pair counts, always class_count elements */
+    RFC_counts_type                    *lc;                         /**< Level crossing counts, always class_count elements */
 #endif /*RFC_MINIMAL*/
 
 #if RFC_TP_SUPPORT
@@ -376,7 +379,7 @@ typedef struct rfc_ctx
     rfc_value_tuple_s                  *tp;                         /**< Buffer for turning points, pointer may be changed thru memory reallocation! */
     size_t                              tp_cap;                     /**< Buffer capacity (number of elements) */
     size_t                              tp_cnt;                     /**< Number of turning points in buffer */
-    bool                                tp_locked;                  /**< If tp_locked, tp is freezed */
+    bool                                tp_locked;                  /**< If tp_locked, tp is freezed. Only RFC_tp_prune() may change content */
     size_t                              tp_threshold;               /**< Threshold for (auto)pruning */
 #endif /*RFC_TP_SUPPORT*/
 
@@ -405,7 +408,11 @@ typedef struct rfc_ctx
 #if RFC_TP_SUPPORT
         rfc_value_tuple_s               margin[2];                  /**< First and last data point */
         rfc_value_tuple_s               tp_delayed;                 /**< Delay stage when RFC_FLAGS_ENFORCE_MARGIN is set */
+        bool                            tp_static;                  /**< true, if tp is statically allocated */
 #endif /*RFC_TP_SUPPORT*/
+#if RFC_DH_SUPPORT
+        bool                            dh_static;                  /**< true, if dh is statically allocated */
+#endif /*RFC_DH_SUPPORT*/
 #if RFC_HCM_SUPPORT
         struct hcm
         {
