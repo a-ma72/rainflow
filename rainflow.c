@@ -188,14 +188,8 @@ static RFC_value_type       value_delta                         ( RFC_value_type
  *
  * @return     false on error
  */
-#if RFC_TP_SUPPORT
-bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
-                                           RFC_value_type hysteresis,
-                                           rfc_value_tuple_s *tp, size_t tp_cap )
-#else /*!RFC_TP_SUPPORT*/
 bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis )
-#endif /*RFC_TP_SUPPORT*/
 {
     rfc_ctx_s         *rfc_ctx = (rfc_ctx_s*)ctx;
     rfc_value_tuple_s  nil   = { 0.0 };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
@@ -312,8 +306,8 @@ bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type 
     
 #if RFC_TP_SUPPORT
     /* Turning points storage (optional, may be NULL) */
-    rfc_ctx->tp                         = tp;
-    rfc_ctx->tp_cap                     = tp ? tp_cap : 0;
+    rfc_ctx->tp                         = NULL;
+    rfc_ctx->tp_cap                     = 0;
     rfc_ctx->tp_cnt                     = 0;
     rfc_ctx->tp_locked                  = 0;
 #endif /*RFC_TP_SUPPORT*/
@@ -331,6 +325,54 @@ bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type 
     rfc_ctx->state = RFC_STATE_INIT;
     return true;
 }
+
+
+#if RFC_TP_SUPPORT
+bool RFC_tp_init( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static )
+{
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || rfc_ctx->tp )
+    {
+        assert( false );
+        rfc_ctx->error = RFC_ERROR_INVARG;
+
+        return false;
+    }
+
+    rfc_ctx->tp     = tp;
+    rfc_ctx->tp_cap = tp_cap;
+    rfc_ctx->tp_cnt = 0;
+    
+    rfc_ctx->internal.tp_static = is_static;
+
+    return true;
+}
+#endif /*RFC_TP_SUPPORT*/
+
+
+#if RFC_DH_SUPPORT
+bool RFC_tp_init( void *ctx, double *dh, size_t dh_cap, bool is_static )
+{
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || rfc_ctx->dh )
+    {
+        assert( false );
+        rfc_ctx->error = RFC_ERROR_INVARG;
+
+        return false;
+    }
+
+    rfc_ctx->dh     = dh;
+    rfc_ctx->dh_cap = dh_cap;
+    rfc_ctx->dh_cnt = 0;
+
+    rfc_ctx->internal.dh_static = is_static;
+
+    return true;
+}
+#endif /*RFC_DH_SUPPORT*/
 
 
 /**
@@ -351,18 +393,26 @@ void RFC_deinit( void *ctx )
         return;
     }
 
-    if( rfc_ctx->damage_lut )           rfc_ctx->mem_alloc( rfc_ctx->damage_lut, 0, 0, RFC_MEM_AIM_DLUT );
     if( rfc_ctx->residue )              rfc_ctx->mem_alloc( rfc_ctx->residue,    0, 0, RFC_MEM_AIM_RESIDUE );
     if( rfc_ctx->matrix )               rfc_ctx->mem_alloc( rfc_ctx->matrix,     0, 0, RFC_MEM_AIM_MATRIX );
+#if RFC_DAMAGE_FAST
+    if( rfc_ctx->damage_lut )           rfc_ctx->mem_alloc( rfc_ctx->damage_lut, 0, 0, RFC_MEM_AIM_DLUT );
+#endif /*RFC_DAMAGE_FAST*/
 #if !RFC_MINIMAL
     if( rfc_ctx->rp )                   rfc_ctx->mem_alloc( rfc_ctx->rp,         0, 0, RFC_MEM_AIM_RP );
     if( rfc_ctx->lc )                   rfc_ctx->mem_alloc( rfc_ctx->lc,         0, 0, RFC_MEM_AIM_LC );
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
-    if( rfc_ctx->tp )                   rfc_ctx->mem_alloc( rfc_ctx->tp,         0, 0, RFC_MEM_AIM_TP );
+    if( rfc_ctx->tp && !rfc_ctx->internal.tp_static )
+    {
+                                        rfc_ctx->mem_alloc( rfc_ctx->tp,         0, 0, RFC_MEM_AIM_TP );
+    }           
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT
-    if( rfc_ctx->dh )                   rfc_ctx->mem_alloc( rfc_ctx->dh,         0, 0, RFC_MEM_AIM_DH );
+    if( rfc_ctx->dh && !rfc_ctx->internal.dh_static )
+    {               
+                                        rfc_ctx->mem_alloc( rfc_ctx->dh,         0, 0, RFC_MEM_AIM_DH );
+    }
 #endif /*RFC_DH_SUPPORT*/
 
 #if RFC_DAMAGE_FAST
@@ -396,7 +446,15 @@ void RFC_deinit( void *ctx )
     rfc_ctx->tp_cap                     = 0;
     rfc_ctx->tp_cnt                     = 0;
     rfc_ctx->tp_locked                  = 0;
+    rfc_ctx->internal.tp_static         = false;
 #endif /*RFC_TP_SUPPORT*/
+
+#if RFC_DH_SUPPORT
+    rfc_ctx->dh                         = NULL;
+    rfc_ctx->dh_cap                     = 0;
+    rfc_ctx->dh_cnt                     = 0;
+    rfc_ctx->internal.dh_static         = false;
+#endif /*RFC_DH_SUPPORT*/
 
 #if RFC_HCM_SUPPORT
     /* Remove stack */
@@ -2427,14 +2485,14 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
     {
         rfc_ctx_s rfc_ctx = { sizeof(rfc_ctx_s) };
     
-        const mxArray *mxData           = prhs[0];
-        const mxArray *mxClassCount     = prhs[1];
-        const mxArray *mxClassWidth     = prhs[2];
-        const mxArray *mxClassOffset    = prhs[3];
-        const mxArray *mxHysteresis     = prhs[4];
+        const mxArray  *mxData           = prhs[0];
+        const mxArray  *mxClassCount     = prhs[1];
+        const mxArray  *mxClassWidth     = prhs[2];
+        const mxArray  *mxClassOffset    = prhs[3];
+        const mxArray  *mxHysteresis     = prhs[4];
 #if !RFC_MINIMAL
-        const mxArray *mxEnforceMargin  = prhs[5];
-        const mxArray *mxUseHCM         = prhs[6];
+        const mxArray  *mxEnforceMargin  = prhs[5];
+        const mxArray  *mxUseHCM         = prhs[6];
 #endif /*!RFC_MINIMAL*/        
 
         RFC_value_type *buffer          = NULL;
@@ -2451,17 +2509,18 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         size_t          i;
         bool            ok;
 
-#if !RFC_MINIMAL
-        rfc_ctx.tp_cap = 128;
-        rfc_ctx.tp     = (rfc_value_tuple_s*)RFC_mem_alloc( NULL, rfc_ctx.tp_cap, sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TP );
-#endif /*!RFC_MINIMAL*/
         ok = RFC_init( &rfc_ctx, 
                        class_count, (RFC_value_type)class_width, (RFC_value_type)class_offset, 
-                       (RFC_value_type)hysteresis
-#if !RFC_MINIMAL
-                       , rfc_ctx.tp, rfc_ctx.tp_cap 
-#endif /*!RFC_MINIMAL*/
-                       );
+                       (RFC_value_type)hysteresis );
+#if RFC_TP_SUPPORT
+        if( ok )
+        {
+            rfc_ctx.tp_cap = 128;
+            rfc_ctx.tp     = (rfc_value_tuple_s*)RFC_mem_alloc( NULL, rfc_ctx.tp_cap, sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TP );
+
+            ok = RFC_tp_init( &rfc_ctx, rfc_ctx.tp, rfc_ctx.tp_cap, /* is_static */ true );
+        }
+#endif /*RFC_TP_SUPPORT*/
 
         if( !ok )
         {
