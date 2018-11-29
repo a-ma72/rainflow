@@ -138,7 +138,7 @@ double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 
 
 
-
+#if RFC_TP_SUPPORT
 TEST RFC_tp_prune_test(void)
 {
     RFC_VALUE_TYPE      data[10000];
@@ -192,14 +192,14 @@ TEST RFC_tp_prune_test(void)
     ASSERT( RFC_feed( &ctx, data, /* count */ data_len ) );
     ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
 
-    RFC_tp_prune( &ctx, 100, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS );
+    RFC_tp_prune( &ctx, /*count*/ 100, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS );
 
     ASSERT( ctx.tp_cnt == 107 );
     /* Should not change anything: */
-    RFC_tp_prune( &ctx, 100, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS );
+    RFC_tp_prune( &ctx, /*count*/ 100, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS );
     ASSERT( ctx.tp_cnt == 107 );
 
-    RFC_tp_prune( &ctx, 0, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS );
+    RFC_tp_prune( &ctx, /*count*/ 0, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS );
     ASSERT( ctx.tp_cnt == ctx.residue_cnt );
     ASSERT_MEM_EQ( ctx.tp, ctx.residue, ctx.tp_cnt * sizeof(RFC_VALUE_TYPE) );
 
@@ -210,6 +210,7 @@ TEST RFC_tp_prune_test(void)
 
     PASS();
 }
+#endif /*RFC_TP_SUPPORT*/
 
 
 TEST RFC_test_turning_points(void)

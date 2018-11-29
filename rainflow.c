@@ -149,7 +149,6 @@ static void *               RFC_mem_alloc                       ( void *ptr, siz
 static bool                 RFC_tp_add                          ( rfc_ctx_s *, rfc_value_tuple_s *pt );
 static void                 RFC_tp_lock                         ( rfc_ctx_s *, bool do_lock );
 static void                 RFC_tp_refeed                       ( rfc_ctx_s *, RFC_value_type new_hysteresis, const rfc_class_param_s *new_class_param );
-static bool                 RFC_tp_prune                        ( rfc_ctx_s *, size_t count, int flags );
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT || RFC_TP_SUPPORT
 static void                 RFC_spread_damage                   ( rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags );
@@ -257,8 +256,10 @@ bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type 
     rfc_ctx->damage_calc_fcn            = NULL;
 #endif /*RFC_USE_DELEGATES*/
 
+#if !RFC_MINIMAL
     /* Rainflow counting method */
     rfc_ctx->counting_method            = RFC_COUNTING_METHOD_4PTM;
+#endif /*RFC_MINIMAL*/
 
     /* Residue */
     rfc_ctx->residue_cnt                = 0;
@@ -348,11 +349,138 @@ bool RFC_tp_init( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_stati
 
     return true;
 }
+
+
+/**
+ * @brief   Drop turning points from storage, to avoid memory excesses 
+ *          or overflow of sample counter "pos"
+ *
+ * @param   rfc_ctx             The rainflow context
+ * @param   limit               The excepted number of points left in turning points storage
+ *                              (May be more, if residuals aren't neglected)
+ * @param   flags               The flags (see RFC_FLAGS_TPPRUNE_...)
+ *
+ * @returns true
+ */
+bool RFC_tp_prune( void *ctx, size_t limit, int flags )
+{
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || rfc_ctx->tp )
+    {
+        assert( false );
+        rfc_ctx->error = RFC_ERROR_INVARG;
+
+        return false;
+    }
+
+#if RFC_USE_DELEGATES
+    if( rfc_ctx->tp_prune_fcn )
+    {
+        return rfc_ctx->tp_prune_fcn( rfc_ctx, limit, flags );
+    }
+#endif /*RFC_USE_DELEGATES*/
+
+    if( rfc_ctx->tp && rfc_ctx->tp_cnt > limit )
+    {
+        rfc_value_tuple_s   *src_beg_it,    /* Source (begin) */
+                            *src_end_it,    /* Source (end) */
+                            *src_it,        /* Source iterator */
+                            *dst_it,        /* Destination iterator */
+                            *res_it;        /* Residue iterator */
+        size_t               src_pos,       /* Source, position base 1 */
+                             dst_i,         /* New turning points, index base 0 */
+                             res_i;         /* Residue, index base 0 */
+
+        size_t               removal;       /* Number of turning points to remove */
+        size_t               offset;        /* Position offset (minuend) */
+        bool                 preserve_pos;  /* Don't justify position */
+        bool                 preserve_res;  /* Don't remove turning points, referenced by resiude */
+
+        removal     = rfc_ctx->tp_cnt - limit;
+        src_pos     = removal + 1;
+        dst_it      = rfc_ctx->tp;
+        dst_i       = 0;
+        src_beg_it  = dst_it + removal;
+        src_end_it  = rfc_ctx->tp + rfc_ctx->tp_cnt
+                      + ( ( rfc_ctx->state == RFC_STATE_BUSY_INTERIM ) ? 1 : 0 );
+        res_it      = rfc_ctx->residue;
+        res_i       = 0;
+        offset      = 0;
+
+        preserve_pos = ( flags & RFC_FLAGS_TPPRUNE_PRESERVE_POS ) > 0;  /* Preserve (stream) position */
+        preserve_res = ( flags & RFC_FLAGS_TPPRUNE_PRESERVE_RES ) > 0;  /* Preserve residual turning points */
+
+        /* Move turning points ahead */
+        for( src_it = src_beg_it; src_it < src_end_it; dst_it++, dst_i++ )
+        {
+            /* Check if there are still residual points to consider */
+            if( res_i < rfc_ctx->residue_cnt )
+            {
+                /* Check if residue refers a turning point from removal area */
+                if( res_it->tp_pos <= src_pos )
+                {
+                    /* First new turning point delivers new offset */
+                    if( !dst_i && !preserve_pos )
+                    {
+                        offset = res_it->pos;
+                        assert( offset );
+                        offset--;
+                    }
+
+                    /* Residual point is at current source position? */
+                    if( res_it->tp_pos == src_pos )
+                    {
+                        src_pos++;
+                    }
+
+                    if( preserve_res )
+                    {
+                        /* Adjust residue reference information */
+                        res_it->tp_pos = dst_i + 1;
+                        res_it->pos   -= offset;
+                        *dst_it        = *res_it++;
+                        res_i++;
+                    }
+                    else
+                    {
+                        /* Residual turning point refers first point now */
+                        res_it->tp_pos = 0;  /* Index 0 => "none" */
+                        res_it->pos   -= offset;
+                        res_it++;
+                        res_i++;
+                    }
+
+                    continue;
+                }
+            }
+
+            /* First new turning point delivers new offset */
+            if( !dst_i && !preserve_pos )
+            {
+                offset = src_it->pos;
+                assert( offset );
+                offset--;
+            }
+
+            /* Copy turning point from source */
+            src_it->tp_pos = dst_i + 1;
+            src_it->pos   -= offset;
+            *dst_it++      = *src_it++;
+        }
+
+        rfc_ctx->tp_cnt                  = dst_i;
+        rfc_ctx->internal.pos           -= offset;
+        rfc_ctx->internal.global_offset += offset;
+    }
+    
+    return true;
+}
 #endif /*RFC_TP_SUPPORT*/
 
 
 #if RFC_DH_SUPPORT
-bool RFC_tp_init( void *ctx, double *dh, size_t dh_cap, bool is_static )
+bool RFC_dh_init( void *ctx, double *dh, size_t dh_cap, bool is_static )
 {
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -1337,6 +1465,8 @@ double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_
                 D_i = exp( fabs(k2) * ( log(Sa_i) - SD_log ) - ND_log );
             }
         }
+#else /*RFC_MINIMAL*/
+        D_i = exp( fabs(k)  * ( log(Sa_i) - SD_log ) - ND_log );
 #endif /*!RFC_MINIMAL*/
     }
 
@@ -1344,7 +1474,41 @@ double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_
 }
 
 
-#if !RFC_MINIMAL
+#if RFC_DAMAGE_FAST
+/**
+ * @brief   Initialize a look-up table of damages for closed cycles.
+ *          In this implementation the midrange doesn't matter!
+ *
+ * @param   rfc_ctx     The rainflow context
+ */
+static 
+void RFC_damage_lut_init( rfc_ctx_s *rfc_ctx )
+{
+    size_t i;
+
+    assert( rfc_ctx && rfc_ctx->damage_lut );
+
+    for( i = 0; i < rfc_ctx->class_count; i++ )
+    {
+        double damage;
+        const int from = 0;
+
+#if RFC_USE_DELEGATES
+        if( rfc_ctx->damage_calc_fcn )
+        {
+            damage = rfc_ctx->damage_calc_fcn( rfc_ctx, from, /*to*/ (int)i );
+        }
+        else
+#endif /*RFC_USE_DELEGATES*/
+        {
+            damage = RFC_damage_calc_fast( rfc_ctx, from, /*to*/ (int)i );
+        }
+
+        rfc_ctx->damage_lut[i] = damage;
+    }
+}
+
+
 /**
  * @brief      Calculate fictive damage for one closed (full) cycle, using look-up table.
  *
@@ -1368,7 +1532,7 @@ double RFC_damage_calc_fast( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned c
     /* Return damage ignoring midrange */
     return rfc_ctx->damage_lut[range];
 }
-#endif /*!RFC_MINIMAL*/
+#endif /*RFC_DAMAGE_FAST*/
 
 
 /**
@@ -1438,7 +1602,7 @@ rfc_value_tuple_s * RFC_tp_next( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *pt
                 /* Maximum */
                 is_falling_slope = 0;
                 rfc_ctx->internal.extrema[1] = *pt;
-#if !RFC_GLOBAL_EXTREMA
+#if RFC_GLOBAL_EXTREMA
                 rfc_ctx->internal.extrema_changed = true;
 #endif /*RFC_GLOBAL_EXTREMA*/
             }
@@ -1971,7 +2135,7 @@ void RFC_tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc
         assert( new_hysteresis >= rfc_ctx->hysteresis );
         rfc_ctx->hysteresis = new_hysteresis;
         RFC_class_param_set( rfc_ctx, new_class_param );
-#if RFC_DH_SUPPORT
+#if RFC_DAMAGE_FAST
         RFC_damage_lut_init( rfc_ctx );
 #endif /*RFC_DH_SUPPORT*/
     }
@@ -1984,161 +2148,7 @@ void RFC_tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc
     RFC_feed_tuple( rfc_ctx, ctx_tp, ctx_tp_cnt );
 
 }
-
-
-/**
- * @brief   Drop turning points from storage, to avoid memory excesses 
- *          or overflow of sample counter "pos"
- *
- * @param   rfc_ctx             The rainflow context
- * @param   limit               The excepted number of points left in turning points storage
- *                              (May be more, if residuals aren't neglected)
- * @param   flags               The flags (see RFC_FLAGS_TPPRUNE_...)
- *
- * @returns true
- */
-static 
-bool RFC_tp_prune( rfc_ctx_s *rfc_ctx, size_t limit, int flags )
-{
-    assert( rfc_ctx );
-
-#if RFC_USE_DELEGATES
-    if( rfc_ctx->tp_prune_fcn )
-    {
-        return rfc_ctx->tp_prune_fcn( rfc_ctx, limit, flags );
-    }
-#endif /*RFC_USE_DELEGATES*/
-
-    if( rfc_ctx->tp && rfc_ctx->tp_cnt > limit )
-    {
-        rfc_value_tuple_s   *src_beg_it,    /* Source (begin) */
-                            *src_end_it,    /* Source (end) */
-                            *src_it,        /* Source iterator */
-                            *dst_it,        /* Destination iterator */
-                            *res_it;        /* Residue iterator */
-        size_t               src_pos,       /* Source, position base 1 */
-                             dst_i,         /* New turning points, index base 0 */
-                             res_i;         /* Residue, index base 0 */
-
-        size_t               removal;       /* Number of turning points to remove */
-        size_t               offset;        /* Position offset (minuend) */
-        bool                 preserve_pos;  /* Don't justify position */
-        bool                 preserve_res;  /* Don't remove turning points, referenced by resiude */
-
-        removal     = rfc_ctx->tp_cnt - limit;
-        src_pos     = removal + 1;
-        dst_it      = rfc_ctx->tp;
-        dst_i       = 0;
-        src_beg_it  = dst_it + removal;
-        src_end_it  = rfc_ctx->tp + rfc_ctx->tp_cnt
-                      + ( ( rfc_ctx->state == RFC_STATE_BUSY_INTERIM ) ? 1 : 0 );
-        res_it      = rfc_ctx->residue;
-        res_i       = 0;
-        offset      = 0;
-
-        preserve_pos = ( flags & RFC_FLAGS_TPPRUNE_PRESERVE_POS ) > 0;  /* Preserve (stream) position */
-        preserve_res = ( flags & RFC_FLAGS_TPPRUNE_PRESERVE_RES ) > 0;  /* Preserve residual turning points */
-
-        /* Move turning points ahead */
-        for( src_it = src_beg_it; src_it < src_end_it; dst_it++, dst_i++ )
-        {
-            /* Check if there are still residual points to consider */
-            if( res_i < rfc_ctx->residue_cnt )
-            {
-                /* Check if residue refers a turning point from removal area */
-                if( res_it->tp_pos <= src_pos )
-                {
-                    /* First new turning point delivers new offset */
-                    if( !dst_i && !preserve_pos )
-                    {
-                        offset = res_it->pos;
-                        assert( offset );
-                        offset--;
-                    }
-
-                    /* Residual point is at current source position? */
-                    if( res_it->tp_pos == src_pos )
-                    {
-                        src_pos++;
-                    }
-
-                    if( preserve_res )
-                    {
-                        /* Adjust residue reference information */
-                        res_it->tp_pos = dst_i + 1;
-                        res_it->pos   -= offset;
-                        *dst_it        = *res_it++;
-                        res_i++;
-                    }
-                    else
-                    {
-                        /* Residual turning point refers first point now */
-                        res_it->tp_pos = 0;  /* Index 0 => "none" */
-                        res_it->pos   -= offset;
-                        res_it++;
-                        res_i++;
-                    }
-
-                    continue;
-                }
-            }
-
-            /* First new turning point delivers new offset */
-            if( !dst_i && !preserve_pos )
-            {
-                offset = src_it->pos;
-                assert( offset );
-                offset--;
-            }
-
-            /* Copy turning point from source */
-            src_it->tp_pos = dst_i + 1;
-            src_it->pos   -= offset;
-            *dst_it++      = *src_it++;
-        }
-
-        rfc_ctx->tp_cnt                  = dst_i;
-        rfc_ctx->internal.pos           -= offset;
-        rfc_ctx->internal.global_offset += offset;
-    }
-    
-    return true;
-}
 #endif /*RFC_TP_SUPPORT*/
-
-
-/**
- * @brief   Initialize a look-up table of damages for closed cycles.
- *          In this implementation the midrange doesn't matter!
- *
- * @param   rfc_ctx     The rainflow context
- */
-static 
-void RFC_damage_lut_init( rfc_ctx_s *rfc_ctx )
-{
-    size_t i;
-
-    assert( rfc_ctx && rfc_ctx->damage_lut );
-
-    for( i = 0; i < rfc_ctx->class_count; i++ )
-    {
-        double damage;
-        const int from = 0;
-
-#if RFC_USE_DELEGATES
-        if( rfc_ctx->damage_calc_fcn )
-        {
-            damage = rfc_ctx->damage_calc_fcn( rfc_ctx, from, /*to*/ (int)i );
-        }
-        else
-#endif /*RFC_USE_DELEGATES*/
-        {
-            damage = RFC_damage_calc_fast( rfc_ctx, from, /*to*/ (int)i );
-        }
-
-        rfc_ctx->damage_lut[i] = damage;
-    }
-}
 
 
 #if RFC_DH_SUPPORT
@@ -2441,24 +2451,26 @@ void RFC_rp_from_matrix( rfc_ctx_s *rfc_ctx, RFC_counts_type* buffer, size_t buf
     }
 }
 
-
-/*********************************************************************************************************/
-/*********************************************************************************************************/
-/*********************************************************************************************************/
-/*********************************************************************************************************/
-/*********************************************************************************************************/
-/*********************************************************************************************************/
-/*********************************************************************************************************/
-
 #endif /*!RFC_MINIMAL*/
 
+
+/*********************************************************************************************************/
+/*********************************************************************************************************/
+/*********************************************************************************************************/
+/*********************************************************************************************************/
+/*********************************************************************************************************/
+/*********************************************************************************************************/
+/*********************************************************************************************************/
+
+
 #if MATLAB_MEX_FILE
-#if !RFC_TP_SUPPORT || !RFC_HCM_SUPPORT
+
+#if 0
 void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 {
     mexErrMsgTxt( "Unsupported configuration!" );
 }
-#else /*RFC_TP_SUPPORT && RFC_HCM_SUPPORT*/
+#else
 
 /**
  * MATLAB wrapper for the rainflow algorithm
@@ -2495,16 +2507,16 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         const mxArray  *mxUseHCM         = prhs[6];
 #endif /*!RFC_MINIMAL*/        
 
-        RFC_value_type *buffer          = NULL;
-        double         *data            = mxGetPr( mxData );
-        size_t          data_len        = mxGetNumberOfElements( mxData );
-        unsigned        class_count     = (unsigned)( mxGetScalar( mxClassCount ) + 0.5 );
-        double          class_width     = mxGetScalar( mxClassWidth );
-        double          class_offset    = mxGetScalar( mxClassOffset );
-        double          hysteresis      = mxGetScalar( mxHysteresis );
+        RFC_value_type *buffer           = NULL;
+        double         *data             = mxGetPr( mxData );
+        size_t          data_len         = mxGetNumberOfElements( mxData );
+        unsigned        class_count      = (unsigned)( mxGetScalar( mxClassCount ) + 0.5 );
+        double          class_width      = mxGetScalar( mxClassWidth );
+        double          class_offset     = mxGetScalar( mxClassOffset );
+        double          hysteresis       = mxGetScalar( mxHysteresis );
 #if !RFC_MINIMAL
-        int             enforce_margin  = (int)mxGetScalar( mxEnforceMargin );
-        int             use_hcm         = (int)mxGetScalar( mxUseHCM );
+        int             enforce_margin   = (int)mxGetScalar( mxEnforceMargin );
+        int             use_hcm          = (int)mxGetScalar( mxUseHCM );
 #endif /*!RFC_MINIMAL*/
         size_t          i;
         bool            ok;
@@ -2550,8 +2562,14 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 #if !RFC_MINIMAL
         /* Setup */
         rfc_ctx.flags           |= enforce_margin ? RFC_FLAGS_ENFORCE_MARGIN : 0;
-        rfc_ctx.counting_method  = use_hcm ? RFC_COUNTING_METHOD_HCM : RFC_COUNTING_METHOD_4PTM;
 #endif /*!RFC_MINIMAL*/
+#if RFC_HCM_SUPPORT
+        rfc_ctx.counting_method  = use_hcm ? RFC_COUNTING_METHOD_HCM : RFC_COUNTING_METHOD_4PTM;
+#else /*!RFC_HCM_SUPPORT*/
+#if !RFC_MINIMAL
+        rfc_ctx.counting_method  = RFC_COUNTING_METHOD_4PTM;
+#endif /*!RFC_MINIMAL*/
+#endif /*RFC_HCM_SUPPORT*/
         RFC_feed( &rfc_ctx, buffer, data_len  );
         RFC_finalize( &rfc_ctx, RFC_RES_IGNORE );
 
@@ -2569,7 +2587,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
             plhs[0] = mxCreateDoubleScalar( rfc_ctx.pseudo_damage );
 
             /* Residue */
-#if !RFC_MINIMAL
+#if RFC_HCM_SUPPORT
             if( use_hcm )
             {
                 if( nlhs > 1 && rfc_ctx.internal.hcm.stack )
@@ -2589,7 +2607,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                 }
             }
             else
-#endif /*!RFC_MINIMAL*/
+#endif /*!RFC_HCM_SUPPORT*/
             {
                 if( nlhs > 1 && rfc_ctx.residue )
                 {
@@ -2685,6 +2703,5 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         RFC_deinit( &rfc_ctx );
     }
 }
-#endif /*!RFC_TP_SUPPORT || !RFC_COUNTING_METHOD_HCM*/
+#endif
 #endif /*MATLAB_MEX_FILE*/
-
