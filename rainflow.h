@@ -223,7 +223,9 @@ typedef struct rfc_value_tuple
     size_t                              pos;                        /**< Absolute position in input data stream, base 1 */
 #if RFC_TP_SUPPORT
     size_t                              tp_pos;                     /**< Position in tp storage, base 1 */
+#if RFC_DH_SUPPORT
     double                              damage;                     /**< Damage accumulated to this turning point */
+#endif /*RFC_DH_SUPPORT*/    
 #endif /*RFC_TP_SUPPORT*/
 } rfc_value_tuple_s;
 
@@ -351,8 +353,8 @@ typedef struct rfc_ctx
 
 #if RFC_USE_DELEGATES
     /* Delegates (optional, may be NULL) */
-#if RFC_TP_SUPPORT
     rfc_tp_next_fcn_t                   tp_next_fcn;                /**< Test if new turning point exists */
+#if RFC_TP_SUPPORT
     rfc_tp_add_fcn_t                    tp_add_fcn;                 /**< Handling new turning points */
     rfc_tp_prune_fcn_t                  tp_prune_fcn;               /**< Prune turning points */
 #endif /*RFC_TP_SUPPORT*/

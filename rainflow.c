@@ -122,8 +122,10 @@
 #if !RFC_MINIMAL
 static void                 RFC_reset                           ( rfc_ctx_s * );
 static void                 RFC_cycle_find                      ( rfc_ctx_s * );
+#else /*RFC_MINIMAL*/
+#define RFC_cycle_find RFC_cycle_find_4ptm
 #endif /*!RFC_MINIMAL*/
-static bool                 RFC_feed_once                       ( rfc_ctx_s *, rfc_value_tuple_s* tp );
+static bool                 RFC_feed_once                       ( rfc_ctx_s *, const rfc_value_tuple_s* tp );
 static bool                 RFC_feed_finalize                   ( rfc_ctx_s * );
 static rfc_value_tuple_s *  RFC_tp_next                         ( rfc_ctx_s *, const rfc_value_tuple_s *pt );
 static void                 RFC_cycle_find_4ptm                 ( rfc_ctx_s * );
@@ -150,9 +152,9 @@ static bool                 RFC_tp_add                          ( rfc_ctx_s *, r
 static void                 RFC_tp_lock                         ( rfc_ctx_s *, bool do_lock );
 static void                 RFC_tp_refeed                       ( rfc_ctx_s *, RFC_value_type new_hysteresis, const rfc_class_param_s *new_class_param );
 #endif /*RFC_TP_SUPPORT*/
-#if RFC_DH_SUPPORT || RFC_TP_SUPPORT
+#if RFC_DH_SUPPORT
 static void                 RFC_spread_damage                   ( rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags );
-#endif /*RFC_DH_SUPPORT || RFC_TP_SUPPORT*/
+#endif /*RFC_DH_SUPPORT*/
 /* Other */
 #if !RFC_MINIMAL
 static void                 RFC_class_param_set                 ( rfc_ctx_s *, const rfc_class_param_s * );
@@ -352,8 +354,7 @@ bool RFC_tp_init( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_stati
 
 
 /**
- * @brief   Drop turning points from storage, to avoid memory excesses 
- *          or overflow of sample counter "pos"
+ * @brief   Drop turning points from storage, to avoid memory excess
  *
  * @param   rfc_ctx             The rainflow context
  * @param   limit               The excepted number of points left in turning points storage
@@ -366,7 +367,7 @@ bool RFC_tp_prune( void *ctx, size_t limit, int flags )
 {
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || rfc_ctx->tp )
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || !rfc_ctx->tp )
     {
         assert( false );
         rfc_ctx->error = RFC_ERROR_INVARG;
@@ -395,7 +396,7 @@ bool RFC_tp_prune( void *ctx, size_t limit, int flags )
         size_t               removal;       /* Number of turning points to remove */
         size_t               offset;        /* Position offset (minuend) */
         bool                 preserve_pos;  /* Don't justify position */
-        bool                 preserve_res;  /* Don't remove turning points, referenced by resiude */
+        bool                 preserve_res;  /* Don't remove turning points, if referenced by resiude */
 
         removal     = rfc_ctx->tp_cnt - limit;
         src_pos     = removal + 1;
@@ -612,8 +613,7 @@ void RFC_deinit( void *ctx )
  */
 bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
 {
-    rfc_ctx_s           *rfc_ctx        = (rfc_ctx_s*)ctx;
-    rfc_class_param_s    class_param;
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
     if( data_count && !data ) return false;
 
@@ -629,8 +629,6 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
     {
         return false;
     }
-
-    RFC_class_param_get( rfc_ctx, &class_param );
 
     /* Process data */
     while( data_count-- )
@@ -835,20 +833,20 @@ void RFC_reset( rfc_ctx_s *rfc_ctx )
  * @return     false on error
  */
 static
-bool RFC_feed_once( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
+bool RFC_feed_once( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt )
 {
-    rfc_value_tuple_s *tp_residue;
+    rfc_value_tuple_s *tp_residue;  /* Pointer to residue element */
 #if RFC_TP_SUPPORT
-    rfc_value_tuple_s  tp_delayed;
+    rfc_value_tuple_s  tp_delayed;  /* Swap buffer */
     bool               do_margin;
 #endif /*RFC_TP_SUPPORT*/
 
     assert( rfc_ctx && pt );
 
 #if RFC_DH_SUPPORT
-    if( rfc_ctx->dh_cnt++ > rfc_ctx->dh_cap )
+    if( rfc_ctx->dh && rfc_ctx->dh_cnt > rfc_ctx->dh_cap )
     {
-        size_t new_cap = rfc_ctx->dh_cap + 1024;
+        size_t new_cap = (size_t)1024 * ( rfc_ctx->dh_cap / 640 + 1 ); /* + 60% + 1024 */
 
         rfc_ctx->dh = (double*)rfc_ctx->mem_alloc( rfc_ctx->dh, new_cap, sizeof(RFC_value_type), RFC_MEM_AIM_DH );
 
@@ -859,45 +857,54 @@ bool RFC_feed_once( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
 
         memset( rfc_ctx->dh + rfc_ctx->dh_cnt, 0, sizeof(RFC_value_type) * ( new_cap - rfc_ctx->dh_cap ) );
         rfc_ctx->dh_cap = new_cap;
+        rfc_ctx->dh_cnt++;
     }
 #endif /*RFC_DH_SUPPORT*/
 
-    /* Check for next turning point and update residue */
-    /* (tp_residue refers member residue in rfc_ctx) */
+    /* Check for next turning point and update residue. tp_residue is NULL, if there is no turning point */
+    /* Otherwise tp_residue refers the forelast element in member rfc_ctx->residue */
     tp_residue = RFC_tp_next( rfc_ctx, pt );
 
 #if RFC_TP_SUPPORT
     /* Turning points storage */
 
-    /* Delay stage when RFC_FLAGS_ENFORCE_MARGIN is set */
+    /* Delay stage if RFC_FLAGS_ENFORCE_MARGIN is set */
     do_margin = rfc_ctx->flags & RFC_FLAGS_ENFORCE_MARGIN;
     if( do_margin && rfc_ctx->tp && !rfc_ctx->tp_locked )
     {
-        /* Check for left margin */
-        if( pt->pos == 1 )
+        /* Check for left and right margin */
+		
+        if( !rfc_ctx->internal.margin[0].pos )
         {
             /* Save left margin */
-            rfc_ctx->internal.margin[0]  =
+            assert( !rfc_ctx->internal.tp_delayed.pos );
+            rfc_ctx->internal.margin[0]  = *pt;
             rfc_ctx->internal.tp_delayed = *pt;
             tp_residue = NULL;
         }
-        else if( tp_residue && rfc_ctx->internal.tp_delayed.value == tp_residue->value )
+        else 
         {
-            tp_residue = NULL;
-        }
-
-        if( pt->pos > 1 )
-        {
+			/* Save right margin so far */
             rfc_ctx->internal.margin[1] = *pt;
         }
 
-        if( tp_residue )
-        {
-            /* Emit delayed turning point */
-            tp_delayed = rfc_ctx->internal.tp_delayed;
-            rfc_ctx->internal.tp_delayed = *tp_residue;
-            tp_residue = &tp_delayed;
-        }
+        /* Delay stage */ 
+
+		if( tp_residue )
+		{
+			if( tp_residue->value == rfc_ctx->internal.tp_delayed.value )
+			{
+				/* Suppress repeated values, due to RFC_FLAGS_ENFORCE_MARGIN-operations */
+				tp_residue = NULL;
+			}
+			else
+			{
+				/* Emit delayed turning point */
+				tp_delayed = *tp_residue;
+				*tp_residue = rfc_ctx->internal.tp_delayed;
+				rfc_ctx->internal.tp_delayed = tp_delayed;
+			}
+		}
     }
 #endif /*RFC_TP_SUPPORT*/
 
@@ -907,16 +914,12 @@ bool RFC_feed_once( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
     if( tp_residue )
     {
 #if RFC_TP_SUPPORT
-        /* Add new turning point */
+        /* Add new turning point, position in tp will be stored in tp_residue */
         if( !RFC_tp_add( rfc_ctx, tp_residue ) ) return false;
 #endif /*RFC_TP_SUPPORT*/
 
-        /* New turning point, check for closed cycles and count */
-#if !RFC_MINIMAL
+        /* New turning point, check for closed cycles and count. Modifies residue! */
         RFC_cycle_find( rfc_ctx );
-#else /*RFC_MINIMAL*/
-        RFC_cycle_find_4ptm( rfc_ctx );
-#endif /*!RFC_MINIMAL*/
     }
 
     return true;
@@ -1008,11 +1011,7 @@ bool RFC_feed_finalize( rfc_ctx_s *rfc_ctx )
     if( tp_interim )
     {
         /* Check once more if a new cycle is closed now */
-#if !RFC_MINIMAL
         RFC_cycle_find( rfc_ctx );
-#else /*RFC_MINIMAL*/
-        RFC_cycle_find_4ptm( rfc_ctx );
-#endif /*!RFC_MINIMAL*/
     }
 
 #if RFC_TP_SUPPORT
@@ -1556,12 +1555,12 @@ rfc_value_tuple_s * RFC_tp_next( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *pt
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state <= RFC_STATE_BUSY_INTERIM );
 
-#if RFC_USE_DELEGATES && RFC_TP_SUPPORT
+#if RFC_USE_DELEGATES
     if( rfc_ctx->tp_next_fcn )
     {
         return rfc_ctx->tp_next_fcn( rfc_ctx, pt );
     }
-#endif /*RFC_USE_DELEGATES && RFC_TP_SUPPORT*/
+#endif /*RFC_USE_DELEGATES*/
 
     if( !pt ) return NULL;
 
@@ -2019,13 +2018,13 @@ void RFC_cycle_process( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_value_t
                 }
             }
         }
-#endif /*!RFC_MINIMAL*/
+
 #if RFC_DH_SUPPORT
-        if( rfc_ctx->dh )
-        {
-            RFC_dh_spread_damage( rfc_ctx, from, to, next, flags );
-        }
+        /* "Spread" damage over turning points (tp) and damage history (dh) */
+        RFC_spread_damage( rfc_ctx, from, to, next, flags );
 #endif /*RFC_DH_SUPPORT*/
+
+#endif /*!RFC_MINIMAL*/
     }
 }
 
@@ -2066,7 +2065,7 @@ bool RFC_tp_add( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *tp )
                 size_t              tp_cap_increment;
 
                 /* Increment about a tenth of current size */
-                tp_cap_increment = ( rfc_ctx->tp_cap / 10240 + 1 ) * 1024;
+                tp_cap_increment = (size_t)1024 * ( rfc_ctx->tp_cap / 640 + 1 );  /* + 60% + 1024 */
                 tp_cap_new       = rfc_ctx->tp_cap + tp_cap_increment;
                 tp_new           = rfc_ctx->mem_alloc( rfc_ctx->tp, tp_cap_new, sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TP );
 
@@ -2081,9 +2080,9 @@ bool RFC_tp_add( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *tp )
                 }
             }
             /* Append turning point */
-            rfc_ctx->tp[ rfc_ctx->tp_cnt++ ] = *tp;
-            tp->tp_pos = rfc_ctx->tp_cnt; /* Turning point get its position index in tp */
-        }
+			rfc_ctx->tp[ rfc_ctx->tp_cnt++ ] = *tp;
+			tp->tp_pos = rfc_ctx->tp_cnt; /* Turning point get its position index in tp, base 1 */
+		}
 
         if( rfc_ctx->flags & RFC_FLAGS_TPAUTOPRUNE )
         {
@@ -2153,9 +2152,9 @@ void RFC_tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc
 
 #if RFC_DH_SUPPORT
 static 
-void RFC_dh_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, 
-                                               rfc_value_tuple_s *to, 
-                                               rfc_value_tuple_s *next, int flags )
+void RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, 
+                                            rfc_value_tuple_s *to, 
+                                            rfc_value_tuple_s *next, int flags )
 {
     double damage = 0.0;
 
@@ -2247,12 +2246,12 @@ void RFC_dh_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
             }
         }
         break;
-#if RFC_DH_SUPPORT
+
         case RFC_SD_TRANSIENT_23:
             break;
         case RFC_SD_TRANSIENT_23c:
             break;
-#endif /*RFC_DH_SUPPORT*/
+
         default:
             assert( false );
             break;
