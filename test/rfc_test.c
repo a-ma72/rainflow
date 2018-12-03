@@ -211,16 +211,24 @@ TEST RFC_tp_prune_test(void)
     ASSERT( RFC_feed( &ctx, data, /* count */ data_len ) );
     ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
 
-    RFC_tp_prune( &ctx, /*count*/ 100, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS );
+    RFC_tp_prune( &ctx, /*count*/ 100, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS | RFC_FLAGS_TPPRUNE_PRESERVE_RES );
 
     ASSERT( ctx.tp_cnt == 107 );
     /* Should not change anything: */
-    RFC_tp_prune( &ctx, /*count*/ 100, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS );
+    RFC_tp_prune( &ctx, /*count*/ 100, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS | RFC_FLAGS_TPPRUNE_PRESERVE_RES );
     ASSERT( ctx.tp_cnt == 107 );
 
-    RFC_tp_prune( &ctx, /*count*/ 0, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS );
+    RFC_tp_prune( &ctx, /*count*/ 0, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS | RFC_FLAGS_TPPRUNE_PRESERVE_RES );
     ASSERT( ctx.tp_cnt == ctx.residue_cnt );
     ASSERT_MEM_EQ( ctx.tp, ctx.residue, ctx.tp_cnt * sizeof(RFC_VALUE_TYPE) );
+
+    RFC_tp_prune( &ctx, /*count*/ 0, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS );
+    ASSERT( ctx.tp_cnt == 0 );
+
+    for( i = 0; i < ctx.residue_cnt; i++ )
+    {
+        ASSERT( ctx.residue[i].tp_pos == 0 );
+    }
 
     if( ctx.state != RFC_STATE_INIT0 )
     {
@@ -313,9 +321,9 @@ TEST RFC_test_turning_points(void)
     ASSERT( ctx.tp[1].value == 2.1f && ctx.tp[1].pos == 5 );
     ASSERT( ctx.tp[2].value == 1.0f && ctx.tp[2].pos == 8 );
     ASSERT( ctx.residue_cnt == 3 );
-    ASSERT( ctx.residue[0].value == 1.0f && ctx.residue[0].pos == 1 );
-    ASSERT( ctx.residue[1].value == 2.1f && ctx.residue[1].pos == 5 );
-    ASSERT( ctx.residue[2].value == 1.0f && ctx.residue[2].pos == 8 );
+    ASSERT( ctx.residue[0].value == 1.0f && ctx.residue[0].pos == 1 && ctx.residue[0].tp_pos == 1 );
+    ASSERT( ctx.residue[1].value == 2.1f && ctx.residue[1].pos == 5 && ctx.residue[1].tp_pos == 2 );
+    ASSERT( ctx.residue[2].value == 1.0f && ctx.residue[2].pos == 8 && ctx.residue[2].tp_pos == 3 );
     ctx.tp = NULL;
     RFC_deinit( &ctx );
 
@@ -344,9 +352,9 @@ TEST RFC_test_turning_points(void)
     ASSERT( ctx.tp[1].value == 2.1f && ctx.tp[1].pos == 3 );
     ASSERT( ctx.tp[2].value == 1.0f && ctx.tp[2].pos == 6 ); /* Turning point at right margin! */
     ASSERT( ctx.residue_cnt == 3 );
-    ASSERT( ctx.residue[0].value == 1.0f && ctx.residue[0].pos == 1 );
-    ASSERT( ctx.residue[1].value == 2.1f && ctx.residue[1].pos == 3 );
-    ASSERT( ctx.residue[2].value == 1.0f && ctx.residue[2].pos == 5 );  /* In residue, turning point at original position! */
+    ASSERT( ctx.residue[0].value == 1.0f && ctx.residue[0].pos == 1 && ctx.residue[0].tp_pos == 1 );
+    ASSERT( ctx.residue[1].value == 2.1f && ctx.residue[1].pos == 3 && ctx.residue[1].tp_pos == 2 );
+    ASSERT( ctx.residue[2].value == 1.0f && ctx.residue[2].pos == 5 && ctx.residue[2].tp_pos == 3 );  /* In residue, turning point at original position! */
     ctx.tp = NULL;
     RFC_deinit( &ctx );
 
@@ -447,16 +455,16 @@ TEST RFC_cycle_up(void)
         ASSERT_EQ( ctx.residue[0].value, 1.0 );
         ASSERT_EQ( ctx.residue[1].value, 4.0 );
         ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
-		for( i = 0; i < ctx.residue_cnt; i++ )
-		{
-			ASSERT_EQ( ctx.residue[0].pos, i + 1 );
-			ASSERT_EQ( ctx.residue[0].tp_pos, i + 1 );
-		}
+        ASSERT_EQ( ctx.residue[0].pos, 1 );
+        ASSERT_EQ( ctx.residue[0].tp_pos, 1 );
+        ASSERT_EQ( ctx.residue[1].pos, 4 );
+        ASSERT_EQ( ctx.residue[1].tp_pos, 4 );
 #if RFC_TP_SUPPORT
 		for( i = 0; i < ctx.tp_cnt; i++ )
 		{
-			ASSERT_EQ( ctx.tp[0].pos, i + 1 );
-		}
+            ASSERT_EQ( ctx.tp[i].pos, i + 1 );
+            ASSERT_EQ( ctx.tp[i].tp_pos, 0 );
+        }
 #endif /*RFC_TP_SUPPORT*/
     } while(0);
 
@@ -513,6 +521,17 @@ TEST RFC_cycle_down(void)
         ASSERT_EQ( ctx.residue[0].value, 4.0 );
         ASSERT_EQ( ctx.residue[1].value, 1.0 );
         ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
+        ASSERT_EQ( ctx.residue[0].pos, 1 );
+        ASSERT_EQ( ctx.residue[0].tp_pos, 1 );
+        ASSERT_EQ( ctx.residue[1].pos, 4 );
+        ASSERT_EQ( ctx.residue[1].tp_pos, 4 );
+#if RFC_TP_SUPPORT
+        for( i = 0; i < ctx.tp_cnt; i++ )
+        {
+            ASSERT_EQ( ctx.tp[i].pos, i + 1 );
+            ASSERT_EQ( ctx.tp[i].tp_pos, 0 );
+        }
+#endif /*RFC_TP_SUPPORT*/
     } while(0);
 
 #if RFC_TP_SUPPORT
@@ -605,7 +624,7 @@ TEST RFC_long_series(void)
     rfc_value_tuple_s   tp[10000]           = {0};
     size_t              i;
 
-    if(0)
+    if(1)
     {
 #include "long_series.c"
 
