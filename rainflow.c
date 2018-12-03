@@ -207,8 +207,12 @@ bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type 
     /* Flags */
 #if !RFC_MINIMAL
     rfc_ctx->flags                      = RFC_FLAGS_COUNT_ALL            | 
+#if RFC_TP_SUPPORT
                                           RFC_FLAGS_TPPRUNE_PRESERVE_POS | 
-                                          RFC_FLAGS_TPPRUNE_PRESERVE_RES;
+                                          RFC_FLAGS_TPPRUNE_PRESERVE_RES |
+#else /*!RFC_TP_SUPPORT*/
+                                          0;
+#endif /*RFC_TP_SUPPORT*/
 #else /*RFC_MINIMAL*/
     rfc_ctx->flags                      = RFC_FLAGS_COUNT_MATRIX;
 #endif /*!RFC_MINIMAL*/
@@ -2675,7 +2679,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                     plhs[4] = lc;
                 }
             }
-
+#if RFC_TP_SUPPORT
             /* Turning points */
             if( nlhs > 5 && rfc_ctx.tp )
             {
@@ -2694,6 +2698,7 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                     plhs[5] = tp;
                 }
             }
+#endif /*RFC_TP_SUPPORT*/
 #endif /*!RFC_MINIMAL*/
         }
 

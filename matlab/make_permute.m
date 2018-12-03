@@ -1,7 +1,10 @@
-%clear rfc
-%clc
-%mex -g -v -output rfc -DRFC_USE_INTEGRAL_COUNTS=0 rainflow.c
+assert( ispc )
+
 clear all
+
+builddir = cd( cd( '../build' ) );
+VS_Toolset = 'Visual Studio 15 2017 Win64';
+VS_CommonTools = '%VS140COMNTOOLS%VsDevCmd.bat';
 for RFC_USE_INTEGRAL_COUNTS = 0:1
   for RFC_MINIMAL = 0:1
     for RFC_TP_SUPPORT = 0:1
@@ -18,10 +21,11 @@ for RFC_USE_INTEGRAL_COUNTS = 0:1
                 defs(5,:) = deal( {' '} );
                 fid = fopen( '../build/generate.bat', 'wt' );
                 fprintf( fid, '%s\n', 'cd %~dp0' );
-                fprintf( fid, '%s\n', '@call "%VS140COMNTOOLS%VsDevCmd.bat"' );
-                fprintf( fid, '%s\n', sprintf( '"%s\\cmake.exe" %s %s" ', ...
+                fprintf( fid, '@call "%s"\n', VS_CommonTools );
+                fprintf( fid, '%s\n', sprintf( '"%s\\cmake.exe" -T"%s" %s %s" ', ...
+                                               VS_Toolset, ...
                                                getenv('cmake_root'), [defs{:}], ...
-                                               'd:\git\gitlab\rainflow\build' ) );
+                                               builddir ) );
                 fprintf( fid, '%s\n', 'devenv rainflow.sln /build Release' );
                 fprintf( fid, '%s\n', 'if %errorlevel% neq 0 exit /b %errorlevel%' );
                 fprintf( fid, '%s\n', '.\Release\rfc_test.exe || exit /b' );

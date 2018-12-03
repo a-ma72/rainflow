@@ -83,6 +83,7 @@ mem_chunk* new_chunk( size_t size )
 }
 
 
+#if RFC_TP_SUPPORT
 void export_tp( const char *filename, rfc_value_tuple_s* data, size_t count )
 {
     FILE* fid = fopen( filename, "wt" );
@@ -91,14 +92,15 @@ void export_tp( const char *filename, rfc_value_tuple_s* data, size_t count )
     {
         while( count-- )
         {
-			//fprintf(fid, "%g\t%lu\t%lu\t%lu\t%g\n", data->value, data->class, data->tp_pos, data->pos, data->damage);
-			fprintf(fid, "%g\t%d\t%llu\t%llu\n", data->value, data->class, data->tp_pos, data->pos );
-			data++;
+            //fprintf(fid, "%g\t%lu\t%lu\t%lu\t%g\n", data->value, data->class, data->tp_pos, data->pos, data->damage);
+            fprintf(fid, "%g\t%d\t%llu\t%llu\n", data->value, data->class, data->tp_pos, data->pos );
+            data++;
         }
 
         fclose( fid );
     }
 }
+#endif /*RFC_TP_SUPPORT*/
 
 
 double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
@@ -456,12 +458,12 @@ TEST RFC_cycle_up(void)
         ASSERT_EQ( ctx.residue[1].value, 4.0 );
         ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
         ASSERT_EQ( ctx.residue[0].pos, 1 );
-        ASSERT_EQ( ctx.residue[0].tp_pos, 1 );
         ASSERT_EQ( ctx.residue[1].pos, 4 );
-        ASSERT_EQ( ctx.residue[1].tp_pos, 4 );
 #if RFC_TP_SUPPORT
-		for( i = 0; i < ctx.tp_cnt; i++ )
-		{
+        ASSERT_EQ( ctx.residue[0].tp_pos, 1 );
+        ASSERT_EQ( ctx.residue[1].tp_pos, 4 );
+        for( i = 0; i < ctx.tp_cnt; i++ )
+        {
             ASSERT_EQ( ctx.tp[i].pos, i + 1 );
             ASSERT_EQ( ctx.tp[i].tp_pos, 0 );
         }
@@ -522,10 +524,10 @@ TEST RFC_cycle_down(void)
         ASSERT_EQ( ctx.residue[1].value, 1.0 );
         ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
         ASSERT_EQ( ctx.residue[0].pos, 1 );
-        ASSERT_EQ( ctx.residue[0].tp_pos, 1 );
         ASSERT_EQ( ctx.residue[1].pos, 4 );
-        ASSERT_EQ( ctx.residue[1].tp_pos, 4 );
 #if RFC_TP_SUPPORT
+        ASSERT_EQ( ctx.residue[0].tp_pos, 1 );
+        ASSERT_EQ( ctx.residue[1].tp_pos, 4 );
         for( i = 0; i < ctx.tp_cnt; i++ )
         {
             ASSERT_EQ( ctx.tp[i].pos, i + 1 );
