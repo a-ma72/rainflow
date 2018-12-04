@@ -123,7 +123,7 @@
 static void                 RFC_reset                           ( rfc_ctx_s * );
 static void                 RFC_cycle_find                      ( rfc_ctx_s * );
 #else /*RFC_MINIMAL*/
-#define RFC_cycle_find RFC_cycle_find_4ptm
+#define RFC_cycle_find      RFC_cycle_find_4ptm
 #endif /*!RFC_MINIMAL*/
 static bool                 RFC_feed_once                       ( rfc_ctx_s *, const rfc_value_tuple_s* tp );
 static bool                 RFC_feed_finalize                   ( rfc_ctx_s * );
@@ -161,6 +161,7 @@ static void                 RFC_class_param_set                 ( rfc_ctx_s *, c
 static void                 RFC_class_param_get                 ( rfc_ctx_s *, rfc_class_param_s * );
 #endif /*!RFC_MINIMAL*/
 static bool                 RFC_error_raise                     ( rfc_ctx_s *, int );
+static double               RFC_damage_calc_amplitude           ( rfc_ctx_s *, double amplitude );
 static double               RFC_damage_calc                     ( rfc_ctx_s *, unsigned class_from, unsigned class_to );
 #if RFC_DAMAGE_FAST
 static void                 RFC_damage_lut_init                 ( rfc_ctx_s * );
@@ -268,19 +269,24 @@ bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type 
     /* Residue */
     rfc_ctx->residue_cnt                = 0;
     rfc_ctx->residue_cap                = 2 * rfc_ctx->class_count; /* max size is 2*n-1 plus interim point = 2*n */
-    rfc_ctx->residue                    = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( NULL, rfc_ctx->residue_cap, sizeof(rfc_value_tuple_s), RFC_MEM_AIM_RESIDUE );
+    rfc_ctx->residue                    = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( NULL, rfc_ctx->residue_cap, 
+                                                                                  sizeof(rfc_value_tuple_s), RFC_MEM_AIM_RESIDUE );
 
     /* Non-sparse storages (optional, may be NULL) */
-    rfc_ctx->matrix                     = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count * class_count, sizeof(RFC_counts_type), RFC_MEM_AIM_MATRIX );
+    rfc_ctx->matrix                     = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count * class_count, 
+                                                                                sizeof(RFC_counts_type), RFC_MEM_AIM_MATRIX );
 #if !RFC_MINIMAL
-    rfc_ctx->rp                         = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count,               sizeof(RFC_counts_type), RFC_MEM_AIM_RP );
-    rfc_ctx->lc                         = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count,               sizeof(RFC_counts_type), RFC_MEM_AIM_LC );
+    rfc_ctx->rp                         = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count,
+                                                                                sizeof(RFC_counts_type), RFC_MEM_AIM_RP );
+    rfc_ctx->lc                         = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count,
+                                                                                sizeof(RFC_counts_type), RFC_MEM_AIM_LC );
 #endif /*!RFC_MINIMAL*/
 
     /* Damage */
     rfc_ctx->pseudo_damage              = 0.0;
 #if RFC_DAMAGE_FAST
-    rfc_ctx->damage_lut                 = (double*)rfc_ctx->mem_alloc( rfc_ctx->damage_lut, class_count, sizeof(double), RFC_MEM_AIM_DLUT );
+    rfc_ctx->damage_lut                 = (double*)rfc_ctx->mem_alloc( rfc_ctx->damage_lut, class_count * class_count, 
+                                                                       sizeof(double), RFC_MEM_AIM_DLUT );
     RFC_damage_lut_init( rfc_ctx );
 #endif /*RFC_DAMAGE_FAST*/
 
@@ -324,7 +330,8 @@ bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type 
     rfc_ctx->internal.hcm.IR            = 1;
     /* Residue */
     rfc_ctx->internal.hcm.stack_cap     = 2 * rfc_ctx->class_count; /* max size is 2*n-1 plus interim point = 2*n */
-    rfc_ctx->internal.hcm.stack         = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( NULL, rfc_ctx->internal.hcm.stack_cap, sizeof(rfc_value_tuple_s), RFC_MEM_AIM_HCM );
+    rfc_ctx->internal.hcm.stack         = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( NULL, rfc_ctx->internal.hcm.stack_cap, 
+                                                                                  sizeof(rfc_value_tuple_s), RFC_MEM_AIM_HCM );
 #endif /*RFC_HCM_SUPPORT*/
 
     rfc_ctx->state = RFC_STATE_INIT;
@@ -862,7 +869,8 @@ bool RFC_feed_once( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt )
     {
         size_t new_cap = (size_t)1024 * ( rfc_ctx->dh_cap / 640 + 1 ); /* + 60% + 1024 */
 
-        rfc_ctx->dh = (double*)rfc_ctx->mem_alloc( rfc_ctx->dh, new_cap, sizeof(RFC_value_type), RFC_MEM_AIM_DH );
+        rfc_ctx->dh = (double*)rfc_ctx->mem_alloc( rfc_ctx->dh, new_cap, 
+                                                   sizeof(RFC_value_type), RFC_MEM_AIM_DH );
 
         if( !rfc_ctx->dh )
         {
@@ -1039,7 +1047,8 @@ bool RFC_feed_finalize( rfc_ctx_s *rfc_ctx )
         if( stack_cnt )
         {
             /* Reallocate residue */
-            rfc_ctx->residue = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( rfc_ctx->residue, (size_t)stack_cnt, sizeof(rfc_value_tuple_s), RFC_MEM_AIM_RESIDUE );
+            rfc_ctx->residue = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( rfc_ctx->residue, (size_t)stack_cnt, 
+                                                                       sizeof(rfc_value_tuple_s), RFC_MEM_AIM_RESIDUE );
 
             if( !rfc_ctx->residue )
             {
@@ -1288,7 +1297,8 @@ bool RFC_finalize_res_repeated( rfc_ctx_s *rfc_ctx )
     {
         /* Feed again with the content of the residue itself */
         size_t              cnt     = rfc_ctx->residue_cnt;
-        rfc_value_tuple_s  *residue = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( NULL, cnt + 1, sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TEMP );
+        rfc_value_tuple_s  *residue = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( NULL, cnt + 1, 
+                                                                              sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TEMP );
 
         if( rfc_ctx->state == RFC_STATE_BUSY_INTERIM )
         {
@@ -1353,7 +1363,8 @@ bool RFC_residue_exchange( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s **residue, size
         /* Backup */
         *residue_cap = rfc_ctx->residue_cap;
         *residue_cnt = rfc_ctx->residue_cnt;
-        *residue     = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( NULL, *residue_cap, sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TEMP );
+        *residue     = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( NULL, *residue_cap, 
+                                                               sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TEMP );
 
         if( !*residue )
         {
@@ -1422,27 +1433,10 @@ void RFC_residue_remove_item( rfc_ctx_s *rfc_ctx, size_t index, size_t count )
 }
 #endif /*!RFC_MINIMAL*/
 
-/**
- * @brief      Calculate fictive damage for one closed (full) cycle.
- *
- * @param      rfc_ctx       The rainflow context
- * @param[in]  class_from    The starting class
- * @param[in]  class_to      The ending class
- *
- * @return     Pseudo damage value for the closed cycle
- */
+
 static
-double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_to )
+double RFC_damage_calc_amplitude( rfc_ctx_s *rfc_ctx, double amplitude )
 {
-    assert( rfc_ctx );
-
-#if RFC_USE_DELEGATES
-    if( rfc_ctx->damage_calc_fcn )
-    {
-        return rfc_ctx->damage_calc_fcn( rfc_ctx, class_from, class_to );
-    }
-#endif /*RFC_USE_DELEGATES*/
-
     /* Constants for the Woehler curve */
     const double SD_log  = log(rfc_ctx->wl_sd);
     const double ND_log  = log(rfc_ctx->wl_nd);
@@ -1450,19 +1444,20 @@ double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_
 #if !RFC_MINIMAL
     const double k2      = rfc_ctx->wl_k2;
 #endif /*!RFC_MINIMAL*/
+
+    double Sa_i = amplitude;
+
     /* Pseudo damage */
     double D_i = 0.0;
 
-    if( class_from != class_to )
+    assert( Sa_i >= 0.0 );
+
+    if( Sa_i > 0.0 )
     {
         /* D_i =           h_i /    ND   *    ( Sa_i /    SD)  ^ ABS(k)   */
         /* D_i = exp(  log(h_i /    ND)  + log( Sa_i /    SD)  * ABS(k) ) */
         /* D_i = exp( (log(h_i)-log(ND)) + (log(Sa_i)-log(SD)) * ABS(k) ) */
         /* D_i = exp(      0   -log(ND)  + (log(Sa_i)-log(SD)) * ABS(k) ) */
-
-        double range  = (double)rfc_ctx->class_width * abs( (int)class_to - (int)class_from );
-        double Sa_i   = range / 2.0;  /* amplitude */
-
 #if !RFC_MINIMAL
         if( Sa_i > rfc_ctx->wl_omission )
         {
@@ -1484,6 +1479,47 @@ double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_
 }
 
 
+/**
+ * @brief      Calculate fictive damage for one closed (full) cycle.
+ *
+ * @param      rfc_ctx       The rainflow context
+ * @param[in]  class_from    The starting class
+ * @param[in]  class_to      The ending class
+ *
+ * @return     Pseudo damage value for the closed cycle
+ */
+static
+double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_to )
+{
+    assert( rfc_ctx );
+
+#if RFC_DAMAGE_FAST
+    if( rfc_ctx->damage_lut )
+    {
+        return RFC_damage_calc_fast( rfc_ctx, class_from, class_to );
+    }
+#endif /*RFC_DAMAGE_FAST*/
+
+#if RFC_USE_DELEGATES
+    if( rfc_ctx->damage_calc_fcn )
+    {
+        return rfc_ctx->damage_calc_fcn( rfc_ctx, class_from, class_to );
+    }
+#endif /*RFC_USE_DELEGATES*/
+
+
+    if( class_from != class_to )
+    {
+        double range     = (double)rfc_ctx->class_width * abs( (int)class_to - (int)class_from );
+        double amplitude = range / 2.0;
+
+		return RFC_damage_calc_amplitude( rfc_ctx, amplitude );
+    }
+
+	return 0.0;
+}
+
+
 #if RFC_DAMAGE_FAST
 /**
  * @brief   Initialize a look-up table of damages for closed cycles.
@@ -1494,30 +1530,26 @@ double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_
 static 
 void RFC_damage_lut_init( rfc_ctx_s *rfc_ctx )
 {
+    double *lut;
     size_t i;
 
     assert( rfc_ctx && rfc_ctx->damage_lut );
+
+    lut = rfc_ctx->damage_lut;
+    rfc_ctx->damage_lut = NULL;
 
     for( i = 0; i < rfc_ctx->class_count; i++ )
     {
         double damage;
         const int from = 0;
 
-#if RFC_USE_DELEGATES
-        if( rfc_ctx->damage_calc_fcn )
-        {
-            /* Calculate damage ignoring midrange */
-            damage = rfc_ctx->damage_calc_fcn( rfc_ctx, from, /*to*/ (int)i );
-        }
-        else
-#endif /*RFC_USE_DELEGATES*/
-        {
-            /* Calculate damage ignoring midrange */
-            damage = RFC_damage_calc_fast( rfc_ctx, from, /*to*/ (int)i );
-        }
+        /* Calculate damage ignoring midrange */
+        damage = RFC_damage_calc( rfc_ctx, from, /*to*/ (int)i );
 
-        rfc_ctx->damage_lut[i] = damage;
+        lut[i] = damage;
     }
+
+    rfc_ctx->damage_lut = lut;
 }
 
 
@@ -1543,6 +1575,140 @@ double RFC_damage_calc_fast( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned c
 
     /* Return damage ignoring midrange */
     return rfc_ctx->damage_lut[range];
+}
+
+
+static
+double RFC_haigh( rfc_ctx, const double *Sm, const double *Sa, size_t count, double Sm_norm )
+{
+    assert( rfc_ctx && Sm && Sa && count );
+
+    if( Sm_norm <= Sm[0] )
+    {
+        return Sa[0];  /* Transform to Sa(R=-1) */
+    }
+    else if( Sm_norm >= Sm[count-1] )
+    {
+        return Sa[count-1];  /* Transform to Sa(R=-1) */
+    }
+    else
+    {
+        /* Interpolation */
+        for( i = 1; i < count; i++ )
+        {
+            if( Sm_norm > Sm[i-1] && Sm_norm < Sm[i] )
+            {
+                double frac = ( Sm_norm - Sm[i-1] ) / ( Sm[i] - Sm[i-1] );
+                double linterp = Sa[i-1] * ( 1.0 - frac ) + Sa[i] * frac;
+
+                return linterp;  /* Transform to Sa(R=-1) */
+            }
+        }
+    }
+
+    assert( false );
+    return 0.0;
+}
+
+
+static
+bool RFC_damage_lut_init_haigh( rfc_ctx_s *rfc_ctx, const double *Sm, const double *Sa, size_t count, double M )
+{
+    int    from, to;
+    double Sa_FKM[3], Sm_FKM[3];
+    double *lut;
+
+    assert( rfc_ctx->damage_lut );
+
+    if( !count )
+    {
+        if( Sm || Sa || M <= 0.0 || M >= 1.0 )
+        {
+            RFC_error_raise( rfc_ctx, RFC_ERROR_INVARG );
+            return false;
+        }
+
+        Sm = (double*)rfc_ctx->mem_alloc( Sm, rfc_ctx->class_count, sizeof(double), RFC_MEM_AIM_TEMP );
+        Sa = (double*)rfc_ctx->mem_alloc( Sa, rfc_ctx->class_count, sizeof(double), RFC_MEM_AIM_TEMP );
+
+        if( !Sm || !Sa )
+        {
+            RFC_error_raise( rfc_ctx, RFC_ERROR_MEMORY );
+            rfc_ctx->mem_alloc( Sm, 0, 0, RFC_MEM_AIM_TEMP, RFC_MEM_AIM_TEMP );
+            rfc_ctx->mem_alloc( Sa, 0, 0, RFC_MEM_AIM_TEMP, RFC_MEM_AIM_TEMP );
+            return false;
+        }
+        else
+        {
+            double Sa_R_Inf, Sa_R_0, Sa_R_0p5;
+
+            Sa_R_Inf = 1.0 / ( 1.0 - M );                      /* y = -x && y = Sa(R=-1) - Mx                  */
+            Sa_R_0   = 1.0 / ( 1.0 + M );                      /* y =  x && y = Sa(R=-1) - Mx                  */
+            Sa_R_0p5 = Sa_R_0 * ( 1.0 + M/3 ) / ( 1.0 + M );   /* Backtrace Sa(R=0) to Sa(R=-1) with M/3, then */
+                                                               /* 3y = x && y = Sa(R=-1) - (M/3)x              */
+
+            Sa_FKM[0] = Sa_R_Inf; Sm_FKM[0] = -Sa_R_Inf;
+            Sa_FKM[1] = Sa_R_0;   Sm_FKM[1] =  Sa_R_0;
+            Sa_FKM[2] = Sa_R_0p5; Sm_FKM[2] =  Sa_R_0p5 * 3.0;
+        }
+
+        Sa = Sa_FKM;
+        Sm = Sm_FKM;
+        count = 3;
+    }
+    else
+    {
+        if( !Sm || !Sa )
+        {
+            RFC_error_raise( rfc_ctx, RFC_ERROR_INVARG );
+            return false;
+        }
+    }
+
+    lut = rfc_ctx->damage_lut;
+    rfc_ctx->damage_lut = NULL;
+
+    for( from = 0; from < (int)rfc_ctx->class_count; from++ )
+    {
+        for( to = 0; to < (int)rfc_ctx->class_count; to++ )
+        {
+            double Sa_i, Sm_i;
+            double damage = 0.0;
+
+            Sa_i = fabs( from - to ) / 2;
+
+            if( Sa_i > 0.0 )
+            {
+                double Sm_n;
+
+                /* Normalize Sm */
+                Sm_i = ( from + to ) / 2;
+                Sm_n = Sm_i / Sa_i;
+
+                Sa_i /= RFC_haigh( rfc_ctx, Sa, Sm, count, Sm_n );
+
+                damage = RFC_damage_calc_amplitude( rfc_ctx, Sa_i );
+            }
+
+            lut[from * rfc_ctx->class_count + to] = damage;
+        }
+    }
+
+    rfc_ctx->damage_lut = lut;
+
+    return true;
+}
+
+
+static
+double RFC_damage_calc_fast_haig( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_to )
+{
+    assert( rfc_ctx );
+    assert( class_from < rfc_ctx->class_count );
+    assert( class_to   < rfc_ctx->class_count );
+    assert( rfc_ctx->damage_lut );
+
+    return( rfc_ctx->damage_lut[class_from * rfc_ctx->class_count + class_to] );
 }
 #endif /*RFC_DAMAGE_FAST*/
 
@@ -1963,12 +2129,7 @@ void RFC_cycle_process( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_value_t
     if( class_from != class_to )
     {
         /* Cumulate pseudo damage */
-        double damage;
-#if RFC_DAMAGE_FAST
-        damage = RFC_damage_calc_fast( rfc_ctx, class_from, class_to );
-#else /*!RFC_DAMAGE_FAST*/
-        damage = RFC_damage_calc( rfc_ctx, class_from, class_to );
-#endif /*RFC_DAMAGE_FAST*/
+        double damage = RFC_damage_calc( rfc_ctx, class_from, class_to );
 
         /* Adding damage due to current cycle weight */
         rfc_ctx->pseudo_damage += damage * rfc_ctx->curr_inc / rfc_ctx->full_inc;
@@ -2085,7 +2246,8 @@ bool RFC_tp_add( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *tp )
                 /* Reallocation */
                 tp_cap_increment = (size_t)1024 * ( rfc_ctx->tp_cap / 640 + 1 );  /* + 60% + 1024 */
                 tp_cap_new       = rfc_ctx->tp_cap + tp_cap_increment;
-                tp_new           = rfc_ctx->mem_alloc( rfc_ctx->tp, tp_cap_new, sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TP );
+                tp_new           = rfc_ctx->mem_alloc( rfc_ctx->tp, tp_cap_new, 
+                                                       sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TP );
 
                 if( tp_new )
                 {
@@ -2183,32 +2345,20 @@ void RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
         case RFC_SD_NONE:
             break;
         case RFC_SD_HALF_23:
-#if RFC_DAMAGE_FAST
-            damage = RFC_damage_calc_fast( rfc_ctx, from->class, to->class );
-#else /*!RFC_DAMAGE_FAST*/
             damage = RFC_damage_calc( rfc_ctx, from->class, to->class );
-#endif RFC_DAMAGE_FAST
 #if RFC_TP_SUPPORT && RFC_DH_SUPPORT
             from->damage += damage / 2.0;
             to->damage   += damage / 2.0;
 #endif /*RFC_TP_SUPPORT && RFC_DH_SUPPORT*/
             break;
         case RFC_SD_FULL_P2:
-#if RFC_DAMAGE_FAST
-            damage = RFC_damage_calc_fast( rfc_ctx, from->class, to->class );
-#else /*!RFC_DAMAGE_FAST*/
             damage = RFC_damage_calc( rfc_ctx, from->class, to->class );
-#endif RFC_DAMAGE_FAST
 #if RFC_TP_SUPPORT && RFC_DH_SUPPORT
             from->damage += damage;
 #endif /*RFC_TP_SUPPORT && RFC_DH_SUPPORT*/
             break;
         case RFC_SD_FULL_P3:
-#if RFC_DAMAGE_FAST
-            damage = RFC_damage_calc_fast( rfc_ctx, from->class, to->class );
-#else /*!RFC_DAMAGE_FAST*/
             damage = RFC_damage_calc( rfc_ctx, from->class, to->class );
-#endif RFC_DAMAGE_FAST
 #if RFC_TP_SUPPORT && RFC_DH_SUPPORT
             to->damage += damage;
 #endif /*RFC_TP_SUPPORT && RFC_DH_SUPPORT*/
@@ -2267,19 +2417,11 @@ void RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
                 {
                     case RFC_SD_RAMP_AMPLITUDE_23:
                     case RFC_SD_RAMP_AMPLITUDE_24:
-#if RFC_DAMAGE_FAST
-                        damage = RFC_damage_calc_fast( rfc_ctx, from->class, to->class );
-#else /*!RFC_DAMAGE_FAST*/
                         damage = RFC_damage_calc( rfc_ctx, from->class, to->class );
-#endif RFC_DAMAGE_FAST
                         break;
                     case RFC_SD_RAMP_DAMAGE_23:
                     case RFC_SD_RAMP_DAMAGE_24:
-#if RFC_DAMAGE_FAST
-                        damage = RFC_damage_calc_fast( rfc_ctx, from->class, to->class );
-#else /*!RFC_DAMAGE_FAST*/
                         damage = RFC_damage_calc( rfc_ctx, from->class, to->class );
-#endif RFC_DAMAGE_FAST
                         break;
                 }
 
@@ -2573,7 +2715,8 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         if( ok )
         {
             rfc_ctx.tp_cap = 128;
-            rfc_ctx.tp     = (rfc_value_tuple_s*)RFC_mem_alloc( NULL, rfc_ctx.tp_cap, sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TP );
+            rfc_ctx.tp     = (rfc_value_tuple_s*)RFC_mem_alloc( NULL, rfc_ctx.tp_cap, 
+                                                                sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TP );
 
             ok = RFC_tp_init( &rfc_ctx, rfc_ctx.tp, rfc_ctx.tp_cap, /* is_static */ true );
         }
@@ -2587,7 +2730,8 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         /* Casting values from double type to RFC_value_type */ 
         if( sizeof( RFC_value_type ) != sizeof(double) && data_len )  /* maybe unsafe! */
         {
-            buffer = (RFC_value_type *)RFC_mem_alloc( NULL, data_len, sizeof(RFC_value_type), RFC_MEM_AIM_TEMP );
+            buffer = (RFC_value_type *)RFC_mem_alloc( NULL, data_len, 
+                                                      sizeof(RFC_value_type), RFC_MEM_AIM_TEMP );
 
             if( !buffer )
             {
