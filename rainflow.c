@@ -210,9 +210,8 @@ bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type 
 #if RFC_TP_SUPPORT
                                           RFC_FLAGS_TPPRUNE_PRESERVE_POS | 
                                           RFC_FLAGS_TPPRUNE_PRESERVE_RES |
-#else /*!RFC_TP_SUPPORT*/
-                                          0;
 #endif /*RFC_TP_SUPPORT*/
+                                          0;
 #else /*RFC_MINIMAL*/
     rfc_ctx->flags                      = RFC_FLAGS_COUNT_MATRIX;
 #endif /*!RFC_MINIMAL*/
@@ -809,6 +808,7 @@ void RFC_reset( rfc_ctx_s *rfc_ctx )
     rfc_ctx->internal.extrema_changed   = false;
 #endif
     rfc_ctx->internal.pos               = 0;
+    rfc_ctx->internal.global_offset     = 0;
 #if RFC_TP_SUPPORT
     rfc_ctx->internal.margin[0]         = nil;  /* left margin */
     rfc_ctx->internal.margin[1]         = nil;  /* right margin */
@@ -817,7 +817,15 @@ void RFC_reset( rfc_ctx_s *rfc_ctx )
     rfc_ctx->tp_locked                  = 0;
 #endif /*RFC_TP_SUPPORT*/
 
+#if RFC_DH_SUPPORT
+    rfc_ctx->dh_cnt                     = 0;
+#endif /*RFC_DH_SUPPORT*/
+
     rfc_ctx->pseudo_damage              = 0.0;
+
+#if RFC_DAMAGE_FAST
+    RFC_damage_lut_init( rfc_ctx );
+#endif /*RFC_DAMAGE_FAST*/
 
 #if RFC_HCM_SUPPORT
     /* Reset stack pointers */
@@ -825,7 +833,7 @@ void RFC_reset( rfc_ctx_s *rfc_ctx )
     rfc_ctx->internal.hcm.IZ            = 0;
 #endif /*RFC_HCM_SUPPORT*/
 
-    rfc_ctx->state = RFC_STATE_INIT0;
+    rfc_ctx->state = RFC_STATE_INIT;
 }
 #endif /*!RFC_MINIMAL*/
 
@@ -1498,11 +1506,13 @@ void RFC_damage_lut_init( rfc_ctx_s *rfc_ctx )
 #if RFC_USE_DELEGATES
         if( rfc_ctx->damage_calc_fcn )
         {
+            /* Calculate damage ignoring midrange */
             damage = rfc_ctx->damage_calc_fcn( rfc_ctx, from, /*to*/ (int)i );
         }
         else
 #endif /*RFC_USE_DELEGATES*/
         {
+            /* Calculate damage ignoring midrange */
             damage = RFC_damage_calc_fast( rfc_ctx, from, /*to*/ (int)i );
         }
 
@@ -1953,7 +1963,12 @@ void RFC_cycle_process( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_value_t
     if( class_from != class_to )
     {
         /* Cumulate pseudo damage */
-        double damage = RFC_damage_calc( rfc_ctx, class_from, class_to );
+        double damage;
+#if RFC_DAMAGE_FAST
+        damage = RFC_damage_calc_fast( rfc_ctx, class_from, class_to );
+#else /*!RFC_DAMAGE_FAST*/
+        damage = RFC_damage_calc( rfc_ctx, class_from, class_to );
+#endif /*RFC_DAMAGE_FAST*/
 
         /* Adding damage due to current cycle weight */
         rfc_ctx->pseudo_damage += damage * rfc_ctx->curr_inc / rfc_ctx->full_inc;
@@ -2168,23 +2183,42 @@ void RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
         case RFC_SD_NONE:
             break;
         case RFC_SD_HALF_23:
-            damage = rfc_ctx->damage_lut[abs( (int)from->class - (int)to->class )];
+#if RFC_DAMAGE_FAST
+            damage = RFC_damage_calc_fast( rfc_ctx, from->class, to->class );
+#else /*!RFC_DAMAGE_FAST*/
+            damage = RFC_damage_calc( rfc_ctx, from->class, to->class );
+#endif RFC_DAMAGE_FAST
+#if RFC_TP_SUPPORT && RFC_DH_SUPPORT
             from->damage += damage / 2.0;
             to->damage   += damage / 2.0;
+#endif /*RFC_TP_SUPPORT && RFC_DH_SUPPORT*/
             break;
         case RFC_SD_FULL_P2:
-            damage = rfc_ctx->damage_lut[abs( (int)from->class - (int)to->class )];
+#if RFC_DAMAGE_FAST
+            damage = RFC_damage_calc_fast( rfc_ctx, from->class, to->class );
+#else /*!RFC_DAMAGE_FAST*/
+            damage = RFC_damage_calc( rfc_ctx, from->class, to->class );
+#endif RFC_DAMAGE_FAST
+#if RFC_TP_SUPPORT && RFC_DH_SUPPORT
             from->damage += damage;
+#endif /*RFC_TP_SUPPORT && RFC_DH_SUPPORT*/
             break;
         case RFC_SD_FULL_P3:
-            damage = rfc_ctx->damage_lut[abs( (int)from->class - (int)to->class )];
+#if RFC_DAMAGE_FAST
+            damage = RFC_damage_calc_fast( rfc_ctx, from->class, to->class );
+#else /*!RFC_DAMAGE_FAST*/
+            damage = RFC_damage_calc( rfc_ctx, from->class, to->class );
+#endif RFC_DAMAGE_FAST
+#if RFC_TP_SUPPORT && RFC_DH_SUPPORT
             to->damage += damage;
+#endif /*RFC_TP_SUPPORT && RFC_DH_SUPPORT*/
             break;
         case RFC_SD_RAMP_AMPLITUDE_23:
         case RFC_SD_RAMP_DAMAGE_23:
         case RFC_SD_RAMP_AMPLITUDE_24:
         case RFC_SD_RAMP_DAMAGE_24:
         {
+#if RFC_TP_SUPPORT
             size_t  i,
                     start, end, width, 
                     tp_start, tp_end;
@@ -2233,11 +2267,19 @@ void RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
                 {
                     case RFC_SD_RAMP_AMPLITUDE_23:
                     case RFC_SD_RAMP_AMPLITUDE_24:
-                    new_damage = RFC_damage_calc_fast( rfc_ctx, 0, (int)( weight * range + 0.5 ) );
+#if RFC_DAMAGE_FAST
+                        damage = RFC_damage_calc_fast( rfc_ctx, from->class, to->class );
+#else /*!RFC_DAMAGE_FAST*/
+                        damage = RFC_damage_calc( rfc_ctx, from->class, to->class );
+#endif RFC_DAMAGE_FAST
                         break;
                     case RFC_SD_RAMP_DAMAGE_23:
                     case RFC_SD_RAMP_DAMAGE_24:
-                        new_damage = RFC_damage_calc_fast( rfc_ctx, 0, range ) * weight;
+#if RFC_DAMAGE_FAST
+                        damage = RFC_damage_calc_fast( rfc_ctx, from->class, to->class );
+#else /*!RFC_DAMAGE_FAST*/
+                        damage = RFC_damage_calc( rfc_ctx, from->class, to->class );
+#endif RFC_DAMAGE_FAST
                         break;
                 }
 
@@ -2247,6 +2289,7 @@ void RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
                     damage = new_damage;
                 }
             }
+#endif /*RFC_TP_SUPPORT*/
         }
         break;
 
