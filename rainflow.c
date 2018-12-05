@@ -1480,6 +1480,50 @@ double RFC_damage_calc_amplitude( rfc_ctx_s *rfc_ctx, double amplitude )
 
 
 /**
+ * @brief      Calculate the allevation factor for amplitude with mean load
+ *
+ * @param      rfc_ctx       The rainflow context
+ * @param[in]  Sm            Mean load vector (polygonal chain)
+ * @param[in]  Sa            Allevation factors, appropriate to Sm. Sa(Sm=0)=1
+ * @param      count         Length tog Sa and Sm
+ * @param      Sm_norm       Normalized mean load (Sm_i/Sa_i)
+ *
+ * @return     Allevation factor
+ */
+static
+double RFC_haigh( rfc_ctx, const double *Sm, const double *Sa, size_t count, double Sm_norm )
+{
+    assert( rfc_ctx && Sm && Sa && count );
+
+    if( Sm_norm <= Sm[0] )
+    {
+        return Sa[0];  /* Clip to first point */
+    }
+    else if( Sm_norm >= Sm[count-1] )
+    {
+        return Sa[count-1];  /* Clip to last point */
+    }
+    else
+    {
+        /* Interpolate between polygonal points */
+        for( i = 1; i < count; i++ )
+        {
+            if( Sm_norm > Sm[i-1] && Sm_norm < Sm[i] )
+            {
+                double frac   = ( Sm_norm - Sm[i-1] ) / ( Sm[i] - Sm[i-1] );
+                double factor = Sa[i-1] * ( 1.0 - frac ) + Sa[i] * frac;
+
+                return factor;  /* Transform to Sa(R=-1) */
+            }
+        }
+    }
+
+    assert( false );
+    return 0.0;
+}
+
+
+/**
  * @brief      Calculate fictive damage for one closed (full) cycle.
  *
  * @param      rfc_ctx       The rainflow context
@@ -1510,10 +1554,23 @@ double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_
 
     if( class_from != class_to )
     {
+#if RFC_MINIMAL
         double range     = (double)rfc_ctx->class_width * abs( (int)class_to - (int)class_from );
         double amplitude = range / 2.0;
 
 		return RFC_damage_calc_amplitude( rfc_ctx, amplitude );
+#else /*!RFC_MINIMAL*/
+        double Sa_i   = fabs( (int)from - (int)to ) / 2.0 * rfc_ctx->class_width;
+        double Sm_i   =     ( (int)from + (int)tp ) / 2.0 * rfc_ctx->class_width + rfc_ctx->class_offset;
+
+        if( Sa_i > 0.0 )
+        {
+            /* Calculate transformation factor with normalized mean value */
+            Sa_i /= RFC_haigh( rfc_ctx, Sa, Sm, count, Sm_i / Sa_i );
+
+            return RFC_damage_calc_amplitude( rfc_ctx, Sa_i );
+        }
+#endif /*RFC_MINIMAL*/
     }
 
 	return 0.0;
@@ -1531,13 +1588,39 @@ static
 void RFC_damage_lut_init( rfc_ctx_s *rfc_ctx )
 {
     double *lut;
-    size_t i;
+    unsigned from, to;
 
     assert( rfc_ctx && rfc_ctx->damage_lut );
 
     lut = rfc_ctx->damage_lut;
     rfc_ctx->damage_lut = NULL;
 
+    for( from = 0; from < rfc_ctx->class_count; from++ )
+    {
+        for( to = 0; to < rfc_ctx->class_count; to++ )
+        {
+            double Sa_i, Sm_i;
+            double damage = 0.0;
+
+            Sa_i = fabs( from - to ) / 2;
+            Sm_i =     ( from + tp ) / 2;
+
+            if( Sa_i > 0.0 )
+            {
+                double Sm_n;
+
+                /* Normalize Sm */
+                Sm_i = ( from + to ) / 2;
+                Sm_n = Sm_i / Sa_i;
+
+                Sa_i /= RFC_haigh( rfc_ctx, Sa, Sm, count, Sm_n );
+
+                damage = RFC_damage_calc_amplitude( rfc_ctx, Sa_i );
+            }
+
+            lut[from * rfc_ctx->class_count + to] = damage;
+        }
+    }
     for( i = 0; i < rfc_ctx->class_count; i++ )
     {
         double damage;
@@ -1575,39 +1658,6 @@ double RFC_damage_calc_fast( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned c
 
     /* Return damage ignoring midrange */
     return rfc_ctx->damage_lut[range];
-}
-
-
-static
-double RFC_haigh( rfc_ctx, const double *Sm, const double *Sa, size_t count, double Sm_norm )
-{
-    assert( rfc_ctx && Sm && Sa && count );
-
-    if( Sm_norm <= Sm[0] )
-    {
-        return Sa[0];  /* Transform to Sa(R=-1) */
-    }
-    else if( Sm_norm >= Sm[count-1] )
-    {
-        return Sa[count-1];  /* Transform to Sa(R=-1) */
-    }
-    else
-    {
-        /* Interpolation */
-        for( i = 1; i < count; i++ )
-        {
-            if( Sm_norm > Sm[i-1] && Sm_norm < Sm[i] )
-            {
-                double frac = ( Sm_norm - Sm[i-1] ) / ( Sm[i] - Sm[i-1] );
-                double linterp = Sa[i-1] * ( 1.0 - frac ) + Sa[i] * frac;
-
-                return linterp;  /* Transform to Sa(R=-1) */
-            }
-        }
-    }
-
-    assert( false );
-    return 0.0;
 }
 
 
