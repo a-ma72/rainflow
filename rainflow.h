@@ -116,6 +116,7 @@
 #define RFC_HCM_SUPPORT      OFF
 #define RFC_TP_SUPPORT       OFF
 #define RFC_DH_SUPPORT       OFF
+#define RFC_AT_SUPPORT       OFF
 #define RFC_GLOBAL_EXTREMA   OFF
 #define RFC_DAMAGE_FAST      OFF
 #else /*!RFC_MINIMAL*/

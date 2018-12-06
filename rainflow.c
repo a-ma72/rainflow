@@ -1434,8 +1434,16 @@ void RFC_residue_remove_item( rfc_ctx_s *rfc_ctx, size_t index, size_t count )
 #endif /*!RFC_MINIMAL*/
 
 
+/**
+ * @brief       Calculate pseudo damage for one cycle with given amplitude Sa
+ *
+ * @param       rfc_ctx  The rainflow context
+ * @param       Sa       The amplitude
+ * 
+ * @return      Pseudo damage
+ */
 static
-double RFC_damage_calc_amplitude( rfc_ctx_s *rfc_ctx, double amplitude )
+double RFC_damage_calc_amplitude( rfc_ctx_s *rfc_ctx, double Sa )
 {
     /* Constants for the Woehler curve */
     const double SD_log  = log(rfc_ctx->wl_sd);
@@ -1445,40 +1453,39 @@ double RFC_damage_calc_amplitude( rfc_ctx_s *rfc_ctx, double amplitude )
     const double k2      = rfc_ctx->wl_k2;
 #endif /*!RFC_MINIMAL*/
 
-    double Sa_i = amplitude;
-
     /* Pseudo damage */
-    double D_i = 0.0;
+    double D = 0.0;
 
-    assert( Sa_i >= 0.0 );
+    assert( Sa >= 0.0 );
 
-    if( Sa_i > 0.0 )
+    if( Sa > 0.0 )
     {
-        /* D_i =           h_i /    ND   *    ( Sa_i /    SD)  ^ ABS(k)   */
-        /* D_i = exp(  log(h_i /    ND)  + log( Sa_i /    SD)  * ABS(k) ) */
-        /* D_i = exp( (log(h_i)-log(ND)) + (log(Sa_i)-log(SD)) * ABS(k) ) */
-        /* D_i = exp(      0   -log(ND)  + (log(Sa_i)-log(SD)) * ABS(k) ) */
+        /* D =           h /    ND   *    ( Sa /    SD)  ^ ABS(k)   */
+        /* D = exp(  log(h /    ND)  + log( Sa /    SD)  * ABS(k) ) */
+        /* D = exp( (log(h)-log(ND)) + (log(Sa)-log(SD)) * ABS(k) ) */
+        /* D = exp(      0 -log(ND)  + (log(Sa)-log(SD)) * ABS(k) ) */
 #if !RFC_MINIMAL
-        if( Sa_i > rfc_ctx->wl_omission )
+        if( Sa > rfc_ctx->wl_omission )
         {
-            if( Sa_i > rfc_ctx->wl_sd )
+            if( Sa > rfc_ctx->wl_sd )
             {
-                D_i = exp( fabs(k)  * ( log(Sa_i) - SD_log ) - ND_log );
+                D = exp( fabs(k)  * ( log(Sa) - SD_log ) - ND_log );
             }
             else
             {
-                D_i = exp( fabs(k2) * ( log(Sa_i) - SD_log ) - ND_log );
+                D = exp( fabs(k2) * ( log(Sa) - SD_log ) - ND_log );
             }
         }
 #else /*RFC_MINIMAL*/
-        D_i = exp( fabs(k)  * ( log(Sa_i) - SD_log ) - ND_log );
+        D = exp( fabs(k)  * ( log(Sa) - SD_log ) - ND_log );
 #endif /*!RFC_MINIMAL*/
     }
 
-    return D_i;
+    return D;
 }
 
 
+#if RFC_AT_SUPPORT
 /**
  * @brief      Calculate the allevation factor for amplitude with mean load
  *
@@ -1521,6 +1528,7 @@ double RFC_haigh( rfc_ctx, const double *Sm, const double *Sa, size_t count, dou
     assert( false );
     return 0.0;
 }
+#endif /*RFC_AT_SUPPORT*/
 
 
 /**
@@ -1558,22 +1566,24 @@ double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_
         double range     = (double)rfc_ctx->class_width * abs( (int)class_to - (int)class_from );
         double amplitude = range / 2.0;
 
-		return RFC_damage_calc_amplitude( rfc_ctx, amplitude );
+        return RFC_damage_calc_amplitude( rfc_ctx, amplitude );
 #else /*!RFC_MINIMAL*/
         double Sa_i   = fabs( (int)from - (int)to ) / 2.0 * rfc_ctx->class_width;
         double Sm_i   =     ( (int)from + (int)tp ) / 2.0 * rfc_ctx->class_width + rfc_ctx->class_offset;
 
         if( Sa_i > 0.0 )
         {
+#if RFC_AT_SUPPORT
             /* Calculate transformation factor with normalized mean value */
             Sa_i /= RFC_haigh( rfc_ctx, Sa, Sm, count, Sm_i / Sa_i );
+#endif /*RFC_AT_SUPPORT*/
 
             return RFC_damage_calc_amplitude( rfc_ctx, Sa_i );
         }
 #endif /*RFC_MINIMAL*/
     }
 
-	return 0.0;
+    return 0.0;
 }
 
 
@@ -1661,6 +1671,7 @@ double RFC_damage_calc_fast( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned c
 }
 
 
+#if RFC_AT_SUPPORT
 static
 bool RFC_damage_lut_init_haigh( rfc_ctx_s *rfc_ctx, const double *Sm, const double *Sa, size_t count, double M )
 {
@@ -1760,6 +1771,7 @@ double RFC_damage_calc_fast_haig( rfc_ctx_s *rfc_ctx, unsigned class_from, unsig
 
     return( rfc_ctx->damage_lut[class_from * rfc_ctx->class_count + class_to] );
 }
+#endif /*RFC_AT_SUPPORT*/
 #endif /*RFC_DAMAGE_FAST*/
 
 

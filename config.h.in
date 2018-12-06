@@ -12,4 +12,5 @@
   #define RFC_GLOBAL_EXTREMA       ${RFC_GLOBAL_EXTREMA}
   #define RFC_DAMAGE_FAST          ${RFC_DAMAGE_FAST}
   #define RFC_DH_SUPPORT           ${RFC_DH_SUPPORT}
+  #define RFC_AT_SUPPORT           ${RFC_AT_SUPPORT}
 #endif /*RFC_VERSION_MAJOR*/
