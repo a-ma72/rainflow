@@ -36,25 +36,32 @@
  * predefined functions.
  * 
  * References:
- * [1] ASTM Standard E 1049, 1985 (2011). 
- *     "Standard Practices for Cycle Counting in Fatigue Analysis."
+ * [1] "Standard Practices for Cycle Counting in Fatigue Analysis."
+ *     ASTM Standard E 1049, 1985 (2011). 
  *     West Conshohocken, PA: ASTM International, 2011.
- * [2] Rainflow - HCM
- *     "Ein Hysteresisschleifen-Zaehlalgorithmus auf werkstoffmechanischer Grundlage"
+ * [2] "Rainflow - HCM / Ein Hysteresisschleifen-Zaehlalgorithmus auf werkstoffmechanischer Grundlage"
  *     U.H. Clormann, T. Seeger
  *     1985 TU Darmstadt, Fachgebiet Werkstoffmechanik
- * [3] FVA-Richtlinie, 2010.
- *     "Zaehlverfahren zur Bildung von Kollektiven und Matrizen aus Zeitfunktionen"
+ * [3] "Zaehlverfahren zur Bildung von Kollektiven und Matrizen aus Zeitfunktionen"
+ *     FVA-Richtlinie, 2010.
  *     [https://fva-net.de/fileadmin/content/Richtlinien/FVA-Richtlinie_Zaehlverfahren_2010.pdf]
  * [4] Siemens Product Lifecycle Management Software Inc., 2018. 
  *     [https://community.plm.automation.siemens.com/t5/Testing-Knowledge-Base/Rainflow-Counting/ta-p/383093]
- * [5] G.Marsh on: "Review and application of Rainflow residue processing techniques for accurate fatigue damage estimation"
+ * [5] "Review and application of Rainflow residue processing techniques for accurate fatigue damage estimation"
+ *     G.Marsh;
  *     International Journal of Fatigue 82 (2016) 757-765,
  *     [https://doi.org/10.1016/j.ijfatigue.2015.10.007]
- * []  Hack, M: Schaedigungsbasierte Hysteresefilter; D386 (Diss Univ. Kaiserslautern), Shaker Verlag Aachen, 1998, ISBN 3-8265-3936-2
- * []  Brokate, M; Sprekels, J, Hysteresis and Phase Transition, Applied Mathematical Sciences 121, Springer,  New York, 1996
- * []  Brokate, M; Dressler, K; Krejci, P: Rainflow counting and energy dissipation in elastoplasticity, Eur. J. Mech. A/Solids 15, pp. 705-737, 1996
- * []  Scott, D.: Multivariate Density Estimation: Theory, Practice and Visualization. New York, Chichester, Wiley & Sons, 1992
+ * []  "Schaedigungsbasierte Hysteresefilter"; Hack, M, D386 (Diss Univ. Kaiserslautern), Shaker Verlag Aachen, 1998, ISBN 3-8265-3936-2
+ * []  "Hysteresis and Phase Transition"
+ *     Brokate, M.; Sprekels, J.; Applied Mathematical Sciences 121; Springer, New York, 1996
+ * []  "Rainflow counting and energy dissipation in elastoplasticity"; Eur. J. Mech. A/Solids 15, pp. 705-737, 1996
+ *     Brokate, M.; Dressler, K.; Krejci, P.
+ * []  "Multivariate Density Estimation: Theory, Practice and Visualization". New York, Chichester, Wiley & Sons, 1992
+ *     Scott, D.
+ * []  "Werkstoffmechanik - Bauteile sicher beurteilen undWerkstoffe richtig einsetzen"; 
+ *      Ralf Bürgel, Hans Albert Richard, Andre Riemer; Springer FachmedienWiesbaden 2005, 2014
+ * [] "Zählverfahren und Lastannahme in der Betriebsfestigkeit";
+ *    Michael Köhler, Sven Jenne • Kurt Pötter, Harald Zenner; Springer-Verlag Berlin Heidelberg 2012
  *
  *                                                                                                                                                          *
  *================================================================================
@@ -136,6 +143,10 @@
 #define RFC_DH_SUPPORT OFF
 #endif /*RFC_DH_SUPPORT*/
 
+#ifndef RFC_AT_SUPPORT
+#define RFC_AT_SUPPORT OFF
+#endif /*RFC_AT_SUPPORT*/
+
 #ifndef RFC_GLOBAL_EXTREMA
 #define RFC_GLOBAL_EXTREMA OFF
 #endif /*RFC_GLOBAL_EXTREMA*/
@@ -200,6 +211,10 @@ bool RFC_tp_prune             ( void *ctx, size_t count, int flags );
 bool RFC_dh_init              ( void *ctx, double *dh, size_t dh_cap, bool is_static );
 #endif /*RFC_DH_SUPPORT*/
 
+#if RFC_AT_SUPPORT
+bool RFC_at_init              ( void *ctx, const double *Sa, const double *Sm, unsigned count, double M, double Sm_rig, double R_rig, bool R_pinned );
+#endif /*RFC_AT_SUPPORT*/
+
 #if RFC_USE_DELEGATES
 /* Delegates typedef */
 typedef  void                ( *rfc_cycle_find_fcn_t )    ( rfc_ctx_s * );
@@ -213,6 +228,9 @@ typedef  bool                ( *rfc_tp_prune_fcn_t )      ( rfc_ctx_s *, size_t,
 #if RFC_DH_SUPPORT
 typedef  void                ( *rfc_spread_damage_fcn_t ) ( rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags );
 #endif /*RFC_DH_SUPPORT*/
+#if RFC_AT_SUPPORT
+typedef  double              ( *rfc_at_transform_fcn_t )  ( rfc_ctx_s *, double Sa, double Sm );
+#endif /*RFC_AT_SUPPORT*/
 #endif /*RFC_USE_DELEGATES*/
 
 
@@ -365,6 +383,9 @@ typedef struct rfc_ctx
 #if RFC_DH_SUPPORT                                        
     rfc_spread_damage_fcn_t             spread_damage_fcn;          /**< Spread damage over turning points and damage history */
 #endif /*RFC_DH_SUPPORT*/
+#if RFC_AT_SUPPORT
+    rfc_at_transform_fcn_t              at_transform_fcn;           /**< Amplitude transformation to take mean load influence into account */
+#endif /*RFC_AT_SUPPORT*/
 #endif /*RFC_USE_DELEGATES*/
     
     /* Residue */
@@ -399,7 +420,21 @@ typedef struct rfc_ctx
     double                             *damage_lut;                 /**< Damage look-up table */
 #endif /*RFC_DAMAGE_FAST*/
     double                              pseudo_damage;              /**< Cumulated pseudo damage */
-    
+
+#if RFC_AT_SUPPORT
+    struct at
+    {
+        const double                   *Sa;
+        const double                   *Sm;
+        unsigned                        count;
+        double                          M;
+        double                          Sm_rig;
+        double                          R_rig;
+        bool                            R_pinned;
+    }                                   
+                                        at;
+#endif /*RFC_AT_SUPPORT*/
+
     /* Internal usage */
     struct internal
     {
@@ -428,6 +463,15 @@ typedef struct rfc_ctx
             int                         IZ;                         /**< Pointer to residue stack, last turning point of cycles able to close, base 1 */
         }                               hcm;
 #endif /*RFC_HCM_SUPPORT*/
+#if RFC_AT_SUPPORT
+        struct at
+        {
+            double                      Sa[5];
+            double                      Sm[5];
+            unsigned                    count;
+        }
+#endif /*RFC_AT_SUPPORT*/
+
     }
                                         internal;
 } rfc_ctx_s;

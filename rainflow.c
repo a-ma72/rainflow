@@ -155,6 +155,9 @@ static void                 RFC_tp_refeed                       ( rfc_ctx_s *, R
 #if RFC_DH_SUPPORT
 static void                 RFC_spread_damage                   ( rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags );
 #endif /*RFC_DH_SUPPORT*/
+#if RFC_AT_SUPPORT
+static double               RFC_at_transform                    ( rfc_ctx_s *, double Sa, double Sm );
+#endif /*RFC_AT_SUPPORT*/
 /* Other */
 #if !RFC_MINIMAL
 static void                 RFC_class_param_set                 ( rfc_ctx_s *, const rfc_class_param_s * );
@@ -334,10 +337,21 @@ bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type 
                                                                                   sizeof(rfc_value_tuple_s), RFC_MEM_AIM_HCM );
 #endif /*RFC_HCM_SUPPORT*/
 
+#if RFC_AT_SUPPORT
+    rfc_ctx->at.Sa                      = NULL;
+    rfc_ctx->at.Sm                      = NULL;
+    rfc_ctx->at.count                   = 0;
+    rfc_ctx->at.M                       = 0.0;
+    rfc_ctx->at.Sm_rig                  = 0.0;
+    rfc_ctx->at.R_rig                   = 0.0;
+    rfc_ctx->at.R_pinned                = false;
+
+    rfc_ctx->internal.count             = 0;
+#endif /*RFC_AT_SUPPORT*/
+
     rfc_ctx->state = RFC_STATE_INIT;
     return true;
 }
-
 
 #if RFC_TP_SUPPORT
 bool RFC_tp_init( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static )
@@ -517,6 +531,82 @@ bool RFC_dh_init( void *ctx, double *dh, size_t dh_cap, bool is_static )
 #endif /*RFC_DH_SUPPORT*/
 
 
+#if RFC_AT_SUPPORT
+bool RFC_at_init( void *ctx, const double *Sa, const double *Sm, unsigned count, double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric )
+{
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || M < 0.0 )
+    {
+        assert( false );
+        rfc_ctx->error = RFC_ERROR_INVARG;
+
+        return false;
+    }
+
+    if( count )
+    {
+        if( !Sa || !Sm )
+        {
+            rfc_ctx->error = RFC_ERROR_INVARG;
+            return false;
+        }
+
+        rfc_ctx->at.Sa       = Sa;
+        rfc_ctx->at.Sm       = Sm;
+        rfc_ctx->at.count    = count;
+        rfc_ctx->at.R_rig    = R_rig;
+        rfc_ctx->at.R_pinned = R_pinned;
+        rfc_ctx->at.Sm_rig   = R_pinned ? RFC_at_R_to_Sm_norm( rfc_ctx, Sm ) : Sm_rig;
+    }
+    else
+    {
+        double Sa_R_Inf, Sa_R_0, Sa_R_0p5;
+
+        assert( !Sa && !Sm && !count );
+
+        Sa_R_Inf = 1.0 / ( 1.0 - M );                      /* y = -x && y = Sa(R=-1) - Mx                  */
+        Sa_R_0   = 1.0 / ( 1.0 + M );                      /* y =  x && y = Sa(R=-1) - Mx                  */
+        Sa_R_0p5 = Sa_R_0 * ( 1.0 + M/3 ) / ( 1.0 + M );   /* Backtrace Sa(R=0) to Sa(R=-1) with M/3, then */
+                                                           /* 3y = x && y = Sa(R=-1) - (M/3)x              */
+        if( symmetric )
+        {
+            double *Sa_ = rfc_ctx->internal.Sa;
+            double *Sm_ = rfc_ctx->internal.Sm;
+
+            assert( NUMEL( rfc_ctx->internal.Sa ) >= 3 );
+            
+            rfc_ctx->internal.count = 5;
+
+            Sa_[0] = Sa_R_0p5; Sm_[0] = -Sa_R_0p5 * 3.0;
+            Sa_[1] = Sa_R_0;   Sm_[1] = -Sa_R_0;
+            Sa_[2] = 1.0;      Sm_[2] =  0.0;
+            Sa_[3] = Sa_[1];   Sm_[3] = -Sm_[1];
+            Sa_[3] = Sa_[0];   Sm_[3] = -Sm_[0];
+        }
+        else
+        {
+            double *Sa = rfc_ctx->internal.Sa;
+            double *Sm = rfc_ctx->internal.Sm;
+
+            assert( NUMEL( rfc_ctx->internal.Sa ) >= 3 );
+            
+            rfc_ctx->internal.count = 3;
+
+            Sa_[0] = Sa_R_Inf; Sm_[0] = -Sa_R_Inf;
+            Sa_[1] = Sa_R_0;   Sm_[1] =  Sa_R_0;
+            Sa_[2] = Sa_R_0p5; Sm_[2] =  Sa_R_0p5 * 3.0;
+        }
+
+        rfc_ctx->at.Sa    = rfc_ctx->internal.Sa;
+        rfc_ctx->at.Sm    = rfc_ctx->internal.Sm;
+        rfc_ctx->at.count = rfc_ctx->internal.count;
+    }
+    return true;
+}
+#endif /*RFC_AT_SUPPORT*/
+
+
 /**
  * @brief   De-initialization (freeing memory).
  *
@@ -597,6 +687,18 @@ void RFC_deinit( void *ctx )
     rfc_ctx->dh_cnt                     = 0;
     rfc_ctx->internal.dh_static         = false;
 #endif /*RFC_DH_SUPPORT*/
+
+#if RFC_AT_SUPPORT
+    rfc_ctx->at.Sa                      = NULL;
+    rfc_ctx->at.Sm                      = NULL;
+    rfc_ctx->at.count                   = 0;
+    rfc_ctx->at.M                       = 0.0;
+    rfc_ctx->at.Sm_rig                  = 0.0;
+    rfc_ctx->at.R_rig                   = 0.0;
+    rfc_ctx->at.R_pinned                = false;
+
+    rfc_ctx->internal.count             = 0;
+#endif /*RFC_AT_SUPPORT*/
 
 #if RFC_HCM_SUPPORT
     /* Remove stack */
@@ -829,6 +931,18 @@ void RFC_reset( rfc_ctx_s *rfc_ctx )
 #endif /*RFC_DH_SUPPORT*/
 
     rfc_ctx->pseudo_damage              = 0.0;
+
+#if RFC_AT_SUPPORT
+    rfc_ctx->at.Sa                      = NULL;
+    rfc_ctx->at.Sm                      = NULL;
+    rfc_ctx->at.count                   = 0;
+    rfc_ctx->at.M                       = 0.0;
+    rfc_ctx->at.Sm_rig                  = 0.0;
+    rfc_ctx->at.R_rig                   = 0.0;
+    rfc_ctx->at.R_pinned                = false;
+
+    rfc_ctx->internal.count             = 0;
+#endif /*RFC_AT_SUPPORT*/
 
 #if RFC_DAMAGE_FAST
     RFC_damage_lut_init( rfc_ctx );
@@ -1487,46 +1601,124 @@ double RFC_damage_calc_amplitude( rfc_ctx_s *rfc_ctx, double Sa )
 
 #if RFC_AT_SUPPORT
 /**
- * @brief      Calculate the allevation factor for amplitude with mean load
+ * @brief      Calculate the normalized mean load for a given load ratio "R"
  *
  * @param      rfc_ctx       The rainflow context
- * @param[in]  Sm            Mean load vector (polygonal chain)
- * @param[in]  Sa            Allevation factors, appropriate to Sm. Sa(Sm=0)=1
- * @param      count         Length tog Sa and Sm
- * @param      Sm_norm       Normalized mean load (Sm_i/Sa_i)
+ * @param      R             Load ratio (Su/So)
  *
- * @return     Allevation factor
+ * @return     Normalized mean load "Sm_norm"
  */
 static
-double RFC_haigh( rfc_ctx, const double *Sm, const double *Sa, size_t count, double Sm_norm )
+double RFC_at_R_to_Sm_norm( rfc_ctx_s *rfc_ctx, double R )
 {
-    assert( rfc_ctx && Sm && Sa && count );
+    double Sm_norm;
 
-    if( Sm_norm <= Sm[0] )
+    if( isinf( R ) )
     {
-        return Sa[0];  /* Clip to first point */
+        Sm_norm = -1.0;
     }
-    else if( Sm_norm >= Sm[count-1] )
+    else
     {
-        return Sa[count-1];  /* Clip to last point */
+        /* Sm = Sa * ( 1 + R ) / ( 1 - R ) */
+        /* Su = Sm - Sa */
+        /* So = Sm + Sa */
+        /* R  = Su / So */
+
+        Sm_norm = ( 1 + R ) / ( 1 - R );
+    }
+
+    return Sm_norm;
+}
+
+
+/**
+ * @brief      Calculate the influence of mean load on fatigue strength (Haigh-diagram)
+ *
+ * @param      rfc_ctx       The rainflow context
+ * @param[in]  Sm            Mean load
+ *
+ * @return     Alleviation factor
+ */
+static
+double RFC_at_alleviation( rfc_ctx_s *rfc_ctx, double Sm )
+{
+    double   *Sa_   = rfc_ctx->at.Sa;
+    double   *Sm_   = rfc_ctx->at.Sm;
+    unsigned  count = rfc_ctx->at-count;
+
+    if( !count )
+    {
+        return 1.0;
+    }
+
+    assert( rfc_ctx && Sm_ && Sa_ );
+
+    if( Sm <= Sm_[0] )
+    {
+        return Sa_[0];  /* Clip to first point */
+    }
+    else if( Sm >= Sm_[count-1] )
+    {
+        return Sa_[count-1];  /* Clip to last point */
     }
     else
     {
         /* Interpolate between polygonal points */
         for( i = 1; i < count; i++ )
         {
-            if( Sm_norm > Sm[i-1] && Sm_norm < Sm[i] )
+            if( Sm > Sm_[i-1] && Sm < Sm_[i] )
             {
-                double frac   = ( Sm_norm - Sm[i-1] ) / ( Sm[i] - Sm[i-1] );
-                double factor = Sa[i-1] * ( 1.0 - frac ) + Sa[i] * frac;
+                double frac        = ( Sm - Sm_[i-1] ) / ( Sm_[i] - Sm_[i-1] );
+                double alleviation = Sa_[i-1] * ( 1.0 - frac ) + Sa_[i] * frac;
 
-                return factor;  /* Transform to Sa(R=-1) */
+                return alleviation;
             }
         }
     }
 
     assert( false );
-    return 0.0;
+    return 1.0;
+}
+
+
+#if RFC_AT_SUPPORT
+/**
+ * @brief       Amplitude transformation to take mean load influence into account.
+ *
+ * @param       rfc_ctx     The rainflow context
+ * @param       Sa          Amplitude
+ * @param       Sm          Mean load
+ *
+ * @return      Transformed amplitude Sa
+ */
+static
+double RFC_at_transform( rfc_ctx_s *ctx, double Sa, double Sm )
+{
+    double Sa_transform;
+    double Sm_norm;
+    double Sm_norm_target;
+
+    assert( rfc_ctx );
+
+#if RFC_USE_DELEGATES
+    if( rfc_ctx->at_transform_fcn )
+    {
+        return rfc_ctx->at_transform_fcn( rfc_ctx, Sa, Sm );
+    }
+#endif
+
+    if( Sa > 0.0 )
+    {
+        Sm_norm        = Sm / Sa;
+        Sm_norm_target = rfc_ctx->at.Sm_rig;
+        Sa_transform   = Sa / RFC_at_alleviation( rfc_ctx, Sm_norm ) * RFC_at_alleviation( rfc_ctx, Sm_norm_target );
+    }
+    else
+    {
+        Sa_transform = 0.0;
+    }
+
+    return Sa_transform;
 }
 #endif /*RFC_AT_SUPPORT*/
 
@@ -1702,6 +1894,7 @@ bool RFC_damage_lut_init_haigh( rfc_ctx_s *rfc_ctx, const double *Sm, const doub
         else
         {
             double Sa_R_Inf, Sa_R_0, Sa_R_0p5;
+
 
             Sa_R_Inf = 1.0 / ( 1.0 - M );                      /* y = -x && y = Sa(R=-1) - Mx                  */
             Sa_R_0   = 1.0 / ( 1.0 + M );                      /* y =  x && y = Sa(R=-1) - Mx                  */
@@ -2509,6 +2702,7 @@ void RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
 }
 #endif /*RFC_TP_SUPPORT*/
 
+
 /**
  * @brief       Returns the unsigned difference of two values, sign optionally returned as -1 or 1.
  *
@@ -2543,6 +2737,8 @@ RFC_value_type value_delta( RFC_value_type from, RFC_value_type to, int *sign_pt
 static
 bool RFC_error_raise( rfc_ctx_s *rfc_ctx, int error )
 {
+    assert( rfc_ctx );
+
     rfc_ctx->state = RFC_STATE_ERROR;
     rfc_ctx->error = error;
 
