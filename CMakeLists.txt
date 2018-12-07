@@ -21,6 +21,7 @@ option( RFC_GLOBAL_EXTREMA      "Always calculate global extrema" OFF )
 option( RFC_HCM_SUPPORT         "Support HCM (Clormann/Seeger) algorithm" ON )
 option( RFC_TP_SUPPORT          "Support turning points" ON )
 option( RFC_DH_SUPPORT          "Support \"spread damage\" over turning points and damage history" OFF )
+option( RFC_AT_SUPPORT          "Support amplitude transformation regarding mean load influence on fatigue strength" OFF )
 option( RFC_DAMAGE_FAST         "Enables fast damage calculation (per look-up table)" ON )
 
 

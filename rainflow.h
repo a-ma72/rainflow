@@ -193,26 +193,26 @@ typedef struct rfc_class_param  rfc_class_param_s;   /** Class parameters (width
 
 
 /* Core functions */
-bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
+bool RFC_init                ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis );
-void RFC_deinit               ( void *ctx );
-bool RFC_feed                 ( void *ctx, const RFC_value_type* data, size_t count );
+void RFC_deinit              ( void *ctx );
+bool RFC_feed                ( void *ctx, const RFC_value_type* data, size_t count );
 #if !RFC_MINIMAL
-bool RFC_feed_tuple           ( void *ctx, rfc_value_tuple_s *data, size_t count );
+bool RFC_feed_tuple          ( void *ctx, rfc_value_tuple_s *data, size_t count );
 #endif /*RFC_MINIMAL*/
-bool RFC_finalize             ( void *ctx, int residual_method );
+bool RFC_finalize            ( void *ctx, int residual_method );
 
 #if RFC_TP_SUPPORT
-bool RFC_tp_init              ( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
-bool RFC_tp_prune             ( void *ctx, size_t count, int flags );
+bool RFC_tp_init             ( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
+bool RFC_tp_prune            ( void *ctx, size_t count, int flags );
 #endif /*RFC_TP_SUPPORT*/
 
 #if RFC_DH_SUPPORT
-bool RFC_dh_init              ( void *ctx, double *dh, size_t dh_cap, bool is_static );
+bool RFC_dh_init             ( void *ctx, double *dh, size_t dh_cap, bool is_static );
 #endif /*RFC_DH_SUPPORT*/
 
 #if RFC_AT_SUPPORT
-bool RFC_at_init              ( void *ctx, const double *Sa, const double *Sm, unsigned count, double M, double Sm_rig, double R_rig, bool R_pinned );
+bool RFC_at_init             ( void *ctx, const double *Sa, const double *Sm, unsigned count, double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
 #endif /*RFC_AT_SUPPORT*/
 
 #if RFC_USE_DELEGATES
@@ -464,12 +464,12 @@ typedef struct rfc_ctx
         }                               hcm;
 #endif /*RFC_HCM_SUPPORT*/
 #if RFC_AT_SUPPORT
-        struct at
+        struct
         {
             double                      Sa[5];
             double                      Sm[5];
             unsigned                    count;
-        }
+        }                               at;
 #endif /*RFC_AT_SUPPORT*/
 
     }
