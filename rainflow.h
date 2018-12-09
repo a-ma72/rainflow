@@ -194,7 +194,7 @@ typedef struct rfc_class_param  rfc_class_param_s;   /** Class parameters (width
 
 /* Core functions */
 bool RFC_init                ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
-                                           RFC_value_type hysteresis );
+                                          RFC_value_type hysteresis );
 void RFC_deinit              ( void *ctx );
 bool RFC_feed                ( void *ctx, const RFC_value_type* data, size_t count );
 #if !RFC_MINIMAL
@@ -212,7 +212,8 @@ bool RFC_dh_init             ( void *ctx, double *dh, size_t dh_cap, bool is_sta
 #endif /*RFC_DH_SUPPORT*/
 
 #if RFC_AT_SUPPORT
-bool RFC_at_init             ( void *ctx, const double *Sa, const double *Sm, unsigned count, double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
+bool RFC_at_init             ( void *ctx, const double *Sa, const double *Sm_norm, unsigned count, 
+                                          double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
 #endif /*RFC_AT_SUPPORT*/
 
 #if RFC_USE_DELEGATES
@@ -285,21 +286,23 @@ typedef struct rfc_ctx
     enum
     {
         RFC_FLAGS_COUNT_MATRIX          = 1 << 0,                   /**< Count into matrix */
+        RFC_FLAGS_COUNT_DAMAGE          = 1 << 1,                   /**< Count pseudo damage */
 #if !RFC_MINIMAL
-        RFC_FLAGS_COUNT_RP              = 1 << 1,                   /**< Count into range pair */
-        RFC_FLAGS_COUNT_LC_UP           = 1 << 2,                   /**< Count into level crossing (only rising slopes) */
-        RFC_FLAGS_COUNT_LC_DN           = 1 << 3,                   /**< Count into level crossing (only falling slopes) */
+        RFC_FLAGS_COUNT_RP              = 1 << 2,                   /**< Count into range pair */
+        RFC_FLAGS_COUNT_LC_UP           = 1 << 3,                   /**< Count into level crossing (only rising slopes) */
+        RFC_FLAGS_COUNT_LC_DN           = 1 << 4,                   /**< Count into level crossing (only falling slopes) */
         RFC_FLAGS_COUNT_LC              = RFC_FLAGS_COUNT_LC_UP     /**< Count into level crossing (all slopes) */
                                         | RFC_FLAGS_COUNT_LC_DN,
         RFC_FLAGS_COUNT_ALL             = RFC_FLAGS_COUNT_MATRIX    /**< Count all */
+                                        | RFC_FLAGS_COUNT_DAMAGE
                                         | RFC_FLAGS_COUNT_RP
                                         | RFC_FLAGS_COUNT_LC,
-        RFC_FLAGS_ENFORCE_MARGIN        = 1 << 8,                   /**< Enforce first and last data point are turning points */
+        RFC_FLAGS_ENFORCE_MARGIN        = 1 << 5,                   /**< Enforce first and last data point are turning points */
 #endif /*RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
-        RFC_FLAGS_TPPRUNE_PRESERVE_POS  = 1 << 9,
-        RFC_FLAGS_TPPRUNE_PRESERVE_RES  = 1 << 10,
-        RFC_FLAGS_TPAUTOPRUNE           = 1 << 11,                  /**< Automatic prune on tp */
+        RFC_FLAGS_TPPRUNE_PRESERVE_POS  = 1 << 6,
+        RFC_FLAGS_TPPRUNE_PRESERVE_RES  = 1 << 7,
+        RFC_FLAGS_TPAUTOPRUNE           = 1 << 8,                   /**< Automatic prune on tp */
 #endif /*RFC_TP_SUPPORT*/
     }
                                         flags;                      /**< Flags */
