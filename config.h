@@ -12,5 +12,5 @@
   #define RFC_GLOBAL_EXTREMA       ON
   #define RFC_DAMAGE_FAST          ON
   #define RFC_DH_SUPPORT           ON
-  #define RFC_AT_SUPPORT           OFF
+  #define RFC_AT_SUPPORT           ON
 #endif /*RFC_VERSION_MAJOR*/

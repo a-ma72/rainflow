@@ -173,7 +173,6 @@ static void                 RFC_spread_damage                   ( rfc_ctx_s *, r
 #if RFC_AT_SUPPORT
 static double               RFC_at_R_to_Sm_norm                 ( rfc_ctx_s *, double R );
 static double               RFC_at_alleviation                  ( rfc_ctx_s *, double Sm_norm );
-static double               RFC_at_transform                    ( rfc_ctx_s *, double Sa, double Sm );
 #endif /*RFC_AT_SUPPORT*/
 /* Other */
 #if !RFC_MINIMAL
@@ -591,7 +590,7 @@ bool RFC_dh_init( void *ctx, double *dh, size_t dh_cap, bool is_static )
  *
  * @return  false on error
  */
-bool RFC_at_init( void *ctx, const double *Sa, const double *Sm_norm, unsigned count, 
+bool RFC_at_init( void *ctx, const double *Sa, const double *Sm, unsigned count, 
                              double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric )
 {
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
@@ -609,26 +608,27 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm_norm, unsigned c
         return false;
     }
 
+    rfc_ctx->at.Sm_rig   = Sm_rig;
+    rfc_ctx->at.R_rig    = R_rig;
+    rfc_ctx->at.R_pinned = R_pinned;
+
     if( count )
     {
-        if( !Sa || !Sm_norm )
+        if( !Sa || !Sm )
         {
             rfc_ctx->error = RFC_ERROR_INVARG;
             return false;
         }
 
         rfc_ctx->at.Sa       = Sa;
-        rfc_ctx->at.Sm_norm  = Sm_norm;
+        rfc_ctx->at.Sm       = Sm;
         rfc_ctx->at.count    = count;
-        rfc_ctx->at.Sm_rig   = Sm_rig;
-        rfc_ctx->at.R_rig    = R_rig;
-        rfc_ctx->at.R_pinned = R_pinned;
     }
     else
     {
         double Sa_R_Inf, Sa_R_0, Sa_R_0p5;
 
-        assert( !Sa && !Sm_norm && !count );
+        assert( !Sa && !Sm && !count );
 
         Sa_R_Inf = 1.0 / ( 1.0 - M );                      /* y = -x && y = Sa(R=-1) - Mx                  */
         Sa_R_0   = 1.0 / ( 1.0 + M );                      /* y =  x && y = Sa(R=-1) - Mx                  */
@@ -637,7 +637,7 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm_norm, unsigned c
         if( symmetric )
         {
             double *Sa_ = rfc_ctx->internal.at.Sa;
-            double *Sm_ = rfc_ctx->internal.at.Sm_norm;
+            double *Sm_ = rfc_ctx->internal.at.Sm;
 
             assert( NUMEL( rfc_ctx->internal.at.Sa ) >= 3 );
             
@@ -652,7 +652,7 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm_norm, unsigned c
         else
         {
             double *Sa_ = rfc_ctx->internal.at.Sa;
-            double *Sm_ = rfc_ctx->internal.at.Sm_norm;
+            double *Sm_ = rfc_ctx->internal.at.Sm;
 
             assert( NUMEL( rfc_ctx->internal.at.Sa ) >= 3 );
             
@@ -664,7 +664,7 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm_norm, unsigned c
         }
 
         rfc_ctx->at.Sa      = rfc_ctx->internal.at.Sa;
-        rfc_ctx->at.Sm_norm = rfc_ctx->internal.at.Sm_norm;
+        rfc_ctx->at.Sm      = rfc_ctx->internal.at.Sm;
         rfc_ctx->at.count   = rfc_ctx->internal.at.count;
     }
     return true;
@@ -947,6 +947,61 @@ bool RFC_finalize( void *ctx, int residual_method )
     rfc_ctx->state = ok ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
     return ok;
 }
+
+
+#if RFC_AT_SUPPORT
+/**
+ * @brief       Amplitude transformation to take mean load influence into account.
+ *
+ * @param       rfc_ctx     The rainflow context
+ * @param       Sa          Amplitude
+ * @param       Sm          Mean load
+ *
+ * @return      Transformed amplitude Sa
+ */
+double RFC_at_transform( rfc_ctx_s *rfc_ctx, double Sa, double Sm )
+{
+    double Sa_transform;
+    double Sm_norm;
+    double Sm_norm_target;
+
+    assert( rfc_ctx );
+    assert( rfc_ctx->state >= RFC_STATE_INIT );
+
+#if RFC_USE_DELEGATES
+    if( rfc_ctx->at_transform_fcn )
+    {
+        return rfc_ctx->at_transform_fcn( rfc_ctx, Sa, Sm );
+    }
+#endif
+
+    if( Sa > 0.0 )
+    {
+        /* Normalize Sm (Sa=1) */
+        Sm_norm = Sm / Sa;
+
+        if( rfc_ctx->at.R_pinned )
+        {
+            Sm_norm_target = RFC_at_R_to_Sm_norm( rfc_ctx, rfc_ctx->at.R_rig );
+        }
+        else
+        {
+            Sm_norm_target = rfc_ctx->at.Sm_rig / Sa;
+        }
+
+        Sa_transform = Sa / RFC_at_alleviation( rfc_ctx, Sm_norm ) * RFC_at_alleviation( rfc_ctx, Sm_norm_target );
+    }
+    else
+    {
+        Sa_transform = 0.0;
+    }
+
+    return Sa_transform;
+}
+#endif /*RFC_AT_SUPPORT*/
+
+
+
 
 
 
@@ -1849,104 +1904,52 @@ double RFC_at_R_to_Sm_norm( rfc_ctx_s *rfc_ctx, double R )
 static
 double RFC_at_alleviation( rfc_ctx_s *rfc_ctx, double Sm_norm )
 {
-    const double   *Sa_;
-    const double   *Sm_;
-    unsigned        count;
-
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT );
 
-    *Sa_   = rfc_ctx->at.Sa;
-    *Sm_   = rfc_ctx->at.Sm;
-     count = rfc_ctx->at.count;
-
-    if( !count )
+    if( !rfc_ctx->at.count )
     {
         return 1.0;
     }
-
-    assert( rfc_ctx && Sm_ && Sa_ );
-
-    if( Sm_norm <= Sm_[0] )
-    {
-        return Sa_[0];  /* Clip to first point */
-    }
-    else if( Sm_norm >= Sm_[count-1] )
-    {
-        return Sa_[count-1];  /* Clip to last point */
-    }
     else
     {
-		unsigned i;
+        const double   *Sa_   = rfc_ctx->at.Sa;
+        const double   *Sm_   = rfc_ctx->at.Sm;
+              unsigned  count = rfc_ctx->at.count;
 
-        /* Select correct quadrant */
-        for( i = 1; i < count; i++ )
+
+        assert( rfc_ctx && Sm_ && Sa_ );
+
+        if( Sm_norm <= Sm_[0] / Sa_[0] )
         {
-            assert( Sa_[i-1] > 0.0 && Sa_[i] > 0.0 && Sm_[i-1] <= Sm_[i] );
-
-            if( Sm_norm / Sa_[i-1] > Sm_[i-1] && Sm_norm / Sa_[i] < Sm_[i] )
-            {
-                double M_signed    = ( Sa_[i] - Sa_[i-1] ) / ( Sm_[i] - Sm_[i-1] );
-                double alleviation = ( Sa_[i-1] - M_signed * Sm_[i-1] ) / ( 1.0 - M_signed * Sm_norm );
-
-                return alleviation;
-            }
+            return Sa_[0];  /* Clip to first point */
         }
-    }
-
-    assert( false );
-    return 1.0;
-}
-
-
-/**
- * @brief       Amplitude transformation to take mean load influence into account.
- *
- * @param       rfc_ctx     The rainflow context
- * @param       Sa          Amplitude
- * @param       Sm          Mean load
- *
- * @return      Transformed amplitude Sa
- */
-static
-double RFC_at_transform( rfc_ctx_s *rfc_ctx, double Sa, double Sm )
-{
-    double Sa_transform;
-    double Sm_norm;
-    double Sm_norm_target;
-
-    assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT );
-
-#if RFC_USE_DELEGATES
-    if( rfc_ctx->at_transform_fcn )
-    {
-        return rfc_ctx->at_transform_fcn( rfc_ctx, Sa, Sm );
-    }
-#endif
-
-    if( Sa > 0.0 )
-    {
-        /* Normalize Sm (Sa=1) */
-        Sm_norm = Sm / Sa;
-
-        if( rfc_ctx->at.R_pinned )
+        else if( Sm_norm >= Sm_[count-1] / Sa_[count-1] )
         {
-            Sm_norm_target = RFC_at_R_to_Sm_norm( rfc_ctx, rfc_ctx->at.R_rig );
+            return Sa_[count-1];  /* Clip to last point */
         }
         else
         {
-            Sm_norm_target = rfc_ctx->at.Sm_rig / Sa;
+    		unsigned i;
+
+            /* Select correct quadrant */
+            for( i = 1; i < count; i++ )
+            {
+                assert( Sa_[i-1] > 0.0 && Sa_[i] > 0.0 && Sm_[i-1] <= Sm_[i] );
+
+                if( Sm_norm > Sm_[i-1] / Sa_[i-1] && Sm_norm <= Sm_[i] / Sa_[i] )
+                {
+                    double M_signed    = ( Sa_[i] - Sa_[i-1] ) / ( Sm_[i] - Sm_[i-1] );
+                    double alleviation = ( Sa_[i-1] - M_signed * Sm_[i-1] ) / ( 1.0 - M_signed * Sm_norm );
+
+                    return alleviation;
+                }
+            }
         }
 
-        Sa_transform = Sa / RFC_at_alleviation( rfc_ctx, Sm_norm ) * RFC_at_alleviation( rfc_ctx, Sm_norm_target );
+        assert( false );
+        return 1.0;
     }
-    else
-    {
-        Sa_transform = 0.0;
-    }
-
-    return Sa_transform;
 }
 #endif /*RFC_AT_SUPPORT*/
 

@@ -866,6 +866,51 @@ TEST RFC_long_series(void)
 }
 
 
+#if RFC_AT_SUPPORT
+TEST RFC_at_test( void )
+{
+    bool ok = false;
+
+    if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, 0 /* class_offset */,
+                        1 /* hysteresis */ ) &&
+        RFC_at_init( &ctx, NULL /* Sa */, NULL /* Sm */, 0 /* count */, 0.3 /* M */, 
+                           0.0 /* Sm_rig */, -1.0 /* R_rig */, true /* R_pinned */, false /* symmetric */ ) )
+    {
+        ok = true;
+        double tol = 1e-10;
+
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  0.0 /*Sa*/,  2.0 /*Sm*/ ), 0.0,      0.0   /*tol*/ );
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  0.0 /*Sa*/,  0.0 /*Sm*/ ), 0.0,      0.0   /*tol*/ );
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  0.0 /*Sa*/, -2.0 /*Sm*/ ), 0.0,      0.0   /*tol*/ );
+
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  0.1 /*Sa*/,  9.0 /*Sm*/ ), 0.153636, 1e-5  /*tol*/ );  /* R =  89.0  */
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  1.0 /*Sa*/,  4.0 /*Sm*/ ), 1.536363, 1e-5  /*tol*/ );  /* R =  0.6   */
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  1.0 /*Sa*/,  3.0 /*Sm*/ ), 1.536363, 1e-5  /*tol*/ );  /* R =  0.5   */
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  2.0 /*Sa*/,  2.0 /*Sm*/ ), 2.6,      tol   /*tol*/ );  /* R =  0.0   */
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  3.0 /*Sa*/,  3.0 /*Sm*/ ), 3.9,      tol   /*tol*/ );  /* R =  0.0   */
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  3.0 /*Sa*/,  2.0 /*Sm*/ ), 3.6,      tol   /*tol*/ );  /* R = -0.2   */
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  2.0 /*Sa*/,  1.0 /*Sm*/ ), 2.3,      tol   /*tol*/ );  /* R = -0.333 */
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  3.0 /*Sa*/,  1.0 /*Sm*/ ), 3.3,      tol   /*tol*/ );  /* R = -0.5   */
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  3.0 /*Sa*/,  0.0 /*Sm*/ ), 3.0,      tol   /*tol*/ );  /* R = -1.0   */
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  2.0 /*Sa*/, -2.0 /*Sm*/ ), 1.4,      tol   /*tol*/ );  /* R = -Inf   */
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  2.0 /*Sa*/, -9.0 /*Sm*/ ), 1.4,      tol   /*tol*/ );  /* R = -Inf   */
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  0.2 /*Sa*/, -9.0 /*Sm*/ ), 0.14,     tol   /*tol*/ );  /* R = -Inf   */
+    }
+
+    RFC_deinit( &ctx );
+
+    if( ok )
+    {
+        PASS();
+    }
+    else
+    {
+        FAIL();
+    }
+}
+#endif /*RFC_AT_SUPPORT*/
+
+
 
 /* local suite (greatest) */
 SUITE( RFC_TEST_SUITE )
@@ -879,6 +924,9 @@ SUITE( RFC_TEST_SUITE )
     RUN_TEST( RFC_test_turning_points );
     RUN_TEST( RFC_tp_prune_test );
 #endif /*RFC_TP_SUPPORT*/
+#if RFC_AT_SUPPORT
+    RUN_TEST( RFC_at_test );
+#endif /*RFC_AT_SUPPORT*/
 }
 
 
