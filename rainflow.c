@@ -614,15 +614,15 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm, unsigned count,
 
     if( count )
     {
-        if( !Sa || !Sm )
+        if( !Sa || !Sm || symmetric )
         {
             rfc_ctx->error = RFC_ERROR_INVARG;
             return false;
         }
 
-        rfc_ctx->at.Sa       = Sa;
-        rfc_ctx->at.Sm       = Sm;
-        rfc_ctx->at.count    = count;
+        rfc_ctx->at.Sa    = Sa;
+        rfc_ctx->at.Sm    = Sm;
+        rfc_ctx->at.count = count;
     }
     else
     {
@@ -647,7 +647,7 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm, unsigned count,
             Sa_[1] = Sa_R_0;   Sm_[1] = -Sa_R_0;
             Sa_[2] = 1.0;      Sm_[2] =  0.0;
             Sa_[3] = Sa_[1];   Sm_[3] = -Sm_[1];
-            Sa_[3] = Sa_[0];   Sm_[3] = -Sm_[0];
+            Sa_[4] = Sa_[0];   Sm_[4] = -Sm_[0];
         }
         else
         {
@@ -663,9 +663,9 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm, unsigned count,
             Sa_[2] = Sa_R_0p5; Sm_[2] =  Sa_R_0p5 * 3.0;
         }
 
-        rfc_ctx->at.Sa      = rfc_ctx->internal.at.Sa;
-        rfc_ctx->at.Sm      = rfc_ctx->internal.at.Sm;
-        rfc_ctx->at.count   = rfc_ctx->internal.at.count;
+        rfc_ctx->at.Sa    = rfc_ctx->internal.at.Sa;
+        rfc_ctx->at.Sm    = rfc_ctx->internal.at.Sm;
+        rfc_ctx->at.count = rfc_ctx->internal.at.count;
     }
     return true;
 }
