@@ -964,11 +964,13 @@ TEST RFC_at_test( void )
 
 
 		ASSERT(
-		RFC_at_init( &ctx, Sa /* Sa */, Sm /* Sm */, 5 /* count */, 0.3 /* M */, 
-						   123.0 /* Sm_rig */, 0.0 /* R_rig */, false /* R_pinned */, false /* symmetric */ )
+		RFC_at_init( &ctx, NULL /* Sa */, NULL /* Sm */, 0 /* count */, 0.3 /* M */, 
+						   50.0 /* Sm_rig */, 0.0 /* R_rig */, false /* R_pinned */, false /* symmetric */ )
 		);
 
-		GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  1.0 /*Sa*/, -4.0 /*Sm*/ ), 1.536363, 1e-5  /*tol*/ );  /* R =  0.6   */
+		GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  100.0 /*Sa*/, 0.0 /*Sm*/ ), 85.0, tol  /*tol*/ );
+        ctx.at.Sm_rig = 200.0;
+		GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  100.0 /*Sa*/, 0.0 /*Sm*/ ), 65.088757, 1e-5  /*tol*/ );
 	}
 
 	ASSERT( RFC_deinit( &ctx ) );

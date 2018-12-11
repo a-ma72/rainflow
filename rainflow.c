@@ -1063,7 +1063,7 @@ double RFC_at_transform( rfc_ctx_s *rfc_ctx, double Sa, double Sm )
 
 				if( Sm_lhs <= rfc_ctx->at.Sm_rig && rfc_ctx->at.Sm_rig <= Sm_rhs )
 				{
-					double frac = rfc_ctx->at.Sm_rig - Sm_lhs;
+					double frac = ( rfc_ctx->at.Sm_rig - Sm_lhs ) / ( Sm_rhs - Sm_lhs );
 
 					Sa_transform = Sa_lhs * (1.0 - frac) + Sa_rhs * frac;
 					break;

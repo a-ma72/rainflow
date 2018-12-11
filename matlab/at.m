@@ -11,6 +11,7 @@ Sa_R_0p5 = Sa_R_0 * ( 1.0 + M/3 ) / ( 1.0 + M );   %/* Backtrace Sa(R=0) to Sa(R
 Sa = 4;
 Sm = 1;
 
+%           1         2          3       4             5
 Sm_norm = [ -3,       -Sa_R_Inf, Sa_R_0, Sa_R_0p5 * 3, 3        ];
 Sa_norm = [ Sa_R_Inf,  Sa_R_Inf, Sa_R_0, Sa_R_0p5,     Sa_R_0p5 ];
 
@@ -25,3 +26,10 @@ Sa_norm = ( Sa_norm - M_signed .* Sm_norm ) ./ ( 1 - M_signed .* Sm ./ Sa );
 Sa/Sa_norm
 ftc2( 'amptransform', Sa, Sm, M, -1, 1 )
 
+
+%%
+Sa = 100;
+Sm = 0;
+M = 0.3;
+
+ftc2( 'amptransform', Sa, Sm, M, 200, 0 )
