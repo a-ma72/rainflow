@@ -608,10 +608,6 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm, unsigned count,
         return false;
     }
 
-    rfc_ctx->at.Sm_rig   = Sm_rig;
-    rfc_ctx->at.R_rig    = R_rig;
-    rfc_ctx->at.R_pinned = R_pinned;
-
     if( count )
     {
         unsigned n;
@@ -622,7 +618,7 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm, unsigned count,
             return false;
         }
 
-        /* Check for falid input */
+        /* Check for valid input */
         for( n = 0; n < count; n++ )
         {
             if( Sa[n] <= 0.0 ) break;
@@ -638,9 +634,13 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm, unsigned count,
             return false;
         }
 
-        rfc_ctx->at.Sa    = Sa;
-        rfc_ctx->at.Sm    = Sm;
-        rfc_ctx->at.count = count;
+        rfc_ctx->at.Sa       = Sa;
+        rfc_ctx->at.Sm       = Sm;
+        rfc_ctx->at.count    = count;
+        rfc_ctx->at.M        = M;
+        rfc_ctx->at.Sm_rig   = Sm_rig;
+        rfc_ctx->at.R_rig    = R_rig;
+        rfc_ctx->at.R_pinned = R_pinned;
     }
     else
     {
@@ -681,10 +681,19 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm, unsigned count,
             Sa_[2] = Sa_R_0p5; Sm_[2] =  Sa_R_0p5 * 3.0;
         }
 
-        rfc_ctx->at.Sa    = rfc_ctx->internal.at.Sa;
-        rfc_ctx->at.Sm    = rfc_ctx->internal.at.Sm;
-        rfc_ctx->at.count = rfc_ctx->internal.at.count;
+        rfc_ctx->at.Sa       = rfc_ctx->internal.at.Sa;
+        rfc_ctx->at.Sm       = rfc_ctx->internal.at.Sm;
+        rfc_ctx->at.count    = rfc_ctx->internal.at.count;
+        rfc_ctx->at.M        = M;
+        rfc_ctx->at.Sm_rig   = Sm_rig;
+        rfc_ctx->at.R_rig    = R_rig;
+        rfc_ctx->at.R_pinned = R_pinned;
     }
+
+#if RFC_DAMAGE_FAST
+    //RFC_damage_lut_init( rfc_ctx );  //!
+#endif /*RFC_DAMAGE_FAST*/
+
     return true;
 }
 #endif /*RFC_AT_SUPPORT*/
@@ -991,6 +1000,11 @@ double RFC_at_transform( rfc_ctx_s *rfc_ctx, double Sa, double Sm )
     }
 #endif
 
+    if (!rfc_ctx->at.count)
+    {
+        return Sa;
+    }
+
     if( Sa > 0.0 )
     {
         double Sm_norm_base;
@@ -1008,26 +1022,52 @@ double RFC_at_transform( rfc_ctx_s *rfc_ctx, double Sa, double Sm )
         }
         else
         {
-            double   *Sa    = rfc_ctx->at.Sa;
-            double   *Sm    = rfc_ctx->at.Sm;
+            double   *Sa_   = rfc_ctx->at.Sa;
+            double   *Sm_   = rfc_ctx->at.Sm;
             unsigned  count = rfc_ctx->at.count;
+            unsigned  n;
+			double    Sa_lhs, Sa_rhs;
+			double    Sm_lhs, Sm_rhs;
 
-            for( n = 1; n < count;n ++ )
+            for( n = 0; n <= count; n++ )
             {
-                double Sa_lhs = Sa / alleviation_base * RFC_at_alleviation( rfc_ctx, Sm[n-1] / Sa[n-1] );
-                double Sm_lhs = Sa_lhs / Sa[n-1] * Sm[n-1];
-                double Sa_rhs = Sa / alleviation_base * RFC_at_alleviation( rfc_ctx, Sm[n] / Sa[n] );
-                double Sm_rhs = Sa_rhs / Sa[n] * Sm[n];
+				if( n )
+				{
+                    Sa_lhs = Sa_rhs;
+                    Sm_lhs = Sm_rhs;
 
-                if( Sm_lhs <= rfc_ctx->at.Sm_rig && rfc_ctx->at.Sm_rig <= Sm_rhs )
-                {
-                    double frac = rfc_ctx->at.Sm_rig - Sm_lhs;
+                    if( n < count )
+                    {
+                        Sa_rhs = Sa / alleviation_base * RFC_at_alleviation( rfc_ctx, Sm_[n - 1] / Sa_[n - 1] );
+                        Sm_rhs = Sa_rhs / Sa_[n - 1] * Sm_[n - 1];
+                    }
+                    else
+                    {
+                        assert( Sm_lhs <= rfc_ctx->at.Sm_rig );
 
-                    Sa_transform = Sa_lhs * ( 1.0 - frac ) + Sa_rhs * frac;
-                    break;
+                        Sa_transform = Sa_lhs;
+                    }
                 }
+                else /* n == 0 */
+                {
+				    Sa_rhs = Sa / alleviation_base * RFC_at_alleviation( rfc_ctx, Sm_[0] / Sa_[0] );
+				    Sm_rhs = Sa_rhs / Sa_[0] * Sm_[0];
 
-                assert( false );
+                    if( rfc_ctx->at.Sm_rig <= Sm_rhs)
+					{
+						Sa_transform = Sa_rhs;
+                        break;
+					}
+                    else continue;
+				}
+
+				if( Sm_lhs <= rfc_ctx->at.Sm_rig && rfc_ctx->at.Sm_rig <= Sm_rhs )
+				{
+					double frac = rfc_ctx->at.Sm_rig - Sm_lhs;
+
+					Sa_transform = Sa_lhs * (1.0 - frac) + Sa_rhs * frac;
+					break;
+				}
             }
         }
     }
@@ -1970,7 +2010,7 @@ double RFC_at_alleviation( rfc_ctx_s *rfc_ctx, double Sm_norm )
         }
         else
         {
-    		unsigned i;
+            unsigned i;
 
             /* Select correct quadrant */
             for( i = 1; i < count; i++ )
