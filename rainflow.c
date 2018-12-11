@@ -614,7 +614,25 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm, unsigned count,
 
     if( count )
     {
-        if( !Sa || !Sm || symmetric )
+        unsigned n;
+
+        if( !Sa || !Sm || symmetric || count < 2 )
+        {
+            rfc_ctx->error = RFC_ERROR_INVARG;
+            return false;
+        }
+
+        /* Check for falid input */
+        for( n = 0; n < count; n++ )
+        {
+            if( Sa[n] <= 0.0 ) break;
+
+            if( !n ) continue;
+
+            if( Sm[n-1] > Sm[n] || Sm[n-1] / Sa[n-1] > Sm[n] / Sa[n] ) break;
+        }
+
+        if( n < count )
         {
             rfc_ctx->error = RFC_ERROR_INVARG;
             return false;
@@ -962,8 +980,6 @@ bool RFC_finalize( void *ctx, int residual_method )
 double RFC_at_transform( rfc_ctx_s *rfc_ctx, double Sa, double Sm )
 {
     double Sa_transform;
-    double Sm_norm;
-    double Sm_norm_target;
 
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT );
@@ -977,19 +993,43 @@ double RFC_at_transform( rfc_ctx_s *rfc_ctx, double Sa, double Sm )
 
     if( Sa > 0.0 )
     {
+        double Sm_norm_base;
+        double Sm_norm_target;
+        double alleviation_base;
+
         /* Normalize Sm (Sa=1) */
-        Sm_norm = Sm / Sa;
+        Sm_norm_base = Sm / Sa;
+        alleviation_base = RFC_at_alleviation( rfc_ctx, Sm_norm_base );
 
         if( rfc_ctx->at.R_pinned )
         {
             Sm_norm_target = RFC_at_R_to_Sm_norm( rfc_ctx, rfc_ctx->at.R_rig );
+            Sa_transform   = Sa / alleviation_base * RFC_at_alleviation( rfc_ctx, Sm_norm_target );
         }
         else
         {
-            Sm_norm_target = rfc_ctx->at.Sm_rig / Sa;
-        }
+            double   *Sa    = rfc_ctx->at.Sa;
+            double   *Sm    = rfc_ctx->at.Sm;
+            unsigned  count = rfc_ctx->at.count;
 
-        Sa_transform = Sa / RFC_at_alleviation( rfc_ctx, Sm_norm ) * RFC_at_alleviation( rfc_ctx, Sm_norm_target );
+            for( n = 1; n < count;n ++ )
+            {
+                double Sa_lhs = Sa / alleviation_base * RFC_at_alleviation( rfc_ctx, Sm[n-1] / Sa[n-1] );
+                double Sm_lhs = Sa_lhs / Sa[n-1] * Sm[n-1];
+                double Sa_rhs = Sa / alleviation_base * RFC_at_alleviation( rfc_ctx, Sm[n] / Sa[n] );
+                double Sm_rhs = Sa_rhs / Sa[n] * Sm[n];
+
+                if( Sm_lhs <= rfc_ctx->at.Sm_rig && rfc_ctx->at.Sm_rig <= Sm_rhs )
+                {
+                    double frac = rfc_ctx->at.Sm_rig - Sm_lhs;
+
+                    Sa_transform = Sa_lhs * ( 1.0 - frac ) + Sa_rhs * frac;
+                    break;
+                }
+
+                assert( false );
+            }
+        }
     }
     else
     {
