@@ -98,13 +98,20 @@
 #if !RFC_MINIMAL
 #define RFC_MEX_USAGE \
 "\nUsage:\n"\
-"[pd,re,rm,rp,lc,tp] = rfc( data, class_count, class_width, class_offset, hysteresis, enfore_margin, use_hcm )\n"\
+"[pd,re,rm,rp,lc,tp] = rfc( 'rfc', data, class_count, class_width, class_offset, hysteresis, enfore_margin, use_hcm )\n"\
 "    pd = Pseudo damage\n"\
 "    re = Residue\n"\
 "    rm = Rainflow matrix (from/to)\n"\
 "    rp = Range pair counts\n"\
 "    lc = Level crossings\n"\
-"    tp = Turning points\n"
+"    tp = Turning points\n"\
+"\n"\
+"[Sa] = rfc( 'amptransform', Sa, Sm, M, target, R_pinned )\n"\
+"             Sa = Amplitude\n"\
+"             Sm = Mean load\n"\
+"              M = Mean load sensitivity\n"\
+"         target = Mean load or mean load ratio (R)\n"\
+"    target_is_R = true, if target is R (otherwise target is test rig mean load)\n"
 #else /*RFC_MINIMAL*/
 #define RFC_MEX_USAGE \
 "\nUsage:\n"\
@@ -114,6 +121,7 @@
 "    rm = Rainflow matrix (from/to)\n"
 #endif /*!RFC_MINIMAL*/
 #pragma message(RFC_MEX_USAGE)
+#include <ctype.h>
 #include <string.h>
 #include <mex.h>
 #endif /*MATLAB_MEX_FILE*/
@@ -123,6 +131,7 @@
 static void                 RFC_reset                           ( rfc_ctx_s * );
 static void                 RFC_cycle_find                      ( rfc_ctx_s *, int flags );
 #else /*RFC_MINIMAL*/
+#define mexFunction         mexRainflow
 #define RFC_cycle_find      RFC_cycle_find_4ptm
 #endif /*!RFC_MINIMAL*/
 static bool                 RFC_feed_once                       ( rfc_ctx_s *, const rfc_value_tuple_s* tp );
@@ -584,8 +593,8 @@ bool RFC_dh_init( void *ctx, double *dh, size_t dh_cap, bool is_static )
  * @param   count               The capacity of Sa and Sm_norm
  * @param   M                   The mean stress sensitivity
  * @param   Sm_rig              The mean load applied on the test rig
- * @param   R_rig               The stress ratio applied on the test rig
- * @param   R_pinned            true, if R is constant on test rig. false if Sm is constant on test rig
+ * @param   R_rig               The mean load ratio applied on the test rig
+ * @param   R_pinned            true, if R is constant on test rig (R_rig is used). false if Sm is constant on test rig (Sm_rig is used)
  * @param   symmetric           true if Haigh diagram is symmetric at Sa(R=-1)
  *
  * @return  false on error
@@ -603,13 +612,10 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm, unsigned count,
         return false;
     }
 
-    if( rfc_ctx->state != RFC_STATE_INIT )
-    {
-        return false;
-    }
-
     if( count )
     {
+        /* Reference curve given, doing some checks */
+
         unsigned n;
 
         if( !Sa || !Sm || symmetric || count < 2 )
@@ -625,7 +631,7 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm, unsigned count,
 
             if( !n ) continue;
 
-            if( Sm[n-1] > Sm[n] || Sm[n-1] / Sa[n-1] > Sm[n] / Sa[n] ) break;
+            if( Sm[n-1] >= Sm[n] || Sm[n-1] / Sa[n-1] > Sm[n] / Sa[n] ) break;
         }
 
         if( n < count )
@@ -644,6 +650,8 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm, unsigned count,
     }
     else
     {
+        /* No reference curve given */
+
         double Sa_R_Inf, Sa_R_0, Sa_R_0p5;
 
         assert( !Sa && !Sm && !count );
@@ -654,10 +662,13 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm, unsigned count,
                                                            /* 3y = x && y = Sa(R=-1) - (M/3)x              */
         if( symmetric )
         {
+            /* Build symmetrical reference curve */
+            /* Symmetric around R=-1 (Sm=0) */
+
             double *Sa_ = rfc_ctx->internal.at.Sa;
             double *Sm_ = rfc_ctx->internal.at.Sm;
 
-            assert( NUMEL( rfc_ctx->internal.at.Sa ) >= 3 );
+            assert( NUMEL( rfc_ctx->internal.at.Sa ) >= 5 );
             
             rfc_ctx->internal.at.count = 5;
 
@@ -669,6 +680,7 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm, unsigned count,
         }
         else
         {
+            /* Build non-symmetric reference curve */
             double *Sa_ = rfc_ctx->internal.at.Sa;
             double *Sm_ = rfc_ctx->internal.at.Sm;
 
@@ -691,7 +703,7 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm, unsigned count,
     }
 
 #if RFC_DAMAGE_FAST
-    //RFC_damage_lut_init( rfc_ctx );  //!
+    RFC_damage_lut_init( rfc_ctx );
 #endif /*RFC_DAMAGE_FAST*/
 
     return true;
@@ -991,7 +1003,9 @@ double RFC_at_transform( rfc_ctx_s *rfc_ctx, double Sa, double Sm )
     double Sa_transform;
 
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT );
+
+    /* Amplitude is always positive */
+    Sa = fabs( Sa );
 
 #if RFC_USE_DELEGATES
     if( rfc_ctx->at_transform_fcn )
@@ -1002,10 +1016,16 @@ double RFC_at_transform( rfc_ctx_s *rfc_ctx, double Sa, double Sm )
 
     if (!rfc_ctx->at.count)
     {
+        /* No reference curve given, return original amplitude */
         return Sa;
     }
 
-    if( Sa > 0.0 )
+    if( Sa == 0.0 )
+    {
+        /* Zero amplitude */
+        Sa_transform = 0.0;
+    }
+    else
     {
         double Sm_norm_base;
         double Sm_norm_target;
@@ -1017,18 +1037,21 @@ double RFC_at_transform( rfc_ctx_s *rfc_ctx, double Sa, double Sm )
 
         if( rfc_ctx->at.R_pinned )
         {
+            /* Calculate intersection of R slope and M slope */
             Sm_norm_target = RFC_at_R_to_Sm_norm( rfc_ctx, rfc_ctx->at.R_rig );
             Sa_transform   = Sa / alleviation_base * RFC_at_alleviation( rfc_ctx, Sm_norm_target );
         }
         else
         {
-            double   *Sa_   = rfc_ctx->at.Sa;
-            double   *Sm_   = rfc_ctx->at.Sm;
-            unsigned  count = rfc_ctx->at.count;
-            unsigned  n;
-			double    Sa_lhs, Sa_rhs;
-			double    Sm_lhs, Sm_rhs;
+            /* Calculate intersection of mean load on test rig (Sm_rig) with curve taken from Haigh diagram */
+            const double   *Sa_   = rfc_ctx->at.Sa;
+            const double   *Sm_   = rfc_ctx->at.Sm;
+                  unsigned  count = rfc_ctx->at.count;
+                  unsigned  n;
+			      double    Sa_lhs, Sa_rhs;
+			      double    Sm_lhs, Sm_rhs;
 
+            /* Check each segment from the reference curve */
             for( n = 0; n <= count; n++ )
             {
 				if( n )
@@ -1038,11 +1061,13 @@ double RFC_at_transform( rfc_ctx_s *rfc_ctx, double Sa, double Sm )
 
                     if( n < count )
                     {
-                        Sa_rhs = Sa / alleviation_base * RFC_at_alleviation( rfc_ctx, Sm_[n - 1] / Sa_[n - 1] );
-                        Sm_rhs = Sa_rhs / Sa_[n - 1] * Sm_[n - 1];
+                        /* Next segment */
+                        Sa_rhs = Sa / alleviation_base * RFC_at_alleviation( rfc_ctx, Sm_[n] / Sa_[n] );
+                        Sm_rhs = Sa_rhs / Sa_[n] * Sm_[n];
                     }
                     else
                     {
+                        /* Last segment */
                         assert( Sm_lhs <= rfc_ctx->at.Sm_rig );
 
                         Sa_transform = Sa_lhs;
@@ -1050,6 +1075,7 @@ double RFC_at_transform( rfc_ctx_s *rfc_ctx, double Sa, double Sm )
                 }
                 else /* n == 0 */
                 {
+                    /* First segment */
 				    Sa_rhs = Sa / alleviation_base * RFC_at_alleviation( rfc_ctx, Sm_[0] / Sa_[0] );
 				    Sm_rhs = Sa_rhs / Sa_[0] * Sm_[0];
 
@@ -1061,19 +1087,20 @@ double RFC_at_transform( rfc_ctx_s *rfc_ctx, double Sa, double Sm )
                     else continue;
 				}
 
+                /* Interpolate intermediate points */
 				if( Sm_lhs <= rfc_ctx->at.Sm_rig && rfc_ctx->at.Sm_rig <= Sm_rhs )
 				{
-					double frac = ( rfc_ctx->at.Sm_rig - Sm_lhs ) / ( Sm_rhs - Sm_lhs );
+					double frac, denom;
 
-					Sa_transform = Sa_lhs * (1.0 - frac) + Sa_rhs * frac;
+                    denom = Sm_rhs - Sm_lhs;
+
+                    frac = ( denom < 1e-20 ) ? 1.0 : ( ( rfc_ctx->at.Sm_rig - Sm_lhs ) / denom );
+
+					Sa_transform = Sa_lhs * ( 1.0 - frac ) + Sa_rhs * frac;
 					break;
 				}
             }
         }
-    }
-    else
-    {
-        Sa_transform = 0.0;
     }
 
     return Sa_transform;
@@ -1961,10 +1988,11 @@ double RFC_at_R_to_Sm_norm( rfc_ctx_s *rfc_ctx, double R )
     }
     else
     {
-        /* Sm = Sa * ( 1 + R ) / ( 1 - R ) */
-        /* Su = Sm - Sa */
-        /* So = Sm + Sa */
-        /* R  = Su / So */
+        /* Su      = Sm - Sa */
+        /* So      = Sm + Sa */
+        /* R       = Su / So */
+        /* Sm      = Sa * ( 1 + R ) / ( 1 - R ) */
+        /* Sm_norm = Sm / Sa */
 
         Sm_norm = ( 1 + R ) / ( 1 - R );
     }
@@ -1979,20 +2007,21 @@ double RFC_at_R_to_Sm_norm( rfc_ctx_s *rfc_ctx, double R )
  * @param      rfc_ctx       The rainflow context
  * @param[in]  Sm_norm       Mean load, normalized (Sm/Sa)
  *
- * @return     Alleviation factor
+ * @return     Alleviation factor on reference curve
  */
 static
 double RFC_at_alleviation( rfc_ctx_s *rfc_ctx, double Sm_norm )
 {
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT );
 
     if( !rfc_ctx->at.count )
     {
+        /* No reference curve given, no transformation */
         return 1.0;
     }
     else
     {
+        /* Reference curve */
         const double   *Sa_   = rfc_ctx->at.Sa;
         const double   *Sm_   = rfc_ctx->at.Sm;
               unsigned  count = rfc_ctx->at.count;
@@ -2002,23 +2031,26 @@ double RFC_at_alleviation( rfc_ctx_s *rfc_ctx, double Sm_norm )
 
         if( Sm_norm <= Sm_[0] / Sa_[0] )
         {
+            /* First segment */
             return Sa_[0];  /* Clip to first point */
         }
         else if( Sm_norm >= Sm_[count-1] / Sa_[count-1] )
         {
+            /* Last segment */
             return Sa_[count-1];  /* Clip to last point */
         }
         else
         {
             unsigned i;
 
-            /* Select correct quadrant */
+            /* Select correct segment */
             for( i = 1; i < count; i++ )
             {
                 assert( Sa_[i-1] > 0.0 && Sa_[i] > 0.0 && Sm_[i-1] <= Sm_[i] );
 
                 if( Sm_norm > Sm_[i-1] / Sa_[i-1] && Sm_norm <= Sm_[i] / Sa_[i] )
                 {
+                    /* Intersection of R slope and M slope */
                     double M_signed    = ( Sa_[i] - Sa_[i-1] ) / ( Sm_[i] - Sm_[i-1] );
                     double alleviation = ( Sa_[i-1] - M_signed * Sm_[i-1] ) / ( 1.0 - M_signed * Sm_norm );
 
@@ -3213,14 +3245,9 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 /**
  * MATLAB wrapper for the rainflow algorithm
  */
-void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
+static
+void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 {
-    if( !nrhs )
-    {
-        mexPrintf( "%s", RFC_MEX_USAGE );
-        return;
-    }
-    
 #if !RFC_MINIMAL
     if( nrhs != 7 )
     {
@@ -3444,5 +3471,103 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         RFC_deinit( &rfc_ctx );
     }
 }
-#endif
+#endif /*0~1*/
+
+
+#if !RFC_MINIMAL
+static
+void mexAmpTransform( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
+{
+    if( nrhs != 5 )
+    {
+        mexErrMsgTxt( "Function needs exact 5 arguments!" );
+    }
+    else
+    {
+        double M, target;
+        bool target_is_R;
+        mwSize n, cnt;
+        mxArray *mxResult = NULL;
+
+        rfc_ctx_s ctx = { sizeof(ctx) };
+
+        const mxArray *mxSa          = prhs[0];
+        const mxArray *mxSm          = prhs[1];
+        const mxArray *mxM           = prhs[2];
+        const mxArray *mxTarget      = prhs[3];
+        const mxArray *mxTarget_is_R = prhs[4];
+
+        M          =      mxGetScalar( mxM );
+        target     =      mxGetScalar( mxTarget );
+        target_is_R = (int)mxGetScalar( mxTarget_is_R );
+
+        cnt = mxGetNumberOfElements( mxSa );
+        mxAssert( mxGetNumberOfElements( mxSm ) == cnt, "Sa and Sm must have same length!" );
+
+        mxResult = mxCreateDoubleMatrix( mxGetDimensions( mxSa )[0], mxGetDimensions( mxSa )[1], mxREAL );
+        mxAssert( mxResult, "Memory error!" );
+
+        mxAssert( RFC_at_init( &ctx, NULL /*Sa*/, NULL /*Sm*/, 0 /*count*/, M, target /*Sm_rig*/, target /*R_rig*/, target_is_R, false /*symetric*/ ), 
+                  "Error on RFC_at_init(...)!" );
+
+        for( n = 0; n < cnt; n++ )
+        {
+            double Sa_n = mxGetPr( mxSa )[n];
+            double Sm_n = mxGetPr( mxSm )[n];
+
+            mxGetPr( mxResult )[n] = RFC_at_transform( &ctx, Sa_n, Sm_n );
+        }
+
+        plhs[0] = mxResult;
+    }
+}
+
+
+static
+int wal_stricmp( const char *a, const char *b )
+{
+    int ca, cb;
+    do
+    {
+        ca = (unsigned char) *a++;
+        cb = (unsigned char) *b++;
+        ca = tolower( toupper(ca) );
+        cb = tolower( toupper(cb) );
+    }
+    while( ca == cb && ca != '\0' );
+    
+    return ca - cb;
+}
+
+
+/**
+ * MATLAB wrapper for the rainflow algorithm
+ */
+void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
+{
+    char buffer[80];
+
+    if( !nrhs || !mxIsChar( prhs[0] ) || 0 != mxGetString( prhs[0], buffer, sizeof(buffer) ) )
+    {
+        mexPrintf( "%s", RFC_MEX_USAGE );
+        return;
+    }
+
+    if( 0 == wal_stricmp( buffer, "rfc" ) )
+    { 
+        mexRainflow( nlhs, plhs, nrhs - 1, prhs + 1 );
+    }
+#if !RFC_MINIMAL
+    else if( 0 == wal_stricmp( buffer, "amptransform" ) )
+    {
+        mexAmpTransform( nlhs, plhs, nrhs - 1, prhs + 1 );
+    }
+#endif /*!RFC_MINIMAL*/
+    else
+    {
+        mexPrintf( "Unknown subfunction \"%s\"!\n", buffer );
+    }
+}
+#endif /*!RFC_MINIMAL*/
+    
 #endif /*MATLAB_MEX_FILE*/

@@ -29,7 +29,31 @@ ftc2( 'amptransform', Sa, Sm, M, -1, 1 )
 
 %%
 Sa = 100;
-Sm = 0;
+Sm = 50;
 M = 0.3;
+target = 400;
+target_is_R = 0;
 
-ftc2( 'amptransform', Sa, Sm, M, 200, 0 )
+lhs = ftc2( 'amptransform', Sa, Sm, M, target, target_is_R );
+rhs = rfc( 'amptransform', Sa, Sm, M, target, target_is_R );
+
+assert( abs( lhs / rhs - 1 ) < 1e-7 );
+
+while 1
+  Sa = rand * 50;
+  Sm = rand * 100 - 50;
+  M  = rand * 0.9 + 0.1;
+  target = 400;
+  target_is_R = randi(2)-1;
+  if target_is_R
+    target_m = rand * 100 - 50;
+    target_a = rand * 50;
+    target = (target_m-target_a) / (target_m+target_a);
+  else
+    target = rand * 800 - 400;
+  end
+  lhs = ftc2( 'amptransform', Sa, Sm, M, target, target_is_R );
+  rhs = rfc( 'amptransform', Sa, Sm, M, target, target_is_R );
+
+  assert( abs( lhs / rhs - 1 ) < 1e-7 );
+end

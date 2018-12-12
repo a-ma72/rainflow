@@ -905,6 +905,14 @@ TEST RFC_at_test( void )
 		GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  2.0 /*Sa*/, -9.0 /*Sm*/ ), 1.4,      tol   /*tol*/ );  /* R = -Inf   */
 		GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  0.2 /*Sa*/, -9.0 /*Sm*/ ), 0.14,     tol   /*tol*/ );  /* R = -Inf   */
 
+        ctx.at.R_rig = 0.6;
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  3.0 /*Sa*/,  1.0 /*Sm*/ ), 2.147928, 1e-5  /*tol*/ );  /* R = -0.5   */
+        ctx.at.R_rig = 0.1;
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  3.0 /*Sa*/,  1.0 /*Sm*/ ), 2.488194, 1e-5  /*tol*/ );  /* R = -0.5   */
+        ctx.at.R_rig = -4.0;
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  3.0 /*Sa*/,  1.0 /*Sm*/ ), 4.024390, 1e-5  /*tol*/ );  /* R = -0.5   */
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  3.0 /*Sa*/,  100.0 /*Sm*/ ), 5.6208425, 1e-5  /*tol*/ );  /* R ~ 0.942   */
+
 		ASSERT(
 		RFC_at_init( &ctx, NULL /* Sa */, NULL /* Sm */, 0 /* count */, 0.3 /* M */, 
 						   0.0 /* Sm_rig */, -1.0 /* R_rig */, true /* R_pinned */, true /* symmetric */ )
@@ -970,8 +978,19 @@ TEST RFC_at_test( void )
 
 		GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  100.0 /*Sa*/, 0.0 /*Sm*/ ), 85.0, tol  /*tol*/ );
         ctx.at.Sm_rig = 200.0;
-		GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  100.0 /*Sa*/, 0.0 /*Sm*/ ), 65.088757, 1e-5  /*tol*/ );
-	}
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  100.0 /*Sa*/, 0.0 /*Sm*/ ), 65.088757, 1e-5  /*tol*/ );
+        ctx.at.Sm_rig = 400.0;
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  100.0 /*Sa*/, 50.0 /*Sm*/ ), 74.85207, 1e-5  /*tol*/ );
+
+        for( i = 0; i < 3; i++ )
+        {
+            Sa[i] = ctx.at.Sa[i] * 333;
+            Sm[i] = ctx.at.Sm[i] * 333;
+        }
+        ctx.at.Sm_rig = 400.0;
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  100.0 /*Sa*/, 50.0 /*Sm*/ ), 74.85207, 1e-5  /*tol*/ );
+
+    }
 
 	ASSERT( RFC_deinit( &ctx ) );
 
