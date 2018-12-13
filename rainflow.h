@@ -299,15 +299,17 @@ typedef struct rfc_ctx
         RFC_FLAGS_COUNT_LC_DN           = 1 << 5,                   /**< Count into level crossing (only falling slopes) */
         RFC_FLAGS_COUNT_LC              = RFC_FLAGS_COUNT_LC_UP     /**< Count into level crossing (all slopes) */
                                         | RFC_FLAGS_COUNT_LC_DN,
+        RFC_FLAGS_ENFORCE_MARGIN        = 1 << 6,                   /**< Enforce first and last data point are turning points */
+#endif /*RFC_MINIMAL*/
         RFC_FLAGS_COUNT_ALL             = RFC_FLAGS_COUNT_MATRIX    /**< Count all */
                                         | RFC_FLAGS_COUNT_DAMAGE
 #if RFC_DH_SUPPORT
                                         | RFC_FLAGS_COUNT_DH
 #endif /*RFC_DH_SUPPORT*/
+#if !RFC_MINIMAL
                                         | RFC_FLAGS_COUNT_RP
                                         | RFC_FLAGS_COUNT_LC,
-        RFC_FLAGS_ENFORCE_MARGIN        = 1 << 6,                   /**< Enforce first and last data point are turning points */
-#endif /*RFC_MINIMAL*/
+#endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
         RFC_FLAGS_TPPRUNE_PRESERVE_POS  = 1 << 7,
         RFC_FLAGS_TPPRUNE_PRESERVE_RES  = 1 << 8,
@@ -330,6 +332,7 @@ typedef struct rfc_ctx
 
     enum 
     {
+        /* Don't change order! */
         RFC_RES_NONE                    = 0,                        /**< No residual method */
         RFC_RES_IGNORE,                                             /**< Ignore residue (same as RFC_RES_NONE) */
 #if !RFC_MINIMAL
@@ -457,6 +460,9 @@ typedef struct rfc_ctx
 #endif /*RFC_MINIMAL*/
         size_t                          pos;                        /**< Absolute position in data input stream, base 1 */
         size_t                          global_offset;              /**< Offset for pos */
+        rfc_value_tuple_s               residue[3];                 /**< Static residue (if class_count is zero) */
+        size_t                          residue_cap;                /**< Capacity of static residue */
+        bool                            res_static;                 /**< true, if static residue is in use */
 #if RFC_TP_SUPPORT
         rfc_value_tuple_s               margin[2];                  /**< First and last data point */
         int                             margin_stage;               /**< 0: Init, 1: Left margin set, 2: 1st turning point safe */
