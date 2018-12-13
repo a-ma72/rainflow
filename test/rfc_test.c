@@ -219,10 +219,10 @@ TEST RFC_tp_prune_test( int ccnt )
 
     RFC_tp_prune( &ctx, /*count*/ 100, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS | RFC_FLAGS_TPPRUNE_PRESERVE_RES );
 
-    ASSERT( ctx.tp_cnt == 107 );
+    ASSERT( ctx.tp_cnt == ccnt ? 107 : 100 );
     /* Should not change anything: */
     RFC_tp_prune( &ctx, /*count*/ 100, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS | RFC_FLAGS_TPPRUNE_PRESERVE_RES );
-    ASSERT( ctx.tp_cnt == 107 );
+    ASSERT( ctx.tp_cnt == ccnt ? 107 : 100 );
 
     RFC_tp_prune( &ctx, /*count*/ 0, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS | RFC_FLAGS_TPPRUNE_PRESERVE_RES );
     ASSERT( ctx.tp_cnt == ctx.residue_cnt );
@@ -328,10 +328,13 @@ TEST RFC_test_turning_points( int ccnt )
     ASSERT( ctx.tp[0].value == 1.0f && ctx.tp[0].pos == 1 );
     ASSERT( ctx.tp[1].value == 2.1f && ctx.tp[1].pos == 5 );
     ASSERT( ctx.tp[2].value == 1.0f && ctx.tp[2].pos == 8 );
-    ASSERT( ctx.residue_cnt == 3 );
-    ASSERT( ctx.residue[0].value == 1.0f && ctx.residue[0].pos == 1 && ctx.residue[0].tp_pos == 1 );
-    ASSERT( ctx.residue[1].value == 2.1f && ctx.residue[1].pos == 5 && ctx.residue[1].tp_pos == 2 );
-    ASSERT( ctx.residue[2].value == 1.0f && ctx.residue[2].pos == 8 && ctx.residue[2].tp_pos == 3 );
+    if( ctx.class_count )
+    {
+        ASSERT( ctx.residue_cnt == 3 );
+        ASSERT( ctx.residue[0].value == 1.0f && ctx.residue[0].pos == 1 && ctx.residue[0].tp_pos == 1 );
+        ASSERT( ctx.residue[1].value == 2.1f && ctx.residue[1].pos == 5 && ctx.residue[1].tp_pos == 2 );
+        ASSERT( ctx.residue[2].value == 1.0f && ctx.residue[2].pos == 8 && ctx.residue[2].tp_pos == 3 );
+    }
     ctx.tp = NULL;
     RFC_deinit( &ctx );
 
@@ -359,10 +362,13 @@ TEST RFC_test_turning_points( int ccnt )
     ASSERT( ctx.tp[0].value == 1.0f && ctx.tp[0].pos == 1 );
     ASSERT( ctx.tp[1].value == 2.1f && ctx.tp[1].pos == 3 );
     ASSERT( ctx.tp[2].value == 1.0f && ctx.tp[2].pos == 6 ); /* Turning point at right margin! */
-    ASSERT( ctx.residue_cnt == 3 );
-    ASSERT( ctx.residue[0].value == 1.0f && ctx.residue[0].pos == 1 && ctx.residue[0].tp_pos == 1 );
-    ASSERT( ctx.residue[1].value == 2.1f && ctx.residue[1].pos == 3 && ctx.residue[1].tp_pos == 2 );
-    ASSERT( ctx.residue[2].value == 1.0f && ctx.residue[2].pos == 5 && ctx.residue[2].tp_pos == 3 );  /* In residue, turning point at original position! */
+    if( ctx.class_count )
+    {
+        ASSERT( ctx.residue_cnt == 3 );
+        ASSERT( ctx.residue[0].value == 1.0f && ctx.residue[0].pos == 1 && ctx.residue[0].tp_pos == 1 );
+        ASSERT( ctx.residue[1].value == 2.1f && ctx.residue[1].pos == 3 && ctx.residue[1].tp_pos == 2 );
+        ASSERT( ctx.residue[2].value == 1.0f && ctx.residue[2].pos == 5 && ctx.residue[2].tp_pos == 3 );  /* In residue, turning point at original position! */
+    }
     ctx.tp = NULL;
     RFC_deinit( &ctx );
 

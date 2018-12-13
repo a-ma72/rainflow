@@ -281,8 +281,9 @@ typedef struct rfc_ctx
 
     enum
     {
-        RFC_ERROR_INVARG,
-        RFC_ERROR_MEMORY,
+        RFC_ERROR_NOERROR,                                          /**< No error */
+        RFC_ERROR_INVARG,                                           /**< Invalid arguments passed */
+        RFC_ERROR_MEMORY,                                           /**< Error on memory allocation */
     }                                   error;                      /**< Error code */
 
     enum

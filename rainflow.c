@@ -248,6 +248,7 @@ bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type 
     rfc_ctx->flags                      = RFC_FLAGS_COUNT_MATRIX | 
                                           RFC_FLAGS_COUNT_DAMAGE;
 #endif /*!RFC_MINIMAL*/
+    RFC_flags_set( rfc_ctx, rfc_ctx->flags );  /* Validate flags */
 
     /* Counter increments */
     rfc_ctx->full_inc                   = RFC_FULL_CYCLE_INCREMENT;
@@ -889,6 +890,11 @@ int RFC_flags_set( void *ctx, int flags )
         return false;
     }
 
+    if( !rfc_ctx->class_count )
+    {
+        flags &= ~(RFC_FLAGS_COUNT_ALL);
+    }
+
     old_flags = rfc_ctx->flags;
     rfc_ctx->flags = flags;
 
@@ -1020,7 +1026,7 @@ bool RFC_finalize( void *ctx, int residual_method )
         switch( residual_method )
         {
             case RFC_RES_NONE:
-                /* fallthrough */
+                /* FALLTHROUGH */
             case RFC_RES_IGNORE:
                 ok = RFC_finalize_res_ignore( rfc_ctx, flags );
                 break;
@@ -1050,6 +1056,11 @@ bool RFC_finalize( void *ctx, int residual_method )
                 ok = false;
         }
         assert( rfc_ctx->state == RFC_STATE_FINALIZE );
+    }
+
+    if( rfc_ctx->counting_method == RFC_COUNTING_METHOD_NONE || !rfc_ctx->class_count )
+    {
+        rfc_ctx->residue_cnt = 0;
     }
 
     rfc_ctx->state = ok ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
@@ -1328,7 +1339,9 @@ bool RFC_feed_once( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt )
         else
         {
             if( rfc_ctx->residue_cnt > 1 )
-            RFC_residue_remove_item( rfc_ctx, 0, 1 );
+            {
+                RFC_residue_remove_item( rfc_ctx, 0, 1 );
+            }
         }
     }
 
@@ -2496,7 +2509,7 @@ void RFC_cycle_find( rfc_ctx_s *rfc_ctx, int flags )
                 break;
 #endif /*RFC_HCM_SUPPORT*/
             case RFC_COUNTING_METHOD_DELEGATED:
-                /* fallthrough */
+                /* FALLTHROUGH */
             default:
                 assert( false );
                 break;
