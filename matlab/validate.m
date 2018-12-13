@@ -11,8 +11,8 @@ function validate
   enforce_margin    = 0;
   use_hcm           = 0;
 
-  [~,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis, ...
-                   enforce_margin, use_hcm );
+  [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
+                          enforce_margin, use_hcm );
 
   assert( sum( sum( rm ) ) == 0 );
 
@@ -33,8 +33,8 @@ function validate
   enforce_margin    = 0;
   use_hcm           = 0;
 
-  [~,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis, ...
-                   enforce_margin, use_hcm );
+  [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
+                          enforce_margin, use_hcm );
 
   assert( sum( sum( rm ) ) == 1 );
   assert( rm( 3,2 ) == 1 );
@@ -57,8 +57,8 @@ function validate
   enforce_margin    = 0;
   use_hcm           = 0;
 
-  [~,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis, ...
-                   enforce_margin, use_hcm );
+  [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
+                          enforce_margin, use_hcm );
 
   assert( sum( sum( rm ) ) == 1 );
   assert( rm( 2,3 ) == 1 );
@@ -81,8 +81,8 @@ function validate
   enforce_margin    = 0;
   use_hcm           = 0;
 
-  [~,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis, ...
-                   enforce_margin, use_hcm );
+  [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
+                          enforce_margin, use_hcm );
 
   assert( sum( sum( rm ) ) == 7 );
   assert( rm( 5,3 ) == 2 );
@@ -109,8 +109,8 @@ function validate
   enforce_margin    = 0;
   use_hcm           = 0;
 
-  [pd,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis, ...
-                    enforce_margin, use_hcm );
+  [pd,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
+                           enforce_margin, use_hcm );
 
   save( name, 'rm', 're' );
 
@@ -144,6 +144,13 @@ function validate
       test = abs( y.residuum ./ re - 1 );
       assert( all( test < 1e-1 ))
   end
+  
+  %% Long series, turning points only
+  y = rfc( 'turningpoints', x, class_width, enforce_margin );
+  figure
+  plot( x, 'k-' );
+  hold all
+  plot( y(2,:), y(1,:), 'r--' );
 end
 
 function rounded_data = export_series( filename, data, class_count )

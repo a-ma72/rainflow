@@ -3,7 +3,7 @@ assert( ispc )
 clear all
 clc
 
-rmdir( '../build', 's' );
+[~] = rmdir( '../build', 's' );
 mkdir( '../build' );
 cd( '..' );
 projdir = cd( 'build' );

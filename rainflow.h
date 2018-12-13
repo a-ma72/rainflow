@@ -301,7 +301,9 @@ typedef struct rfc_ctx
                                         | RFC_FLAGS_COUNT_LC_DN,
         RFC_FLAGS_COUNT_ALL             = RFC_FLAGS_COUNT_MATRIX    /**< Count all */
                                         | RFC_FLAGS_COUNT_DAMAGE
+#if RFC_DH_SUPPORT
                                         | RFC_FLAGS_COUNT_DH
+#endif /*RFC_DH_SUPPORT*/
                                         | RFC_FLAGS_COUNT_RP
                                         | RFC_FLAGS_COUNT_LC,
         RFC_FLAGS_ENFORCE_MARGIN        = 1 << 6,                   /**< Enforce first and last data point are turning points */

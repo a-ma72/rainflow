@@ -154,8 +154,8 @@ static void                 RFC_cycle_find_4ptm                 ( rfc_ctx_s *, i
 static void                 RFC_cycle_find_hcm                  ( rfc_ctx_s *, int flags );
 #endif /*RFC_HCM_SUPPORT*/
 #if !RFC_MINIMAL
-#endif /*!RFC_MINIMAL*/
 static void                 RFC_cycle_process_lc                ( rfc_ctx_s *, int flags );
+#endif /*!RFC_MINIMAL*/
 static void                 RFC_cycle_process_counts            ( rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags );
 /* Methods on residue */
 static bool                 RFC_finalize_res_ignore             ( rfc_ctx_s *, int flags );
@@ -416,7 +416,7 @@ bool RFC_tp_init( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_stati
 {
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || rfc_ctx->tp )
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || !tp )
     {
         assert( false );
         rfc_ctx->error = RFC_ERROR_INVARG;
@@ -1021,7 +1021,11 @@ bool RFC_finalize( void *ctx, int residual_method )
     else
 #endif /*RFC_USE_DELEGATES*/
     {
-        int flags = rfc_ctx->flags & ~RFC_FLAGS_COUNT_LC;
+        int flags = rfc_ctx->flags;
+
+#if !RFC_MINIMAL
+        flags &= ~RFC_FLAGS_COUNT_LC;
+#endif /*!RFC_MINIMAL*/
 
         switch( residual_method )
         {
@@ -1328,8 +1332,10 @@ bool RFC_feed_once( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt )
         }
 #endif /*RFC_TP_SUPPORT*/
 
+#if !RFC_MINIMAL
         /* New turning point, do LC count */
         RFC_cycle_process_lc( rfc_ctx, rfc_ctx->flags & (RFC_FLAGS_COUNT_LC | RFC_FLAGS_ENFORCE_MARGIN) );
+#endif /*!RFC_MINIMAL*/
 
         if( rfc_ctx->class_count )
         {
@@ -1490,7 +1496,7 @@ bool RFC_feed_finalize( rfc_ctx_s *rfc_ctx )
         tp_interim = &rfc_ctx->residue[rfc_ctx->residue_cnt];
         rfc_ctx->residue_cnt++;
 
-        rfc_ctx->state = RFC_STATE_BUSY;  //!
+        rfc_ctx->state = RFC_STATE_BUSY;
     }
 
 #if RFC_TP_SUPPORT
@@ -1503,11 +1509,15 @@ bool RFC_feed_finalize( rfc_ctx_s *rfc_ctx )
 
     if( tp_interim )
     {
+        int flags = rfc_ctx->flags;
+#if !RFC_MINIMAL
         /* New turning point, do LC count */
         RFC_cycle_process_lc( rfc_ctx, rfc_ctx->flags & (RFC_FLAGS_COUNT_LC | RFC_FLAGS_ENFORCE_MARGIN) );
+        flags &= ~RFC_FLAGS_COUNT_LC;
+#endif /*!RFC_MINIMAL*/
 
         /* Check once more if a new cycle is closed now */
-        RFC_cycle_find( rfc_ctx, rfc_ctx->flags & ~RFC_FLAGS_COUNT_LC );
+        RFC_cycle_find( rfc_ctx, flags );
     }
 
 #if RFC_HCM_SUPPORT
@@ -3414,7 +3424,13 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 #else /*RFC_MINIMAL*/
     if( nrhs != 5 )
     {
+        if( !nrhs )
+        {
+            mexPrintf( "%s", RFC_MEX_USAGE );
+            return;
+        }
         mexErrMsgTxt( "Function needs exact 5 arguments!" );
+
 #endif /*!RFC_MINIMAL*/
     }
     else
@@ -3633,7 +3649,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 #endif /*0~1*/
 
 
-#if !RFC_MINIMAL
+#if RFC_AT_SUPPORT
 /**
  * MATLAB wrapper for the amplitude transformation
  */
@@ -3683,8 +3699,10 @@ void mexAmpTransform( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]
         plhs[0] = mxResult;
     }
 }
+#endif /*RFC_AT_SUPPORT*/
 
 
+#if RFC_TP_SUPPORT
 /**
  * MATLAB wrapper calculates turning points from data points
  */
@@ -3699,6 +3717,7 @@ void mexTP( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
     {
         rfc_value_tuple_s *tp = NULL;
         mxArray *mxResult = NULL;
+        double *ptr;
         rfc_ctx_s ctx = { sizeof(ctx) };
         mwSize n;
         bool ok = true;
@@ -3710,8 +3729,6 @@ void mexTP( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         double hysteresis     = mxGetScalar( mxHysteresis );
         bool   enforce_margin = (int)mxGetScalar( mxEnforceMargin );
 
-        mxResult = mxCreateDoubleMatrix( mxGetDimensions(mxData)[0], mxGetDimensions(mxData)[1], mxREAL );
-        mxAssert( mxResult, "Memory allocation error!" );
         tp = calloc( mxGetNumberOfElements( mxData ), sizeof(tp[0]) );
         if( !tp )
         {
@@ -3724,13 +3741,13 @@ void mexTP( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
             mexErrMsgTxt( "Error on RFC init!" );
         }
 
-        if( !RFC_tp_init( &ctx, tp, mxGetNumberOfElements( mxResult ), true /*tp_is_static*/ ) )
+        if( !RFC_tp_init( &ctx, tp, mxGetNumberOfElements( mxData ), true /*tp_is_static*/ ) )
         {
             free(tp);
             mexErrMsgTxt( "Error on RFC tp init!" );
         }
 
-        ctx.flags = enforce_margin ? RFC_FLAGS_ENFORCE_MARGIN : 0;
+        RFC_flags_set( &ctx, enforce_margin ? RFC_FLAGS_ENFORCE_MARGIN : 0 );
 
         if( !RFC_feed( &ctx, mxGetPr( mxData ), mxGetNumberOfElements( mxData ) ) )
         {
@@ -3744,9 +3761,12 @@ void mexTP( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
             mexErrMsgTxt( "Error on RFC finalize!" );
         }
 
-        for( n = 0; n < mxGetNumberOfElements( mxData ); n++ )
+        mxResult = mxCreateDoubleMatrix( 2, ctx.tp_cnt, mxREAL );
+        mxAssert( mxResult, "Memory allocation error!" );
+        for( ptr = mxGetPr( mxResult ), n = 0; n < ctx.tp_cnt; n++ )
         {
-            mxGetPr( mxResult )[n] = tp[n].value;
+            *ptr++ = tp[n].value;
+            *ptr++ = (double)tp[n].pos;
         }
         free( tp );
 
@@ -3758,9 +3778,10 @@ void mexTP( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         plhs[0] = mxResult;
     }
 }
+#endif /*RFC_TP_SUPPORT*/
 
 
-
+#if !RFC_MINIMAL
 /**
  * @brief      Compare two string case insensitive
  *
@@ -3803,16 +3824,18 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
     { 
         mexRainflow( nlhs, plhs, nrhs - 1, prhs + 1 );
     }
-#if !RFC_MINIMAL
+#if RFC_AT_SUPPORT
     else if( 0 == wal_stricmp( buffer, "amptransform" ) )
     {
         mexAmpTransform( nlhs, plhs, nrhs - 1, prhs + 1 );
     }
+#endif /*RFC_AT_SUPPORT*/
+#if RFC_TP_SUPPORT
     else if( 0 == wal_stricmp( buffer, "turningpoints" ) )
     {
         mexTP( nlhs, plhs, nrhs - 1, prhs + 1 );
     }
-#endif /*!RFC_MINIMAL*/
+#endif /*RFC_TP_SUPPORT*/
     else
     {
         mexPrintf( "Unknown subfunction \"%s\"!\n", buffer );
