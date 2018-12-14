@@ -1098,7 +1098,7 @@ bool RFC_finalize( void *ctx, int residual_method )
  */
 double RFC_at_transform( rfc_ctx_s *rfc_ctx, double Sa, double Sm )
 {
-    double Sa_transform;
+    double Sa_transform = Sa;
 
     assert( rfc_ctx );
 
@@ -2365,7 +2365,7 @@ rfc_value_tuple_s * RFC_feed_check_tp( rfc_ctx_s *rfc_ctx, const rfc_value_tuple
         }
         else
         {
-            int is_falling_slope;
+            int is_falling_slope = -1;
 
             assert( rfc_ctx->state == RFC_STATE_BUSY );
 
@@ -2394,7 +2394,7 @@ rfc_value_tuple_s * RFC_feed_check_tp( rfc_ctx_s *rfc_ctx, const rfc_value_tuple
             /* Local hysteresis filtering */
             delta = value_delta( rfc_ctx->internal.extrema[0].value, rfc_ctx->internal.extrema[1].value, NULL /* sign_ptr */ );
 
-            if( delta > rfc_ctx->hysteresis )
+            if( is_falling_slope >= 0 && delta > rfc_ctx->hysteresis )
             {
                 /* Criteria met, new turning point found.
                  * Emit maximum on falling slope as first interim turning point, 
@@ -3499,7 +3499,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
             mexErrMsgTxt( "Error during initialization!" );
         }
 
-        /* Casting values from double type to RFC_value_type */ 
+        /* Cast values from double type to RFC_value_type */ 
         if( sizeof( RFC_value_type ) != sizeof(double) && data_len )  /* maybe unsafe! */
         {
             buffer = (RFC_value_type *)RFC_mem_alloc( NULL, data_len, 
