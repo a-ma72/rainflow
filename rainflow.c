@@ -1847,7 +1847,7 @@ bool RFC_finalize_res_rp_DIN45667( rfc_ctx_s *rfc_ctx, int flags )
         return false;
     }
 
-    /* This approach only affects range pair and level crossing countings */
+    /* This approach only affects range pair counting */
     if( rfc_ctx->flags & RFC_FLAGS_COUNT_RP ) 
     {
         while( rfc_ctx->residue_cnt >= 2 )
@@ -1861,7 +1861,7 @@ bool RFC_finalize_res_rp_DIN45667( rfc_ctx_s *rfc_ctx, int flags )
             size_t             j;
 
             /* Watch all adjacent slopes */
-            for( j = 1; j < rfc_ctx->residue_cnt; j += 2 )
+            for( j = 1; j < rfc_ctx->residue_cnt; )
             {
                 /* Right hand slopes to compare, all are adjacent to the given "left hand slope" */
                 rfc_value_tuple_s *from_j       = &rfc_ctx->residue[j];
@@ -1874,11 +1874,12 @@ bool RFC_finalize_res_rp_DIN45667( rfc_ctx_s *rfc_ctx, int flags )
                 if( srange_i == -srange_j )
                 {
                     /* Do the countings for the matching slope */
-                    RFC_cycle_process_counts( rfc_ctx, from_j, to_j, to_j + 1, flags );
+                    RFC_cycle_process_counts( rfc_ctx, from_j, to_j, to_j + 1, flags & ~RFC_FLAGS_COUNT_LC );
 
                     /* Remove "left hand slope" */
                     RFC_residue_remove_item( rfc_ctx, /*index*/ j, /*count*/ 2 );
                 }
+                else j += 2;
             }
 
             /* Remove first point */
