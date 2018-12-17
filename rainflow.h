@@ -119,38 +119,39 @@
 #endif /*RFC_USE_INTEGRAL_COUNTS*/
 
 #if RFC_MINIMAL
+#undef  RFC_USE_DELEGATES
 #define RFC_USE_DELEGATES    OFF
+#undef  RFC_HCM_SUPPORT
 #define RFC_HCM_SUPPORT      OFF
+#undef  RFC_TP_SUPPORT
 #define RFC_TP_SUPPORT       OFF
+#undef  RFC_DH_SUPPORT
 #define RFC_DH_SUPPORT       OFF
+#undef  RFC_AT_SUPPORT
 #define RFC_AT_SUPPORT       OFF
+#undef  RFC_GLOBAL_EXTREMA
 #define RFC_GLOBAL_EXTREMA   OFF
+#undef  RFC_DAMAGE_FAST
 #define RFC_DAMAGE_FAST      OFF
 #else /*!RFC_MINIMAL*/
 #ifndef RFC_USE_DELEGATES
 #define RFC_USE_DELEGATES OFF
 #endif /*RFC_USE_DELEGATES*/
-
 #ifndef RFC_HCM_SUPPORT
 #define RFC_HCM_SUPPORT OFF
 #endif /*RFC_HCM_SUPPORT*/
-
 #ifndef RFC_TP_SUPPORT
 #define RFC_TP_SUPPORT ON
 #endif /*RFC_TP_SUPPORT*/
-
 #ifndef RFC_DH_SUPPORT
 #define RFC_DH_SUPPORT OFF
 #endif /*RFC_DH_SUPPORT*/
-
 #ifndef RFC_AT_SUPPORT
 #define RFC_AT_SUPPORT OFF
 #endif /*RFC_AT_SUPPORT*/
-
 #ifndef RFC_GLOBAL_EXTREMA
 #define RFC_GLOBAL_EXTREMA OFF
 #endif /*RFC_GLOBAL_EXTREMA*/
-
 #ifndef RFC_DAMAGE_FAST
 #define RFC_DAMAGE_FAST ON
 #endif /*RFC_DAMAGE_FAST*/
@@ -205,6 +206,7 @@ bool   RFC_finalize          ( void *ctx, int residual_method );
 
 #if RFC_TP_SUPPORT
 bool   RFC_tp_init           ( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
+bool   RFC_tp_init_autoprune ( void *ctx, bool autoprune, size_t size, size_t threshold );
 bool   RFC_tp_prune          ( void *ctx, size_t count, int flags );
 #endif /*RFC_TP_SUPPORT*/
 
@@ -421,7 +423,8 @@ typedef struct rfc_ctx
     size_t                              tp_cap;                     /**< Buffer capacity (number of elements) */
     size_t                              tp_cnt;                     /**< Number of turning points in buffer */
     bool                                tp_locked;                  /**< If tp_locked, tp is freezed. Only RFC_tp_prune() may change content */
-    size_t                              tp_threshold;               /**< Threshold for (auto)pruning */
+    size_t                              tp_prune_size;              /**< Size for autoprune */
+    size_t                              tp_prune_threshold;         /**< Threshold for (auto)pruning */
 #endif /*RFC_TP_SUPPORT*/
 
 #if RFC_DH_SUPPORT

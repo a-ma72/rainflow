@@ -148,7 +148,7 @@ static bool                 RFC_feed_finalize_tp                ( rfc_ctx_s *, r
 #if RFC_HCM_SUPPORT
 static bool                 RFC_feed_finalize_hcm               ( rfc_ctx_s *, int flags );
 #endif /*!RFC_HCM_SUPPORT*/
-static rfc_value_tuple_s *  RFC_feed_check_tp                   ( rfc_ctx_s *, const rfc_value_tuple_s *pt );
+static rfc_value_tuple_s *  RFC_feed_filter_pt                  ( rfc_ctx_s *, const rfc_value_tuple_s *pt );
 static void                 RFC_cycle_find_4ptm                 ( rfc_ctx_s *, int flags );
 #if RFC_HCM_SUPPORT
 static void                 RFC_cycle_find_hcm                  ( rfc_ctx_s *, int flags );
@@ -366,6 +366,8 @@ bool RFC_init                 ( void *ctx, unsigned class_count, RFC_value_type 
     rfc_ctx->tp_cap                     = 0;
     rfc_ctx->tp_cnt                     = 0;
     rfc_ctx->tp_locked                  = 0;
+    rfc_ctx->tp_prune_threshold         = (size_t)-1;
+    rfc_ctx->tp_prune_size              = (size_t)-1;
 #endif /*RFC_TP_SUPPORT*/
 
 
@@ -443,6 +445,29 @@ bool RFC_tp_init( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_stati
     rfc_ctx->internal.tp_static = is_static;
 
     return true;
+}
+
+
+bool RFC_tp_init_autoprune( void *ctx, bool autoprune, size_t size, size_t threshold )
+{
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
+    {
+        assert( false );
+        rfc_ctx->error = RFC_ERROR_INVARG;
+
+        return false;
+    }
+
+    if( rfc_ctx->state != RFC_STATE_INIT )
+    {
+        return false;
+    }
+
+    rfc_ctx->flags                      = rfc_ctx->flags & ~RFC_FLAGS_TPAUTOPRUNE | (autoprune ? RFC_FLAGS_TPAUTOPRUNE : 0);
+    rfc_ctx->tp_prune_threshold         = threshold;
+    rfc_ctx->tp_prune_size              = size;
 }
 
 
@@ -1323,10 +1348,10 @@ bool RFC_feed_once( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt, int flags )
 
     /* Check for next turning point and update residue. tp_residue is NULL, if there is no turning point */
     /* Otherwise tp_residue refers the forelast element in member rfc_ctx->residue */
-    tp_residue = RFC_feed_check_tp( rfc_ctx, pt );
+    tp_residue = RFC_feed_filter_pt( rfc_ctx, pt );
 
 #if RFC_TP_SUPPORT
-    /* Check if pt influences margins */
+    /* Check if pt influences margins (tp_residue may be set to NULL then!) */
     if( !RFC_feed_once_tp_check_margin( rfc_ctx, pt, &tp_residue ) )
     {
         return false;
@@ -1454,6 +1479,7 @@ bool RFC_feed_once_tp_check_margin( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s*
                 /* Save right margin so far */
                 rfc_ctx->internal.margin[1] = *pt;
 
+                /* Prevent storing 1st point twice */
                 if( *tp_residue )
                 {
                     /* First turning point found */
@@ -1465,7 +1491,7 @@ bool RFC_feed_once_tp_check_margin( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s*
 
                         /* Left margin and first turning point are identical, set reference in residue */
                         (*tp_residue)->tp_pos = 1;
-                        (*tp_residue) = 0;
+                        (*tp_residue) = 0;  /* Avoid further processing of this turning point */
                     }
                 }
                 break;
@@ -2320,7 +2346,7 @@ double RFC_damage_calc_fast( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned c
 
 /**
  * @brief      Test data sample for a new turning point and add to the residue
- *             in that case.
+ *             in that case. Update extrema.
  *             - 1. Hysteresis Filtering
  *             - 2. Peak-Valley Filtering
  *
@@ -2330,7 +2356,7 @@ double RFC_damage_calc_fast( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned c
  * @return     Returns pointer to new turning point in residue or NULL
  */
 static
-rfc_value_tuple_s * RFC_feed_check_tp( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *pt )
+rfc_value_tuple_s * RFC_feed_filter_pt( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *pt )
 {
     int                 slope;
     RFC_value_type      delta;
@@ -2921,9 +2947,9 @@ bool RFC_tp_add( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *tp )
             tp->tp_pos = rfc_ctx->tp_cnt; /* Turning point get its position index in tp, base 1 */
         }
 
-        if( rfc_ctx->flags & RFC_FLAGS_TPAUTOPRUNE )
+        if( rfc_ctx->flags & RFC_FLAGS_TPAUTOPRUNE && rfc_ctx->tp_cnt > rfc_ctx->tp_prune_threshold )
         {
-            return RFC_tp_prune( rfc_ctx, rfc_ctx->tp_threshold, RFC_FLAGS_TPPRUNE_PRESERVE_POS );
+            return RFC_tp_prune( rfc_ctx, rfc_ctx->tp_prune_size, RFC_FLAGS_TPPRUNE_PRESERVE_POS );
         }
 
         return true;
