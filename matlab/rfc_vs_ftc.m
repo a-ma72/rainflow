@@ -30,35 +30,6 @@ use_hcm = 0;
 
 
 %%
-if 1
-  % RFC residue only
-  [bkz,res,rm,rp,lc,tp] = rfc( 'rfc', x_orig, cc, cw, lbound, 0, 0, 1, 0 ); % 0 = None, 6 = Repeated
-  x = [res(:);res(:)];
-  %x = x_orig;
-  residual_mode = [1,0];
-  
-  x = res;
-  residual_mode = [5,6];
-else
-  % RFC entire signal, residue "repeated"
-  x = x_orig;
-  residual_mode = [5,6];
-end
-
-
-y = ftc2( 'rfc', x, 'classcount', cc, 'classwidth', cw, 'lbound', lbound, ...
-          'dilation', 0, 'hysteresis', hysteresis, 'residuum', residual_mode(1) ); % 1 = None, 0/5 = Repeated
-y_rfm = zeros(cc);
-for i = 1:numel( y.rfm )
-  y_rfm( cn(y.rfm(i).from), cn(y.rfm(i).to) ) = y.rfm(i).counts;
-end
-[bkz,res,rm,rp,lc,tp] = rfc( 'rfc', x, cc, cw, lbound, hysteresis, ...
-                             residual_mode(2), enforce_margin, use_hcm ); % 0 = None, 6 = Repeated
-
-z = rm - y_rfm;
-sum(abs(z(:)))
-
-%%
 
 
 [bkz,res,rm,rp,lc,tp] = rfc( 'rfc', x_orig, cc, cw, lbound, hysteresis, ...
@@ -89,13 +60,22 @@ sum( abs( Z1(:) - rm_rep(:) ) )
 sum( abs( Z2(:) - rm_rep(:) ) )
 
 y = ftc2( 'rfc', x, 'classcount', cc, 'classwidth', cw, 'lbound', lbound, ...
-          'dilation', 0, 'hysteresis', hysteresis, 'residuum', 0 ); % 1 = None, 0/5 = Repeated
-        
+          'dilation', 0, 'hysteresis', hysteresis, 'residuum', 1 ); % 1 = None, 0/5 = Repeated
+y_rfm = zeros(cc);
+for i = 1:numel( y.rfm )
+  y_rfm( cn(y.rfm(i).from), cn(y.rfm(i).to) ) = y.rfm(i).counts;
+end
+
+sum( abs( rm_none(:) - y_rfm(:) ) )
+sum( abs( rm_none(:) - y_rfm(:) ) )
+
+y = ftc2( 'rfc', x, 'classcount', cc, 'classwidth', cw, 'lbound', lbound, ...
+          'dilation', 0, 'hysteresis', hysteresis, 'residuum', 5 ); % 1 = None, 0/5 = Repeated
 y_rfm = zeros(cc);
 for i = 1:numel( y.rfm )
   y_rfm( cn(y.rfm(i).from), cn(y.rfm(i).to) ) = y.rfm(i).counts;
 end
 
 % Z1 und Z2 sind mit ftc Ergebnis identisch
-sum( ( Z1(:) - y_rfm(:) ) )
-sum( ( Z2(:) - y_rfm(:) ) )
+sum( abs( Z1(:) - y_rfm(:) ) )
+sum( abs( Z2(:) - y_rfm(:) ) )

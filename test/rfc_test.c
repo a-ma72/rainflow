@@ -113,7 +113,7 @@ double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 #define INIT_ARRAY(...) __VA_ARGS__
 #define SIMPLE_RFC_0(CCNT,TP,TP_N,OFFS) \
     if( RFC_init( &ctx, CCNT /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
-                        1 /* hysteresis */ ) &&                                                \
+                        1 /* hysteresis */, RFC_FLAGS_DEFAULT ) &&                             \
         RFC_tp_init( &ctx, TP /* *tp */, TP_N /* tp_cap */, true /* is_static */ ) )           \
     {                                                                                          \
         RFC_VALUE_TYPE data[] = {0};                                                           \
@@ -125,7 +125,7 @@ double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 #define INIT_ARRAY(...) __VA_ARGS__
 #define SIMPLE_RFC(CCNT,TP,TP_N,OFFS,X) \
     if( RFC_init( &ctx, CCNT /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
-                        1 /* hysteresis */ ) &&                                                \
+                        1 /* hysteresis */, RFC_FLAGS_DEFAULT ) &&                             \
         RFC_tp_init( &ctx, TP /* *tp */, TP_N /* tp_cap */, true /* is_static */ ) )           \
     {                                                                                          \
         RFC_VALUE_TYPE data[] = {INIT_ARRAY X};                                                \
@@ -136,11 +136,10 @@ double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 
 #define SIMPLE_RFC_MARGIN_0(CCNT,TP,TP_N,OFFS) \
     if( RFC_init( &ctx, CCNT /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
-                        1 /* hysteresis */ ) &&                                                \
+                        1 /* hysteresis */, RFC_FLAGS_COUNT_ALL|RFC_FLAGS_ENFORCE_MARGIN ) &&  \
         RFC_tp_init( &ctx, TP /* *tp */, TP_N /* tp_cap */, true /* is_static */ ) )           \
     {                                                                                          \
         RFC_VALUE_TYPE data[] = {0};                                                           \
-        ctx.flags |= RFC_FLAGS_ENFORCE_MARGIN;                                                 \
         RFC_feed( &ctx, data, 0 );                                                             \
         RFC_finalize( &ctx, RFC_RES_NONE /* residual_method */ );                              \
     }                                                                                          \
@@ -148,11 +147,10 @@ double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 
 #define SIMPLE_RFC_MARGIN(CCNT,TP,TP_N,OFFS,X) \
     if( RFC_init( &ctx, CCNT /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
-                        1 /* hysteresis */ ) &&                                                \
+                        1 /* hysteresis */, RFC_FLAGS_COUNT_ALL|RFC_FLAGS_ENFORCE_MARGIN ) &&  \
         RFC_tp_init( &ctx, TP /* *tp */, TP_N /* tp_cap */, true /* is_static */ ) )           \
     {                                                                                          \
         RFC_VALUE_TYPE data[] = {INIT_ARRAY X};                                                \
-        ctx.flags |= RFC_FLAGS_ENFORCE_MARGIN;                                                 \
         RFC_feed( &ctx, data, sizeof(data)/sizeof(RFC_VALUE_TYPE) );                           \
         RFC_finalize( &ctx, RFC_RES_NONE /* residual_method */ );                              \
     }                                                                                          \
@@ -212,7 +210,7 @@ TEST RFC_tp_prune_test( int ccnt )
         ASSERT( x_max <  class_offset + class_width * class_count );
     }
 
-    ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis ) );
+    ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
     ASSERT( RFC_tp_init( &ctx, tp, NUMEL(tp), /* is_static */ true ) );
     ASSERT( RFC_feed( &ctx, data, /* count */ data_len ) );
     ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
@@ -399,7 +397,7 @@ TEST RFC_empty( int ccnt )
         ASSERT( NUMEL(tp) >= NUMEL(data) );
 #endif /*RFC_TP_SUPPORT*/
 
-        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis ) );
+        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
 #if RFC_TP_SUPPORT
         ASSERT( RFC_tp_init( &ctx, tp, NUMEL(tp), /* is_static */ true ) );
 #endif /*RFC_TP_SUPPORT*/
@@ -451,7 +449,7 @@ TEST RFC_cycle_up( int ccnt )
         ASSERT( NUMEL(tp) >= NUMEL(data) );
 #endif /*RFC_TP_SUPPORT*/
 
-        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis ) );
+        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
 #if RFC_TP_SUPPORT
         ASSERT( RFC_tp_init( &ctx, tp, NUMEL(tp), /* is_static */ true ) );
 #endif /*RFC_TP_SUPPORT*/
@@ -523,7 +521,7 @@ TEST RFC_cycle_down( int ccnt )
         ASSERT( NUMEL(tp) >= NUMEL(data) );
 #endif /*RFC_TP_SUPPORT*/
 
-        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis ) );
+        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
 #if RFC_TP_SUPPORT
         ASSERT( RFC_tp_init( &ctx, tp, NUMEL(tp), /* is_static */ true ) );
 #endif /*RFC_TP_SUPPORT*/
@@ -595,7 +593,7 @@ TEST RFC_small_example( int ccnt )
         ASSERT( NUMEL(tp) >= NUMEL(data) );
 #endif /*RFC_TP_SUPPORT*/
 
-        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis ) );
+        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
 #if RFC_TP_SUPPORT
         ASSERT( RFC_tp_init( &ctx, tp, NUMEL(tp), /* is_static */ true ) );
 #endif /*RFC_TP_SUPPORT*/
@@ -789,7 +787,7 @@ TEST RFC_long_series( int ccnt )
         ASSERT( x_max <  class_offset + class_width * class_count );
     }
 
-    ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis ) );
+    ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
 #if RFC_TP_SUPPORT
     ASSERT( RFC_tp_init( &ctx, tp, NUMEL(tp), /* is_static */ true ) );
 #endif /*RFC_TP_SUPPORT*/
@@ -903,7 +901,7 @@ TEST RFC_at_test( void )
     bool ok = false;
 
     if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, 0 /* class_offset */,
-                        1 /* hysteresis */ ) )
+                        1 /* hysteresis */, 0 /*flags*/ ) )
     {
         int i;
         double tol = 1e-10;
