@@ -1017,7 +1017,7 @@ TEST RFC_at_test( void )
             Sm[i] = ctx.at.Sm[i] * 333;
         }
         ctx.at.Sm_rig = 400.0;
-        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx,  100.0 /*Sa*/, 50.0 /*Sm*/ ), 74.85207, 1e-5  /*tol*/ );
+        GREATEST_ASSERT_IN_RANGE( RFC_at_transform( &ctx, 100.0 /*Sa*/, 50.0 /*Sm*/ ), 74.85207, 1e-5  /*tol*/ );
 
     }
 
