@@ -215,9 +215,10 @@ static double               RFC_damage_calc_fast                ( rfc_ctx_s *, u
 static RFC_value_type       value_delta                         ( RFC_value_type from_val, RFC_value_type to, int *sign_ptr );
 
 
-#define QUANTIZE( r, v )   ( (unsigned)( ((v) - (r)->class_offset) / (r)->class_width ) )
-#define CLASS_MEAN( r, c ) ( (double)( (r)->class_width * (0.5 + (c)) + (r)->class_offset ) )
-#define NUMEL( x )         ( sizeof(x) / sizeof(*(x)) )
+#define QUANTIZE( r, v )    ( (unsigned)( ((v) - (r)->class_offset) / (r)->class_width ) )
+#define CLASS_MEAN( r, c )  ( (double)( (r)->class_width * (0.5 + (c)) + (r)->class_offset ) )
+#define CLASS_UPPER( r, c ) ( (double)( (r)->class_width * (1.0 + (c)) + (r)->class_offset ) )
+#define NUMEL( x )          ( sizeof(x) / sizeof(*(x)) )
 
 
 /**
@@ -343,12 +344,12 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
     {
         int ok = rfc_ctx->residue != NULL;
 
-        if( ok && ( flags & RFC_FLAGS_COUNT_MATRIX ) )
+        if( ok && ( flags & RFC_FLAGS_COUNT_RFM ) )
         {
             /* Non-sparse storages (optional, may be NULL) */
-            rfc_ctx->matrix                 = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count * class_count, 
+            rfc_ctx->rfm                    = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count * class_count, 
                                                                                     sizeof(RFC_counts_type), RFC_MEM_AIM_MATRIX );
-            if( !rfc_ctx->matrix ) ok = false;
+            if( !rfc_ctx->rfm ) ok = false;
         }
 #if !RFC_MINIMAL
         if( ok && ( flags & RFC_FLAGS_COUNT_RP ) )
@@ -832,7 +833,7 @@ bool RFC_deinit( void *ctx )
 
     if( !rfc_ctx->internal.res_static &&
         rfc_ctx->residue )              rfc_ctx->mem_alloc( rfc_ctx->residue,    0, 0, RFC_MEM_AIM_RESIDUE );
-    if( rfc_ctx->matrix )               rfc_ctx->mem_alloc( rfc_ctx->matrix,     0, 0, RFC_MEM_AIM_MATRIX );
+    if( rfc_ctx->rfm )                  rfc_ctx->mem_alloc( rfc_ctx->rfm,        0, 0, RFC_MEM_AIM_MATRIX );
 #if RFC_DAMAGE_FAST
     if( rfc_ctx->damage_lut )           rfc_ctx->mem_alloc( rfc_ctx->damage_lut, 0, 0, RFC_MEM_AIM_DLUT );
 #endif /*RFC_DAMAGE_FAST*/
@@ -861,7 +862,7 @@ bool RFC_deinit( void *ctx )
     rfc_ctx->residue_cap                = 0;
     rfc_ctx->residue_cnt                = 0;
 
-    rfc_ctx->matrix                     = NULL;
+    rfc_ctx->rfm                        = NULL;
 #if !RFC_MINIMAL
     rfc_ctx->rp                         = NULL;
     rfc_ctx->lc                         = NULL;
@@ -1112,9 +1113,10 @@ bool RFC_finalize( void *ctx, int residual_method )
  */
 bool RFC_rfm_get( void *ctx, rfc_rfm_element_s **buffer, unsigned *count )
 {
+    unsigned           class_count;
     unsigned           from, to;
     unsigned           count_old;
-    RFC_counts_type   *matrix_ptr;
+    RFC_counts_type   *rfm_it;
     rfc_rfm_element_s *elements;
 
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
@@ -1132,7 +1134,11 @@ bool RFC_rfm_get( void *ctx, rfc_rfm_element_s **buffer, unsigned *count )
         return false;
     }
 
-    if( !rfc_ctx->matrix )
+    class_count = rfc_ctx->class_count;
+
+    rfm_it = rfc_ctx->rfm;
+
+    if( !rfm_it || !class_count )
     {
         return false;
     }
@@ -1140,18 +1146,17 @@ bool RFC_rfm_get( void *ctx, rfc_rfm_element_s **buffer, unsigned *count )
     // *buffer = NULL;
     count_old  = *count;
     *count     = 0;
-    matrix_ptr = rfc_ctx->matrix;
-    for( from = 0; from < rfc_ctx->class_count; from++ )
+    for( from = 0; from < class_count; from++ )
     {
-        for( to = 0; to < rfc_ctx->class_count; to++, matrix_ptr )
+        for( to = 0; to < class_count; to++, rfm_it )
         {
-            if( *matrix_ptr ) *count++;
+            if( *rfm_it ) *count++;
         }
     }
 
     if( *count > count_old )
     {
-        *buffer = rfc_ctx->mem_alloc( *buffer, *count, sizeof( rfc_rfm_element_s ), RFC_MEM_AIM_RFM_ELEMENTS );
+        *buffer = rfc_ctx->mem_alloc( *buffer, *count, sizeof(rfc_rfm_element_s), RFC_MEM_AIM_RFM_ELEMENTS );
 
         if( !*buffer )
         {
@@ -1161,16 +1166,16 @@ bool RFC_rfm_get( void *ctx, rfc_rfm_element_s **buffer, unsigned *count )
     }
         
     elements   = *buffer;
-    matrix_ptr = rfc_ctx->matrix;
-    for( from = 0; from < rfc_ctx->class_count; from++ )
+    rfm_it     = rfc_ctx->rfm;
+    for( from = 0; from < class_count; from++ )
     {
-        for( to = 0; to < rfc_ctx->class_count; to++, matrix_ptr++ )
+        for( to = 0; to < class_count; to++, rfm_it++ )
         {
-            if( *matrix_ptr )
+            if( *rfm_it )
             {
                 elements->from   = from;
                 elements->to     = to;
-                elements->counts = *matrix_ptr;
+                elements->counts = *rfm_it;
 
                 elements++;
             }
@@ -1195,6 +1200,7 @@ bool RFC_rfm_set( void *ctx, const rfc_rfm_element_s *buffer, unsigned count, bo
 {
           unsigned           class_count, i;
     const rfc_rfm_element_s *elements;
+          RFC_counts_type   *rfm;
 
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -1211,16 +1217,18 @@ bool RFC_rfm_set( void *ctx, const rfc_rfm_element_s *buffer, unsigned count, bo
         return false;
     }
 
-    if( !rfc_ctx->matrix )
+    class_count = rfc_ctx->class_count;
+
+    rfm = rfc_ctx->rfm;
+
+    if( !rfm || !class_count )
     {
         return false;
     }
 
-    class_count = rfc_ctx->class_count;
-
     if( !add_only )
     {
-        memset( rfc_ctx->matrix, (RFC_counts_type)0, sizeof(RFC_counts_type) * class_count * class_count );
+        memset( rfm, (RFC_counts_type)0, sizeof(rfc_rfm_element_s) * class_count * class_count );
     }
 
     elements = buffer;
@@ -1237,7 +1245,7 @@ bool RFC_rfm_set( void *ctx, const rfc_rfm_element_s *buffer, unsigned count, bo
         if( from > class_count ) from = class_count;
         if( to   > class_count ) to   = class_count;
 
-        rfc_ctx->matrix[ from * class_count + to ] += elements->counts;
+        rfm[ from * class_count + to ] += elements->counts;
     }
 
     return true;
@@ -1258,6 +1266,7 @@ bool RFC_rfm_peek( void *ctx, RFC_value_type from_val, RFC_value_type to_val, RF
 {
     unsigned           from, to;
     unsigned           class_count;
+    RFC_counts_type   *rfm;
 
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -1274,12 +1283,14 @@ bool RFC_rfm_peek( void *ctx, RFC_value_type from_val, RFC_value_type to_val, RF
         return false;
     }
 
-    if( !rfc_ctx->matrix )
+    class_count = rfc_ctx->class_count;
+
+    rfm = rfc_ctx->rfm;
+
+    if( !rfm || !class_count )
     {
         return false;
     }
-
-    class_count = rfc_ctx->class_count;
 
     assert( from_val >= rfc_ctx->class_offset );
     assert( to_val   >= rfc_ctx->class_offset );
@@ -1292,7 +1303,7 @@ bool RFC_rfm_peek( void *ctx, RFC_value_type from_val, RFC_value_type to_val, RF
 
     if( count )
     {
-        *count = rfc_ctx->matrix[ from * class_count + to ];
+        *count = rfm[ from * class_count + to ];
     }
 
     return true;
@@ -1314,6 +1325,7 @@ bool RFC_rfm_poke( void *ctx, RFC_value_type from_val, RFC_value_type to_val, RF
 {
     unsigned           from, to;
     unsigned           class_count;
+    RFC_counts_type   *rfm;
 
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -1330,12 +1342,14 @@ bool RFC_rfm_poke( void *ctx, RFC_value_type from_val, RFC_value_type to_val, RF
         return false;
     }
 
-    if( !rfc_ctx->matrix )
+    class_count = rfc_ctx->class_count;
+
+    rfm = rfc_ctx->rfm;
+
+    if( !rfm || !class_count )
     {
         return false;
     }
-
-    class_count = rfc_ctx->class_count;
 
     assert( from_val >= rfc_ctx->class_offset );
     assert( to_val   >= rfc_ctx->class_offset );
@@ -1348,11 +1362,11 @@ bool RFC_rfm_poke( void *ctx, RFC_value_type from_val, RFC_value_type to_val, RF
 
     if( add_only )
     {
-        rfc_ctx->matrix[ from * class_count + to ] += count;
+        rfm[ from * class_count + to ] += count;
     }
     else
     {
-        rfc_ctx->matrix[ from * class_count + to ] = count;
+        rfm[ from * class_count + to ] = count;
     }
 
     return true;
@@ -1375,6 +1389,7 @@ bool RFC_rfm_count( void *ctx, unsigned from_first, unsigned from_last, unsigned
 {
     unsigned            from, to;
     unsigned            class_count;
+    RFC_counts_type    *rfm;
 
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -1391,12 +1406,14 @@ bool RFC_rfm_count( void *ctx, unsigned from_first, unsigned from_last, unsigned
         return false;
     }
 
-    if( !rfc_ctx->matrix )
+    class_count = rfc_ctx->class_count;
+
+    rfm = rfc_ctx->rfm;
+
+    if( !rfm || !class_count )
     {
         return false;
     }
-
-    class_count = rfc_ctx->class_count;
 
     assert( from_first < class_count );
     assert( from_last  < class_count );
@@ -1413,7 +1430,7 @@ bool RFC_rfm_count( void *ctx, unsigned from_first, unsigned from_last, unsigned
         {
             for( to = to_first; to < to_last; to++ )
             {
-                sum += rfc_ctx->matrix[ from * class_count + to ];
+                sum += rfm[ from * class_count + to ];
             }
         }
 
@@ -1438,8 +1455,9 @@ bool RFC_rfm_count( void *ctx, unsigned from_first, unsigned from_last, unsigned
  */
 bool RFC_rfm_damage( void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage )
 {
-    unsigned    from, to;
-    unsigned    class_count;
+    unsigned             from, to;
+    unsigned             class_count;
+    RFC_counts_type     *rfm;
 
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -1456,12 +1474,14 @@ bool RFC_rfm_damage( void *ctx, unsigned from_first, unsigned from_last, unsigne
         return false;
     }
 
-    if( !rfc_ctx->matrix )
+    class_count = rfc_ctx->class_count;
+
+    rfm = rfc_ctx->rfm;
+
+    if( !rfm || !class_count )
     {
         return false;
     }
-
-    class_count = rfc_ctx->class_count;
 
     assert( from_first < class_count );
     assert( from_last  < class_count );
@@ -1477,17 +1497,363 @@ bool RFC_rfm_damage( void *ctx, unsigned from_first, unsigned from_last, unsigne
         {
             for( to = to_first; to < to_last; to++ )
             {
-                RFC_counts_type count = rfc_ctx->matrix[ from * class_count + to ];
+                RFC_counts_type count = rfm[ from * class_count + to ];
                 double damage_i       = RFC_damage_calc( rfc_ctx, from, to );
 
-                sum += damage_i / rfc_ctx->full_inc * count;
+                sum += damage_i * count;
             }
         }
 
-        *damage = sum;
+        *damage = sum / rfc_ctx->full_inc;
     }
 
     return true;
+}
+
+
+/**
+ * @brief      Create level crossing histogram from rainflow matrix
+ *
+ * @param      ctx     The rainflow context
+ * @param[out] counts  The histogram
+ * @param[out] level   The corresponding level, may be NULL
+ * @param[in]  rfm     The rainflow matrix, max be NULL
+ * @param[in]  flags   The flags
+ *
+ * @return     true on success
+ */
+bool RFC_lc_from_rfm( void *ctx, RFC_counts_type *counts, RFC_value_type *level, const RFC_counts_type *rfm, int flags )
+{
+    unsigned             from, to, i;
+    unsigned             class_count;
+    bool                 up = flags & RFC_FLAGS_COUNT_LC_UP;
+    bool                 dn = flags & RFC_FLAGS_COUNT_LC_DN;
+
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || !counts )
+    {
+        assert( false );
+        rfc_ctx->error = RFC_ERROR_INVARG;
+
+        return false;
+    }
+    
+    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
+    {
+        return false;
+    }
+
+    class_count = rfc_ctx->class_count;
+
+    rfm = rfc_ctx->rfm;
+
+    if( !rfm || !class_count )
+    {
+        return false;
+    }
+
+    for( i = 0; i < class_count; i++ ) 
+    {
+        RFC_counts_type sum = 0;
+
+        /* First index (0) counts crossings of upper class limit of the first class */
+        if( level )
+        {
+            level[i] = CLASS_UPPER( rfc_ctx, i );
+        }
+        
+        for( from = 0; from < i; from++ )
+        {
+            for( to = i + 1; to < class_count; to++ )
+            {
+                if( up )
+                {
+                    /* Count rising slopes */
+                    assert( sum < RFC_COUNTS_LIMIT - rfm[ from * class_count + to ] );
+                    sum += rfm[ from * class_count + to ];
+                }
+                if( dn )
+                {
+                    /* Count falling slopes */
+                    assert( sum < RFC_COUNTS_LIMIT - rfm[ from * class_count + to ] );
+                    sum += rfm[ to * class_count + from ];
+                }
+            }
+        }
+
+        counts[i] = sum;
+    }
+
+    return true;
+}
+
+
+/**
+ * Calculate level crossing counts from rainflow matrix, write results to lc
+ * histogram buffer.
+ *
+ * @param      rfc_ctx  The rainflow context
+ * @param[out] lc       The buffer for LC histogram
+ * @param[in]  flags    The flags
+ *
+ * @return     true on success
+ */
+bool RFC_lc_from_residue( void *ctx, RFC_counts_type* lc, RFC_value_type *level, int flags )
+{
+          unsigned           i;
+          unsigned           class_count;
+          bool               up   = flags & RFC_FLAGS_COUNT_LC_UP;
+          bool               dn   = flags & RFC_FLAGS_COUNT_LC_DN;
+    const rfc_value_tuple_s *from;
+
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || !lc )
+    {
+        assert( false );
+        rfc_ctx->error = RFC_ERROR_INVARG;
+
+        return false;
+    }
+    
+    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
+    {
+        return false;
+    }
+
+    class_count = rfc_ctx->class_count;
+
+    if( !class_count )
+    {
+        return false;
+    }
+
+    memset( lc, 0, sizeof(RFC_counts_type) * class_count );
+
+    if( level )
+    {
+        for( i = 0; i < class_count; i++ )
+        {
+            level[i] = CLASS_UPPER( rfc_ctx, i );
+        }
+    }
+
+    from = rfc_ctx->residue;
+    for( i = 1; i < rfc_ctx->residue_cnt; i++ ) 
+    {
+        const rfc_value_tuple_s *to         = from + 1;
+              unsigned           class_from = from->class;
+              unsigned           class_to   = to->class;
+
+        /* Level crossing, count rising and falling slopes.
+         * Level crossing histogram (vector storage)
+         * Counts class upper bound crossings
+         * Class upper bound value = (idx+1) * class_width + class_offset
+         */
+        
+        if( class_from < class_to && up )
+        {
+            /* Count rising slopes */
+            unsigned idx;
+            for( idx = class_from; idx < class_to; idx++ )
+            {
+                assert( lc[idx] <= RFC_COUNTS_LIMIT );
+                lc[idx] += rfc_ctx->full_inc;
+            }
+        }
+        else if( class_to < class_from && dn )
+        {
+            /* Count falling slopes */
+            unsigned idx;
+            for( idx = class_to; idx < class_from; idx++ )
+            {
+                assert( lc[idx] <= RFC_COUNTS_LIMIT );
+                lc[idx] += rfc_ctx->full_inc;
+            }
+        }
+
+        from = to;
+    }
+
+    return true;
+}
+
+
+/**
+ * @brief      Generate range pair histogram from rainflow matrix
+ *
+ * @param      ctx          The rainflow context
+ * @param[out] counts       The counts
+ * @param[out] class_means  The class means, may be NULL
+ *
+ * @return     true on success
+ */
+bool RFC_rp_from_rfm( void *ctx, RFC_counts_type *counts, RFC_value_type *class_means, const RFC_counts_type *rfm )
+{
+    unsigned    i, j;
+    unsigned    class_count;
+
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || !counts )
+    {
+        assert( false );
+        rfc_ctx->error = RFC_ERROR_INVARG;
+
+        return false;
+    }
+    
+    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
+    {
+        return false;
+    }
+
+    class_count = rfc_ctx->class_count;
+
+    if( !rfm )
+    {
+        rfm = rfc_ctx->rfm;
+    }
+
+    if( !rfm || !class_count )
+    {
+        return false;
+    }
+
+    for( i = 0; i < class_count; i++ ) 
+    {
+        RFC_counts_type sum = (RFC_counts_type)0;
+
+        if( class_means )
+        {
+            class_means[i] = CLASS_MEAN( rfc_ctx, i );
+        }
+
+        for( j = i; j < class_count; j++ ) 
+        {
+            /* Count rising and falling slopes */
+            //!assert( sum < RFC_COUNTS_LIMIT - rfm[ j-i, j ] - rfm[ j, j-i ] );
+            sum += rfm[ j-i, j   ];
+            sum += rfm[ j,   j-i ];
+        }
+
+        counts[i] = sum;
+    }
+
+    return true;
+}
+
+
+/**
+ * @brief      Calculate the damage from a range pair histogram
+ *
+ * @param      ctx     The rainflow context
+ * @param      counts  The counts, may be NULL
+ *
+ * @return     The pseudo damage
+ */
+double RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts )
+{
+    const unsigned    from = 0;
+          unsigned    i;
+          unsigned    class_count;
+          double      pseudo_damage;
+
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
+    {
+        assert( false );
+        rfc_ctx->error = RFC_ERROR_INVARG;
+
+        return false;
+    }
+    
+    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
+    {
+        return false;
+    }
+
+    class_count = rfc_ctx->class_count;
+
+    if( !counts )
+    {
+        counts = rfc_ctx->rp;
+    }
+
+    if( !counts || !class_count )
+    {
+        return false;
+    }
+
+    pseudo_damage = 0.0;
+    for( i = 0; i < class_count; i++ )
+    {
+        if( counts[i] )
+        {
+            pseudo_damage += RFC_damage_calc( rfc_ctx, from, i /*to*/ ) * counts[i];
+        }
+    }
+
+    return pseudo_damage / rfc_ctx->full_inc;
+}
+
+
+/**
+ * @brief      Calculate the pseudo damage from rainflow matrix
+ *
+ * @param      ctx   The rainflow context
+ * @param      rfm   The rainflow matrix, max be NULL
+ *
+ * @return     The pseudo damage
+ */
+double RFC_damage_from_rfm( void *ctx, const RFC_counts_type *rfm )
+{
+    unsigned    from, to;
+    unsigned    class_count;
+    double      pseudo_damage;
+
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
+    {
+        assert( false );
+        rfc_ctx->error = RFC_ERROR_INVARG;
+
+        return false;
+    }
+    
+    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
+    {
+        return false;
+    }
+
+    class_count = rfc_ctx->class_count;
+
+    if( !rfm )
+    {
+        rfm = rfc_ctx->rfm;
+    }
+
+    if( !rfm || !class_count )
+    {
+        return false;
+    }
+
+    pseudo_damage = 0.0;
+    for( from = 0; from < class_count; from++ )
+    {
+        for( to = 0; to < class_count; to++ )
+        {
+            if( rfm[ from * class_count + to ] )
+            {
+                pseudo_damage += RFC_damage_calc( rfc_ctx, from, to ) * rfm[ from * class_count + to ];
+            }
+        }
+    }
+
+    return pseudo_damage / rfc_ctx->full_inc;
 }
 
 #endif /*!RFC_MINIMAL*/
@@ -1638,9 +2004,9 @@ void RFC_clear_count( rfc_ctx_s *rfc_ctx )
 
     assert( rfc_ctx && rfc_ctx->state >= RFC_STATE_INIT );
 
-    if( rfc_ctx->matrix )
+    if( rfc_ctx->rfm )
     {
-        memset( rfc_ctx->matrix, 0, sizeof(RFC_counts_type) * rfc_ctx->class_count * rfc_ctx->class_count );
+        memset( rfc_ctx->rfm, 0, sizeof(RFC_counts_type) * rfc_ctx->class_count * rfc_ctx->class_count );
     }
 
     if( rfc_ctx->rp )
@@ -1723,7 +2089,7 @@ void RFC_clear_lut( rfc_ctx_s *rfc_ctx )
 
     if( rfc_ctx->damage_lut )
     {
-        memset( rfc_ctx->damage_lut, (RFC_counts_type) 0, sizeof( RFC_counts_type ) * rfc_ctx->class_count * rfc_ctx->class_count );
+        memset( rfc_ctx->damage_lut, 0, sizeof(double) * rfc_ctx->class_count * rfc_ctx->class_count );
     }
 }
 #endif /*RFC_DH_SUPPORT*/
@@ -3223,7 +3589,7 @@ void RFC_cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_
         }
 
         /* Rainflow matrix */
-        if( rfc_ctx->matrix && ( flags & RFC_FLAGS_COUNT_MATRIX ) )
+        if( rfc_ctx->rfm && ( flags & RFC_FLAGS_COUNT_RFM ) )
         {
             /* Matrix (row-major storage):
              *          t o
@@ -3237,8 +3603,8 @@ void RFC_cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_
              */
             size_t idx = rfc_ctx->class_count * class_from + class_to;
             
-            assert( rfc_ctx->matrix[idx] <= RFC_COUNTS_LIMIT );
-            rfc_ctx->matrix[idx] += rfc_ctx->curr_inc;
+            assert( rfc_ctx->rfm[idx] <= RFC_COUNTS_LIMIT );
+            rfc_ctx->rfm[idx] += rfc_ctx->curr_inc;
         }
 
 #if !RFC_MINIMAL
@@ -3425,7 +3791,7 @@ bool RFC_tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc
         if( rfc_ctx->class_count != new_class_param->count )
         {
             size_t num = rfc_ctx->class_count * rfc_ctx->class_count;
-            if( !rfc_ctx->mem_alloc( rfc_ctx->damage_lut, num, sizeof( RFC_counts_type ), RFC_MEM_AIM_DLUT ) )
+            if( !rfc_ctx->mem_alloc( rfc_ctx->damage_lut, num, sizeof(RFC_counts_type), RFC_MEM_AIM_DLUT ) )
             {
                 RFC_error_raise( rfc_ctx, RFC_ERROR_MEMORY );
                 return false;
@@ -3688,179 +4054,6 @@ void RFC_class_param_get( rfc_ctx_s *rfc_ctx, rfc_class_param_s *class_param )
 }
 #endif /*!RFC_MINIMAL*/
 
-/*********************************************************************************************************/
-/*********************************************************************************************************/
-/*********************************************************************************************************/
-/*********************************************************************************************************/
-/*********************************************************************************************************/
-/*********************************************************************************************************/
-/*********************************************************************************************************/
-
-#if !RFC_MINIMAL
-bool RFC_lc_from_matrix     ( rfc_ctx_s *rfc_ctx, RFC_counts_type* buffer, size_t buffer_cap, int flags );
-bool RFC_lc_from_residue    ( rfc_ctx_s *rfc_ctx, RFC_counts_type* buffer, size_t buffer_cap, int flags );
-bool RFC_rp_from_matrix     ( rfc_ctx_s *rfc_ctx, RFC_counts_type* buffer, size_t buffer_cap, int flags );
-
-/**
- * Calculate level crossing counts from rainflow matrix, write results to
- * buffer.
- *
- * @param      rfc_ctx     The rainflow context
- * @param      buffer      The buffer for LC histogram
- * @param[in]  buffer_cap  The buffer capability
- * @param[in]  flags       The flags
- *
- * @return     true on success
- */
-bool RFC_lc_from_matrix( rfc_ctx_s *rfc_ctx, RFC_counts_type* buffer, size_t buffer_cap, int flags )
-{
-    unsigned i, j, k;
-    bool     up     = flags & RFC_FLAGS_COUNT_LC_UP;
-    bool     dn     = flags & RFC_FLAGS_COUNT_LC_DN;
-
-    assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT );
-
-    if( !buffer || buffer_cap < rfc_ctx->class_count ) return false;
-
-    for( i = 0; i < rfc_ctx->class_count; i++ ) 
-    {
-        RFC_counts_type counts = (RFC_counts_type)0;
-
-        for( j = i; j < rfc_ctx->class_count; j++ )  /* To */
-        {
-            for( k = 0; k < i; k++ )                 /* From */
-            {
-                /* Count rising slopes */
-                assert( counts < RFC_COUNTS_LIMIT - rfc_ctx->matrix[ k * rfc_ctx->class_count + j ] );
-                if( up )
-                {
-                    counts += rfc_ctx->matrix[ k * rfc_ctx->class_count + j ];
-                }
-
-                /* Count falling slopes */
-                assert( counts < RFC_COUNTS_LIMIT - rfc_ctx->matrix[ j * rfc_ctx->class_count + k ] );
-                if( dn )
-                {
-                    counts += rfc_ctx->matrix[ j * rfc_ctx->class_count + k ];
-                }
-            }
-        }
-
-        buffer[i] = counts;
-    }
-
-    return true;
-}
-
-
-/**
- * Calculate level crossing counts from rainflow matrix, write results to
- * buffer.
- *
- * @param      rfc_ctx     The rainflow context
- * @param[out] buffer      The buffer for LC histogram
- * @param[in]  buffer_cap  The buffer capability
- * @param[in]  flags       The flags
- *
- * @return     true on success
- */
-
-bool RFC_lc_from_residue( rfc_ctx_s *rfc_ctx, RFC_counts_type* buffer, size_t buffer_cap, int flags )
-{
-    unsigned i;
-    bool     up     = flags & RFC_FLAGS_COUNT_LC_UP;
-    bool     dn     = flags & RFC_FLAGS_COUNT_LC_DN;
-    const rfc_value_tuple_s *from = rfc_ctx->residue;
-
-    assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT );
-
-    if( !buffer || buffer_cap < rfc_ctx->class_count ) return false;
-
-    for( i = 1; i < rfc_ctx->residue_cnt; i++ ) 
-    {
-        const rfc_value_tuple_s *to         = from + 1;
-              unsigned           class_from = from->class;
-              unsigned           class_to   = to->class;
-
-        /* Level crossing, count rising and falling slopes.
-         * Level crossing histogram (vector storage)
-         * Counts class upper bound crossings
-         * Class upper bound value = (idx+1) * class_width + class_offset
-         */
-        
-        if( class_from < class_to && up )
-        {
-            /* Count rising slopes */
-            unsigned idx;
-            for( idx = class_from; idx < class_to; idx++ )
-            {
-                assert( buffer[idx] <= RFC_COUNTS_LIMIT );
-                buffer[idx] += rfc_ctx->full_inc;
-            }
-        }
-        else if( class_to < class_from && dn )
-        {
-            /* Count falling slopes */
-            unsigned idx;
-            for( idx = class_to; idx < class_from; idx++ )
-            {
-                assert( buffer[idx] <= RFC_COUNTS_LIMIT );
-                buffer[idx] += rfc_ctx->full_inc;
-            }
-        }
-
-        from = to;
-    }
-
-    return true;
-}
-
-
-/**
- * Calculate range pair counts from rainflow matrix, write results to buffer.
- *
- * @param      rfc_ctx     The rainflow context
- * @param[out] buffer      The buffer for RP histogram
- * @param[in]  buffer_cap  The buffer capability
- * @param[in]  flags       The flags
- *
- * @return     true on success
- */
-bool RFC_rp_from_matrix( rfc_ctx_s *rfc_ctx, RFC_counts_type* buffer, size_t buffer_cap, int flags )
-{
-    unsigned i, j;
-    size_t   maxcnt = buffer_cap / sizeof(RFC_counts_type);
-
-    assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT );
-
-    if( !buffer || buffer_cap < rfc_ctx->class_count ) return false;
-
-    buffer[0] = 0;
-
-    for( i = 1; i < rfc_ctx->class_count; i++ ) 
-    {
-        RFC_counts_type counts = (RFC_counts_type)0;
-
-        for( j = i; j < rfc_ctx->class_count; j++ )
-        {
-            /* Count rising and falling slopes */
-            assert( counts < RFC_COUNTS_LIMIT - rfc_ctx->matrix[ i * rfc_ctx->class_count + j ] 
-                                              - rfc_ctx->matrix[ j * rfc_ctx->class_count + i ] );
-            counts += rfc_ctx->matrix[ i * rfc_ctx->class_count + j ];
-            counts += rfc_ctx->matrix[ j * rfc_ctx->class_count + i ];
-        }
-
-        buffer[i > maxcnt ? maxcnt : i] = counts;
-    }
-
-    return true;
-}
-
-#endif /*!RFC_MINIMAL*/
-
 
 /*********************************************************************************************************/
 /*********************************************************************************************************/
@@ -4043,21 +4236,21 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
             }
 
             /* Rainflow matrix (column major order) */
-            if( nlhs > 2 && rfc_ctx.matrix )
+            if( nlhs > 2 && rfc_ctx.rfm )
             {
-                mxArray* matrix = mxCreateDoubleMatrix( class_count, class_count, mxREAL );
-                if( matrix )
+                mxArray* rfm = mxCreateDoubleMatrix( class_count, class_count, mxREAL );
+                if( rfm )
                 {
-                    double *ptr = mxGetPr(matrix);
+                    double *ptr = mxGetPr(rfm);
                     size_t from, to;
                     for( to = 0; to < class_count; to++ )
                     {
                         for( from = 0; from < class_count; from++ )
                         {
-                            *ptr++ = (double)rfc_ctx.matrix[ from * class_count + to ] / rfc_ctx.full_inc;
+                            *ptr++ = (double)rfc_ctx.rfm[ from * class_count + to ] / rfc_ctx.full_inc;
                         }
                     }
-                    plhs[2] = matrix;
+                    plhs[2] = rfm;
                 }
             }
             
@@ -4203,7 +4396,7 @@ void mexTP( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         double hysteresis     = mxGetScalar( mxHysteresis );
         bool   enforce_margin = (int)mxGetScalar( mxEnforceMargin );
 
-        tp = calloc( mxGetNumberOfElements( mxData ), sizeof(tp[0]) );
+        tp = (rfc_value_tuple_s*)calloc( mxGetNumberOfElements( mxData ), sizeof(rfc_value_tuple_s) );
         if( !tp )
         {
             mexErrMsgTxt( "Memory allocation error!" );

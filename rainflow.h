@@ -191,7 +191,7 @@ enum
 enum
 {
     RFC_FLAGS_DEFAULT               = -1,
-    RFC_FLAGS_COUNT_MATRIX          = 1 << 0,                       /**< Count into matrix */
+    RFC_FLAGS_COUNT_RFM             = 1 << 0,                       /**< Count into rainflow matrix */
     RFC_FLAGS_COUNT_DAMAGE          = 1 << 1,                       /**< Count pseudo damage */
 #if !RFC_MINIMAL
 #if RFC_DH_SUPPORT
@@ -204,7 +204,7 @@ enum
                                     | RFC_FLAGS_COUNT_LC_DN,
     RFC_FLAGS_ENFORCE_MARGIN        = 1 << 6,                       /**< Enforce first and last data point are turning points */
 #endif /*!RFC_MINIMAL*/
-    RFC_FLAGS_COUNT_ALL             = RFC_FLAGS_COUNT_MATRIX        /**< Count all */
+    RFC_FLAGS_COUNT_ALL             = RFC_FLAGS_COUNT_RFM           /**< Count all */
                                     | RFC_FLAGS_COUNT_DAMAGE
 #if RFC_DH_SUPPORT
                                     | RFC_FLAGS_COUNT_DH
@@ -257,12 +257,18 @@ bool    RFC_feed_tuple        ( void *ctx, rfc_value_tuple_s *data, size_t count
 #endif /*!RFC_MINIMAL*/
 bool    RFC_finalize          ( void *ctx, int residual_method );
 #if !RFC_MINIMAL
-/* Functions on matrix */
+/* Functions on rainflow matrix */
 bool    RFC_rfm_get           ( void *ctx, rfc_rfm_element_s **buffer, unsigned *count );
 bool    RFC_rfm_set           ( void *ctx, const rfc_rfm_element_s *buffer, unsigned count, bool add_only );
 bool    RFC_rfm_peek          ( void *ctx, RFC_value_type from_val, RFC_value_type to_val, RFC_counts_type *count );
 bool    RFC_rfm_poke          ( void *ctx, RFC_value_type from_val, RFC_value_type to_val, RFC_counts_type count, bool add_only );
 bool    RFC_rfm_count         ( void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, RFC_counts_type *count );
+bool    RFC_rfm_damage        ( void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage );
+bool    RFC_lc_from_rfm       ( void *ctx, RFC_counts_type *lc, RFC_value_type *level, const RFC_counts_type *rfm, int flags );
+bool    RFC_lc_from_residue   ( void *ctx, RFC_counts_type *lc, RFC_value_type *level, int flags );
+bool    RFC_rp_from_rfm       ( void *ctx, RFC_counts_type *rp, RFC_value_type *class_means, const RFC_counts_type *rfm );
+double  RFC_damage_from_rp    ( void *ctx, const RFC_counts_type *rp );
+double  RFC_damage_from_rfm   ( void *ctx, const RFC_counts_type *rfm );
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
 bool    RFC_tp_init           ( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
@@ -447,7 +453,7 @@ typedef struct rfc_ctx
     size_t                              residue_cnt;                /**< Number of value tuples in buffer */
 
     /* Non-sparse storages (optional, may be NULL) */
-    RFC_counts_type                    *matrix;                     /**< Rainflow matrix, always class_count^2 elements (row-major, row=from, to=col). */
+    RFC_counts_type                    *rfm;                        /**< Rainflow matrix, always class_count^2 elements (row-major, row=from, to=col). */
 #if !RFC_MINIMAL
     RFC_counts_type                    *rp;                         /**< Range pair counts, always class_count elements */
     RFC_counts_type                    *lc;                         /**< Level crossing counts, always class_count elements */

@@ -105,7 +105,12 @@ void export_tp( const char *filename, rfc_value_tuple_s* data, size_t count )
 
 double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 {
-    return (double)rfc_ctx->matrix[ (from-1)*rfc_ctx->class_count + (to-1)] / rfc_ctx->full_inc;
+    double          from_val = rfc_ctx->class_width * (from-1) + rfc_ctx->class_offset;
+    double          to_val   = rfc_ctx->class_width * (to  -1) + rfc_ctx->class_offset;
+    RFC_counts_type counts;
+
+    RFC_rfm_peek( rfc_ctx, from_val, to_val, &counts );
+    return (double)counts / rfc_ctx->full_inc;
 }
 
 
@@ -406,7 +411,7 @@ TEST RFC_empty( int ccnt )
 
         for( i = 0; i < class_count * class_count; i++ )
         {
-            sum += ctx.matrix[i];
+            sum += ctx.rfm[i];
         }
 
         ASSERT_EQ( sum, 0.0 );
@@ -458,7 +463,7 @@ TEST RFC_cycle_up( int ccnt )
 
         for( i = 0; i < class_count * class_count; i++ )
         {
-            sum += ctx.matrix[i] / ctx.full_inc;
+            sum += ctx.rfm[i] / ctx.full_inc;
         }
 
         if( class_count )
@@ -530,7 +535,7 @@ TEST RFC_cycle_down( int ccnt )
 
         for( i = 0; i < class_count * class_count; i++ )
         {
-            sum += ctx.matrix[i] / ctx.full_inc;
+            sum += ctx.rfm[i] / ctx.full_inc;
         }
 
         if( class_count )
@@ -602,7 +607,7 @@ TEST RFC_small_example( int ccnt )
 
         for( i = 0; i < class_count * class_count; i++ )
         {
-            sum += ctx.matrix[i] / ctx.full_inc;
+            sum += ctx.rfm[i] / ctx.full_inc;
         }
 
         if( class_count )
@@ -828,7 +833,7 @@ TEST RFC_long_series( int ccnt )
         {
             for( to = 0; to < (int)ctx.class_count; to++ )
             {
-                double value = (double)ctx.matrix[from * (int)ctx.class_count + to] / ctx.full_inc;
+                double value = (double)ctx.rfm[from * (int)ctx.class_count + to] / ctx.full_inc;
 
                 if( value > 0.0 )
                 {
@@ -858,7 +863,7 @@ TEST RFC_long_series( int ccnt )
 
             for( i = 0; i < class_count * class_count; i++ )
             {
-                sum += ctx.matrix[i] / ctx.full_inc;
+                sum += ctx.rfm[i] / ctx.full_inc;
             }
 
             ASSERT_EQ( sum, 602.0 );
