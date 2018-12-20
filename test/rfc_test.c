@@ -51,6 +51,7 @@
 #include "../greatest/greatest.h"
 #include <locale.h>
 
+
 #define ROUND(x) ((x)>=0?(long)((x)+0.5):(long)((x)-0.5))
 #define NUMEL(x) (sizeof(x)/sizeof((x)[0]))
 
@@ -93,7 +94,7 @@ void export_tp( const char *filename, rfc_value_tuple_s* data, size_t count )
         while( count-- )
         {
             //fprintf(fid, "%g\t%lu\t%lu\t%lu\t%g\n", data->value, data->class, data->tp_pos, data->pos, data->damage);
-            fprintf(fid, "%g\t%d\t%llu\t%llu\n", data->value, data->class, data->tp_pos, data->pos );
+            fprintf(fid, "%g\t%d\t%llu\t%llu\n", data->value, data->cls, data->tp_pos, data->pos );
             data++;
         }
 
@@ -848,7 +849,7 @@ TEST RFC_long_series( int ccnt )
         fprintf( file, "\n\nResidue (classes base 0):\n" );
         for( i = 0; i < ctx.residue_cnt; i++ )
         {
-            fprintf( file, "%s%d", i ? ", " : "", ctx.residue[i].class );
+            fprintf( file, "%s%d", i ? ", " : "", ctx.residue[i].cls );
         }
 
         fprintf( file, "\n" );
@@ -896,6 +897,22 @@ TEST RFC_long_series( int ccnt )
         mem_chain = next;
     }
 
+    PASS();
+}
+
+
+TEST RFC_res_DIN45667( void )
+{
+    rfc_value_tuple_s tp[10];
+
+    SIMPLE_RFC( 10 /*ccnt*/, tp, NUMEL(tp), 0.0 /*offs*/, 
+               (4.9f, 6, 4, 7, 3, 9, 5, 8, 6.9f) );
+
+    ASSERT( ctx.residue_cnt == 9 );
+    ASSERT( ctx.state == RFC_STATE_FINISHED );
+    ctx.state = RFC_STATE_BUSY;
+
+    RFC_finalize( &ctx, RFC_RES_RP_DIN45667 );
     PASS();
 }
 
@@ -1039,11 +1056,18 @@ TEST RFC_at_test( void )
 }
 #endif /*RFC_AT_SUPPORT*/
 
+TEST RFC_CPP_wrapper( void )
+{
+    extern test_cpp( void );
+    ASSERT( test_cpp() );
+    PASS();
+}
 
 
 /* local suite (greatest) */
 SUITE( RFC_TEST_SUITE )
 {
+    /* Test rainflow counting */
     RUN_TEST1( RFC_empty, 1 );
     RUN_TEST1( RFC_cycle_up, 1 );
     RUN_TEST1( RFC_cycle_down, 1 );
@@ -1054,15 +1078,21 @@ SUITE( RFC_TEST_SUITE )
     RUN_TEST1( RFC_cycle_down, 0 );
     RUN_TEST1( RFC_small_example, 0 );
     RUN_TEST1( RFC_long_series, 0 );
+    /* Residual methods */
+    RUN_TEST( RFC_res_DIN45667 );
 #if RFC_TP_SUPPORT
+    /* Test turning points */
     RUN_TEST1( RFC_test_turning_points, 1 );
     RUN_TEST1( RFC_tp_prune_test, 1 );
     RUN_TEST1( RFC_test_turning_points, 0 );
     RUN_TEST1( RFC_tp_prune_test, 0 );
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_AT_SUPPORT
+    /* Test amplitude transformation */
     RUN_TEST( RFC_at_test );
 #endif /*RFC_AT_SUPPORT*/
+    /* Test C++ Wrapper */
+    RUN_TEST( RFC_CPP_wrapper );
 }
 
 

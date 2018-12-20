@@ -309,7 +309,7 @@ typedef  double              ( *rfc_at_transform_fcn_t )  ( rfc_ctx_s *, double 
 typedef struct rfc_value_tuple
 {
     RFC_value_type                      value;                      /**< Value. Don't change order, value field must be first! */
-    unsigned                            class;                      /**< Class number, base 0 */
+    unsigned                            cls;                        /**< Class number, base 0 */
     size_t                              pos;                        /**< Absolute position in input data stream, base 1 */
 #if RFC_TP_SUPPORT
     size_t                              tp_pos;                     /**< Position in tp storage, base 1 */

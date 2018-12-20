@@ -961,7 +961,7 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
         rfc_value_tuple_s tp = { *data++ };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
 
         /* Assign class and global position (base 1) */
-        tp.class = QUANTIZE( rfc_ctx, tp.value );
+        tp.cls = QUANTIZE( rfc_ctx, tp.value );
         tp.pos   = ++rfc_ctx->internal.pos;
 
         if( !RFC_feed_once( rfc_ctx, &tp, rfc_ctx->internal.flags ) ) return false;
@@ -1643,8 +1643,8 @@ bool RFC_lc_from_residue( void *ctx, RFC_counts_type* lc, RFC_value_type *level,
     for( i = 1; i < rfc_ctx->residue_cnt; i++ ) 
     {
         const rfc_value_tuple_s *to         = from + 1;
-              unsigned           class_from = from->class;
-              unsigned           class_to   = to->class;
+              unsigned           class_from = from->cls;
+              unsigned           class_to   = to->cls;
 
         /* Level crossing, count rising and falling slopes.
          * Level crossing histogram (vector storage)
@@ -2111,7 +2111,7 @@ bool RFC_feed_once( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt, int flags )
     rfc_value_tuple_s *tp_residue;  /* Pointer to residue element */
 
     assert( rfc_ctx && pt );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
 #if RFC_DH_SUPPORT
     /* Resize damage history if necessary */
@@ -2185,7 +2185,7 @@ static
 bool RFC_feed_once_dh( rfc_ctx_s *rfc_ctx )
 {
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
     if( rfc_ctx->dh && rfc_ctx->dh_cnt > rfc_ctx->dh_cap )
     {
@@ -2224,7 +2224,7 @@ bool RFC_feed_once_tp_check_margin( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s*
     bool do_margin;
 
     assert( rfc_ctx && tp_residue );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
     do_margin = rfc_ctx->internal.flags & RFC_FLAGS_ENFORCE_MARGIN;
 
@@ -2302,7 +2302,7 @@ bool RFC_feed_finalize( rfc_ctx_s *rfc_ctx )
     rfc_value_tuple_s *tp_interim = NULL;
 
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state <= RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
     if( rfc_ctx->state < RFC_STATE_FINALIZE )
     {
@@ -2366,7 +2366,7 @@ bool RFC_feed_finalize_tp( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *tp_interim, in
     bool do_margin;
 
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
     
     /* Finalize turning points storage */
     do_margin = rfc_ctx->internal.flags & RFC_FLAGS_ENFORCE_MARGIN;
@@ -2417,7 +2417,7 @@ static
 bool RFC_feed_finalize_hcm( rfc_ctx_s *rfc_ctx, int flags )
 {
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
     /* Move HCM stack to residue */
     if( rfc_ctx->counting_method == RFC_COUNTING_METHOD_HCM )
@@ -2463,7 +2463,7 @@ static
 bool RFC_finalize_res_ignore( rfc_ctx_s *rfc_ctx, int flags )
 {
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
     /* Include interim turning point */
     return RFC_feed_finalize( rfc_ctx );
@@ -2483,7 +2483,7 @@ static
 bool RFC_finalize_res_discard( rfc_ctx_s *rfc_ctx, int flags )
 {
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
     /* Include interim turning point */
     if( !RFC_feed_finalize( rfc_ctx ) )
@@ -2512,7 +2512,7 @@ static
 bool RFC_finalize_res_weight_cycles( rfc_ctx_s *rfc_ctx, RFC_counts_type weight, int flags )
 {
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
     /* Count every unclosed cycle with the given weight */
     if( rfc_ctx->residue && rfc_ctx->residue_cnt >= 2 )
@@ -2558,7 +2558,7 @@ bool RFC_finalize_res_clormann_seeger( rfc_ctx_s *rfc_ctx, int flags )
     size_t i;
 
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
     /* Include interim turning point */
     if( !RFC_feed_finalize( rfc_ctx ) )
@@ -2613,7 +2613,7 @@ static
 bool RFC_finalize_res_rp_DIN45667( rfc_ctx_s *rfc_ctx, int flags )
 {
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
     /* Include interim turning point */
     if( !RFC_feed_finalize( rfc_ctx ) )
@@ -2680,7 +2680,7 @@ static
 bool RFC_finalize_res_repeated( rfc_ctx_s *rfc_ctx, int flags )
 {
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
     /* Don't include interim turning point! */
 
@@ -2757,7 +2757,7 @@ static
 bool RFC_residue_exchange( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s **residue, size_t *residue_cap, size_t *residue_cnt, bool restore )
 {
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
     assert( residue && residue_cap && residue_cnt );
     assert( rfc_ctx->residue_cap > 0 );
 
@@ -2809,7 +2809,7 @@ void RFC_residue_remove_item( rfc_ctx_s *rfc_ctx, size_t index, size_t count )
             end;
 
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
     assert( rfc_ctx->residue && index + count <= rfc_ctx->residue_cnt );
 
     end = (int)rfc_ctx->residue_cnt;
@@ -3309,7 +3309,7 @@ static
 void RFC_cycle_find( rfc_ctx_s *rfc_ctx, int flags )
 {
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
 #if RFC_USE_DELEGATES
     /* Check for delegates */
@@ -3363,7 +3363,7 @@ static
 void RFC_cycle_find_4ptm( rfc_ctx_s *rfc_ctx, int flags )
 {
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
     while( rfc_ctx->residue_cnt >= 4 )
     {
@@ -3424,7 +3424,7 @@ void RFC_cycle_find_hcm( rfc_ctx_s *rfc_ctx, int flags )
     int IZ, IR;
 
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
     IZ = rfc_ctx->internal.hcm.IZ - 1,  /* hcm.IZ and hcm.IR are base 1! */
     IR = rfc_ctx->internal.hcm.IR - 1;
@@ -3550,7 +3550,7 @@ void RFC_cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_
     unsigned class_from, class_to;
 
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
     assert( !rfc_ctx->class_count || ( from->value > rfc_ctx->class_offset && to->value > rfc_ctx->class_offset ) );
 
 #if RFC_TP_SUPPORT
@@ -3678,7 +3678,7 @@ static
 bool RFC_tp_add( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *tp )
 {
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
     /* Add new turning point */
 
@@ -3742,7 +3742,7 @@ static
 void RFC_tp_lock( rfc_ctx_s *rfc_ctx, bool do_lock )
 {
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
     rfc_ctx->tp_locked = do_lock;
 }
@@ -3764,7 +3764,7 @@ bool RFC_tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc
                        i;
 
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state <= RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
     if( !RFC_feed_finalize( rfc_ctx ) )
     {
@@ -3806,7 +3806,7 @@ bool RFC_tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc
 
     for( i = 0; i < ctx_tp_cnt; i++, ctx_tp++ )
     {
-        ctx_tp->class = QUANTIZE( rfc_ctx, ctx_tp->value );
+        ctx_tp->cls = QUANTIZE( rfc_ctx, ctx_tp->value );
     }
 
     RFC_feed_tuple( rfc_ctx, ctx_tp, ctx_tp_cnt );
@@ -3832,7 +3832,7 @@ void RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
     double damage = 0.0;
 
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINALIZE );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
     assert( from && to );
 
     switch( rfc_ctx->spread_damage_method )
@@ -3840,20 +3840,20 @@ void RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
         case RFC_SD_NONE:
             break;
         case RFC_SD_HALF_23:
-            damage = RFC_damage_calc( rfc_ctx, from->class, to->class );
+            damage = RFC_damage_calc( rfc_ctx, from->cls, to->cls );
 #if RFC_TP_SUPPORT && RFC_DH_SUPPORT
             from->damage += damage / 2.0;
             to->damage   += damage / 2.0;
 #endif /*RFC_TP_SUPPORT && RFC_DH_SUPPORT*/
             break;
         case RFC_SD_FULL_P2:
-            damage = RFC_damage_calc( rfc_ctx, from->class, to->class );
+            damage = RFC_damage_calc( rfc_ctx, from->cls, to->cls );
 #if RFC_TP_SUPPORT && RFC_DH_SUPPORT
             from->damage += damage;
 #endif /*RFC_TP_SUPPORT && RFC_DH_SUPPORT*/
             break;
         case RFC_SD_FULL_P3:
-            damage = RFC_damage_calc( rfc_ctx, from->class, to->class );
+            damage = RFC_damage_calc( rfc_ctx, from->cls, to->cls );
 #if RFC_TP_SUPPORT && RFC_DH_SUPPORT
             to->damage += damage;
 #endif /*RFC_TP_SUPPORT && RFC_DH_SUPPORT*/
@@ -3894,7 +3894,7 @@ void RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
             tp_end   = to->tp_pos;
             tp_end  += ( tp_start >= tp_end ) ? rfc_ctx->tp_cnt : 0;
 
-            range    = abs( (int)to->class - (int)from->class );
+            range    = abs( (int)to->cls - (int)from->cls );
             damage   = 0.0;
 
             /* Iterate over turning points */
@@ -3912,11 +3912,11 @@ void RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
                 {
                     case RFC_SD_RAMP_AMPLITUDE_23:
                     case RFC_SD_RAMP_AMPLITUDE_24:
-                        damage = RFC_damage_calc( rfc_ctx, from->class, to->class );
+                        damage = RFC_damage_calc( rfc_ctx, from->cls, to->cls );
                         break;
                     case RFC_SD_RAMP_DAMAGE_23:
                     case RFC_SD_RAMP_DAMAGE_24:
-                        damage = RFC_damage_calc( rfc_ctx, from->class, to->class );
+                        damage = RFC_damage_calc( rfc_ctx, from->cls, to->cls );
                         break;
                 }
 
