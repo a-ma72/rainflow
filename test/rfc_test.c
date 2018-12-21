@@ -262,53 +262,43 @@ TEST RFC_test_turning_points( int ccnt )
     /*******************************************/
     SIMPLE_RFC_0( ccnt, tp, 10, 0.0 );
     ASSERT( ctx.tp_cnt == 0 );
-    ctx.tp = NULL;
     RFC_deinit( &ctx );
 
     SIMPLE_RFC( ccnt, tp, 10, 0.0, (0) );
     ASSERT( ctx.tp_cnt == 0 );
-    ctx.tp = NULL;
     RFC_deinit( &ctx );
 
     SIMPLE_RFC( ccnt, tp, 10, 0.0, (0,0) );
     ASSERT( ctx.tp_cnt == 0 );
-    ctx.tp = NULL;
     RFC_deinit( &ctx );
 
     SIMPLE_RFC( ccnt, tp, 10, 0.0, (0.0f, 0.1f) );
     ASSERT( ctx.tp_cnt == 0 );
-    ctx.tp = NULL;
     RFC_deinit( &ctx );
 
     SIMPLE_RFC( ccnt, tp, 10, 0.0, (0.0f, 1.0f) );
     ASSERT( ctx.tp_cnt == 0 );
-    ctx.tp = NULL;
     RFC_deinit( &ctx );
 
     /**************** Test margin *******************/
     SIMPLE_RFC_MARGIN_0( ccnt, tp, 10, 0.0 );
     ASSERT( ctx.tp_cnt == 0 );
-    ctx.tp = NULL;
     RFC_deinit( &ctx );
 
     SIMPLE_RFC_MARGIN( ccnt, tp, 10, 0.0, (0) );
     ASSERT( ctx.tp_cnt == 1 );
-    ctx.tp = NULL;
     RFC_deinit( &ctx );
 
     SIMPLE_RFC_MARGIN( ccnt, tp, 10, 0.0, (0, 0) );
     ASSERT( ctx.tp_cnt == 2 );
-    ctx.tp = NULL;
     RFC_deinit( &ctx );
 
     SIMPLE_RFC_MARGIN( ccnt, tp, 10, 0.0, (0.0f, 0.1f) );
     ASSERT( ctx.tp_cnt == 2 );
-    ctx.tp = NULL;
     RFC_deinit( &ctx );
 
     SIMPLE_RFC_MARGIN( ccnt, tp, 10, 0.0, (0.0f, 1.0f) );
     ASSERT( ctx.tp_cnt == 2 );
-    ctx.tp = NULL;
     RFC_deinit( &ctx );
 
     /*******************************************/
@@ -318,12 +308,10 @@ TEST RFC_test_turning_points( int ccnt )
     SIMPLE_RFC( ccnt, tp, 10, 0.0, (0.0f, 0.0f, 1.0f, 1.0f) );
     ASSERT( ctx.tp_cnt == 0 );
     ASSERT( ctx.residue_cnt == 0 );
-    ctx.tp = NULL;
     RFC_deinit( &ctx );
 
     SIMPLE_RFC( ccnt, tp, 10, 0.0, (1.0f, 1.1f, 1.2f, 1.1f, 1.3f, 1.0f, 1.98f, 1.0f) );
     ASSERT( ctx.tp_cnt == 0 );
-    ctx.tp = NULL;
     RFC_deinit( &ctx );
 
     /* Series with 3 turning points */
@@ -339,7 +327,6 @@ TEST RFC_test_turning_points( int ccnt )
         ASSERT( ctx.residue[1].value == 2.1f && ctx.residue[1].pos == 5 && ctx.residue[1].tp_pos == 2 );
         ASSERT( ctx.residue[2].value == 1.0f && ctx.residue[2].pos == 8 && ctx.residue[2].tp_pos == 3 );
     }
-    ctx.tp = NULL;
     RFC_deinit( &ctx );
 
     /**************** Test margin *******************/
@@ -349,7 +336,6 @@ TEST RFC_test_turning_points( int ccnt )
     ASSERT( ctx.tp[0].value == 0.0f && ctx.tp[0].pos == 1 );
     ASSERT( ctx.tp[1].value == 1.0f && ctx.tp[1].pos == 4 );
     ASSERT( ctx.residue_cnt == 0 );
-    ctx.tp = NULL;
     RFC_deinit( &ctx );
 
     SIMPLE_RFC_MARGIN( ccnt, tp, 10, 0.0, (1.0f, 1.1f, 1.2f, 1.1f, 1.3f, 1.0f, 1.98f, 1.0f) );
@@ -357,7 +343,6 @@ TEST RFC_test_turning_points( int ccnt )
     ASSERT( ctx.tp[0].value == 1.0f && ctx.tp[0].pos == 1 );
     ASSERT( ctx.tp[1].value == 1.0f && ctx.tp[1].pos == 8 );
     ASSERT( ctx.residue_cnt == 0 );
-    ctx.tp = NULL;
     RFC_deinit( &ctx );
 
     /* Series with 3 turning points */
@@ -373,7 +358,6 @@ TEST RFC_test_turning_points( int ccnt )
         ASSERT( ctx.residue[1].value == 2.1f && ctx.residue[1].pos == 3 && ctx.residue[1].tp_pos == 2 );
         ASSERT( ctx.residue[2].value == 1.0f && ctx.residue[2].pos == 5 && ctx.residue[2].tp_pos == 3 );  /* In residue, turning point at original position! */
     }
-    ctx.tp = NULL;
     RFC_deinit( &ctx );
 
     PASS();
@@ -419,10 +403,6 @@ TEST RFC_empty( int ccnt )
         ASSERT_EQ( ctx.residue_cnt, 0 );
         ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
     } while(0);
-
-#if RFC_TP_SUPPORT
-    ctx.tp = NULL;
-#endif /*RFC_TP_SUPPORT*/
 
     if( ctx.state != RFC_STATE_INIT0 )
     {
@@ -492,10 +472,6 @@ TEST RFC_cycle_up( int ccnt )
 #endif /*RFC_TP_SUPPORT*/
     } while(0);
 
-#if RFC_TP_SUPPORT
-    ctx.tp = NULL;
-#endif /*RFC_TP_SUPPORT*/
-
     if( ctx.state != RFC_STATE_INIT0 )
     {
         RFC_deinit( &ctx );
@@ -564,10 +540,6 @@ TEST RFC_cycle_down( int ccnt )
 #endif /*RFC_TP_SUPPORT*/
     } while(0);
 
-#if RFC_TP_SUPPORT
-    ctx.tp = NULL;
-#endif /*RFC_TP_SUPPORT*/
-
     if( ctx.state != RFC_STATE_INIT0 )
     {
         RFC_deinit( &ctx );
@@ -628,10 +600,6 @@ TEST RFC_small_example( int ccnt )
         }
         ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
     } while(0);
-
-#if RFC_TP_SUPPORT
-    ctx.tp = NULL;
-#endif /*RFC_TP_SUPPORT*/
 
     if( ctx.state != RFC_STATE_INIT0 )
     {
@@ -905,14 +873,47 @@ TEST RFC_res_DIN45667( void )
 {
     rfc_value_tuple_s tp[10];
 
-    SIMPLE_RFC( 10 /*ccnt*/, tp, NUMEL(tp), 0.0 /*offs*/, 
+    SIMPLE_RFC( 10 /*ccnt*/, tp, NUMEL(tp), -0.5 /*offs*/, 
                (4.9f, 6, 4, 7, 3, 9, 5, 8, 6.9f) );
+/*
+                              +
+    8.5 ___________________________________________________
+                                      +
+    7.5 ___________________________________________________
+                      +                   +
+    6.5 ___________________________________________________
+              +
+    5.5 ___________________________________________________
+          +                       +
+    4.5 ___________________________________________________
+                  +
+    3.5 ___________________________________________________
+                          +
+    2.5 ___________________________________________________
+
+    Slopes: 1, -2, 3, -4, 6, -4, 3, -1
+    Sorted:  6,  3,  3,  1 ...  (raising)
+            -4, -4, -2, -1      (falling)
+    ==================================
+    Counts: -4,  3,  2,  1
+*/
 
     ASSERT( ctx.residue_cnt == 9 );
+    ctx.state = RFC_STATE_FINALIZE;  /* SIMPLE_RFC finished already with RFC_RES_NONE */
+    ASSERT( RFC_finalize( &ctx, RFC_RES_RP_DIN45667 ) );
     ASSERT( ctx.state == RFC_STATE_FINISHED );
-    ctx.state = RFC_STATE_BUSY;
+    ASSERT( ctx.rp[0] == 0 );
+    ASSERT( ctx.rp[1] == ctx.full_inc );
+    ASSERT( ctx.rp[2] == ctx.full_inc );
+    ASSERT( ctx.rp[3] == ctx.full_inc );
+    ASSERT( ctx.rp[4] == ctx.full_inc );
+    ASSERT( ctx.rp[5] == 0 );
+    ASSERT( ctx.rp[6] == 0 );
+    ASSERT( ctx.rp[7] == 0 );
+    ASSERT( ctx.rp[8] == 0 );
+    ASSERT( ctx.rp[9] == 0 );
+    ASSERT( RFC_deinit( &ctx ) );
 
-    RFC_finalize( &ctx, RFC_RES_RP_DIN45667 );
     PASS();
 }
 
@@ -1058,8 +1059,8 @@ TEST RFC_at_test( void )
 
 TEST RFC_CPP_wrapper( void )
 {
-    extern test_cpp( void );
-    ASSERT( test_cpp() );
+    extern wrapper_test( void );
+    ASSERT( wrapper_test() );
     PASS();
 }
 

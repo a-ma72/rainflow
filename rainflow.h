@@ -418,7 +418,7 @@ typedef struct rfc_ctx
     unsigned                            class_count;                /**< Class count */
     RFC_value_type                      class_width;                /**< Class width */
     RFC_value_type                      class_offset;               /**< Lower bound of first class */
-    RFC_value_type                      hysteresis;                 /**< Hysteresis filtering */
+    RFC_value_type                      hysteresis;                 /**< Hysteresis filtering, slope must exceed hysteresis to be counted! */
 
     /* Woehler curve */
     double                              wl_sd;                      /**< Fatigue resistance range (amplitude) */

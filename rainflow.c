@@ -265,7 +265,7 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
 #endif /*RFC_TP_SUPPORT*/
                                               0;
 #else /*RFC_MINIMAL*/
-        flags                               = RFC_FLAGS_COUNT_MATRIX | 
+        flags                               = RFC_FLAGS_COUNT_RFM            | 
                                               RFC_FLAGS_COUNT_DAMAGE;
 #endif /*!RFC_MINIMAL*/
     }
@@ -1651,7 +1651,6 @@ bool RFC_lc_from_residue( void *ctx, RFC_counts_type* lc, RFC_value_type *level,
          * Counts class upper bound crossings
          * Class upper bound value = (idx+1) * class_width + class_offset
          */
-        
         if( class_from < class_to && up )
         {
             /* Count rising slopes */
@@ -2621,44 +2620,84 @@ bool RFC_finalize_res_rp_DIN45667( rfc_ctx_s *rfc_ctx, int flags )
         return false;
     }
 
-    /* This approach only affects range pair counting */
-    if( rfc_ctx->internal.flags ) 
+    if( flags && rfc_ctx->residue_cnt > 2 )
     {
-        while( rfc_ctx->residue_cnt >= 2 )
+        int i, j, k;
+        int slopes_cnt = (int)rfc_ctx->residue_cnt - 1;
+        struct slopes
         {
-            /* Left hand slope to compare */
-            rfc_value_tuple_s *from_i       = &rfc_ctx->residue[0];
-            rfc_value_tuple_s *to_i         = &rfc_ctx->residue[1];
-            int                from_class_i = QUANTIZE( rfc_ctx, from_i->value );
-            int                to_class_i   = QUANTIZE( rfc_ctx, to_i->value );
-            int                srange_i     = to_class_i - from_class_i;
-            size_t             j;
+            int slope;
+            rfc_value_tuple_s *lhs;
+            rfc_value_tuple_s *rhs;
+        } *slopes, tmp;
 
-            /* Watch all adjacent slopes */
-            for( j = 1; j < rfc_ctx->residue_cnt; )
+        slopes = (struct slopes*)rfc_ctx->mem_alloc( NULL, slopes_cnt, sizeof( slopes[0] ), RFC_MEM_AIM_TEMP );
+
+        if( !slopes )
+        {
+            RFC_error_raise( rfc_ctx, RFC_ERROR_MEMORY );
+            return false;
+        }
+
+        /* Evaluate slopes */
+        for( i = 0; i < slopes_cnt; i++ )
+        {
+            slopes[i].lhs   = &rfc_ctx->residue[i];
+            slopes[i].rhs   = &rfc_ctx->residue[i+1];
+            slopes[i].slope = (int)slopes[i].rhs->cls - slopes[i].lhs->cls;
+        }
+
+        /* Order slopes (simple "bubble sort") */
+        k = 0;
+        for( i = 0; i < slopes_cnt; i++ )
+        {
+            /* Drag higher ranks */
+            for( j = slopes_cnt - 2; j >= i; j-- )
             {
-                /* Right hand slopes to compare, all are adjacent to the given "left hand slope" */
-                rfc_value_tuple_s *from_j       = &rfc_ctx->residue[j];
-                rfc_value_tuple_s *to_j         = &rfc_ctx->residue[j+1];
-                int                from_class_j = QUANTIZE( rfc_ctx, from_j->value );
-                int                to_class_j   = QUANTIZE( rfc_ctx, to_j->value );
-                int                srange_j     = to_class_j - from_class_j;
+                bool do_swap = false;
 
-                /* Matching range found */
-                if( srange_i == -srange_j )
+                if( ( slopes[j].slope > 0 ) == ( slopes[j+1].slope > 0 ) )
                 {
-                    /* Do the countings for the matching slope */
-                    RFC_cycle_process_counts( rfc_ctx, from_j, to_j, to_j + 1, flags );
-
-                    /* Remove "left hand slope" */
-                    RFC_residue_remove_item( rfc_ctx, /*index*/ j, /*count*/ 2 );
+                    do_swap = abs( slopes[j].slope ) < abs( slopes[j+1].slope );
                 }
-                else j += 2;
+                else
+                {
+                    do_swap = slopes[j].slope < 0;
+                    k       = j + 1;  /* k indicates the first falling slope now */
+                }
+
+                if( do_swap )
+                {
+                    tmp         = slopes[j];
+                    slopes[j]   = slopes[j+1];
+                    slopes[j+1] = tmp;
+                }
+            }
+        }
+
+        assert( k > 0 );
+
+        /* Compare positive slopes with adjacent negative slopes */
+        for( i = 0; i < k && i + k < slopes_cnt; i++ )
+        {
+            /* Get the smaller slope of two adjacent. On equality choose the primarily in time */
+            int lh_slope = slopes[i].slope;
+            int rh_slope = slopes[i+k].slope;
+
+            if( abs( lh_slope ) == abs( rh_slope ) )
+            {
+                j = ( slopes[i].rhs->pos < slopes[i+k].rhs->pos ) ? i : (i+k);
+            }
+            else
+            {
+                j = ( abs( lh_slope ) < abs( rh_slope ) ) ? i : (i+k);
             }
 
-            /* Remove first point */
-            RFC_residue_remove_item( rfc_ctx, /*index*/ 0, /*count*/ 1 );
+            /* Do the countings for the matching slope */
+            RFC_cycle_process_counts( rfc_ctx, slopes[j].lhs, slopes[j].rhs, NULL, flags );
         }
+
+        rfc_ctx->mem_alloc( slopes, 0, 0, RFC_MEM_AIM_TEMP );
     }
 
     /* Empty residue */
