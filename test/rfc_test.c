@@ -94,7 +94,9 @@ void export_tp( const char *filename, rfc_value_tuple_s* data, size_t count )
         while( count-- )
         {
             //fprintf(fid, "%g\t%lu\t%lu\t%lu\t%g\n", data->value, data->class, data->tp_pos, data->pos, data->damage);
-            fprintf(fid, "%g\t%d\t%llu\t%llu\n", data->value, data->cls, data->tp_pos, data->pos );
+            fprintf(fid, "%g\t%d\t%llu\t%llu\n", 
+                          data->value, data->cls, 
+                         (long long unsigned int)data->tp_pos, (long long unsigned int)data->pos );
             data++;
         }
 
@@ -1059,7 +1061,7 @@ TEST RFC_at_test( void )
 
 TEST RFC_CPP_wrapper( void )
 {
-    extern wrapper_test( void );
+    extern bool wrapper_test( void );
     ASSERT( wrapper_test() );
     PASS();
 }

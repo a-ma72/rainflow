@@ -1864,18 +1864,26 @@ double RFC_damage_from_rfm( void *ctx, const RFC_counts_type *rfm )
  * @brief      Amplitude transformation to take mean load influence into
  *             account.
  *
- * @param      rfc_ctx  The rainflow context
- * @param[in]  Sa       Amplitude
- * @param[in]  Sm       Mean load
+ * @param      ctx   The rainflow context
+ * @param[in]  Sa    Amplitude
+ * @param[in]  Sm    Mean load
  *
  * @return     Transformed amplitude Sa
  */
-double RFC_at_transform( rfc_ctx_s *rfc_ctx, double Sa, double Sm )
+double RFC_at_transform( void *ctx, double Sa, double Sm )
 {
     double Sa_transform = Sa;
 
-    assert( rfc_ctx );
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
+    {
+        assert( false );
+        rfc_ctx->error = RFC_ERROR_INVARG;
+
+        return false;
+    }
+    
     /* Amplitude is always positive */
     Sa = fabs( Sa );
 

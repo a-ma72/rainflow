@@ -61,6 +61,7 @@ target_link_libraries( ${CMAKE_PROJECT_NAME} ${Matlab_LIBRARIES} ${MATH_LIB} )
 add_executable( rfc_test rainflow.c test/rfc_test.c rfc_wrapper_test.cpp )
 target_link_libraries( rfc_test ${MATH_LIB} )
 target_sources( rfc_test PUBLIC greatest/greatest.h )
+set_target_properties( rfc_test PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS YES )
 set_property( DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT rfc_test )
 
 # install to /bin by default
