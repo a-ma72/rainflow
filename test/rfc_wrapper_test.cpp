@@ -1,15 +1,13 @@
 
 /* Using Rainflow C-Library in a C++ context */
 
-#ifdef __GNUC__
-#include <cstdlib>  /* For GNUC It is crucial that you incude stdlib outside any namespace! */
-#endif /*__GNUC__*/
-
 namespace rainflow_C
 {
+    // Notes on mix C and C++ headers:
+    // https://developers.redhat.com/blog/2016/02/29/why-cstdlib-is-more-complicated-than-you-might-think/
     extern "C"
     {
-        #include "rainflow.h"
+        #include "../rainflow.h"
     }
 }
 

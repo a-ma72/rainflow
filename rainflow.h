@@ -102,7 +102,6 @@
 #include <stdint.h>  /* ULLONG_MAX */
 #include <limits.h>  /* ULLONG_MAX */
 #include <stddef.h>  /* size_t, NULL */
-#include <stdlib.h>  /* calloc(), free(), abs() */
 #include "config.h"  /* Configuration */
 
 
@@ -267,7 +266,7 @@ bool    RFC_rfm_damage        ( void *ctx, unsigned from_first, unsigned from_la
 bool    RFC_lc_from_rfm       ( void *ctx, RFC_counts_type *lc, RFC_value_type *level, const RFC_counts_type *rfm, int flags );
 bool    RFC_lc_from_residue   ( void *ctx, RFC_counts_type *lc, RFC_value_type *level, int flags );
 bool    RFC_rp_from_rfm       ( void *ctx, RFC_counts_type *rp, RFC_value_type *class_means, const RFC_counts_type *rfm );
-double  RFC_damage_from_rp    ( void *ctx, const RFC_counts_type *rp );
+double  RFC_damage_from_rp    ( void *ctx, const RFC_counts_type *rp, bool mk );
 double  RFC_damage_from_rfm   ( void *ctx, const RFC_counts_type *rfm );
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
@@ -289,7 +288,7 @@ double  RFC_at_transform      ( void *ctx, double Sa, double Sm );
 #if RFC_USE_DELEGATES
 /* Delegates typedef */
 typedef  void                ( *rfc_cycle_find_fcn_t )    ( rfc_ctx_s *, int flags );
-typedef  double              ( *rfc_damage_calc_fcn_t )   ( rfc_ctx_s *, unsigned from_class, unsigned to_class );
+typedef  double              ( *rfc_damage_calc_fcn_t )   ( rfc_ctx_s *, unsigned from_class, unsigned to_class, double *Sa_ret );
 typedef  bool                ( *rfc_finalize_fcn_t )      ( rfc_ctx_s *, int residual_methods );
 typedef  rfc_value_tuple_s * ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, const rfc_value_tuple_s * );
 #if RFC_TP_SUPPORT
@@ -423,15 +422,16 @@ typedef struct rfc_ctx
     /* Woehler curve */
     double                              wl_sd;                      /**< Fatigue resistance range (amplitude) */
     double                              wl_nd;                      /**< Cycles at wl_sd */
-    double                              wl_k;                       /**< Woehler gradient above wl_sd */
+    double                              wl_k;                       /**< Woehler gradient above wl_sd, always negative */
 #if !RFC_MINIMAL
     double                              wl_k2;                      /**< Woehler gradient below wl_sd */
-    double                              wl_omission;                /**< Omission level */
+    double                              wl_omission;                /**< Omission level threshold, smaller amplitudes get discarded */
+    double                              wl_q;                       /**< Parameter q for "Miner konsequent" approach, always positive */
 #endif /*!RFC_MINIMAL*/
 
 #if RFC_USE_DELEGATES
     /* Delegates (optional, may be NULL) */
-    rfc_tp_next_fcn_t                   tp_next_fcn;                /**< Test if new turning point exists */
+    rfc_tp_next_fcn_t                   tp_next_fcn;                /**< Test for new turning point */
 #if RFC_TP_SUPPORT
     rfc_tp_add_fcn_t                    tp_add_fcn;                 /**< Handling new turning points */
     rfc_tp_prune_fcn_t                  tp_prune_fcn;               /**< Prune turning points */
@@ -478,6 +478,9 @@ typedef struct rfc_ctx
     /* Damage */
 #if RFC_DAMAGE_FAST
     double                             *damage_lut;                 /**< Damage look-up table */
+#if RFC_AT_SUPPORT
+    double                             *amplitude_lut;              /**< Amplitude look-up table */
+#endif /*RFC_AT_SUPPORT*/
 #endif /*RFC_DAMAGE_FAST*/
     double                              pseudo_damage;              /**< Cumulated pseudo damage */
 
@@ -501,14 +504,19 @@ typedef struct rfc_ctx
         int                             flags;                      /**< Flags */
         int                             slope;                      /**< Current signal slope */
         rfc_value_tuple_s               extrema[2];                 /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
-#if !RFC_MINIMAL
+#if RFC_GLOBAL_EXTREMA
         bool                            extrema_changed;            /**< True if one extrema has changed */
-#endif /*!RFC_MINIMAL*/
+#endif /*!RFC_GLOBAL_EXTREMA*/
         size_t                          pos;                        /**< Absolute position in data input stream, base 1 */
         size_t                          global_offset;              /**< Offset for pos */
         rfc_value_tuple_s               residue[3];                 /**< Static residue (if class_count is zero) */
         size_t                          residue_cap;                /**< Capacity of static residue */
         bool                            res_static;                 /**< true, if static residue is in use */
+#if !RFC_MINIMAL
+        double                          mk_D;                       /**< Cumulative Damage ("Miner konsequent" approach) */
+        double                          mk_sd;                      /**< Sd ("Miner konsequent" approach) */
+        double                          mk_q;                       /**< Parameter "q" ("Miner konsequent" approach) */
+#endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
         rfc_value_tuple_s               margin[2];                  /**< First and last data point */
         int                             margin_stage;               /**< 0: Init, 1: Left margin set, 2: 1st turning point safe */

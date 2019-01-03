@@ -166,7 +166,6 @@ double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 
 
 
-#if RFC_TP_SUPPORT
 TEST RFC_tp_prune_test( int ccnt )
 {
     RFC_VALUE_TYPE      data[10000];
@@ -249,7 +248,6 @@ TEST RFC_tp_prune_test( int ccnt )
 
     PASS();
 }
-#endif /*RFC_TP_SUPPORT*/
 
 
 TEST RFC_test_turning_points( int ccnt )
@@ -873,10 +871,6 @@ TEST RFC_long_series( int ccnt )
 
 TEST RFC_res_DIN45667( void )
 {
-    rfc_value_tuple_s tp[10];
-
-    SIMPLE_RFC( 10 /*ccnt*/, tp, NUMEL(tp), -0.5 /*offs*/, 
-               (4.9f, 6, 4, 7, 3, 9, 5, 8, 6.9f) );
 /*
                               +
     8.5 ___________________________________________________
@@ -900,8 +894,15 @@ TEST RFC_res_DIN45667( void )
     Counts: -4,  3,  2,  1
 */
 
-    ASSERT( ctx.residue_cnt == 9 );
-    ctx.state = RFC_STATE_FINALIZE;  /* SIMPLE_RFC finished already with RFC_RES_NONE */
+    if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, -0.5 /* class_offset */,
+                        1 /* hysteresis */, RFC_FLAGS_DEFAULT ) )
+    {
+        RFC_VALUE_TYPE data[] = {4.9f, 6, 4, 7, 3, 9, 5, 8, 6.9f};
+        RFC_feed( &ctx, data, sizeof(data)/sizeof(RFC_VALUE_TYPE) );
+    }
+    else FAIL();
+
+    ASSERT( ctx.residue_cnt == 8 );
     ASSERT( RFC_finalize( &ctx, RFC_RES_RP_DIN45667 ) );
     ASSERT( ctx.state == RFC_STATE_FINISHED );
     ASSERT( ctx.rp[0] == 0 );

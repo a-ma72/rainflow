@@ -58,7 +58,7 @@ target_compile_definitions( ${CMAKE_PROJECT_NAME} PRIVATE -DMATLAB_MEX_FILE )
 target_link_libraries( ${CMAKE_PROJECT_NAME} ${Matlab_LIBRARIES} ${MATH_LIB} )
 
 # Test application, start project for MSVC
-add_executable( rfc_test rainflow.c test/rfc_test.c rfc_wrapper_test.cpp )
+add_executable( rfc_test rainflow.c test/rfc_test.c test/rfc_wrapper_test.cpp )
 target_link_libraries( rfc_test ${MATH_LIB} )
 target_sources( rfc_test PUBLIC greatest/greatest.h )
 set_target_properties( rfc_test PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS YES )
