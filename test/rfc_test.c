@@ -1067,6 +1067,29 @@ TEST RFC_CPP_wrapper( void )
 }
 
 
+TEST RFC_MINER_CONSEQUENT( void )
+{
+    double          Sa[]            = { 100, 105, 110, 115, 125, 150, 175, 200, 250, 300, 350, 400, 500, 600, 700, 800 };
+    RFC_counts_type counts[]        = { 0, 605000, 280000, 92000, 20000, 2720, 280, 16, 2 };
+    unsigned        class_count     = NUMEL(counts);
+    RFC_value_type  class_offset    = 0.0,
+                    hysteresis      = 0.0;
+    double          D_mk;
+    int             i;
+
+    for( i = 0; i < NUMEL(Sa); i++ )
+    {
+        RFC_value_type class_width = Sa[i] * 2.0 / class_count;
+
+        RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT );
+
+        D_mk = RFC_damage_from_rp( &ctx, counts, true /*mk*/ );
+    }
+
+    PASS();
+}
+
+
 /* local suite (greatest) */
 SUITE( RFC_TEST_SUITE )
 {
@@ -1098,6 +1121,7 @@ SUITE( RFC_TEST_SUITE )
 #endif /*RFC_AT_SUPPORT*/
     /* Test C++ Wrapper */
     RUN_TEST( RFC_CPP_wrapper );
+    RUN_TEST( RFC_MINER_CONSEQUENT );
 }
 
 
