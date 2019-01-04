@@ -151,7 +151,6 @@ static void                 RFC_clear_lut                       ( rfc_ctx_s * );
 #endif /*RFC_DAMAGE_FAST*/
 static void                 RFC_cycle_find                      ( rfc_ctx_s *, int flags );
 #else /*RFC_MINIMAL*/
-#define mexFunction         mexRainflow
 #define RFC_cycle_find      RFC_cycle_find_4ptm
 #endif /*!RFC_MINIMAL*/
 static void                 RFC_wl_init                         ( rfc_ctx_s *, double sd, double nd, double k );
@@ -3165,6 +3164,7 @@ double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_
     if( rfc_ctx->damage_lut )
     {
         damage = RFC_damage_calc_fast( rfc_ctx, class_from, class_to, &amplitude );
+        assert( amplitude >= 0.0 );
     } else
 #endif /*RFC_DAMAGE_FAST*/
 
@@ -3172,6 +3172,7 @@ double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_
     if( rfc_ctx->damage_calc_fcn )
     {
         damage = rfc_ctx->damage_calc_fcn( rfc_ctx, class_from, class_to, &amplitude );
+        assert( amplitude >= 0.0 );
     } else
 #endif /*RFC_USE_DELEGATES*/
 
@@ -3193,6 +3194,8 @@ double RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_
 #if RFC_AT_SUPPORT
             /* Calculate transformation factor with normalized mean value */
             amplitude = RFC_at_transform( rfc_ctx, Sa_i, Sm_i );
+#else /*!RFC_AT_SUPPORT*/
+            amplitude = Sa_i;
 #endif /*RFC_AT_SUPPORT*/
 
             damage = RFC_damage_calc_amplitude( rfc_ctx, amplitude );
@@ -4001,7 +4004,7 @@ bool RFC_tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc
                 RFC_error_raise( rfc_ctx, RFC_ERROR_MEMORY );
                 return false;
             }
-
+#if RFC_AT_SUPPORT
             if( rfc_ctx->amplitude_lut )
             {
                 if( !rfc_ctx->mem_alloc( rfc_ctx->amplitude_lut, num, sizeof(RFC_counts_type), RFC_MEM_AIM_DLUT ) )
@@ -4010,6 +4013,7 @@ bool RFC_tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc
                     return false;
                 }
             }
+#endif /*RFC_AT_SUPPORT*/
         }
         RFC_class_param_set( rfc_ctx, new_class_param );
         RFC_damage_lut_init( rfc_ctx );
@@ -4028,6 +4032,7 @@ bool RFC_tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc
 #endif /*RFC_TP_SUPPORT*/
 
 
+#if RFC_DH_SUPPORT
 /**
  * @brief         Spread damage over turning points and damage history
  *
@@ -4187,6 +4192,7 @@ void RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
             break;
     }
 }
+#endif /*RFC_DH_SUPPORT*/
 
 
 /**
@@ -4371,7 +4377,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         size_t          i;
         bool            ok;
 
-        mxAssert( residual_method >= RFC_RES_NONE && residual_method <= RFC_RES_RP_DIN45667, 
+        mxAssert( residual_method >= RFC_RES_NONE && residual_method <= RFC_RES_COUNT, 
                   "Invalid residual method!" );
 
         ok = RFC_init( &rfc_ctx, 
@@ -4752,6 +4758,14 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         mexPrintf( "Unknown subfunction \"%s\"!\n", buffer );
     }
 }
+#else /*RFC_MINIMAL*/
+/**
+ * The MATLAB MEX main function
+ */
+void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
+{
+    mexRainflow( nlhs, plhs, nrhs, prhs );
+}
 #endif /*!RFC_MINIMAL*/
-    
+
 #endif /*MATLAB_MEX_FILE*/

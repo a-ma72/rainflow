@@ -108,11 +108,9 @@ void export_tp( const char *filename, rfc_value_tuple_s* data, size_t count )
 
 double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 {
-    double          from_val = rfc_ctx->class_width * (from-1) + rfc_ctx->class_offset;
-    double          to_val   = rfc_ctx->class_width * (to  -1) + rfc_ctx->class_offset;
     RFC_counts_type counts;
 
-    RFC_rfm_peek( rfc_ctx, from_val, to_val, &counts );
+    counts = rfc_ctx->rfm[ rfc_ctx->class_count * (from-1) + (to-1) ];
     return (double)counts / rfc_ctx->full_inc;
 }
 
@@ -868,7 +866,7 @@ TEST RFC_long_series( int ccnt )
     PASS();
 }
 
-
+#if !RFC_MINIMAL
 TEST RFC_res_DIN45667( void )
 {
 /*
@@ -919,6 +917,7 @@ TEST RFC_res_DIN45667( void )
 
     PASS();
 }
+#endif /*!RFC_MINIMAL*/
 
 
 #if RFC_AT_SUPPORT
@@ -1083,7 +1082,9 @@ SUITE( RFC_TEST_SUITE )
     RUN_TEST1( RFC_small_example, 0 );
     RUN_TEST1( RFC_long_series, 0 );
     /* Residual methods */
+#if !RFC_MINIMAL
     RUN_TEST( RFC_res_DIN45667 );
+#endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
     /* Test turning points */
     RUN_TEST1( RFC_test_turning_points, 1 );

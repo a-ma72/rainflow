@@ -36,7 +36,7 @@ for VALUE_TYPE = {'float', 'double'}
                     fprintf( fid, '%s\n', 'if %errorlevel% neq 0 exit /b %errorlevel%' );
                     fprintf( fid, '%s\n', 'devenv rainflow.sln /build Release' );
                     fprintf( fid, '%s\n', 'if %errorlevel% neq 0 exit /b %errorlevel%' );
-                    fprintf( fid, '%s\n', '.\Release\rfc_test.exe || exit /b' );
+                    fprintf( fid, '%s\n', '.\Release\rfc_test.exe || exit /b 1' );
                     fclose( fid );
                     status = system( '..\build\generate.bat', '-echo' );
                     if status ~= 0, return, end

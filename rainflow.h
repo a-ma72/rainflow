@@ -51,6 +51,8 @@
  *     G.Marsh;
  *     International Journal of Fatigue 82 (2016) 757-765,
  *     [https://doi.org/10.1016/j.ijfatigue.2015.10.007]
+ * [6] "Betriebsfestigkeit - Verfahren und Daten zur Bauteilberechnung"
+ *     Haibach, Erwin; Springer Verlag
  * []  "Schaedigungsbasierte Hysteresefilter"; Hack, M, D386 (Diss Univ. Kaiserslautern), Shaker Verlag Aachen, 1998, ISBN 3-8265-3936-2
  * []  "Hysteresis and Phase Transition"
  *     Brokate, M.; Sprekels, J.; Applied Mathematical Sciences 121; Springer, New York, 1996
@@ -59,9 +61,9 @@
  * []  "Multivariate Density Estimation: Theory, Practice and Visualization". New York, Chichester, Wiley & Sons, 1992
  *     Scott, D.
  * []  "Werkstoffmechanik - Bauteile sicher beurteilen undWerkstoffe richtig einsetzen"; 
- *      Ralf Bürgel, Hans Albert Richard, Andre Riemer; Springer FachmedienWiesbaden 2005, 2014
- * [] "Zählverfahren und Lastannahme in der Betriebsfestigkeit";
- *    Michael Köhler, Sven Jenne / Kurt Pötter, Harald Zenner; Springer-Verlag Berlin Heidelberg 2012
+ *      Ralf B?rgel, Hans Albert Richard, Andre Riemer; Springer FachmedienWiesbaden 2005, 2014
+ * []  "Zaelverfahren und Lastannahme in der Betriebsfestigkeit";
+ *     Michael Koehler, Sven Jenne / Kurt Poetter, Harald Zenner; Springer-Verlag Berlin Heidelberg 2012
  *
  *                                                                                                                                                          *
  *================================================================================
@@ -386,6 +388,7 @@ typedef struct rfc_ctx
         RFC_RES_REPEATED,                                           /**< Repeat residue and count closed cycles */
         RFC_RES_RP_DIN45667,                                        /**< Count residue according to range pair in DIN-45667 */
 #endif /*!RFC_MINIMAL*/
+        RFC_RES_COUNT                                               /**< Number of options */
     }
                                         residual_method;
 #if RFC_DH_SUPPORT
