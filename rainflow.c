@@ -4334,9 +4334,9 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 #if !RFC_MINIMAL
     if( nrhs != 8 )
     {
-        mexErrMsgTxt( "Function needs exact 7 arguments!" );
+        mexErrMsgTxt( "Function needs exact 8 arguments!" );
 #else /*RFC_MINIMAL*/
-    if( nrhs != 6 )
+    if( nrhs != 5 )
     {
         if( !nrhs )
         {
@@ -4356,8 +4356,8 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         const mxArray  *mxClassWidth     = prhs[2];
         const mxArray  *mxClassOffset    = prhs[3];
         const mxArray  *mxHysteresis     = prhs[4];
-        const mxArray  *mxResidualMethod = prhs[5];
 #if !RFC_MINIMAL
+        const mxArray  *mxResidualMethod = prhs[5];
         const mxArray  *mxEnforceMargin  = prhs[6];
         const mxArray  *mxUseHCM         = prhs[7];
 #endif /*!RFC_MINIMAL*/        
@@ -4369,10 +4369,12 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         double          class_width      = mxGetScalar( mxClassWidth );
         double          class_offset     = mxGetScalar( mxClassOffset );
         double          hysteresis       = mxGetScalar( mxHysteresis );
-        int             residual_method  = (int)( mxGetScalar( mxResidualMethod ) + 0.5 );
 #if !RFC_MINIMAL
+        int             residual_method  = (int)( mxGetScalar( mxResidualMethod ) + 0.5 );
         int             enforce_margin   = (int)mxGetScalar( mxEnforceMargin );
         int             use_hcm          = (int)mxGetScalar( mxUseHCM );
+#else /*RFC_MINIMAL*/
+        int             residual_method  = RFC_RES_NONE;
 #endif /*!RFC_MINIMAL*/
         size_t          i;
         bool            ok;
