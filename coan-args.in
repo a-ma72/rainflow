@@ -14,3 +14,4 @@ config.h
 config.h.in
 test/rfc_test.c
 test/long_series.c
+test/rfc_wrapper_test.cpp
