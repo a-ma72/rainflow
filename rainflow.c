@@ -471,6 +471,8 @@ bool RFC_wl_init( void *ctx, double sd, double nd, double k )
     rfc_ctx->wl_k2                          =  rfc_ctx->wl_k;  /* "Miner elementary", if k == k2 */
     rfc_ctx->wl_q                           =  fabs(k) - 1;    /* Default value for fatigue strength depression*/
     rfc_ctx->wl_omission                    =  0.0;            /* No omission per default */
+    rfc_ctx->internal.mk_q                  =  rfc_ctx->wl_q;
+    rfc_ctx->internal.mk_sd                 =  rfc_ctx->wl_sd;
 #endif /*!RFC_MINIMAL*/
 }
 
@@ -1774,6 +1776,7 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
     const unsigned    from = 0;
           unsigned    class_count;
           double      D;
+          int         i, j;
 
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -1808,8 +1811,6 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
         double q  = rfc_ctx->internal.mk_q;
         double Sd = rfc_ctx->wl_sd;             /* Fatigue strength SD for the unimpaired(!) part */
         double Sj = Sd;                      
-        int    i, 
-               j;
 
         for( j = (int)class_count - 1; j >= -1; j-- )
         {
@@ -1819,11 +1820,11 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
 
             if( j >= 0 )
             {
-                if( counts[j] > 0 )
+                //if( counts[j] > 0 )
                 {
                     Sa_j = Sa ? Sa[j] : ( rfc_ctx->class_width * j / 2.0 );
                 }
-                else continue;
+                //else continue;
             }
             else
             {
@@ -1855,28 +1856,37 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
                 D_j += D_i * counts[i];
             }
 
-            D += D_j * weight;
+            D += weight * 1.0 / D_j;
         }
     }
     else
-#else /*RFC_MINIMAL*/
+#endif /*!RFC_MINIMAL*/
     {
-        for( i = 0; i < class_count; i++ )
+        for( i = 0; i < (int)class_count; i++ )
         {
             if( counts[i] )
             {
+                double D_i;
+
                 if( Sa )
                 {
-                    D += RFC_damage_calc_amplitude( rfc_ctx, Sa[i] ) * counts[i];
+                    if( !RFC_damage_calc_amplitude( rfc_ctx, Sa[i], &D_i ) )
+                    {
+                        return false;
+                    }
+                    D += D_i * counts[i];
                 }
                 else
                 {
-                    D += RFC_damage_calc( rfc_ctx, from, i /*to*/, NULL /*Sa_ret*/ ) * counts[i];
+                    if( !RFC_damage_calc( rfc_ctx, from, i /*to*/, &D_i, NULL /*Sa_ret*/ ) )
+                    {
+                        return false;
+                    }
+                    D += D_i * counts[i];
                 }
             }
         }
     }
-#endif /*!RFC_MINIMAL*/
 
     *damage = D / rfc_ctx->full_inc;
     return true;

@@ -265,7 +265,7 @@ bool    RFC_rfm_damage        ( void *ctx, unsigned from_first, unsigned from_la
 bool    RFC_lc_from_rfm       ( void *ctx, RFC_counts_type *lc, RFC_value_type *level, const RFC_counts_type *rfm, int flags );
 bool    RFC_lc_from_residue   ( void *ctx, RFC_counts_type *lc, RFC_value_type *level, int flags );
 bool    RFC_rp_from_rfm       ( void *ctx, RFC_counts_type *rp, RFC_value_type *class_means, const RFC_counts_type *rfm );
-bool    RFC_damage_from_rp    ( void *ctx, const RFC_counts_type *rp, const RFC_value_type *Sa, double *damage, int rp_calc_type );
+bool    RFC_damage_from_rp    ( void *ctx, const RFC_counts_type *counts, const RFC_value_type *Sa, double *damage, int rp_calc_type );
 bool    RFC_damage_from_rfm   ( void *ctx, const RFC_counts_type *rfm, double *damage );
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
