@@ -1085,21 +1085,26 @@ TEST RFC_MINER_CONSEQUENT( void )
 {
     /* Data from [6] table 3.2-6 */
     double          Sa_hat[]        = { 100, 105, 110, 115, 125, 150, 175, 200, 250, 300, 350, 400, 500, 600, 700, 800 };
+    double          expected[]      = { 89199.590, 24445.830, 14414.850, 6980.954, 2089.658, 556.181, 253.551, 219.482, 
+                                        152.775, 144.658, 133.296, 129.536, 129.245, 128.810, 128.205, 127.398 };
     double          Sa_rel[]        = { 0.000, 0.125, 0.275, 0.425, 0.575, 0.725, 0.850, 0.950, 1.000 };
-    RFC_counts_type counts[]        = { 0, 605000, 280000, 92000, 20000, 2720, 280, 16, 2 };
+    RFC_counts_type Sa_counts[]     = { 0, 605000, 280000, 92000, 20000, 2720, 280, 16, 2 };
 
-    unsigned        class_count     = NUMEL(counts);
+    const double SD = 100.0;
+    const double ND = 1e6;
+    const double k  = 4;
+
+    unsigned        class_count     = NUMEL(Sa_counts);
     RFC_value_type  class_offset    = 0.0,
                     hysteresis      = 0.0;
     double          D_mk;
     int             i;
 
-    for( i = 0; i < NUMEL(Sa_hat); i++ )
+    for( i = 15; i < NUMEL(Sa_hat); i++ )
     {
         RFC_value_type  class_width = Sa_hat[i] * 2.0 / ( class_count - 1 );
         double          Sa[10];
         int             j;
-        double          test;
 
         ASSERT( NUMEL(Sa) >= class_count );
 
@@ -1109,16 +1114,11 @@ TEST RFC_MINER_CONSEQUENT( void )
         }
 
         RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT );
+        RFC_wl_init( &ctx, SD, ND, k );
 
-        ctx.wl_sd = 100.0;
-        ctx.wl_nd = 1e6;
-        ctx.wl_k  = 4.0;
-        ctx.wl_k2 = ctx.wl_k;
-        ctx.internal.mk_q = fabs(ctx.wl_k) - 1;
+        RFC_damage_from_rp( &ctx, Sa_counts, Sa, &D_mk, true /*mk*/ );
 
-        RFC_damage_from_rp( &ctx, counts, Sa, &D_mk, true /*mk*/ );
-
-        test = 1.0 / D_mk;
+        GREATEST_ASSERT_EQ_FMT( expected[i], 1.0 / D_mk, "%8.3f" );
 
         RFC_deinit( &ctx );
     }

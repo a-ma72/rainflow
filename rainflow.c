@@ -290,7 +290,9 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
     rfc_ctx->hysteresis                     = hysteresis;
 
     /* Values for a "pseudo Woehler curve" */
+    rfc_ctx->state = RFC_STATE_INIT;   /* Bypass sanity check for state in RFC_wl_init() */
     RFC_wl_init( rfc_ctx, 1e3 /*sd*/, 1e7 /*nd*/, -5.0 /*k*/ );
+    rfc_ctx->state = RFC_STATE_INIT0;  /* Reset state */
 
     /* Memory allocator */
     if( !rfc_ctx->mem_alloc )
@@ -440,10 +442,10 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
 /**
  * @brief      Initialize Woehler parameters
  *
- * @param      ctx       The rfc context
- * @param      sd        The amplitude "SD"
- * @param      nd        The cycles "ND"
- * @param      k         The slope "k"
+ * @param      ctx   The rfc context
+ * @param      sd    The amplitude "SD"
+ * @param      nd    The cycles "ND"
+ * @param      k     The slope "k"
  *
  * @return     true on success
  */
@@ -456,7 +458,12 @@ bool RFC_wl_init( void *ctx, double sd, double nd, double k )
         return RFC_error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
 
- /* Woehler curve (fictive) */
+    if( rfc_ctx->state != RFC_STATE_INIT )
+    {
+        return false;
+    }
+
+/* Woehler curve (fictive) */
     rfc_ctx->wl_sd                          =  sd;
     rfc_ctx->wl_nd                          =  nd;
     rfc_ctx->wl_k                           = -fabs(k);
@@ -508,8 +515,8 @@ bool RFC_tp_init( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_stati
  *
  * @param      ctx        The rainflow context
  * @param      autoprune  The flag for autopruning
- * @param      size       The size
- * @param      threshold  The threshold
+ * @param      size       The size to prune to
+ * @param      threshold  The threshold when to prune
  *
  * @return     true on success
  */
@@ -1795,6 +1802,7 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
     D = 0.0;
 
 #if !RFC_MINIMAL
+    /* Calculate the "Miner Consequent" approach */
     if( rp_calc_type != RFC_RP_DAMAGE_CALC_TYPE_DEFAULT )
     {
         double q  = rfc_ctx->internal.mk_q;
@@ -1803,30 +1811,38 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
         int    i, 
                j;
 
-        for( j = (int)class_count - 1; j >= 0; j-- )
+        for( j = (int)class_count - 1; j >= -1; j-- )
         {
-            double D_j      = 0.0;
-            double Sa_j     = Sa ? Sa[j] : ( rfc_ctx->class_width * j / 2.0 );
+            double D_j = 0.0;
+            double Sa_j;
             double weight;
 
-            if( !j )
+            if( j >= 0 )
             {
-                /* Last amplitude must always be 0.0! */
-                if( Sa_j != 0.0 )
+                if( counts[j] > 0 )
                 {
-                    return -1.0;
+                    Sa_j = Sa ? Sa[j] : ( rfc_ctx->class_width * j / 2.0 );
                 }
+                else continue;
+            }
+            else
+            {
+                if( Sa[0] > 0.0 )
+                {
+                    Sa_j = 0.0;
+                }
+                else continue;
             }
 
             /* Forward until amplitude is below fatigue strength SD for the unimpaired part */
-            if( j && Sa_j >= Sd ) continue;
+            if( Sa_j >= Sd && Sa_j > 0.0 ) continue;
 
             /* Weighted damage
                [6] chapter 3.2.9, formula 3.2-65 */
             weight = pow( Sj / Sd, q ) - pow( Sa_j / Sd, q );
             Sj     = Sa_j;
 
-            for( i = (int)class_count - 1; i > j; i-- )
+            for( i = (int)class_count - 1; i > j && i >= 0; i-- )
             {
                 double Sa_i = Sa ? Sa[i] : ( rfc_ctx->class_width * i / 2.0 );
                 double D_i;
