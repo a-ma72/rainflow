@@ -3214,7 +3214,11 @@ bool RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_to
 
         range = (double)rfc_ctx->class_width * abs( (int)class_to - (int)class_from );
         Sa    = range / 2.0;
-        D     = RFC_damage_calc_amplitude( rfc_ctx, Sa );
+
+        if( !RFC_damage_calc_amplitude( rfc_ctx, Sa, &D ) )
+        {
+            return false;
+        }
 #else /*!RFC_MINIMAL*/
         double Sa_i = fabs( (int)class_from - (int)class_to ) / 2.0 * rfc_ctx->class_width;
         double Sm_i =     ( (int)class_from + (int)class_to ) / 2.0 * rfc_ctx->class_width + rfc_ctx->class_offset;
