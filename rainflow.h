@@ -247,6 +247,7 @@ typedef struct rfc_rfm_element  rfc_rfm_element_s;   /** Rainflow matrix element
 /* Core functions */
 bool    RFC_init              ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis, int flags );
+bool    RFC_wl_init           ( void *ctx, double sd, double nd, double k );
 bool    RFC_deinit            ( void *ctx );
 bool    RFC_feed              ( void *ctx, const RFC_value_type* data, size_t count );
 #if !RFC_MINIMAL

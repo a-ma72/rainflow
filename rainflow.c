@@ -153,7 +153,6 @@ static void                 RFC_cycle_find                      ( rfc_ctx_s *, i
 #else /*RFC_MINIMAL*/
 #define RFC_cycle_find      RFC_cycle_find_4ptm
 #endif /*!RFC_MINIMAL*/
-static void                 RFC_wl_init                         ( rfc_ctx_s *, double sd, double nd, double k );
 static bool                 RFC_feed_once                       ( rfc_ctx_s *, const rfc_value_tuple_s* tp, int flags );
 #if RFC_DH_SUPPORT
 static bool                 RFC_feed_once_dh                    ( rfc_ctx_s * );
@@ -436,6 +435,38 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
 
     return true;
 }
+
+
+/**
+ * @brief      Initialize Woehler parameters
+ *
+ * @param      ctx       The rfc context
+ * @param      sd        The amplitude "SD"
+ * @param      nd        The cycles "ND"
+ * @param      k         The slope "k"
+ *
+ * @return     true on success
+ */
+bool RFC_wl_init( void *ctx, double sd, double nd, double k )
+{
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
+    {
+        return RFC_error_raise( rfc_ctx, RFC_ERROR_INVARG );
+    }
+
+ /* Woehler curve (fictive) */
+    rfc_ctx->wl_sd                          =  sd;
+    rfc_ctx->wl_nd                          =  nd;
+    rfc_ctx->wl_k                           = -fabs(k);
+#if !RFC_MINIMAL
+    rfc_ctx->wl_k2                          =  rfc_ctx->wl_k;  /* "Miner elementary", if k == k2 */
+    rfc_ctx->wl_q                           =  fabs(k) - 1;    /* Default value for fatigue strength depression*/
+    rfc_ctx->wl_omission                    =  0.0;            /* No omission per default */
+#endif /*!RFC_MINIMAL*/
+}
+
 
 #if RFC_TP_SUPPORT
 /**
@@ -2177,30 +2208,6 @@ void RFC_clear_lut( rfc_ctx_s *rfc_ctx )
 #endif /*RFC_AT_SUPPORT*/
 }
 #endif /*RFC_DH_SUPPORT*/
-
-
-/**
- * @brief      Initialize Woehler parameters
- *
- * @param      rfc_ctx  The rfc context
- * @param      sd       Amplitude "SD"
- * @param      nd       Cycles "ND"
- * @param      k        Slope "k"
- */
-static
-void RFC_wl_init( rfc_ctx_s *rfc_ctx, double sd, double nd, double k )
-{
-    assert( rfc_ctx );
- /* Woehler curve (fictive) */
-    rfc_ctx->wl_sd                          =  sd;
-    rfc_ctx->wl_nd                          =  nd;
-    rfc_ctx->wl_k                           = -fabs(k);
-#if !RFC_MINIMAL
-    rfc_ctx->wl_k2                          =  rfc_ctx->wl_k;  /* "Miner elementary", if k == k2 */
-    rfc_ctx->wl_omission                    =  0.0;            /* No omission per default */
-    rfc_ctx->wl_q                           =  fabs(k) - 1;    /* Default value for fatigue strength depression*/
-#endif /*!RFC_MINIMAL*/
-}
 
 
 /**
