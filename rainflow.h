@@ -221,18 +221,14 @@ enum
 #endif /*RFC_TP_SUPPORT*/
 };
 
-
 #if !RFC_MINIMAL
-/* RFC_rp_damage */
+//!
 enum
 {
-    RFC_RP_DAMAGE_ELEMENTAR,
-    RFC_RP_DAMAGE_ORIGINAL,
-    RFC_RP_DAMAGE_MODIFIZIERT,
-    RFC_RP_DAMAGE_KONSEQUENT,
+    RFC_RP_DAMAGE_CALC_TYPE_DEFAULT = 0,
+    RFC_RP_DAMAGE_CALC_TYPE_CONSEQUENT,
 };
 #endif /*!RFC_MINIMAL*/
-
     
 /* Memory allocation functions typedef */
 typedef void * ( *rfc_mem_alloc_fcn_t )( void *, size_t num, size_t size, int aim );
@@ -268,8 +264,8 @@ bool    RFC_rfm_damage        ( void *ctx, unsigned from_first, unsigned from_la
 bool    RFC_lc_from_rfm       ( void *ctx, RFC_counts_type *lc, RFC_value_type *level, const RFC_counts_type *rfm, int flags );
 bool    RFC_lc_from_residue   ( void *ctx, RFC_counts_type *lc, RFC_value_type *level, int flags );
 bool    RFC_rp_from_rfm       ( void *ctx, RFC_counts_type *rp, RFC_value_type *class_means, const RFC_counts_type *rfm );
-double  RFC_damage_from_rp    ( void *ctx, const RFC_counts_type *rp, bool mk );
-double  RFC_damage_from_rfm   ( void *ctx, const RFC_counts_type *rfm );
+bool    RFC_damage_from_rp    ( void *ctx, const RFC_counts_type *rp, const RFC_value_type *Sa, double *damage, int rp_calc_type );
+bool    RFC_damage_from_rfm   ( void *ctx, const RFC_counts_type *rfm, double *damage );
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
 bool    RFC_tp_init           ( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
@@ -284,13 +280,13 @@ bool    RFC_dh_init           ( void *ctx, double *dh, size_t dh_cap, bool is_st
 #if RFC_AT_SUPPORT
 bool    RFC_at_init           ( void *ctx, const double *Sa, const double *Sm, unsigned count, 
                                            double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
-double  RFC_at_transform      ( void *ctx, double Sa, double Sm );
+bool    RFC_at_transform      ( void *ctx, double Sa, double Sm, double *Sa_transformed );
 #endif /*RFC_AT_SUPPORT*/
 
 #if RFC_USE_DELEGATES
 /* Delegates typedef */
 typedef  void                ( *rfc_cycle_find_fcn_t )    ( rfc_ctx_s *, int flags );
-typedef  double              ( *rfc_damage_calc_fcn_t )   ( rfc_ctx_s *, unsigned from_class, unsigned to_class, double *Sa_ret );
+typedef  bool                ( *rfc_damage_calc_fcn_t )   ( rfc_ctx_s *, unsigned from_class, unsigned to_class, double *damage, double *Sa_ret );
 typedef  bool                ( *rfc_finalize_fcn_t )      ( rfc_ctx_s *, int residual_methods );
 typedef  rfc_value_tuple_s * ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, const rfc_value_tuple_s * );
 #if RFC_TP_SUPPORT
@@ -301,7 +297,7 @@ typedef  bool                ( *rfc_tp_prune_fcn_t )      ( rfc_ctx_s *, size_t,
 typedef  void                ( *rfc_spread_damage_fcn_t ) ( rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags );
 #endif /*RFC_DH_SUPPORT*/
 #if RFC_AT_SUPPORT
-typedef  double              ( *rfc_at_transform_fcn_t )  ( rfc_ctx_s *, double Sa, double Sm );
+typedef  bool                ( *rfc_at_transform_fcn_t )  ( rfc_ctx_s *, double Sa, double Sm, double *Sa_transformed );
 #endif /*RFC_AT_SUPPORT*/
 #endif /*RFC_USE_DELEGATES*/
 
@@ -360,6 +356,8 @@ typedef struct rfc_ctx
         RFC_ERROR_NOERROR,                                          /**< No error */
         RFC_ERROR_INVARG,                                           /**< Invalid arguments passed */
         RFC_ERROR_MEMORY,                                           /**< Error on memory allocation */
+        RFC_ERROR_AT,                                               /**< Error while amplitude transformation */
+        RFC_ERROR_LUT,                                              /**< Error while accessing look up tables */
     }                                   error;                      /**< Error code */
 
 #if !RFC_MINIMAL
