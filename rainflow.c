@@ -228,14 +228,13 @@ static RFC_value_type       value_delta                         ( RFC_value_type
  * @brief      Initialization (rainflow context).
  *
  * @param      ctx           The rainflow context
- * @param[in]  class_count   The class count
- * @param[in]  class_width   The class width
- * @param[in]  class_offset  The class offset
- * @param[in]  hysteresis    The hysteresis
-#if RFC_TP_SUPPORT 
- * @param[in]  tp            Pointer to turning points buffer
- * @param[in]  tp_cap        Number of turning points in buffer
-#endif
+ * @param      class_count   The class count
+ * @param      class_width   The class width
+ * @param      class_offset  The class offset
+ * @param      hysteresis    The hysteresis #if RFC_TP_SUPPORT
+ * @param      flags         The flags
+ * @param      tp      Pointer to turning points buffer
+ * @param      tp_cap  Number of turning points in buffer #endif
  *
  * @return     true on success
  */
@@ -443,9 +442,9 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
  * @brief      Initialize tp buffer
  *
  * @param      ctx        The rainflow context
- * @param[out] tp         The buffer for tp
- * @param[in]  tp_cap     The tp capability
- * @param[in]  is_static  Indicates if tp is static
+ * @param      tp         The buffer for tp
+ * @param      tp_cap     The tp capability
+ * @param      is_static  Indicates if tp is static
  *
  * @return     true on success
  */
@@ -473,6 +472,16 @@ bool RFC_tp_init( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_stati
 }
 
 
+/**
+ * @brief      Initialize autoprune parameters
+ *
+ * @param      ctx        The rainflow context
+ * @param      autoprune  The flag for autopruning
+ * @param      size       The size
+ * @param      threshold  The threshold
+ *
+ * @return     true on success
+ */
 bool RFC_tp_init_autoprune( void *ctx, bool autoprune, size_t size, size_t threshold )
 {
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
@@ -499,9 +508,9 @@ bool RFC_tp_init_autoprune( void *ctx, bool autoprune, size_t size, size_t thres
  * @brief      Drop turning points from storage, to avoid memory excess
  *
  * @param      ctx    The rainflow context
- * @param[in]  limit  The excepted number of points left in turning points
+ * @param      limit  The excepted number of points left in turning points
  *                    storage (May be more, if residuals aren't neglected)
- * @param[in]  flags  The flags (see RFC_FLAGS_TPPRUNE_...)
+ * @param      flags  The flags (see RFC_FLAGS_TPPRUNE_...)
  *
  * @return     true on success
  */
@@ -638,9 +647,9 @@ bool RFC_tp_prune( void *ctx, size_t limit, int flags )
  * @brief      Initialize damage history storage
  *
  * @param      ctx        The rainflow context
- * @param[out] dh         The storage buffer
- * @param[in]  dh_cap     The capacity of dh
- * @param[in]  is_static  true, if dh is static and should not be freed
+ * @param      dh         The storage buffer
+ * @param      dh_cap     The capacity of dh
+ * @param      is_static  true, if dh is static and should not be freed
  *
  * @return     true on success
  */
@@ -674,16 +683,16 @@ bool RFC_dh_init( void *ctx, double *dh, size_t dh_cap, bool is_static )
  * @brief      Initialize amplitude transformation
  *
  * @param      ctx        The rainflow context
- * @param[in]  Sa         The reference curve vector, amplitude part
- * @param[in]  Sm         The reference curve vector, mean load part. If Sa and
+ * @param      Sa         The reference curve vector, amplitude part
+ * @param      Sm         The reference curve vector, mean load part. If Sa and
  *                        Sm_norm are NULL, the standard (FKM) is applied
- * @param[in]  count      The capacity of Sa and Sm
- * @param[in]  M          The mean stress sensitivity
- * @param[in]  Sm_rig     The mean load applied on the test rig
- * @param[in]  R_rig      The mean load ratio applied on the test rig
- * @param[in]  R_pinned   true, if R is constant on test rig (R_rig is used).
+ * @param      count      The capacity of Sa and Sm
+ * @param      M          The mean stress sensitivity
+ * @param      Sm_rig     The mean load applied on the test rig
+ * @param      R_rig      The mean load ratio applied on the test rig
+ * @param      R_pinned   true, if R is constant on test rig (R_rig is used).
  *                        false if Sm is constant on test rig (Sm_rig is used)
- * @param[in]  symmetric  true if Haigh diagram is symmetric at Sa(R=-1)
+ * @param      symmetric  true if Haigh diagram is symmetric at Sa(R=-1)
  *
  * @return     true on success
  */
@@ -928,7 +937,7 @@ bool RFC_deinit( void *ctx )
  *
  * @param      ctx         The rainflow context
  * @param[in]  data        The data
- * @param[in]  data_count  The data count
+ * @param      data_count  The data count
  *
  * @return     true on success
  */
@@ -966,13 +975,13 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
 
 #if !RFC_MINIMAL
 /**
- * @brief      Feed counting algorithm with data tuples.
+ * @brief         Feed counting algorithm with data tuples.
  *
- * @param      ctx         The rainflow context
- * @param[in]  data        The data tuples
- * @param[in]  data_count  The data count
+ * @param         ctx         The rainflow context
+ * @param[in,out] data        The data tuples
+ * @param         data_count  The data count
  *
- * @return     true on success
+ * @return        true on success
  */
 bool RFC_feed_tuple( void *ctx, rfc_value_tuple_s *data, size_t data_count )
 {
@@ -1005,7 +1014,7 @@ bool RFC_feed_tuple( void *ctx, rfc_value_tuple_s *data, size_t data_count )
  * @brief      Finalize pending counts and turning point storage.
  *
  * @param      ctx              The rainflow context
- * @param[in]  residual_method  The residual method (RFC_RES_...)
+ * @param      residual_method  The residual method (RFC_RES_...)
  *
  * @return     true on success
  */
@@ -1089,13 +1098,13 @@ bool RFC_finalize( void *ctx, int residual_method )
 
 #if !RFC_MINIMAL
 /**
- * @brief         Get the rainflow matrix as sparse elements
+ * @brief      Get the rainflow matrix as sparse elements
  *
- * @param         ctx     The rainflow context
- * @param[in,out] buffer  The elements buffer (may be NULL)
- * @param[in,out] count   The number of elements in buffer
+ * @param      ctx     The rainflow context
+ * @param[out] buffer  The elements buffer (may be NULL)
+ * @param[out] count   The number of elements in buffer
  *
- * @return        true on success
+ * @return     true on success
  */
 bool RFC_rfm_get( void *ctx, rfc_rfm_element_s **buffer, unsigned *count )
 {
@@ -1174,8 +1183,8 @@ bool RFC_rfm_get( void *ctx, rfc_rfm_element_s **buffer, unsigned *count )
  *
  * @param      ctx       The rainflow context
  * @param[in]  buffer    The elements buffer
- * @param[in]  count     The number of elements in buffer
- * @param[in]  add_only  Counts are added if set to true
+ * @param      count     The number of elements in buffer
+ * @param      add_only  Counts are added if set to true
  *
  * @return     true on success
  */
@@ -1236,8 +1245,8 @@ bool RFC_rfm_set( void *ctx, const rfc_rfm_element_s *buffer, unsigned count, bo
  * @brief      Get counts of a single element from the rainflow matrix
  *
  * @param      ctx       The rainflow context
- * @param[in]  from_val  The cycles start value
- * @param[in]  to_val    The cycles target value
+ * @param      from_val  The cycles start value
+ * @param      to_val    The cycles target value
  * @param[out] count     The corresponding value from the matrix element
  *
  * @return     true on success
@@ -1291,10 +1300,10 @@ bool RFC_rfm_peek( void *ctx, RFC_value_type from_val, RFC_value_type to_val, RF
  * @brief      Set (or increment) one matrix value of the rainflow matrix
  *
  * @param      ctx       The rainflow context
- * @param[in]  from_val  The cycles start value
- * @param[in]  to_val    The cycles target value
- * @param[in]  count     The count value for the matrix element
- * @param[in]  add_only  Value is added if set to true
+ * @param      from_val  The cycles start value
+ * @param      to_val    The cycles target value
+ * @param      count     The count value for the matrix element
+ * @param      add_only  Value is added if set to true
  *
  * @return     true on success
  */
@@ -1351,10 +1360,10 @@ bool RFC_rfm_poke( void *ctx, RFC_value_type from_val, RFC_value_type to_val, RF
  * @brief      Add cycles of a rainflow matrix region
  *
  * @param      ctx         The rainflow context
- * @param[in]  from_first  The first start class (row)
- * @param[in]  from_last   The last start class (row)
- * @param[in]  to_first    The first target class (col)
- * @param[in]  to_last     The last target class (col)
+ * @param      from_first  The first start class (row)
+ * @param      from_last   The last start class (row)
+ * @param      to_first    The first target class (col)
+ * @param      to_last     The last target class (col)
  * @param      count       The sum of the matrix region
  *
  * @return     true on success
@@ -1413,14 +1422,15 @@ bool RFC_rfm_count( void *ctx, unsigned from_first, unsigned from_last, unsigned
 
 
 /**
- * @brief      Calculates the sum of (pseudo) damages for a rainflow matrix region
+ * @brief      Calculates the sum of (pseudo) damages for a rainflow matrix
+ *             region
  *
  * @param      ctx         The rainflow context
- * @param[in]  from_first  The first start class (row)
- * @param[in]  from_last   The last start class (row)
- * @param[in]  to_first    The first target class (col)
- * @param[in]  to_last     The last target class (col)
- * @param      damage      The result (sum)
+ * @param      from_first  The first start class (row)
+ * @param      from_last   The last start class (row)
+ * @param      to_first    The first target class (col)
+ * @param      to_last     The last target class (col)
+ * @param[out] damage      The result (sum)
  *
  * @return     true on success
  */
@@ -1491,7 +1501,7 @@ bool RFC_rfm_damage( void *ctx, unsigned from_first, unsigned from_last, unsigne
  * @param[out] counts  The histogram
  * @param[out] level   The corresponding level, may be NULL
  * @param[in]  rfm     The rainflow matrix, max be NULL
- * @param[in]  flags   The flags
+ * @param      flags   The flags
  *
  * @return     true on success
  */
@@ -1563,9 +1573,10 @@ bool RFC_lc_from_rfm( void *ctx, RFC_counts_type *counts, RFC_value_type *level,
  * Calculate level crossing counts from rainflow matrix, write results to lc
  * histogram buffer.
  *
- * @param      rfc_ctx  The rainflow context
- * @param[out] lc       The buffer for LC histogram
- * @param[in]  flags    The flags
+ * @param      ctx    The rainflow context
+ * @param[out] lc     The buffer for LC histogram
+ * @param[out] level  The buffer for LC upper class borders
+ * @param      flags  The flags
  *
  * @return     true on success
  */
@@ -1650,8 +1661,9 @@ bool RFC_lc_from_residue( void *ctx, RFC_counts_type* lc, RFC_value_type *level,
  * @brief      Generate range pair histogram from rainflow matrix
  *
  * @param      ctx          The rainflow context
- * @param[out] counts       The counts
- * @param[out] class_means  The class means, may be NULL
+ * @param[out] counts       The buffer for counts
+ * @param[out] class_means  The buffer for class means, may be NULL
+ * @param[in]  rfm          The rfm
  *
  * @return     true on success
  */
@@ -1711,11 +1723,11 @@ bool RFC_rp_from_rfm( void *ctx, RFC_counts_type *counts, RFC_value_type *class_
 /**
  * @brief      Calculate the damage from a range pair histogram
  *
- * @param      ctx     The rainflow context
- * @param      counts  The counts, may be NULL
- * @param      Sa      The amplitudes, may be NULL
- * @param[out] damage  The damage
- * @param[in]  mk      true, to get damage from "Miner consequent" approach
+ * @param      ctx           The rainflow context
+ * @param[in]  counts        The counts, may be NULL
+ * @param[in]  Sa            The buffer for amplitudes, may be NULL
+ * @param[out] damage        The buffer for damage
+ * @param      rp_calc_type  The rp calculate type (RFC_RP_DAMAGE_CALC_TYPE_*)
  *
  * @return     true on success
  */
@@ -1828,7 +1840,7 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
  * @brief      Calculate the pseudo damage from rainflow matrix
  *
  * @param      ctx     The rainflow context
- * @param      rfm     The rainflow matrix, max be NULL
+ * @param[in]  rfm     The rainflow matrix, max be NULL
  * @param[out] damage  The damage
  *
  * @return     true on success
@@ -1895,8 +1907,8 @@ bool RFC_damage_from_rfm( void *ctx, const RFC_counts_type *rfm, double *damage 
  *             account.
  *
  * @param      ctx             The rainflow context
- * @param[in]  Sa              Amplitude
- * @param[in]  Sm              Mean load
+ * @param      Sa              Amplitude
+ * @param      Sm              Mean load
  * @param[out] Sa_transformed  Transformed amplitude Sa
  *
  * @return     true on success
@@ -2171,16 +2183,15 @@ void RFC_clear_lut( rfc_ctx_s *rfc_ctx )
  * @brief      Initialize Woehler parameters
  *
  * @param      rfc_ctx  The rfc context
- * @param[in]  sd       Amplitude "SD"
- * @param[in]  nd       Cycles "ND"
- * @param[in]  k        Slope "k"
+ * @param      sd       Amplitude "SD"
+ * @param      nd       Cycles "ND"
+ * @param      k        Slope "k"
  */
 static
 void RFC_wl_init( rfc_ctx_s *rfc_ctx, double sd, double nd, double k )
 {
     assert( rfc_ctx );
-
-    /* Woehler curve (fictive) */
+ /* Woehler curve (fictive) */
     rfc_ctx->wl_sd                          =  sd;
     rfc_ctx->wl_nd                          =  nd;
     rfc_ctx->wl_k                           = -fabs(k);
@@ -2198,7 +2209,7 @@ void RFC_wl_init( rfc_ctx_s *rfc_ctx, double sd, double nd, double k )
  *
  * @param      rfc_ctx  The rainflow context
  * @param[in]  pt       The data tuple
- * @param[in]  flags    The flags
+ * @param      flags    The flags
  *
  * @return     true on success
  */
@@ -2453,7 +2464,7 @@ bool RFC_feed_finalize( rfc_ctx_s *rfc_ctx )
  *
  * @param         rfc_ctx     The rainflow context
  * @param[in,out] tp_interim  The interim turning point (or NULL)
- * @param[in]     flags       Only flag RFC_FLAGS_ENFORCE_MARGIN encounters
+ * @param         flags       Only flag RFC_FLAGS_ENFORCE_MARGIN encounters
  *
  * @return        true on success
  */
@@ -2506,7 +2517,7 @@ bool RFC_feed_finalize_tp( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *tp_interim, in
  * @brief      Finalize HCM algorithm, copy residue.
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  flags    The flags
+ * @param      flags    The flags
  *
  * @return     true on success
  */
@@ -2552,7 +2563,7 @@ bool RFC_feed_finalize_hcm( rfc_ctx_s *rfc_ctx, int flags )
  * @brief      Finalize pending counts, ignore residue.
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  flags    The flags
+ * @param      flags    The flags
  *
  * @return     true on success
  */
@@ -2572,7 +2583,7 @@ bool RFC_finalize_res_ignore( rfc_ctx_s *rfc_ctx, int flags )
  * @brief      Finalize pending counts, discard residue.
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  flags    The flags
+ * @param      flags    The flags
  *
  * @return     true on success
  */
@@ -2600,8 +2611,8 @@ bool RFC_finalize_res_discard( rfc_ctx_s *rfc_ctx, int flags )
  *             RF-matrix and pseudo damage and discard residue.
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  weight   The weight for closed cycles
- * @param[in]  flags    The flags
+ * @param      weight   The weight for closed cycles
+ * @param      flags    The flags
  *
  * @return     true on success
  */
@@ -2645,7 +2656,7 @@ bool RFC_finalize_res_weight_cycles( rfc_ctx_s *rfc_ctx, RFC_counts_type weight,
  * @brief      Finalize pending counts to fit HCM results.
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  flags    The flags
+ * @param      flags    The flags
  *
  * @return     true on success
  */
@@ -2702,7 +2713,7 @@ bool RFC_finalize_res_clormann_seeger( rfc_ctx_s *rfc_ctx, int flags )
  * @brief      Finalize pending counts, DIN method.
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  flags    The flags
+ * @param      flags    The flags
  *
  * @return     true on success
  */
@@ -2808,7 +2819,7 @@ bool RFC_finalize_res_rp_DIN45667( rfc_ctx_s *rfc_ctx, int flags )
  * @brief      Finalize pending counts, repeated residue method.
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  flags    The flags
+ * @param      flags    The flags
  *
  * @return     true on success
  */
@@ -2879,15 +2890,15 @@ bool RFC_finalize_res_repeated( rfc_ctx_s *rfc_ctx, int flags )
 
 
 /**
- * @brief      Backup/restore of residue
+ * @brief         Backup/restore of residue
  *
- * @param      rfc_ctx      The rainflow context
- * @param[out] residue      The copy of the current residue
- * @param[out] residue_cap  The capacity of the given residue
- * @param[out] residue_cnt  The number of points in the given residue
- * @param[in]  restore      true->restore, false->backup
+ * @param         rfc_ctx      The rainflow context
+ * @param[in,out] residue      The copy of the current residue
+ * @param[out]    residue_cap  The capacity of the given residue
+ * @param[out]    residue_cnt  The number of points in the given residue
+ * @param         restore      true->restore, false->backup
  *
- * @return     true on success
+ * @return        true on success
  */
 static
 bool RFC_residue_exchange( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s **residue, size_t *residue_cap, size_t *residue_cnt, bool restore )
@@ -2934,8 +2945,8 @@ bool RFC_residue_exchange( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s **residue, size
  * @brief      Remove items (points) from the residue
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  index    The item position in residue, base 0
- * @param[in]  count    The number of elements to remove
+ * @param      index    The item position in residue, base 0
+ * @param      count    The number of elements to remove
  */
 static
 void RFC_residue_remove_item( rfc_ctx_s *rfc_ctx, size_t index, size_t count )
@@ -2980,8 +2991,8 @@ void RFC_residue_remove_item( rfc_ctx_s *rfc_ctx, size_t index, size_t count )
  * @brief      Calculate pseudo damage for one cycle with given amplitude Sa
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  Sa       The amplitude
- * @param      damage   The damage
+ * @param      Sa       The amplitude
+ * @param[out] damage   The damage
  *
  * @return     true on success
  */
@@ -3045,7 +3056,7 @@ bool RFC_damage_calc_amplitude( rfc_ctx_s *rfc_ctx, double Sa, double *damage )
  *             "R"
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  R        Load ratio (Su/So)
+ * @param      R        Load ratio (Su/So)
  * @param[out] Sm_norm  Normalized mean load
  *
  * @return     true on success
@@ -3075,7 +3086,7 @@ bool RFC_at_R_to_Sm_norm( rfc_ctx_s *rfc_ctx, double R, double *Sm_norm )
  *             fatigue strength (Haigh-diagram)
  *
  * @param      rfc_ctx      The rainflow context
- * @param[in]  Sm_norm      Mean load, normalized (Sm/Sa)
+ * @param      Sm_norm      Mean load, normalized (Sm/Sa)
  * @param[out] alleviation  Alleviation factor on reference curve
  *
  * @return     true on success
@@ -3151,9 +3162,9 @@ bool RFC_at_alleviation( rfc_ctx_s *rfc_ctx, double Sm_norm, double *alleviation
  * @brief      Calculate fictive damage for one closed (full) cycle.
  *
  * @param      rfc_ctx     The rainflow context
- * @param[in]  class_from  The starting class
- * @param[in]  class_to    The ending class
- * @param      damage      The pseudo damage value for the closed cycle
+ * @param      class_from  The starting class
+ * @param      class_to    The ending class
+ * @param[out] damage      The pseudo damage value for the closed cycle
  * @param[out] Sa_ret      The amplitude, may be NULL
  *
  * @return     true on success
@@ -3286,8 +3297,8 @@ void RFC_damage_lut_init( rfc_ctx_s *rfc_ctx )
  *             look-up table.
  *
  * @param      rfc_ctx     The rainflow context
- * @param[in]  class_from  The starting class
- * @param[in]  class_to    The ending class
+ * @param      class_from  The starting class
+ * @param      class_to    The ending class
  * @param[out] damage      The pseudo damage value for the closed cycle
  * @param[out] Sa_ret      The amplitude (-1 if not available), may be NULL
  *
@@ -3517,7 +3528,7 @@ rfc_value_tuple_s * RFC_feed_filter_pt( rfc_ctx_s *rfc_ctx, const rfc_value_tupl
  * @brief      Rainflow counting core, assumes
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  flags    The flags
+ * @param      flags    The flags
  */
 static
 void RFC_cycle_find( rfc_ctx_s *rfc_ctx, int flags )
@@ -3571,7 +3582,7 @@ void RFC_cycle_find( rfc_ctx_s *rfc_ctx, int flags )
  * @brief      Rainflow counting core (4-point-method).
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  flags    The flags
+ * @param      flags    The flags
  */
 static
 void RFC_cycle_find_4ptm( rfc_ctx_s *rfc_ctx, int flags )
@@ -3630,7 +3641,7 @@ void RFC_cycle_find_4ptm( rfc_ctx_s *rfc_ctx, int flags )
  * @brief      Rainflow counting core (HCM method).
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  flags    The flags
+ * @param      flags    The flags
  */
 static
 void RFC_cycle_find_hcm( rfc_ctx_s *rfc_ctx, int flags )
@@ -3733,7 +3744,7 @@ label_2:
  * @brief      Processes LC count (level crossing)
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  flags    Control flags
+ * @param      flags    Control flags
  */
 static
 void RFC_cycle_process_lc( rfc_ctx_s *rfc_ctx, int flags )
@@ -3756,7 +3767,7 @@ void RFC_cycle_process_lc( rfc_ctx_s *rfc_ctx, int flags )
  * @param[in,out] from     The starting data point
  * @param[in,out] to       The ending data point
  * @param[in,out] next     The point next after "to"
- * @param[in]     flags    Control flags
+ * @param         flags    Control flags
  */
 static
 void RFC_cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags )
@@ -3983,7 +3994,7 @@ bool RFC_tp_add( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *tp )
  * @brief      Lock turning points queue
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  do_lock  Turning point storage will be locked, if true
+ * @param      do_lock  Turning point storage will be locked, if true
  */
 static 
 void RFC_tp_lock( rfc_ctx_s *rfc_ctx, bool do_lock )
@@ -3999,8 +4010,10 @@ void RFC_tp_lock( rfc_ctx_s *rfc_ctx, bool do_lock )
  * @brief      Restart counting with given points from turning points history
  *
  * @param      rfc_ctx          The rainflow context
- * @param[in]  new_hysteresis   The new hysteresis
+ * @param      new_hysteresis   The new hysteresis
  * @param[in]  new_class_param  The new class parameters
+ *
+ * @return     true on success
  */
 static
 bool RFC_tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc_class_param_s *new_class_param )
@@ -4077,7 +4090,7 @@ bool RFC_tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc
  * @param[in,out] from     The start turning point
  * @param[in,out] to       The end turning point
  * @param[in,out] next     The next turning point after @a to
- * @param[in]     flags    The flags
+ * @param         flags    The flags
  *
  * @return        true on success
  */
@@ -4252,7 +4265,7 @@ bool RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
  * @brief      Raises an error
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  error    The error identifier
+ * @param      error    The error identifier
  *
  * @return     false on error
  */
@@ -4279,8 +4292,8 @@ bool RFC_error_raise( rfc_ctx_s *rfc_ctx, int error )
  * @brief      Returns the unsigned difference of two values, sign optionally
  *             returned as -1 or 1.
  *
- * @param[in]  from      Left hand value
- * @param[in]  to        Right hand value
+ * @param      from_val  Left hand value
+ * @param      to_val    Right hand value
  * @param[out] sign_ptr  Pointer to catch sign (may be NULL)
  *
  * @return     Returns the absolute difference of given values
@@ -4303,9 +4316,9 @@ RFC_value_type value_delta( RFC_value_type from_val, RFC_value_type to_val, int 
  * @brief      (Re-)Allocate or free memory
  *
  * @param      ptr   Previous data pointer, or NULL, if unset
- * @param[in]  num   The number of elements
- * @param[in]  size  The size of one element in bytes
- * @param[in]  aim   The aim
+ * @param      num   The number of elements
+ * @param      size  The size of one element in bytes
+ * @param      aim   The aim
  *
  * @return     New memory pointer or NULL if either num or size is 0
  */
@@ -4352,7 +4365,7 @@ void RFC_class_param_set( rfc_ctx_s *rfc_ctx, const rfc_class_param_s *class_par
  * @brief      Get class parameter.
  *
  * @param      rfc_ctx      The rainflow context
- * @param[in]  class_param  The class parameter
+ * @param[out] class_param  The class parameter
  */
 static
 void RFC_class_param_get( rfc_ctx_s *rfc_ctx, rfc_class_param_s *class_param )

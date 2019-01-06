@@ -222,7 +222,7 @@ enum
 };
 
 #if !RFC_MINIMAL
-//!
+/* See RFC_damage_from_rp() */
 enum
 {
     RFC_RP_DAMAGE_CALC_TYPE_DEFAULT     = 0,
