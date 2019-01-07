@@ -1136,10 +1136,13 @@ TEST RFC_MINER_CONSEQUENT( void )
 
         ctx.full_inc = 1;
         ASSERT( RFC_damage_from_rp( &ctx, Sa_counts, Sa, &D_mk, RFC_RP_DAMAGE_CALC_TYPE_CONSEQUENT /*rp_calc_type*/ ) );
-        A = D_mk; //h_sum / D_mk / N_bar;
 
-        GREATEST_FPRINTF( GREATEST_STDOUT, "%g\n", A );
-        //GREATEST_ASSERT_EQ_FMT( A_expected[i], A, "%8.3f" );
+        /* A is the difference from variable-amplitude to constant-amplitude fatigue life for Sa_hat.
+           (Sa_hat is the largest given Sa in histogram) */
+        A = h_sum / D_mk / N_bar;
+
+        /* Check with the proposed values given in [6] */
+        GREATEST_ASSERT_IN_RANGE( A_expected[i], A, 0.1 );
 
         ASSERT( RFC_deinit( &ctx ) );
     }

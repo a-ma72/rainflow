@@ -474,6 +474,8 @@ bool RFC_wl_init( void *ctx, double sd, double nd, double k )
     rfc_ctx->internal.mk_q                  =  rfc_ctx->wl_q;
     rfc_ctx->internal.mk_sd                 =  rfc_ctx->wl_sd;
 #endif /*!RFC_MINIMAL*/
+
+    return true;
 }
 
 
@@ -1764,9 +1766,9 @@ bool RFC_rp_from_rfm( void *ctx, RFC_counts_type *counts, RFC_value_type *class_
  * @brief      Calculate the damage from a range pair histogram
  *
  * @param      ctx           The rainflow context
- * @param[in]  counts        The counts, may be NULL
+ * @param[in]  counts        The counts, may be NULL (Mind that full_inc describes 1 cycle!)
  * @param[in]  Sa            The buffer for amplitudes, may be NULL
- * @param[out] damage        The buffer for damage
+ * @param[out] damage        The buffer for cumulated damage
  * @param      rp_calc_type  The rp calculate type (RFC_RP_DAMAGE_CALC_TYPE_*)
  *
  * @return     true on success
@@ -1775,7 +1777,7 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
 {
     const unsigned    from = 0;
           unsigned    class_count;
-          double      D;
+          double      D;             /* Cumulative damage */
           int         i, j;
 
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
@@ -1784,7 +1786,7 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
     {
         return RFC_error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
-    
+
     if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
     {
         return false;
@@ -1802,48 +1804,54 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
         return false;
     }
 
+    /* Sa must be sorted in ascending order */
+    for( i = 1; Sa && i < (int)class_count; i++ )
+    {
+        if( Sa[i] < Sa[i-1] )
+        {
+            return RFC_error_raise( rfc_ctx, RFC_ERROR_INVARG );
+        }
+    }
+
     D = 0.0;
 
 #if !RFC_MINIMAL
     /* Calculate the "Miner Consequent" approach */
     if( rp_calc_type != RFC_RP_DAMAGE_CALC_TYPE_DEFAULT )
     {
-        double q  = rfc_ctx->internal.mk_q;
-        double Sd = rfc_ctx->wl_sd;             /* Fatigue strength SD for the unimpaired(!) part */
-        double Sj = Sd;                      
+        double q     = rfc_ctx->internal.mk_q;  /* 
+        double Sd    = rfc_ctx->wl_sd;          /* Fatigue strength SD for the unimpaired(!) part */
+        double Sj    = Sd;                      /* Current fatigue strength, impacted part */
+        double D_inv = 0.0;                     /* The inverse damage */
 
         for( j = (int)class_count - 1; j >= -1; j-- )
         {
-            double D_j = 0.0;
-            double Sa_j;
-            double weight;
+            double D_j = 0.0;  /* Damage for partial histogram */
+            double Sa_j;       /* New fatigue strength */
+            double weight;     /* Weight for partial histogram */
 
+            /* Get the new degraded fatigue strength in Sa_j */
             if( j >= 0 )
             {
-                //if( counts[j] > 0 )
-                {
-                    Sa_j = Sa ? Sa[j] : ( rfc_ctx->class_width * j / 2.0 );
-                }
-                //else continue;
+                Sa_j = Sa ? Sa[j] : ( rfc_ctx->class_width * j / 2.0 );
             }
             else
             {
-                if( Sa[0] > 0.0 )
-                {
-                    Sa_j = 0.0;
-                }
-                else continue;
+                Sa_j = 0.0;
             }
 
             /* Forward until amplitude is below fatigue strength SD for the unimpaired part */
-            if( Sa_j >= Sd && Sa_j > 0.0 ) continue;
+            if( Sa_j >= Sd && Sd > 0.0 ) continue;
 
             /* Weighted damage
                [6] chapter 3.2.9, formula 3.2-65 */
             weight = pow( Sj / Sd, q ) - pow( Sa_j / Sd, q );
             Sj     = Sa_j;
 
-            for( i = (int)class_count - 1; i > j && i >= 0; i-- )
+            if( weight <= 0.0 ) continue;
+
+            /* Calculate damage for partial histogram */
+            for( i = (int)class_count - 1; i > j; i-- )
             {
                 double Sa_i = Sa ? Sa[i] : ( rfc_ctx->class_width * i / 2.0 );
                 double D_i;
@@ -1856,8 +1864,14 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
                 D_j += D_i * counts[i];
             }
 
-            D += weight * 1.0 / D_j;
+            if( D_j > 0.0 )
+            {
+                D_inv += weight / D_j;
+            }
         }
+
+        /* Get the final damage value */
+        D = 1.0 / D_inv;
     }
     else
 #endif /*!RFC_MINIMAL*/
@@ -1897,8 +1911,8 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
  * @brief      Calculate the pseudo damage from rainflow matrix
  *
  * @param      ctx     The rainflow context
- * @param[in]  rfm     The rainflow matrix, max be NULL
- * @param[out] damage  The damage
+ * @param[in]  rfm     The rainflow matrix, max be NULL (Mind that full_inc describes 1 cycle!)
+ * @param[out] damage  The buffer for cumulated damage
  *
  * @return     true on success
  */
