@@ -106,6 +106,7 @@
 #include <math.h>    /* exp(), log(), fabs() */
 #include <stdlib.h>  /* calloc(), free(), abs() */
 #include <string.h>  /* memset() */
+#include <float.h>   /* DBL_MAX */
 
 
 #ifdef MATLAB_MEX_FILE
@@ -206,6 +207,8 @@ static bool                 RFC_at_alleviation                  ( rfc_ctx_s *, d
 #if !RFC_MINIMAL
 static void                 RFC_class_param_set                 ( rfc_ctx_s *, const rfc_class_param_s * );
 static void                 RFC_class_param_get                 ( rfc_ctx_s *, rfc_class_param_s * );
+static void                 RFC_wl_param_set                    ( rfc_ctx_s *, const rfc_wl_param_s * );
+static void                 RFC_wl_param_get                    ( rfc_ctx_s *, rfc_wl_param_s * );
 #endif /*!RFC_MINIMAL*/
 static bool                 RFC_damage_calc_amplitude           ( rfc_ctx_s *, double Sa, double *damage );
 static bool                 RFC_damage_calc                     ( rfc_ctx_s *, unsigned class_from, unsigned class_to, double *damage, double *Sa_ret );
@@ -218,8 +221,9 @@ static RFC_value_type       value_delta                         ( RFC_value_type
 
 
 #define QUANTIZE( r, v )    ( (unsigned)( ((v) - (r)->class_offset) / (r)->class_width ) )
-#define CLASS_MEAN( r, c )  ( (double)( (r)->class_width * (0.5 + (c)) + (r)->class_offset ) )
-#define CLASS_UPPER( r, c ) ( (double)( (r)->class_width * (1.0 + (c)) + (r)->class_offset ) )
+#define AMPLITUDE( r, i )   ( (double)(r)->class_width * (i) / 2 )
+#define CLASS_MEAN( r, c )  ( (double)(r)->class_width * (0.5 + (c)) + (r)->class_offset )
+#define CLASS_UPPER( r, c ) ( (double)(r)->class_width * (1.0 + (c)) + (r)->class_offset )
 #define NUMEL( x )          ( sizeof(x) / sizeof(*(x)) )
 
 
@@ -230,10 +234,12 @@ static RFC_value_type       value_delta                         ( RFC_value_type
  * @param      class_count   The class count
  * @param      class_width   The class width
  * @param      class_offset  The class offset
- * @param      hysteresis    The hysteresis #if RFC_TP_SUPPORT
+ * @param      hysteresis    The hysteresis 
+ #if RFC_TP_SUPPORT
  * @param      flags         The flags
- * @param      tp      Pointer to turning points buffer
- * @param      tp_cap  Number of turning points in buffer #endif
+ * @param      tp            Pointer to turning points buffer
+ * @param      tp_cap        Number of turning points in buffer 
+ #endif
  *
  * @return     true on success
  */
@@ -378,8 +384,10 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
     rfc_ctx->internal.extrema_changed       = false;
 #endif /*RFC_GLOBAL_EXTREMA*/
 #if !RFC_MINIMAL
-    rfc_ctx->internal.mk_D                  = 0.0;
-    rfc_ctx->internal.mk_sd                 = -1;   /* Will be set to wl_sd, when mk_D changes first time */
+    /* Make a shadow copy of the Woehler curve parameters */
+    rfc_ctx->state = RFC_STATE_INIT;   /* Bypass sanity check for state in RFC_wl_init() */
+    RFC_wl_param_get( rfc_ctx, &rfc_ctx->internal.wl );
+    rfc_ctx->state = RFC_STATE_INIT0;  /* Reset state */
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
     rfc_ctx->internal.margin[0]             = nil;  /* left  margin */
@@ -463,20 +471,49 @@ bool RFC_wl_init( void *ctx, double sd, double nd, double k )
         return false;
     }
 
-/* Woehler curve (fictive) */
+/* Woehler curve */
     rfc_ctx->wl_sd                          =  sd;
     rfc_ctx->wl_nd                          =  nd;
     rfc_ctx->wl_k                           = -fabs(k);
 #if !RFC_MINIMAL
+    rfc_ctx->wl_sx                          =  sd;
+    rfc_ctx->wl_nx                          =  nd;
     rfc_ctx->wl_k2                          =  rfc_ctx->wl_k;  /* "Miner elementary", if k == k2 */
-    rfc_ctx->wl_q                           =  fabs(k) - 1;    /* Default value for fatigue strength depression*/
+    rfc_ctx->wl_q                           =  fabs(k) - 1;    /* Default value for fatigue strength depression */
     rfc_ctx->wl_omission                    =  0.0;            /* No omission per default */
-    rfc_ctx->internal.mk_q                  =  rfc_ctx->wl_q;
-    rfc_ctx->internal.mk_sd                 =  rfc_ctx->wl_sd;
+
+    /* Make a shadow copy of the Woehler parameters */
+    RFC_wl_param_get( rfc_ctx, &rfc_ctx->internal.wl );
 #endif /*!RFC_MINIMAL*/
 
     return true;
 }
+
+
+/**
+ * @brief      Initialize Woehler curve
+ *
+ * @param      ctx       The rainflow context
+ * @param[in]  wl_param  The parameter set
+ *
+ * @return     true on success
+ */
+#if !RFC_MINIMAL
+bool RFC_wl_init2( void *ctx, const rfc_wl_param_s* wl_param )
+{
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( !wl_param || !RFC_wl_init( ctx, wl_param->sd, wl_param->nd, wl_param->k ) )
+    {
+        return false;
+    }
+
+    rfc_ctx->wl_k2                          = -fabs( wl_param->k2 );      /* "Miner elementary", if k == k2 */
+    rfc_ctx->wl_omission                    =  wl_param->omission;
+
+    return true;
+}
+#endif /*!RFC_MINIMAL*/
 
 
 #if RFC_TP_SUPPORT
@@ -1537,6 +1574,55 @@ bool RFC_rfm_damage( void *ctx, unsigned from_first, unsigned from_last, unsigne
 
 
 /**
+ * @brief      Check the consistency of the rainflow matrix
+ *
+ * @param      rfc_ctx  The rfc context
+ *
+ * @return     true on success
+ */
+bool RFC_rfm_check( void *ctx )
+{
+    unsigned             class_count;
+    RFC_counts_type     *rfm;
+
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
+    {
+        return RFC_error_raise( rfc_ctx, RFC_ERROR_INVARG );
+    }
+    
+    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
+    {
+        return false;
+    }
+
+    class_count = rfc_ctx->class_count;
+
+    rfm = rfc_ctx->rfm;
+
+    if( !rfm || !class_count )
+    {
+        return false;
+    }
+    else
+    {
+        int i;
+
+        for( i = 0; i < (int)rfc_ctx->class_count; i++ )
+        {
+            /* Matrix diagonal must be all zero */
+            if( rfc_ctx->rfm[ i * rfc_ctx->class_count + i ] != 0 )
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+
+/**
  * @brief      Create level crossing histogram from rainflow matrix
  *
  * @param      ctx     The rainflow context
@@ -1817,12 +1903,19 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
 
 #if !RFC_MINIMAL
     /* Calculate the "Miner Consequent" approach */
-    if( rp_calc_type != RFC_RP_DAMAGE_CALC_TYPE_DEFAULT )
+    if( rp_calc_type == RFC_RP_DAMAGE_CALC_TYPE_CONSEQUENT )
     {
-        double q     = rfc_ctx->internal.mk_q;  /* 
-        double Sd    = rfc_ctx->wl_sd;          /* Fatigue strength SD for the unimpaired(!) part */
-        double Sj    = Sd;                      /* Current fatigue strength, impacted part */
-        double D_inv = 0.0;                     /* The inverse damage */
+        double q     = rfc_ctx->wl_q;   /* Fatigue strength depression exponent */
+        double Sd    = rfc_ctx->wl_sd;  /* Fatigue strength SD for the unimpaired(!) part */
+        double Nd    = rfc_ctx->wl_nd;  /* Fatigue strength cycle count ND for the unimpaired(!) part */
+        double Sj    = Sd;              /* Current fatigue strength, impacted part */
+        double D_inv = 0.0;             /* The inverse damage */
+
+        /* Omission not allowed here! */
+        if( rfc_ctx->wl_omission > 0.0 )
+        {
+            return RFC_error_raise( rfc_ctx, RFC_ERROR_INVARG );
+        }
 
         for( j = (int)class_count - 1; j >= -1; j-- )
         {
@@ -1833,7 +1926,7 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
             /* Get the new degraded fatigue strength in Sa_j */
             if( j >= 0 )
             {
-                Sa_j = Sa ? Sa[j] : ( rfc_ctx->class_width * j / 2.0 );
+                Sa_j = Sa ? Sa[j] : AMPLITUDE( rfc_ctx, j );
             }
             else
             {
@@ -1853,7 +1946,7 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
             /* Calculate damage for partial histogram */
             for( i = (int)class_count - 1; i > j; i-- )
             {
-                double Sa_i = Sa ? Sa[i] : ( rfc_ctx->class_width * i / 2.0 );
+                double Sa_i = Sa ? Sa[i] : AMPLITUDE( rfc_ctx, i );
                 double D_i;
                 
                 if( !RFC_damage_calc_amplitude( rfc_ctx, Sa_i, &D_i ) )
@@ -1875,6 +1968,7 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
     }
     else
 #endif /*!RFC_MINIMAL*/
+    if( rp_calc_type == RFC_RP_DAMAGE_CALC_TYPE_DEFAULT )
     {
         for( i = 0; i < (int)class_count; i++ )
         {
@@ -1901,6 +1995,7 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
             }
         }
     }
+    else return false;
 
     *damage = D / rfc_ctx->full_inc;
     return true;
@@ -1965,6 +2060,130 @@ bool RFC_damage_from_rfm( void *ctx, const RFC_counts_type *rfm, double *damage 
     }
 
     *damage = D / rfc_ctx->full_inc;
+    return true;
+}
+
+
+/**
+ * @brief      Calculate junction point between k and k2 for a Woehler curve
+ *
+ * @param      ctx   The rainflow context
+ * @param      s0    Any point on slope k
+ * @param      n0    Any point on slope k
+ * @param      k     Slope k
+ * @param[out] sx    Junction point between k and k2
+ * @param      nx    Junction point between k and k2
+ * @param      k2    Slope k2
+ * @param      sd    The fatigue strength
+ * @param      nd    The cycle count at sd
+ *
+ * @return     true on success
+ */
+bool RFC_wl_calc_sx( void *ctx, double s0, double n0, double k, double *sx, double nx, double k2, double sd, double nd )
+{
+    double nom, den;
+
+    k  = fabs(k);
+    k2 = fabs(k2);
+
+    if(    s0 <= 0.0    ||    n0 <= 0.0    ||
+        /* sx <= 0.0    || */ nx <= 0.0    ||
+           sd <= 0.0    ||    nd <= 0.0    ||    !sx )
+    {
+        return false;
+    }
+
+    nom = log(s0)*k + log(n0) - log(sd)*k2 - log(nd);
+    den = k - k2;
+
+    if( den == 0.0 ) return false;
+
+    *sx = exp( nom / den );
+
+    return true;
+}
+
+
+/**
+ * @brief      Calculate fatigue strength for a Woehler curve
+ *
+ * @param      ctx   The rainflow context
+ * @param      s0    Any point on slope k
+ * @param      n0    Any point on slope k
+ * @param      k     Slope k
+ * @param      sx    Junction point between k and k2
+ * @param      nx    The cycle
+ * @param      k2    Slope k2
+ * @param[out] sd    The fatigue strength
+ * @param      nd    The cycle count at sd
+ *
+ * @return     true on success
+ */
+bool RFC_wl_calc_sd( void *ctx, double s0, double n0, double k, double sx, double nx, double k2, double *sd, double nd )
+{
+    double nom, den;
+
+    k  = fabs(k);
+    k2 = fabs(k2);
+
+    if(    s0 <= 0.0    ||    n0 <= 0.0    ||
+           sx <= 0.0    ||    nx <= 0.0    ||
+        /* sd <= 0.0    || */ nd <= 0.0    ||    !sd )
+    {
+        return false;
+    }
+
+    nom = log(s0)*k + log(n0) - log(sx)*(k-k2) - log(nd);
+    den = k2;
+
+    if( den == 0.0 ) return false;
+
+    *sd = exp( nom / den );
+
+    return true;
+}
+
+
+/**
+ * @brief      Calculate the slope k2 for a Woehler curve
+ *
+ * @param      ctx   The rainflow context
+ * @param      s0    Any point on slope k
+ * @param      n0    Any point on slope k
+ * @param      k     Slope k
+ * @param      sx    Junction point between k and k2
+ * @param      nx    Junction point between k and k2
+ * @param[out] k2    Slope k2
+ * @param      sd    The fatigue strength
+ * @param      nd    The cycle count at sd
+ *
+ * @return     true on success
+ */
+bool RFC_wl_calc_k2( void *ctx, double s0, double n0, double k, double sx, double nx, double *k2, double sd, double nd )
+{
+    double nom, den;
+
+    k  = fabs(k);
+
+    if(    s0 <= 0.0    ||    n0 <= 0.0    ||
+           sx <= 0.0    ||    nx <= 0.0    ||
+           sd <= 0.0    ||    nd <= 0.0    ||    !k2 )
+    {
+        return false;
+    }
+
+    nom = ( log(s0) - log(sx) ) * k + log(n0) - log(nd);
+    den =   log(sd) - log(sx);
+
+    if( den == 0.0 )
+    {
+        *k2 = -DBL_MAX;  /* Negative infinity */
+    }
+    else
+    {
+        *k2 = -fabs( nom / den );
+    }
+
     return true;
 }
 
@@ -2173,10 +2392,6 @@ void RFC_clear_count( rfc_ctx_s *rfc_ctx )
 #endif
     rfc_ctx->internal.pos               = 0;
     rfc_ctx->internal.global_offset     = 0;
-#if !RFC_MINIMAL
-    rfc_ctx->internal.mk_D              = 0.0;
-    rfc_ctx->internal.mk_sd             = -1;   /* Will be set to wl_sd, when mk_D changes first time */
-#endif /*!RFC_MINIMAL*/
     
     rfc_ctx->pseudo_damage              = 0.0;
 
@@ -3055,6 +3270,8 @@ bool RFC_damage_calc_amplitude( rfc_ctx_s *rfc_ctx, double Sa, double *damage )
         const double ND_log = log(rfc_ctx->wl_nd);
         const double k      = rfc_ctx->wl_k;
 #if !RFC_MINIMAL
+        const double SX_log = log(rfc_ctx->wl_sx);
+        const double NX_log = log(rfc_ctx->wl_nx);
         const double k2 = rfc_ctx->wl_k2;
 #endif /*!RFC_MINIMAL*/
 
@@ -3070,16 +3287,19 @@ bool RFC_damage_calc_amplitude( rfc_ctx_s *rfc_ctx, double Sa, double *damage )
 #if !RFC_MINIMAL
             if( Sa > rfc_ctx->wl_omission )
             {
-                if( Sa > rfc_ctx->wl_sd )
+                if( Sa > rfc_ctx->wl_sx )
                 {
-                    D = exp( fabs(k)  * ( log(Sa) - SD_log ) - ND_log );
+                    /* Upper slope */
+                    D = exp( fabs(k)  * ( log(Sa) - SX_log ) - NX_log );
                 }
                 else
                 {
+                    /* Lower slope */
                     D = exp( fabs(k2) * ( log(Sa) - SD_log ) - ND_log );
                 }
             }
 #else /*RFC_MINIMAL*/
+            /* Miner elementary */
             D = exp( fabs(k)  * ( log(Sa) - SD_log ) - ND_log );
 #endif /*!RFC_MINIMAL*/
         }
@@ -3250,10 +3470,7 @@ bool RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_to
     if( class_from != class_to )
     {
 #if RFC_MINIMAL
-        double range;
-
-        range = (double)rfc_ctx->class_width * abs( (int)class_to - (int)class_from );
-        Sa    = range / 2.0;
+        Sa = fabs( (int)class_from - (int)class_to ) / 2.0 * rfc_ctx->class_width;
 
         if( !RFC_damage_calc_amplitude( rfc_ctx, Sa, &D ) )
         {
@@ -3860,7 +4077,7 @@ void RFC_cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_
         {
             double Sa_i;
             double D_i;
-            
+
             if( !RFC_damage_calc( rfc_ctx, class_from, class_to, &D_i, &Sa_i ) )
             {
                 return;
@@ -3869,30 +4086,34 @@ void RFC_cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_
             /* Adding damage due to current cycle weight */
             rfc_ctx->pseudo_damage += D_i / rfc_ctx->full_inc * rfc_ctx->curr_inc;
 #if !RFC_MINIMAL
-            if( D_i > 0.0 )
+            /* Fatigue strength Sd(D) depresses in subject to cumulative damage D.
+               Sd(D)/Sd = (1-D)^(1/q), [6] chapter 3.2.9, formula 3.2-44 and 3.2-46
+               Only cycles exceeding Sd(D) have damaging effect. */
+            if( Sa_i >= rfc_ctx->internal.wl.sd )
             {
-                if( rfc_ctx->internal.mk_sd < 0.0 )
-                {
-                    /* Initialization */
-                    rfc_ctx->internal.mk_sd = rfc_ctx->wl_sd;
-                }
+                rfc_wl_param_s wl;
+                double         D_mk;
+                double         k, q;
 
-                /* Fatigue strength Sd(D) depresses in subject to cumulative damage D.
-                   Sd(D)/Sd = (1-D)^(1/q), [6] chapter 3.2.9, formula 3.2-44
-                   Only cycles exceeding Sd(D) have damaging effect. */
-                if( Sa_i >= rfc_ctx->internal.mk_sd )
-                {
-                    double mk_D = rfc_ctx->internal.mk_D;
+                /* Backup Woehler curve parameters and use shadowed parameters */
+                RFC_wl_param_get( rfc_ctx, &wl );
+                RFC_wl_param_set( rfc_ctx, &rfc_ctx->internal.wl );
 
-                    mk_D += D_i / rfc_ctx->full_inc * rfc_ctx->curr_inc;
-                    
-                    if( mk_D > 1.0 ) mk_D = 1.0;
+                (void)RFC_damage_calc( rfc_ctx, class_from, class_to, &D_mk, &Sa_i );
 
-                    /* Depress Sd(D) */
-                    rfc_ctx->internal.mk_sd = rfc_ctx->wl_sd * pow( 1.0 - mk_D, 1.0 / rfc_ctx->internal.mk_q );
+                D_mk *= (double)rfc_ctx->curr_inc / rfc_ctx->full_inc;
 
-                    rfc_ctx->internal.mk_D = mk_D;
-                }
+                if( D_mk > 1.0 ) D_mk = 1.0;
+
+                /* Calculate new parameters for the Woehler curve, impaired part */
+                q = rfc_ctx->internal.wl.q;
+                k = fabs( rfc_ctx->internal.wl.k );
+                rfc_ctx->internal.wl.sd = wl.sd * pow( 1.0 - D_mk, 1.0 / q );
+                rfc_ctx->internal.wl.nd = wl.nd * pow( 1.0 - D_mk, -( k - q ) / q );
+                rfc_ctx->internal.wl.D  = D_mk;
+
+                /* Restore Woehler curve parameters, unimpaired part */
+                RFC_wl_param_set( rfc_ctx, &wl );
             }
 #endif /*!RFC_MINIMAL*/
         }
@@ -4427,6 +4648,49 @@ void RFC_class_param_get( rfc_ctx_s *rfc_ctx, rfc_class_param_s *class_param )
     class_param->count  = rfc_ctx->class_count;
     class_param->width  = rfc_ctx->class_width;
     class_param->offset = rfc_ctx->class_offset;
+}
+
+
+/**
+ * @brief      Set Woehler curve parameters
+ *
+ * @param      rfc_ctx   The rainflow context
+ * @param[in]  wl_param  The Woehler curve parameters
+ */
+static
+void RFC_wl_param_set( rfc_ctx_s *rfc_ctx, const rfc_wl_param_s *wl_param )
+{
+    assert( rfc_ctx && wl_param );
+    assert( rfc_ctx->state >= RFC_STATE_INIT );
+
+    rfc_ctx->wl_sd          = wl_param->sd;
+    rfc_ctx->wl_nd          = wl_param->nd;
+    rfc_ctx->wl_k           = wl_param->k;
+    rfc_ctx->wl_k2          = wl_param->k2;
+    rfc_ctx->wl_q           = wl_param->q;
+    rfc_ctx->wl_omission    = wl_param->omission;
+}
+
+
+/**
+ * @brief      Get Woehler curve parameters
+ *
+ * @param      rfc_ctx   The rainflow context
+ * @param[out] wl_param  The Woehler curve parameters
+ */
+static
+void RFC_wl_param_get( rfc_ctx_s *rfc_ctx, rfc_wl_param_s *wl_param )
+{
+    assert( rfc_ctx && wl_param );
+    assert( rfc_ctx->state >= RFC_STATE_INIT );
+
+    wl_param->sd            = rfc_ctx->wl_sd;
+    wl_param->nd            = rfc_ctx->wl_nd;
+    wl_param->k             = rfc_ctx->wl_k;
+    wl_param->k2            = rfc_ctx->wl_k2;
+    wl_param->q             = rfc_ctx->wl_q;
+    wl_param->omission      = rfc_ctx->wl_omission;
+    wl_param->D             = 0.0;
 }
 #endif /*!RFC_MINIMAL*/
 

@@ -835,13 +835,17 @@ TEST RFC_long_series( int ccnt )
                 sum += ctx.rfm[i] / ctx.full_inc;
             }
 
+            /* Check matrix sum */
             ASSERT_EQ( sum, 602.0 );
+            /* Check damage value */
             GREATEST_ASSERT_IN_RANGE( ctx.pseudo_damage, 4.8703e-16, 0.00005e-16 );
+            /* Damage must equal to damage calculated in postprocess */
             ASSERT( RFC_damage_from_rp( &ctx, NULL /*rp*/, NULL /*Sa*/, &pseudo_damage, RFC_RP_DAMAGE_CALC_TYPE_DEFAULT ) );
             GREATEST_ASSERT_IN_RANGE( pseudo_damage, 4.8703e-16, 0.00005e-16 );
             pseudo_damage = 0.0;
             ASSERT( RFC_damage_from_rfm( &ctx, NULL /*rfm*/, &pseudo_damage ) );
             GREATEST_ASSERT_IN_RANGE( pseudo_damage, 4.8703e-16, 0.00005e-16 );
+            /* Check residue */
             ASSERT_EQ( ctx.residue_cnt, 10 );
             ASSERT_EQ_FMT( ctx.residue[0].value,   0.54, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[1].value,   2.37, "%.2f" );
@@ -853,6 +857,21 @@ TEST RFC_long_series( int ccnt )
             ASSERT_EQ_FMT( ctx.residue[7].value,  31.00, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[8].value,  -0.65, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[9].value,  16.59, "%.2f" );
+            /* Check matrix consistency */
+            ASSERT( RFC_rfm_check( &ctx ) );
+
+#if !RFC_MINIMAL
+            if(0)
+            {
+                /* Compare calculation methods */
+                double D_mk;
+
+                RFC_deinit( &ctx );
+                ASSERT( RFC_damage_from_rp( &ctx, NULL /*rp*/, NULL /*Sa*/, &D_mk, RFC_RP_DAMAGE_CALC_TYPE_CONSEQUENT ) );
+
+                ASSERT( ctx.internal.wl.D == D_mk );
+            }
+#endif /*!RFC_MINIMAL*/
         } while(0);
     }
 
@@ -1085,6 +1104,38 @@ TEST RFC_CPP_wrapper( void )
     PASS();
 }
 
+#if !RFC_MINIMAL
+TEST RFC_wl_math( void )
+{
+    double sd =  1e3;
+    double nd =  1e7;
+    double k  = -5;
+    double k2 = -9;
+    double sx =  300;
+    double nx =  pow( sx/sd, k2 ) * nd;
+    double s0 =  500;
+    double n0 =  pow( s0/sx, k ) * nx;
+    double x;
+
+    x = ( log(nx) - log(nd) ) / ( log(sx) - log(sd) );
+    ASSERT_IN_RANGE( k2, x, 1e-3 );
+
+    x = ( log(n0) - log(nx) ) / ( log(s0) - log(sx) );
+    ASSERT_IN_RANGE( k, x, 1e-3 );
+
+    ASSERT( RFC_wl_calc_k2( &ctx, s0, n0, k, sx, nx, &x, sd, nd ) );
+    ASSERT_IN_RANGE( k2, x, 1e-3 );
+
+    ASSERT( RFC_wl_calc_sx( &ctx, s0, n0, k, &x, nx, k2, sd, nd ) );
+    ASSERT_IN_RANGE( sx, x, 1e-3 );
+
+    ASSERT( RFC_wl_calc_sd( &ctx, s0, n0, k, sx, nx, k2, &x, nd ) );
+    ASSERT_IN_RANGE( sd, x, 1e-3 );
+
+    PASS();
+}
+#endif /*!RFC_MINIMAL*/
+
 
 #if !RFC_MINIMAL
 TEST RFC_MINER_CONSEQUENT( void )
@@ -1172,6 +1223,7 @@ SUITE( RFC_TEST_SUITE )
 #if !RFC_MINIMAL
     /* Residual methods */
     RUN_TEST( RFC_res_DIN45667 );
+    RUN_TEST( RFC_wl_math );
     /* "Miner consequent" approach */
     RUN_TEST( RFC_MINER_CONSEQUENT );
 #endif /*!RFC_MINIMAL*/

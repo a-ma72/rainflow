@@ -226,7 +226,9 @@ enum
 enum
 {
     RFC_RP_DAMAGE_CALC_TYPE_DEFAULT     = 0,
+#if !RFC_MINIMAL
     RFC_RP_DAMAGE_CALC_TYPE_CONSEQUENT  = 1,
+#endif /*!RFC_MINIMAL*/
 };
 #endif /*!RFC_MINIMAL*/
     
@@ -240,6 +242,7 @@ typedef struct rfc_ctx          rfc_ctx_s;           /** Forward declaration (ra
 typedef struct rfc_value_tuple  rfc_value_tuple_s;   /** Tuple of value and index position */
 #if !RFC_MINIMAL
 typedef struct rfc_class_param  rfc_class_param_s;   /** Class parameters (width, offset, count) */
+typedef struct rfc_wl_param     rfc_wl_param_s;      /** Woehler curve parameters (sd, nd, k, k2, omission) */
 typedef struct rfc_rfm_element  rfc_rfm_element_s;   /** Rainflow matrix element */
 #endif /*!RFC_MINIMAL*/
 
@@ -248,6 +251,9 @@ typedef struct rfc_rfm_element  rfc_rfm_element_s;   /** Rainflow matrix element
 bool    RFC_init              ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                                            RFC_value_type hysteresis, int flags );
 bool    RFC_wl_init           ( void *ctx, double sd, double nd, double k );
+#if !RFC_MINIMAL
+bool    RFC_wl_init2          ( void *ctx, const rfc_wl_param_s* );
+#endif /*!RFC_MINIMAL*/
 bool    RFC_deinit            ( void *ctx );
 bool    RFC_feed              ( void *ctx, const RFC_value_type* data, size_t count );
 #if !RFC_MINIMAL
@@ -262,11 +268,15 @@ bool    RFC_rfm_peek          ( void *ctx, RFC_value_type from_val, RFC_value_ty
 bool    RFC_rfm_poke          ( void *ctx, RFC_value_type from_val, RFC_value_type to_val, RFC_counts_type count, bool add_only );
 bool    RFC_rfm_count         ( void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, RFC_counts_type *count );
 bool    RFC_rfm_damage        ( void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage );
+bool    RFC_rfm_check         ( void *ctx );
 bool    RFC_lc_from_rfm       ( void *ctx, RFC_counts_type *lc, RFC_value_type *level, const RFC_counts_type *rfm, int flags );
 bool    RFC_lc_from_residue   ( void *ctx, RFC_counts_type *lc, RFC_value_type *level, int flags );
 bool    RFC_rp_from_rfm       ( void *ctx, RFC_counts_type *rp, RFC_value_type *class_means, const RFC_counts_type *rfm );
 bool    RFC_damage_from_rp    ( void *ctx, const RFC_counts_type *counts, const RFC_value_type *Sa, double *damage, int rp_calc_type );
 bool    RFC_damage_from_rfm   ( void *ctx, const RFC_counts_type *rfm, double *damage );
+bool    RFC_wl_calc_sx        ( void *ctx, double s0, double n0, double k, double *sx, double nx, double  k2, double  sd, double nd );
+bool    RFC_wl_calc_sd        ( void *ctx, double s0, double n0, double k, double  sx, double nx, double  k2, double *sd, double nd );
+bool    RFC_wl_calc_k2        ( void *ctx, double s0, double n0, double k, double  sx, double nx, double *k2, double  sd, double nd );
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
 bool    RFC_tp_init           ( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
@@ -324,6 +334,54 @@ typedef struct rfc_class_param
     RFC_value_type                      width;                      /**< Class width */
     RFC_value_type                      offset;                     /**< Lower bound of first class */
 } rfc_class_param_s;
+
+/**
+ *   Wöhler models
+ *  
+ *                                \   (S0,N0,k, any point on slope k)
+ *                                 \ /
+ *                                  o
+ *                                   \
+ *                                    \
+ *                                     \
+ *                                      \
+ *                                       \   (SX,NX,k2)
+ *                                        \ /
+ *                                         o
+ *                                          \    .             (SD,ND)
+ *                                           \         .      /
+ *                                            \              o------------------------------ (Miner original)
+ *                                             \                   . 
+ *                                              \                        . 
+ *                                               \                             . 
+ *                                                \                                  . 
+ *                                                 \                                       . (No fatigue strength) 
+ *                                                  (Miner elementar, k2==k)
+ *  
+ *  ______________________________________________________________________________________ (Omission level)
+ *  
+ *  s0^|k|  * n0 = sx^|k|  * nx     --->  ln(s0)*|k|  + ln(n0) = ln(sx)*|k|  + ln(nx)
+ *  sd^|k2| * nd = sx^|k2| * nx     --->  ln(sd)*|k2| + ln(nd) = ln(sx)*|k2| + ln(nx)
+ *  
+ *     ln(s0)*|k| + ln(n0) - ln(sd)*|k2|       - ln(nd)                          = ln(sx)*|k| - ln(sx)*|k2|
+ *     ln(s0)*|k| + ln(n0) - ln(sd)*|k2|       - ln(nd)                          = ln(sx)*(|k|-|k2|)
+ *   ( ln(s0)*|k| + ln(n0) - ln(sd)*|k2|       - ln(nd) ) / (|k|-|k2|)           = ln(sx)
+ *   ( ln(s0)*|k| + ln(n0) - ln(sx)*(|k|-|k2|) - ln(nd) ) / |k2|                 = ln(sd)
+ *  |( ( ln(s0) - ln(sx) )*|k| + ln(n0)        - ln(nd) ) / ( ln(sd) - ln(sx) )| = |k2|
+ */
+typedef struct rfc_wl_param
+{
+    double                              sd;                         /**< Fatigue strength amplitude (Miner original) */
+    double                              nd;                         /**< Cycles according to wl_sd */
+    double                              k;                          /**< Woehler slope, always negative */
+    double                              sx;                         /**< Junction point between k and k2 */
+    double                              nx;                         /**< Junction point between k and k2 */
+    double                              k2;                         /**< Woehler slope between wl_sx and wl_sd */
+    double                              omission;                   /**< Omission level threshold, smaller amplitudes get discarded */
+    double                              q;                          /**< Parameter q based on k for "Miner konsequent" approach, always positive */
+    double                              q2;                         /**< Parameter q based on k2 for "Miner konsequent" approach, always positive */
+    double                              D;                          /**< If D > 0, parameters define Woehler curve for impaired part */
+} rfc_wl_param_s;
 
 typedef struct rfc_rfm_element
 {
@@ -422,13 +480,16 @@ typedef struct rfc_ctx
     RFC_value_type                      hysteresis;                 /**< Hysteresis filtering, slope must exceed hysteresis to be counted! */
 
     /* Woehler curve */
-    double                              wl_sd;                      /**< Fatigue resistance range (amplitude) */
-    double                              wl_nd;                      /**< Cycles at wl_sd */
-    double                              wl_k;                       /**< Woehler gradient above wl_sd, always negative */
+    double                              wl_sd;                      /**< Fatigue strength amplitude (Miner original) */
+    double                              wl_nd;                      /**< Cycles according to wl_sd */
+    double                              wl_k;                       /**< Woehler slope, always negative */
 #if !RFC_MINIMAL
-    double                              wl_k2;                      /**< Woehler gradient below wl_sd */
+    double                              wl_sx;                      /**< Junction point between k and k2 */
+    double                              wl_nx;                      /**< Junction point between k and k2 */
+    double                              wl_k2;                      /**< Woehler gradient between wl_sx and wl_sd */
     double                              wl_omission;                /**< Omission level threshold, smaller amplitudes get discarded */
-    double                              wl_q;                       /**< Parameter q for "Miner konsequent" approach, always positive */
+    double                              wl_q;                       /**< Parameter q based on k for "Miner konsequent" approach, always positive */
+    double                              wl_q2;                      /**< Parameter q based on k2 for "Miner konsequent" approach, always positive */
 #endif /*!RFC_MINIMAL*/
 
 #if RFC_USE_DELEGATES
@@ -515,9 +576,7 @@ typedef struct rfc_ctx
         size_t                          residue_cap;                /**< Capacity of static residue */
         bool                            res_static;                 /**< true, if static residue is in use */
 #if !RFC_MINIMAL
-        double                          mk_D;                       /**< Cumulative Damage ("Miner konsequent" approach) */
-        double                          mk_sd;                      /**< Sd ("Miner konsequent" approach) */
-        double                          mk_q;                       /**< Parameter "q" ("Miner konsequent" approach) */
+        rfc_wl_param_s                  wl;                         /**< Shadowed Woehler curve parameters */
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
         rfc_value_tuple_s               margin[2];                  /**< First and last data point */
