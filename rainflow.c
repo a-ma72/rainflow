@@ -4671,8 +4671,8 @@ bool RFC_tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc
     {
         assert( new_hysteresis >= rfc_ctx->hysteresis );
         rfc_ctx->hysteresis       = new_hysteresis;
-        rfc_ctx->damage_lut_inapt = 1;
 #if RFC_DAMAGE_FAST
+        rfc_ctx->damage_lut_inapt = 1;
         if( rfc_ctx->class_count != new_class_param->count )
         {
             size_t num = rfc_ctx->class_count * rfc_ctx->class_count;
@@ -5064,14 +5064,6 @@ void RFC_wl_param_get( rfc_ctx_s *rfc_ctx, rfc_wl_param_s *wl_param )
 
 
 #if MATLAB_MEX_FILE
-
-#if 0
-void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
-{
-    mexErrMsgTxt( "Unsupported configuration!" );
-}
-#else
-
 /**
  * MATLAB wrapper for the rainflow algorithm
  */
@@ -5314,7 +5306,6 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         RFC_deinit( &rfc_ctx );
     }
 }
-#endif /*0~1*/
 
 
 #if RFC_AT_SUPPORT
