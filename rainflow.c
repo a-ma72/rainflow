@@ -107,6 +107,7 @@
 #include <float.h>   /* DBL_MAX */
 
 
+#if MATLAB_MEX_FILE
 #define RFC_MEX_USAGE \
 "\nUsage:\n"\
 "[pd,re,rm] = rfc( data, class_count, class_width, class_offset, hysteresis )\n"\
@@ -117,6 +118,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <mex.h>
+#endif /*MATLAB_MEX_FILE*/
 
 /* Core functions */
 #define RFC_cycle_find      RFC_cycle_find_4ptm
@@ -1054,14 +1056,7 @@ void * RFC_mem_alloc( void *ptr, size_t num, size_t size, int aim )
 /*********************************************************************************************************/
 
 
-
-#if 0
-void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
-{
-    mexErrMsgTxt( "Unsupported configuration!" );
-}
-#else
-
+#if MATLAB_MEX_FILE
 /**
  * MATLAB wrapper for the rainflow algorithm
  */
@@ -1192,11 +1187,6 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         RFC_deinit( &rfc_ctx );
     }
 }
-#endif /*0~1*/
-
-
-
-
 
 
 /**
@@ -1207,3 +1197,4 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
     mexRainflow( nlhs, plhs, nrhs, prhs );
 }
 
+#endif /*MATLAB_MEX_FILE*/
