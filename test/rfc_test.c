@@ -51,6 +51,7 @@
 #include "../greatest/greatest.h"
 #include <locale.h>
 #include <math.h>
+#include <float.h>
 
 
 #define ROUND(x) ((x)>=0?(long)((x)+0.5):(long)((x)-0.5))
@@ -789,12 +790,12 @@ TEST RFC_long_series( int ccnt )
 
         setlocale( LC_ALL, "" );
 
-        file = fopen( "long_series_results.csv", "wt" );
+        file = fopen( "long_series_results.txt", "wt" );
         ASSERT( file );
         fprintf( file, "Class count: %d\n", (int)ctx.class_count );
         fprintf( file, "Class width:  %.5f\n", ctx.class_width );
         fprintf( file, "Class offset:  %.5f\n", ctx.class_offset );
-        fprintf( file, "Damage: %g\n", ctx.pseudo_damage);
+        fprintf( file, "Damage: %g\n", ctx.damage);
         fprintf( file, "\nfrom (int base 0);to (int base 0);from (Klassenmitte);to (Klassenmitte);counts\n" );
 
         for( from = 0; from < (int)ctx.class_count; from++ )
@@ -828,7 +829,7 @@ TEST RFC_long_series( int ccnt )
         do
         {
             RFC_VALUE_TYPE sum = 0.0;
-            double pseudo_damage = 0.0;
+            double damage = 0.0;
 
             for( i = 0; i < class_count * class_count; i++ )
             {
@@ -838,13 +839,15 @@ TEST RFC_long_series( int ccnt )
             /* Check matrix sum */
             ASSERT_EQ( sum, 602.0 );
             /* Check damage value */
-            GREATEST_ASSERT_IN_RANGE( ctx.pseudo_damage, 4.8703e-16, 0.00005e-16 );
+            GREATEST_ASSERT_IN_RANGE( ctx.damage, 4.8703e-16, 0.00005e-16 );
+#if !RFC_MINIMAL
             /* Damage must equal to damage calculated in postprocess */
-            ASSERT( RFC_damage_from_rp( &ctx, NULL /*rp*/, NULL /*Sa*/, &pseudo_damage, RFC_RP_DAMAGE_CALC_TYPE_DEFAULT ) );
-            GREATEST_ASSERT_IN_RANGE( pseudo_damage, 4.8703e-16, 0.00005e-16 );
-            pseudo_damage = 0.0;
-            ASSERT( RFC_damage_from_rfm( &ctx, NULL /*rfm*/, &pseudo_damage ) );
-            GREATEST_ASSERT_IN_RANGE( pseudo_damage, 4.8703e-16, 0.00005e-16 );
+            ASSERT( RFC_damage_from_rp( &ctx, NULL /*rp*/, NULL /*Sa*/, &damage, RFC_RP_DAMAGE_CALC_TYPE_DEFAULT ) );
+            GREATEST_ASSERT_IN_RANGE( damage, 4.8703e-16, 0.00005e-16 );
+            damage = 0.0;
+            ASSERT( RFC_damage_from_rfm( &ctx, NULL /*rfm*/, &damage ) );
+            GREATEST_ASSERT_IN_RANGE( damage, 4.8703e-16, 0.00005e-16 );
+#endif /*!RFC_MINIMAL*/
             /* Check residue */
             ASSERT_EQ( ctx.residue_cnt, 10 );
             ASSERT_EQ_FMT( ctx.residue[0].value,   0.54, "%.2f" );
@@ -857,21 +860,11 @@ TEST RFC_long_series( int ccnt )
             ASSERT_EQ_FMT( ctx.residue[7].value,  31.00, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[8].value,  -0.65, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[9].value,  16.59, "%.2f" );
+#if !RFC_MINIMAL
             /* Check matrix consistency */
             ASSERT( RFC_rfm_check( &ctx ) );
-
-#if !RFC_MINIMAL
-            if(0)
-            {
-                /* Compare calculation methods */
-                double D_mk;
-
-                RFC_deinit( &ctx );
-                ASSERT( RFC_damage_from_rp( &ctx, NULL /*rp*/, NULL /*Sa*/, &D_mk, RFC_RP_DAMAGE_CALC_TYPE_CONSEQUENT ) );
-
-                ASSERT( ctx.internal.wl.D == D_mk );
-            }
 #endif /*!RFC_MINIMAL*/
+
         } while(0);
     }
 
@@ -1132,13 +1125,19 @@ TEST RFC_wl_math( void )
     ASSERT( RFC_wl_calc_sd( &ctx, s0, n0, k, sx, nx, k2, &x, nd ) );
     ASSERT_IN_RANGE( sd, x, 1e-3 );
 
+    ASSERT( RFC_wl_calc_sa( &ctx, sx, nx, k2, nd, &x ) );
+    ASSERT_IN_RANGE( sd, x, 1e-3 );
+
+    ASSERT( RFC_wl_calc_n( &ctx, sx, nx, k2, sd, &x ) );
+    ASSERT_IN_RANGE( nd, x, 1e-3 );
+
     PASS();
 }
 #endif /*!RFC_MINIMAL*/
 
 
 #if !RFC_MINIMAL
-TEST RFC_MINER_CONSEQUENT( void )
+TEST RFC_miner_consequent( void )
 {
     /* Data from [6] table 3.2-6 */
     /* =================================================================================================================== */
@@ -1183,7 +1182,7 @@ TEST RFC_MINER_CONSEQUENT( void )
         }
 
         ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
-        ASSERT( RFC_wl_init( &ctx, SD, ND, k ) );
+        ASSERT( RFC_wl_init_original( &ctx, SD, ND, k ) );
 
         ctx.full_inc = 1;
         ASSERT( RFC_damage_from_rp( &ctx, Sa_counts, Sa, &D_mk, RFC_RP_DAMAGE_CALC_TYPE_CONSEQUENT /*rp_calc_type*/ ) );
@@ -1199,14 +1198,178 @@ TEST RFC_MINER_CONSEQUENT( void )
     }
     PASS();
 }
+
+TEST RFC_miner_consequent2( void )
+{
+    RFC_VALUE_TYPE      data[10000];
+    size_t              data_len            =  NUMEL( data );
+    RFC_VALUE_TYPE      x_max;
+    RFC_VALUE_TYPE      x_min;
+    unsigned            class_count         =  100;
+    RFC_VALUE_TYPE      class_width;
+    RFC_VALUE_TYPE      class_offset;
+    RFC_VALUE_TYPE      hysteresis;
+    double              D_orig, D_mod, D_elem, D_mk;
+    double              rp_hist[100];
+    double              k, k2;
+    size_t              i, j;
+    size_t              repeats;
+
+    ASSERT( NUMEL(rp_hist) == class_count );
+
+#include "long_series.c"
+
+    for( i = 0; i < data_len; i++ )
+    {
+        double value = data_export[i];
+        data[i] = value;
+        if( !i )
+        {
+            x_max = x_min = value;
+        }
+        else
+        {
+            if( value > x_max ) x_max = value;
+            if( value < x_min ) x_min = value;
+        }
+    }
+
+    class_width  =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
+    class_offset =  x_min - class_width / 2;
+    hysteresis   =  class_width;
+
+    ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
+    ASSERT( RFC_wl_init_original( &ctx, /*sd */ x_max * 0.075, /* nd */ 1e5, /* k */ -1.5 ) );
+
+    k  = -fabs( ctx.wl_k );
+    k2 = -( 2 * fabs( ctx.wl_k ) - 1 );
+
+    for( i = 0; ctx.internal.wl.D < 1.0; i++ )
+    {
+        ASSERT( RFC_feed_scaled( &ctx, data, /* count */ data_len, /* factor */ 1.0 ) );
+
+        for( j = 0; j < 0; j++ )
+        {
+            ASSERT( RFC_feed_scaled( &ctx, data, /* count */ data_len, /* factor */ 0.02 ) );
+        }
+    }
+
+    repeats = i;
+
+    ASSERT( RFC_damage_from_rp( &ctx, /* counts */ NULL, /* sa */ NULL, &D_orig, RFC_RP_DAMAGE_CALC_TYPE_DEFAULT ) );
+    ASSERT( RFC_damage_from_rp( &ctx, /* counts */ NULL, /* sa */ NULL, &D_elem, RFC_RP_DAMAGE_CALC_TYPE_ELEMENTAR ) );
+    ctx.wl_k2 = k2;
+    ASSERT( RFC_damage_from_rp( &ctx, /* counts */ NULL, /* sa */ NULL, &D_mod,  RFC_RP_DAMAGE_CALC_TYPE_MODIFIED ) );
+    ctx.wl_k2 = k;
+    ASSERT( RFC_damage_from_rp( &ctx, /* counts */ NULL, /* sa */ NULL, &D_mk,   RFC_RP_DAMAGE_CALC_TYPE_CONSEQUENT ) );
+
+    for( j = 0; j < (int)class_count; j++ )
+    {
+        rp_hist[j] = (double)ctx.rp[j] / ctx.full_inc;
+    }
+
+    ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
+
+    if(1)
+    {
+        FILE*   file = NULL;
+        int     i;
+        double  N = 0.0;
+
+        setlocale( LC_ALL, "" );
+
+        file = fopen( "miner_consequent_results.txt", "wt" );
+        ASSERT( file );
+        fprintf( file, "Class parameters:\n" );
+        fprintf( file, "Class count: \t%d\n", (int)ctx.class_count );
+        fprintf( file, "Class width:  \t%.5f\n", ctx.class_width );
+        fprintf( file, "Class offset:  \t%.5f\n", ctx.class_offset );
+        fprintf( file, "\nWoehler parameters:\n" );
+        fprintf( file, "Sx: \t%g\n", ctx.wl_sx );
+        fprintf( file, "Nx: \t%g\n", ctx.wl_nx );
+        fprintf( file, "k: \t%g\n", k );
+        fprintf( file, "Sd: \t%g\n", ctx.wl_sd );
+        fprintf( file, "Nd: \t%g\n", ctx.wl_nd );
+        fprintf( file, "k2: \t%g\n", k2 );
+        fprintf( file, "Omission: \t%g\n", ctx.wl_omission );
+        fprintf( file, "\nDamage:\n" );
+        fprintf( file, "Miner original: \t%g\n", D_orig );
+        fprintf( file, "Miner elementary: \t%g\n", D_elem );
+        fprintf( file, "Miner modified: \t%g\n", D_mod );
+        fprintf( file, "Miner consequent: \t%g\n", D_mk );
+        fprintf( file, "Miner live: \t%g\n", ctx.internal.wl.D );
+        fprintf( file, "\nRepeats: \t%llu\n", repeats );
+        fprintf( file, "\nRP Histogram:\n" );
+        fprintf( file, "#\tSa\tn\tN\tWL_orig\tWL_elem\tWL_mod\n" );
+
+        for( i = (int)ctx.class_count - 1; i >= 0; i-- )
+        {
+            double Sa = (double)ctx.class_width * i / 2;
+            double n = rp_hist[i];
+            double x;
+
+            N += n;
+
+            if( N == 0.0 ) continue;
+
+            fprintf( file, "%d\t", i );
+            fprintf( file, "%g\t", Sa );
+            fprintf( file, "%g\t", n );
+            fprintf( file, "%g\t", N );
+
+            if( Sa < ctx.wl_sd )
+            {
+                x = 1e30; /*DBL_MAX*/
+            }
+            else
+            {
+                ASSERT( RFC_wl_calc_n( &ctx, ctx.wl_sx, ctx.wl_nx, k, Sa, &x ) );
+            }
+            fprintf( file, "%g\t", x );
+
+            if( Sa > 0.0 )
+            {
+                ASSERT( RFC_wl_calc_n( &ctx, ctx.wl_sx, ctx.wl_nx, k, Sa, &x ) );
+            }
+            else
+            {
+                x = 1e30; /*DBL_MAX*/
+            }
+            fprintf( file, "%g\t", x );
+
+            if( Sa > ctx.wl_sx )
+            {
+                ASSERT( RFC_wl_calc_n( &ctx, ctx.wl_sx, ctx.wl_nx, k, Sa, &x ) );
+            }
+            else if( Sa > 0.0 )
+            {
+                ASSERT( RFC_wl_calc_n( &ctx, ctx.wl_sx, ctx.wl_nx, k2, Sa, &x ) );
+            }
+            else
+            {
+                x = 1e30; /*DBL_MAX*/
+            }
+            fprintf( file, "%g\t", x );
+            fprintf( file, "\n" );
+        }
+        fclose( file );
+    }
+
+    ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
+
+    if( ctx.state != RFC_STATE_INIT0 )
+    {
+        RFC_deinit( &ctx );
+    }
+
+    PASS();
+}
 #endif /*!RFC_MINIMAL*/
 
 
 /* local suite (greatest) */
 SUITE( RFC_TEST_SUITE )
 {
-    //ASSERT( fabs(4.0) == 4.0 );
-
     /* Test rainflow counting */
     RUN_TEST1( RFC_empty, 1 );
     RUN_TEST1( RFC_cycle_up, 1 );
@@ -1225,7 +1388,8 @@ SUITE( RFC_TEST_SUITE )
     RUN_TEST( RFC_res_DIN45667 );
     RUN_TEST( RFC_wl_math );
     /* "Miner consequent" approach */
-    RUN_TEST( RFC_MINER_CONSEQUENT );
+    RUN_TEST( RFC_miner_consequent );
+    RUN_TEST( RFC_miner_consequent2 );
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
     /* Test turning points */
@@ -1261,7 +1425,7 @@ int main( int argc, char *argv[] )
 
     if( !long_series_file )
     {
-        long_series_file = "long_series.csv";
+        long_series_file = "long_series.txt";
     }
 
     GREATEST_MAIN_BEGIN();      /* init & parse command-line args */

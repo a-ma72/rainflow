@@ -10,9 +10,10 @@ function validate
   hysteresis        = class_width;
   enforce_margin    = 0;
   use_hcm           = 0;
+  residual_method   = 0;
 
   [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
-                          enforce_margin, use_hcm );
+                          residual_method, enforce_margin, use_hcm );
 
   assert( sum( sum( rm ) ) == 0 );
 
@@ -32,9 +33,10 @@ function validate
   hysteresis        = class_width * 0.99;
   enforce_margin    = 0;
   use_hcm           = 0;
+  residual_method   = 0;
 
   [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
-                          enforce_margin, use_hcm );
+                          residual_method, enforce_margin, use_hcm );
 
   assert( sum( sum( rm ) ) == 1 );
   assert( rm( 3,2 ) == 1 );
@@ -56,9 +58,10 @@ function validate
   hysteresis        = class_width * 0.99;
   enforce_margin    = 0;
   use_hcm           = 0;
+  residual_method   = 0;
 
   [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
-                          enforce_margin, use_hcm );
+                          residual_method, enforce_margin, use_hcm );
 
   assert( sum( sum( rm ) ) == 1 );
   assert( rm( 2,3 ) == 1 );
@@ -80,9 +83,10 @@ function validate
   hysteresis        = class_width;
   enforce_margin    = 0;
   use_hcm           = 0;
+  residual_method   = 0;
 
   [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
-                          enforce_margin, use_hcm );
+                          residual_method, enforce_margin, use_hcm );
 
   assert( sum( sum( rm ) ) == 7 );
   assert( rm( 5,3 ) == 2 );
@@ -108,9 +112,10 @@ function validate
   hysteresis        = class_width;
   enforce_margin    = 0;
   use_hcm           = 0;
+  residual_method   = 0;
 
   [pd,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
-                           enforce_margin, use_hcm );
+                           residual_method, enforce_margin, use_hcm );
 
   save( name, 'rm', 're' );
 

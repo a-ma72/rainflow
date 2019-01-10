@@ -61,7 +61,7 @@
  * []  "Multivariate Density Estimation: Theory, Practice and Visualization". New York, Chichester, Wiley & Sons, 1992
  *     Scott, D.
  * []  "Werkstoffmechanik - Bauteile sicher beurteilen undWerkstoffe richtig einsetzen"; 
- *      Ralf B?rgel, Hans Albert Richard, Andre Riemer; Springer FachmedienWiesbaden 2005, 2014
+ *      Ralf Buergel, Hans Albert Richard, Andre Riemer; Springer FachmedienWiesbaden 2005, 2014
  * []  "Zaelverfahren und Lastannahme in der Betriebsfestigkeit";
  *     Michael Koehler, Sven Jenne / Kurt Poetter, Harald Zenner; Springer-Verlag Berlin Heidelberg 2012
  *
@@ -227,7 +227,9 @@ enum
 {
     RFC_RP_DAMAGE_CALC_TYPE_DEFAULT     = 0,
 #if !RFC_MINIMAL
-    RFC_RP_DAMAGE_CALC_TYPE_CONSEQUENT  = 1,
+    RFC_RP_DAMAGE_CALC_TYPE_ELEMENTAR   = 1,
+    RFC_RP_DAMAGE_CALC_TYPE_MODIFIED    = 2,
+    RFC_RP_DAMAGE_CALC_TYPE_CONSEQUENT  = 3,
 #endif /*!RFC_MINIMAL*/
 };
 #endif /*!RFC_MINIMAL*/
@@ -243,72 +245,77 @@ typedef struct rfc_value_tuple  rfc_value_tuple_s;   /** Tuple of value and inde
 #if !RFC_MINIMAL
 typedef struct rfc_class_param  rfc_class_param_s;   /** Class parameters (width, offset, count) */
 typedef struct rfc_wl_param     rfc_wl_param_s;      /** Woehler curve parameters (sd, nd, k, k2, omission) */
-typedef struct rfc_rfm_element  rfc_rfm_element_s;   /** Rainflow matrix element */
+typedef struct rfc_rfm_item     rfc_rfm_item_s;      /** Rainflow matrix element */
 #endif /*!RFC_MINIMAL*/
 
 
 /* Core functions */
-bool    RFC_init              ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
-                                           RFC_value_type hysteresis, int flags );
-bool    RFC_wl_init           ( void *ctx, double sd, double nd, double k );
+bool    RFC_init                ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
+                                             RFC_value_type hysteresis, int flags );
+bool    RFC_wl_init_elementary  ( void *ctx, double sx, double nx, double k );
 #if !RFC_MINIMAL
-bool    RFC_wl_init2          ( void *ctx, const rfc_wl_param_s* );
+bool    RFC_wl_init_original    ( void *ctx, double sd, double nd, double k );
+bool    RFC_wl_init_modified    ( void *ctx, double sx, double nx, double k, double k2 );
+bool    RFC_wl_init_any         ( void *ctx, const rfc_wl_param_s* );
 #endif /*!RFC_MINIMAL*/
-bool    RFC_deinit            ( void *ctx );
-bool    RFC_feed              ( void *ctx, const RFC_value_type* data, size_t count );
+bool    RFC_deinit              ( void *ctx );
+bool    RFC_feed                ( void *ctx, const RFC_value_type* data, size_t count );
 #if !RFC_MINIMAL
-bool    RFC_feed_tuple        ( void *ctx, rfc_value_tuple_s *data, size_t count );
+bool    RFC_feed_scaled         ( void *ctx, const RFC_value_type* data, size_t count, double factor );
+bool    RFC_feed_tuple          ( void *ctx, rfc_value_tuple_s *data, size_t count );
 #endif /*!RFC_MINIMAL*/
-bool    RFC_finalize          ( void *ctx, int residual_method );
+bool    RFC_finalize            ( void *ctx, int residual_method );
 #if !RFC_MINIMAL
 /* Functions on rainflow matrix */
-bool    RFC_rfm_get           ( void *ctx, rfc_rfm_element_s **buffer, unsigned *count );
-bool    RFC_rfm_set           ( void *ctx, const rfc_rfm_element_s *buffer, unsigned count, bool add_only );
-bool    RFC_rfm_peek          ( void *ctx, RFC_value_type from_val, RFC_value_type to_val, RFC_counts_type *count );
-bool    RFC_rfm_poke          ( void *ctx, RFC_value_type from_val, RFC_value_type to_val, RFC_counts_type count, bool add_only );
-bool    RFC_rfm_count         ( void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, RFC_counts_type *count );
-bool    RFC_rfm_damage        ( void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage );
-bool    RFC_rfm_check         ( void *ctx );
-bool    RFC_lc_from_rfm       ( void *ctx, RFC_counts_type *lc, RFC_value_type *level, const RFC_counts_type *rfm, int flags );
-bool    RFC_lc_from_residue   ( void *ctx, RFC_counts_type *lc, RFC_value_type *level, int flags );
-bool    RFC_rp_from_rfm       ( void *ctx, RFC_counts_type *rp, RFC_value_type *class_means, const RFC_counts_type *rfm );
-bool    RFC_damage_from_rp    ( void *ctx, const RFC_counts_type *counts, const RFC_value_type *Sa, double *damage, int rp_calc_type );
-bool    RFC_damage_from_rfm   ( void *ctx, const RFC_counts_type *rfm, double *damage );
-bool    RFC_wl_calc_sx        ( void *ctx, double s0, double n0, double k, double *sx, double nx, double  k2, double  sd, double nd );
-bool    RFC_wl_calc_sd        ( void *ctx, double s0, double n0, double k, double  sx, double nx, double  k2, double *sd, double nd );
-bool    RFC_wl_calc_k2        ( void *ctx, double s0, double n0, double k, double  sx, double nx, double *k2, double  sd, double nd );
+bool    RFC_rfm_get             ( void *ctx, rfc_rfm_item_s **buffer, unsigned *count );
+bool    RFC_rfm_set             ( void *ctx, const rfc_rfm_item_s *buffer, unsigned count, bool add_only );
+bool    RFC_rfm_peek            ( void *ctx, RFC_value_type from_val, RFC_value_type to_val, RFC_counts_type *count );
+bool    RFC_rfm_poke            ( void *ctx, RFC_value_type from_val, RFC_value_type to_val, RFC_counts_type count, bool add_only );
+bool    RFC_rfm_count           ( void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, RFC_counts_type *count );
+bool    RFC_rfm_damage          ( void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage );
+bool    RFC_rfm_check           ( void *ctx );
+bool    RFC_lc_from_rfm         ( void *ctx, RFC_counts_type *lc, RFC_value_type *level, const RFC_counts_type *rfm, int flags );
+bool    RFC_lc_from_residue     ( void *ctx, RFC_counts_type *lc, RFC_value_type *level, int flags );
+bool    RFC_rp_from_rfm         ( void *ctx, RFC_counts_type *rp, RFC_value_type *class_means, const RFC_counts_type *rfm );
+bool    RFC_damage_from_rp      ( void *ctx, const RFC_counts_type *counts, const RFC_value_type *Sa, double *damage, int rp_calc_type );
+bool    RFC_damage_from_rfm     ( void *ctx, const RFC_counts_type *rfm, double *damage );
+bool    RFC_wl_calc_sx          ( void *ctx, double s0, double n0, double k, double *sx, double nx, double  k2, double  sd, double nd );
+bool    RFC_wl_calc_sd          ( void *ctx, double s0, double n0, double k, double  sx, double nx, double  k2, double *sd, double nd );
+bool    RFC_wl_calc_k2          ( void *ctx, double s0, double n0, double k, double  sx, double nx, double *k2, double  sd, double nd );
+bool    RFC_wl_calc_sa          ( void *ctx, double s0, double n0, double k, double  n,  double *sa );
+bool    RFC_wl_calc_n           ( void *ctx, double s0, double n0, double k, double  sa, double *n );
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
-bool    RFC_tp_init           ( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
-bool    RFC_tp_init_autoprune ( void *ctx, bool autoprune, size_t size, size_t threshold );
-bool    RFC_tp_prune          ( void *ctx, size_t count, int flags );
+bool    RFC_tp_init             ( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
+bool    RFC_tp_init_autoprune   ( void *ctx, bool autoprune, size_t size, size_t threshold );
+bool    RFC_tp_prune            ( void *ctx, size_t count, int flags );
 #endif /*RFC_TP_SUPPORT*/
 
 #if RFC_DH_SUPPORT
-bool    RFC_dh_init           ( void *ctx, double *dh, size_t dh_cap, bool is_static );
+bool    RFC_dh_init             ( void *ctx, double *dh, size_t dh_cap, bool is_static );
 #endif /*RFC_DH_SUPPORT*/
 
 #if RFC_AT_SUPPORT
-bool    RFC_at_init           ( void *ctx, const double *Sa, const double *Sm, unsigned count, 
-                                           double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
-bool    RFC_at_transform      ( void *ctx, double Sa, double Sm, double *Sa_transformed );
+bool    RFC_at_init             ( void *ctx, const double *Sa, const double *Sm, unsigned count, 
+                                             double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
+bool    RFC_at_transform        ( void *ctx, double Sa, double Sm, double *Sa_transformed );
 #endif /*RFC_AT_SUPPORT*/
 
 #if RFC_USE_DELEGATES
 /* Delegates typedef */
-typedef  void                ( *rfc_cycle_find_fcn_t )    ( rfc_ctx_s *, int flags );
-typedef  bool                ( *rfc_damage_calc_fcn_t )   ( rfc_ctx_s *, unsigned from_class, unsigned to_class, double *damage, double *Sa_ret );
-typedef  bool                ( *rfc_finalize_fcn_t )      ( rfc_ctx_s *, int residual_methods );
-typedef  rfc_value_tuple_s * ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, const rfc_value_tuple_s * );
+typedef  void                   ( *rfc_cycle_find_fcn_t )    ( rfc_ctx_s *, int flags );
+typedef  bool                   ( *rfc_damage_calc_fcn_t )   ( rfc_ctx_s *, unsigned from_class, unsigned to_class, double *damage, double *Sa_ret );
+typedef  bool                   ( *rfc_finalize_fcn_t )      ( rfc_ctx_s *, int residual_methods );
+typedef  rfc_value_tuple_s *    ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, const rfc_value_tuple_s * );
 #if RFC_TP_SUPPORT
-typedef  bool                ( *rfc_tp_add_fcn_t )        ( rfc_ctx_s *, rfc_value_tuple_s * );
-typedef  bool                ( *rfc_tp_prune_fcn_t )      ( rfc_ctx_s *, size_t, int );
+typedef  bool                   ( *rfc_tp_add_fcn_t )        ( rfc_ctx_s *, rfc_value_tuple_s * );
+typedef  bool                   ( *rfc_tp_prune_fcn_t )      ( rfc_ctx_s *, size_t, int );
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT
-typedef  void                ( *rfc_spread_damage_fcn_t ) ( rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags );
+typedef  void                   ( *rfc_spread_damage_fcn_t ) ( rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags );
 #endif /*RFC_DH_SUPPORT*/
 #if RFC_AT_SUPPORT
-typedef  bool                ( *rfc_at_transform_fcn_t )  ( rfc_ctx_s *, double Sa, double Sm, double *Sa_transformed );
+typedef  bool                   ( *rfc_at_transform_fcn_t )  ( rfc_ctx_s *, double Sa, double Sm, double *Sa_transformed );
 #endif /*RFC_AT_SUPPORT*/
 #endif /*RFC_USE_DELEGATES*/
 
@@ -336,7 +343,7 @@ typedef struct rfc_class_param
 } rfc_class_param_s;
 
 /**
- *   Wöhler models
+ *   Woehler models
  *  
  *                                \   (S0,N0,k, any point on slope k)
  *                                 \ /
@@ -376,19 +383,19 @@ typedef struct rfc_wl_param
     double                              k;                          /**< Woehler slope, always negative */
     double                              sx;                         /**< Junction point between k and k2 */
     double                              nx;                         /**< Junction point between k and k2 */
-    double                              k2;                         /**< Woehler slope between wl_sx and wl_sd */
+    double                              k2;                         /**< Woehler slope between wl_sx and wl_sd, always negative */
     double                              omission;                   /**< Omission level threshold, smaller amplitudes get discarded */
-    double                              q;                          /**< Parameter q based on k for "Miner konsequent" approach, always positive */
-    double                              q2;                         /**< Parameter q based on k2 for "Miner konsequent" approach, always positive */
+    double                              q;                          /**< Parameter q based on k for "Miner consequent" approach, always positive */
+    double                              q2;                         /**< Parameter q based on k2 for "Miner consequent" approach, always positive */
     double                              D;                          /**< If D > 0, parameters define Woehler curve for impaired part */
 } rfc_wl_param_s;
 
-typedef struct rfc_rfm_element
+typedef struct rfc_rfm_item
 {
     unsigned                            from;                       /**< Start class, base 0 */
     unsigned                            to;                         /**< Ending class, base 0 */
     RFC_counts_type                     counts;                     /**< Counts */
-} rfc_rfm_element_s;
+} rfc_rfm_item_s;
 #endif /*!RFC_MINIMAL*/
 
 
@@ -412,11 +419,16 @@ typedef struct rfc_ctx
 
     enum
     {
-        RFC_ERROR_NOERROR,                                          /**< No error */
-        RFC_ERROR_INVARG,                                           /**< Invalid arguments passed */
-        RFC_ERROR_MEMORY,                                           /**< Error on memory allocation */
-        RFC_ERROR_AT,                                               /**< Error while amplitude transformation */
-        RFC_ERROR_LUT,                                              /**< Error while accessing look up tables */
+        RFC_ERROR_UNEXP                 = -1,                       /**< Unexpected error */
+        RFC_ERROR_NOERROR               =  0,                       /**< No error */
+        RFC_ERROR_INVARG                =  1,                       /**< Invalid arguments passed */
+        RFC_ERROR_MEMORY                =  2,                       /**< Error on memory allocation */
+#if RFC_AT_SUPPORT
+        RFC_ERROR_AT                    =  3,                       /**< Error while amplitude transformation */
+#endif /*RFC_AT_SUPPORT*/
+#if RFC_DAMAGE_FAST
+        RFC_ERROR_LUT                   =  4,                       /**< Error while accessing look up tables */
+#endif /*RFC_DAMAGE_FAST*/
     }                                   error;                      /**< Error code */
 
 #if !RFC_MINIMAL
@@ -480,16 +492,16 @@ typedef struct rfc_ctx
     RFC_value_type                      hysteresis;                 /**< Hysteresis filtering, slope must exceed hysteresis to be counted! */
 
     /* Woehler curve */
-    double                              wl_sd;                      /**< Fatigue strength amplitude (Miner original) */
-    double                              wl_nd;                      /**< Cycles according to wl_sd */
+    double                              wl_sx;                      /**< Sa of any point on the Woehler curve */
+    double                              wl_nx;                      /**< Cycles for Sa on the Woehler curve */
     double                              wl_k;                       /**< Woehler slope, always negative */
 #if !RFC_MINIMAL
-    double                              wl_sx;                      /**< Junction point between k and k2 */
-    double                              wl_nx;                      /**< Junction point between k and k2 */
+    double                              wl_sd;                      /**< Fatigue strength amplitude (Miner original) */
+    double                              wl_nd;                      /**< Cycles according to wl_sd */
     double                              wl_k2;                      /**< Woehler gradient between wl_sx and wl_sd */
     double                              wl_omission;                /**< Omission level threshold, smaller amplitudes get discarded */
-    double                              wl_q;                       /**< Parameter q based on k for "Miner konsequent" approach, always positive */
-    double                              wl_q2;                      /**< Parameter q based on k2 for "Miner konsequent" approach, always positive */
+    double                              wl_q;                       /**< Parameter q based on k for "Miner consequent" approach, always positive */
+    double                              wl_q2;                      /**< Parameter q based on k2 for "Miner consequent" approach, always positive */
 #endif /*!RFC_MINIMAL*/
 
 #if RFC_USE_DELEGATES
@@ -541,11 +553,12 @@ typedef struct rfc_ctx
     /* Damage */
 #if RFC_DAMAGE_FAST
     double                             *damage_lut;                 /**< Damage look-up table */
+    int                                 damage_lut_inapt;           /**< Greater 0, if values in damage_lut aren't proper to Woehler curve parameters */
 #if RFC_AT_SUPPORT
     double                             *amplitude_lut;              /**< Amplitude look-up table */
 #endif /*RFC_AT_SUPPORT*/
 #endif /*RFC_DAMAGE_FAST*/
-    double                              pseudo_damage;              /**< Cumulated pseudo damage */
+    double                              damage;                     /**< Cumulated pseudo damage */
 
 #if RFC_AT_SUPPORT
     struct at

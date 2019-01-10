@@ -61,7 +61,7 @@
  * []  "Multivariate Density Estimation: Theory, Practice and Visualization". New York, Chichester, Wiley & Sons, 1992
  *     Scott, D.
  * []  "Werkstoffmechanik - Bauteile sicher beurteilen undWerkstoffe richtig einsetzen"; 
- *      Ralf B?rgel, Hans Albert Richard, Andre Riemer; Springer FachmedienWiesbaden 2005, 2014
+ *      Ralf Buergel, Hans Albert Richard, Andre Riemer; Springer FachmedienWiesbaden 2005, 2014
  * []  "Zaelverfahren und Lastannahme in der Betriebsfestigkeit";
  *     Michael Koehler, Sven Jenne / Kurt Poetter, Harald Zenner; Springer-Verlag Berlin Heidelberg 2012
  *
@@ -109,7 +109,7 @@
 #include <float.h>   /* DBL_MAX */
 
 
-#ifdef MATLAB_MEX_FILE
+#if MATLAB_MEX_FILE
 #if !RFC_MINIMAL
 #define RFC_MEX_USAGE \
 "\nUsage:\n"\
@@ -227,6 +227,7 @@ static RFC_value_type       value_delta                         ( RFC_value_type
 #define NUMEL( x )          ( sizeof(x) / sizeof(*(x)) )
 
 
+#if !RFC_TP_SUPPORT
 /**
  * @brief      Initialization (rainflow context).
  *
@@ -235,14 +236,26 @@ static RFC_value_type       value_delta                         ( RFC_value_type
  * @param      class_width   The class width
  * @param      class_offset  The class offset
  * @param      hysteresis    The hysteresis 
- #if RFC_TP_SUPPORT
  * @param      flags         The flags
- * @param      tp            Pointer to turning points buffer
- * @param      tp_cap        Number of turning points in buffer 
- #endif
  *
  * @return     true on success
  */
+#else /*RFC_TP_SUPPORT*/
+/**
+ * @brief      Initialization (rainflow context).
+ *
+ * @param      ctx           The rainflow context
+ * @param      class_count   The class count
+ * @param      class_width   The class width
+ * @param      class_offset  The class offset
+ * @param      hysteresis    The hysteresis 
+ * @param      flags         The flags
+ * @param      tp            Pointer to turning points buffer
+ * @param      tp_cap        Number of turning points in buffer 
+ *
+ * @return     true on success
+ */
+#endif /*!RFC_TP_SUPPORT*/
 bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
                           RFC_value_type hysteresis, int flags )
 {
@@ -297,7 +310,7 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
 
     /* Values for a "pseudo Woehler curve" */
     rfc_ctx->state = RFC_STATE_INIT;   /* Bypass sanity check for state in RFC_wl_init() */
-    RFC_wl_init( rfc_ctx, 1e3 /*sd*/, 1e7 /*nd*/, -5.0 /*k*/ );
+    RFC_wl_init_elementary( rfc_ctx, 1e3 /*sx*/, 1e7 /*nx*/, -5.0 /*k*/ );
     rfc_ctx->state = RFC_STATE_INIT0;  /* Reset state */
 
     /* Memory allocator */
@@ -374,7 +387,7 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
     }
 
     /* Damage */
-    rfc_ctx->pseudo_damage                  = 0.0;
+    rfc_ctx->damage                         = 0.0;
 
     /* Internals */
     rfc_ctx->internal.slope                 = 0;
@@ -435,6 +448,7 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
     {
         rfc_ctx->damage_lut                 = (double*)rfc_ctx->mem_alloc( rfc_ctx->damage_lut,    class_count * class_count, 
                                                                            sizeof(double), RFC_MEM_AIM_DLUT );
+        rfc_ctx->damage_lut_inapt           = 1;
 #if RFC_AT_SUPPORT
         rfc_ctx->amplitude_lut              = (double*)rfc_ctx->mem_alloc( rfc_ctx->amplitude_lut, class_count * class_count, 
                                                                            sizeof(double), RFC_MEM_AIM_DLUT );
@@ -448,16 +462,16 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
 
 
 /**
- * @brief      Initialize Woehler parameters
+ * @brief      Initialize Woehler parameters to Miners' elementary rule
  *
  * @param      ctx   The rfc context
- * @param      sd    The amplitude "SD"
- * @param      nd    The cycles "ND"
+ * @param      sx    The amplitude "SA"
+ * @param      nx    The cycles "N" according to Sa
  * @param      k     The slope "k"
  *
  * @return     true on success
  */
-bool RFC_wl_init( void *ctx, double sd, double nd, double k )
+bool RFC_wl_init_elementary( void *ctx, double sx, double nx, double k )
 {
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -471,20 +485,125 @@ bool RFC_wl_init( void *ctx, double sd, double nd, double k )
         return false;
     }
 
+#if RFC_DAMAGE_FAST
+    if( rfc_ctx->damage_lut )
+    {
+        rfc_ctx->damage_lut_inapt++;
+    }
+#endif /*RFC_DAMAGE_FAST*/
+
 /* Woehler curve */
-    rfc_ctx->wl_sd                          =  sd;
-    rfc_ctx->wl_nd                          =  nd;
-    rfc_ctx->wl_k                           = -fabs(k);
+    rfc_ctx->wl_sx        =  sx;
+    rfc_ctx->wl_nx        =  nx;
+    rfc_ctx->wl_k         = -fabs(k);
 #if !RFC_MINIMAL
-    rfc_ctx->wl_sx                          =  sd;
-    rfc_ctx->wl_nx                          =  nd;
-    rfc_ctx->wl_k2                          =  rfc_ctx->wl_k;  /* "Miner elementary", if k == k2 */
-    rfc_ctx->wl_q                           =  fabs(k) - 1;    /* Default value for fatigue strength depression */
-    rfc_ctx->wl_omission                    =  0.0;            /* No omission per default */
+    rfc_ctx->wl_sd        =  0.0;            /* No fatigue strength */
+    rfc_ctx->wl_nd        =  DBL_MAX;
+    rfc_ctx->wl_k2        =  rfc_ctx->wl_k;
+    rfc_ctx->wl_q         =  fabs(k) - 1;    /* Default value for fatigue strength depression */
+    rfc_ctx->wl_q2        =  rfc_ctx->wl_q;  /* Default value for fatigue strength depression */
+    rfc_ctx->wl_omission  =  0.0;            /* No omission per default */
 
     /* Make a shadow copy of the Woehler parameters */
     RFC_wl_param_get( rfc_ctx, &rfc_ctx->internal.wl );
 #endif /*!RFC_MINIMAL*/
+
+#if RFC_DAMAGE_FAST
+    if( rfc_ctx->damage_lut )
+    {
+        RFC_damage_lut_init( rfc_ctx );
+    }
+#endif /*RFC_DAMAGE_FAST*/
+
+    return true;
+}
+
+
+#if !RFC_MINIMAL
+/**
+ * @brief      Initialize Woehler parameters to Miners' original rule
+ *
+ * @param      ctx   The rfc context
+ * @param      sd    The amplitude "SD"
+ * @param      nd    The cycles "ND"
+ * @param      k     The slope "k"
+ *
+ * @return     true on success
+ */
+bool RFC_wl_init_original( void *ctx, double sd, double nd, double k )
+{
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( !RFC_wl_init_elementary( ctx, sd, nd, k ) )
+    {
+        return false;
+    }
+
+#if RFC_DAMAGE_FAST
+    if( rfc_ctx->damage_lut )
+    {
+        rfc_ctx->damage_lut_inapt++;
+    }
+#endif /*RFC_DAMAGE_FAST*/
+
+/* Woehler curve */
+    rfc_ctx->wl_sd = sd;             /* Points sx/nx and sd/nd coincide */
+    rfc_ctx->wl_nd = nd;
+
+    /* Make a shadow copy of the Woehler parameters */
+    RFC_wl_param_get( rfc_ctx, &rfc_ctx->internal.wl );
+
+#if RFC_DAMAGE_FAST
+    if( rfc_ctx->damage_lut )
+    {
+        RFC_damage_lut_init( rfc_ctx );
+    }
+#endif /*RFC_DAMAGE_FAST*/
+
+    return true;
+}
+
+
+/**
+ * @brief      Initialize Woehler parameters to Miners' modified rule
+ *
+ * @param      ctx   The rfc context
+ * @param      sx    The amplitude "Sa"
+ * @param      nx    The cycles "N" according to Sa
+ * @param      k     The slope before sx/nx
+ * @param      k2    The slope after sx/nx
+ *
+ * @return     true on success
+ */
+bool RFC_wl_init_modified( void *ctx, double sx, double nx, double k, double k2 )
+{
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( !RFC_wl_init_elementary( ctx, sx, nx, k ) )
+    {
+        return false;
+    }
+
+#if RFC_DAMAGE_FAST
+    if( rfc_ctx->damage_lut )
+    {
+        rfc_ctx->damage_lut_inapt++;
+    }
+#endif /*RFC_DAMAGE_FAST*/
+
+/* Woehler curve */
+    rfc_ctx->wl_k2 =  rfc_ctx->wl_k2;   /* Woehler slope after sx/nx */
+    rfc_ctx->wl_q2 =  fabs(k2) - 1;     /* Default value for fatigue strength depression */
+
+    /* Make a shadow copy of the Woehler parameters */
+    RFC_wl_param_get( rfc_ctx, &rfc_ctx->internal.wl );
+
+#if RFC_DAMAGE_FAST
+    if( rfc_ctx->damage_lut )
+    {
+        RFC_damage_lut_init( rfc_ctx );
+    }
+#endif /*RFC_DAMAGE_FAST*/
 
     return true;
 }
@@ -498,18 +617,38 @@ bool RFC_wl_init( void *ctx, double sd, double nd, double k )
  *
  * @return     true on success
  */
-#if !RFC_MINIMAL
-bool RFC_wl_init2( void *ctx, const rfc_wl_param_s* wl_param )
+bool RFC_wl_init_any( void *ctx, const rfc_wl_param_s* wl_param )
 {
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
-    if( !wl_param || !RFC_wl_init( ctx, wl_param->sd, wl_param->nd, wl_param->k ) )
+    if( !wl_param || !RFC_wl_init_elementary( ctx, wl_param->sx, wl_param->nx, wl_param->k ) )
     {
         return false;
     }
 
-    rfc_ctx->wl_k2                          = -fabs( wl_param->k2 );      /* "Miner elementary", if k == k2 */
-    rfc_ctx->wl_omission                    =  wl_param->omission;
+#if RFC_DAMAGE_FAST
+    if( rfc_ctx->damage_lut )
+    {
+        rfc_ctx->damage_lut_inapt++;
+    }
+#endif /*RFC_DAMAGE_FAST*/
+
+/* Woehler curve */
+    rfc_ctx->wl_sd       =  wl_param->sd;
+    rfc_ctx->wl_nd       =  wl_param->nd;
+    rfc_ctx->wl_k2       = -fabs( wl_param->k2 );      /* "Miner elementary", if k == k2 */
+    rfc_ctx->wl_q2       =  fabs( wl_param->k2 ) - 1;
+    rfc_ctx->wl_omission =  wl_param->omission;
+
+    /* Make a shadow copy of the Woehler parameters */
+    RFC_wl_param_get( rfc_ctx, &rfc_ctx->internal.wl );
+
+#if RFC_DAMAGE_FAST
+    if( rfc_ctx->damage_lut )
+    {
+        RFC_damage_lut_init( rfc_ctx );
+    }
+#endif /*RFC_DAMAGE_FAST*/
 
     return true;
 }
@@ -937,6 +1076,7 @@ bool RFC_deinit( void *ctx )
 
 #if RFC_DAMAGE_FAST
     rfc_ctx->damage_lut                 = NULL;
+    rfc_ctx->damage_lut_inapt           = 1;
 #if RFC_AT_SUPPORT
     rfc_ctx->amplitude_lut              = NULL;
 #endif /*RFC_AT_SUPPORT*/
@@ -1043,7 +1183,7 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
 
         /* Assign class and global position (base 1) */
         tp.cls = QUANTIZE( rfc_ctx, tp.value );
-        tp.pos   = ++rfc_ctx->internal.pos;
+        tp.pos = ++rfc_ctx->internal.pos;
 
         if( !RFC_feed_once( rfc_ctx, &tp, rfc_ctx->internal.flags ) ) return false;
     }
@@ -1053,6 +1193,49 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
 
 
 #if !RFC_MINIMAL
+/**
+ * @brief      "Feed" counting algorithm with data samples, scaled by a factor
+ *             (consecutive calls allowed).
+ *
+ * @param      ctx         The rainflow context
+ * @param[in]  data        The data
+ * @param      data_count  The data count
+ * @param      factor      The factor
+ *
+ * @return     true on success
+ */
+bool RFC_feed_scaled( void *ctx, const RFC_value_type * data, size_t data_count, double factor )
+{
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( data_count && !data ) return false;
+
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
+    {
+        return RFC_error_raise( rfc_ctx, RFC_ERROR_INVARG );
+    }
+
+    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state >= RFC_STATE_FINISHED )
+    {
+        return false;
+    }
+
+    /* Process data */
+    while( data_count-- )
+    {
+        rfc_value_tuple_s tp = { *data++ * factor };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
+
+        /* Assign class and global position (base 1) */
+        tp.cls = QUANTIZE( rfc_ctx, tp.value );
+        tp.pos = ++rfc_ctx->internal.pos;
+
+        if( !RFC_feed_once( rfc_ctx, &tp, rfc_ctx->internal.flags ) ) return false;
+    }
+
+    return true;
+}
+
+
 /**
  * @brief         Feed counting algorithm with data tuples.
  *
@@ -1185,13 +1368,13 @@ bool RFC_finalize( void *ctx, int residual_method )
  *
  * @return     true on success
  */
-bool RFC_rfm_get( void *ctx, rfc_rfm_element_s **buffer, unsigned *count )
+bool RFC_rfm_get( void *ctx, rfc_rfm_item_s **buffer, unsigned *count )
 {
     unsigned           class_count;
     unsigned           from, to;
     unsigned           count_old;
     RFC_counts_type   *rfm_it;
-    rfc_rfm_element_s *elements;
+    rfc_rfm_item_s    *item;
 
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -1227,7 +1410,7 @@ bool RFC_rfm_get( void *ctx, rfc_rfm_element_s **buffer, unsigned *count )
 
     if( *count > count_old )
     {
-        *buffer = rfc_ctx->mem_alloc( *buffer, *count, sizeof(rfc_rfm_element_s), RFC_MEM_AIM_RFM_ELEMENTS );
+        *buffer = rfc_ctx->mem_alloc( *buffer, *count, sizeof(rfc_rfm_item_s), RFC_MEM_AIM_RFM_ELEMENTS );
 
         if( !*buffer )
         {
@@ -1236,19 +1419,19 @@ bool RFC_rfm_get( void *ctx, rfc_rfm_element_s **buffer, unsigned *count )
         }
     }
         
-    elements   = *buffer;
-    rfm_it     = rfc_ctx->rfm;
+    item   = *buffer;
+    rfm_it = rfc_ctx->rfm;
     for( from = 0; from < class_count; from++ )
     {
         for( to = 0; to < class_count; to++, rfm_it++ )
         {
             if( *rfm_it )
             {
-                elements->from   = from;
-                elements->to     = to;
-                elements->counts = *rfm_it;
+                item->from   = from;
+                item->to     = to;
+                item->counts = *rfm_it;
 
-                elements++;
+                item++;
             }
         }
     }
@@ -1267,10 +1450,10 @@ bool RFC_rfm_get( void *ctx, rfc_rfm_element_s **buffer, unsigned *count )
  *
  * @return     true on success
  */
-bool RFC_rfm_set( void *ctx, const rfc_rfm_element_s *buffer, unsigned count, bool add_only )
+bool RFC_rfm_set( void *ctx, const rfc_rfm_item_s *buffer, unsigned count, bool add_only )
 {
           unsigned           class_count, i;
-    const rfc_rfm_element_s *elements;
+    const rfc_rfm_item_s    *item;
           RFC_counts_type   *rfm;
 
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
@@ -1296,24 +1479,24 @@ bool RFC_rfm_set( void *ctx, const rfc_rfm_element_s *buffer, unsigned count, bo
 
     if( !add_only )
     {
-        memset( rfm, (RFC_counts_type)0, sizeof(rfc_rfm_element_s) * class_count * class_count );
+        memset( rfm, (RFC_counts_type)0, sizeof(rfc_rfm_item_s) * class_count * class_count );
     }
 
-    elements = buffer;
+    item = buffer;
     for( i = 0; i < count; i++ )
     {
         unsigned from, to;
 
-        assert( elements->from >= rfc_ctx->class_offset );
-        assert( elements->to   >= rfc_ctx->class_offset );
+        assert( item->from >= rfc_ctx->class_offset );
+        assert( item->to   >= rfc_ctx->class_offset );
 
-        from = QUANTIZE( rfc_ctx, elements->from );
-        to   = QUANTIZE( rfc_ctx, elements->to );
+        from = QUANTIZE( rfc_ctx, item->from );
+        to   = QUANTIZE( rfc_ctx, item->to );
 
         if( from > class_count ) from = class_count;
         if( to   > class_count ) to   = class_count;
 
-        rfm[ from * class_count + to ] += elements->counts;
+        rfm[ from * class_count + to ] += item->counts;
     }
 
     return true;
@@ -1901,15 +2084,16 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
 
     D = 0.0;
 
-#if !RFC_MINIMAL
     /* Calculate the "Miner Consequent" approach */
     if( rp_calc_type == RFC_RP_DAMAGE_CALC_TYPE_CONSEQUENT )
     {
-        double q     = rfc_ctx->wl_q;   /* Fatigue strength depression exponent */
-        double Sd    = rfc_ctx->wl_sd;  /* Fatigue strength SD for the unimpaired(!) part */
-        double Nd    = rfc_ctx->wl_nd;  /* Fatigue strength cycle count ND for the unimpaired(!) part */
-        double Sj    = Sd;              /* Current fatigue strength, impacted part */
-        double D_inv = 0.0;             /* The inverse damage */
+        rfc_wl_param_s      wl;
+        double              q     = rfc_ctx->wl_q;   /* Fatigue strength depression exponent */
+        double              Sd    = rfc_ctx->wl_sd;  /* Fatigue strength SD for the unimpaired(!) part */
+        double              Nd    = rfc_ctx->wl_nd;  /* Fatigue strength cycle count ND for the unimpaired(!) part */
+        double              Sj    = Sd;              /* Current fatigue strength, impacted part */
+        double              D_inv = 0.0;             /* The inverse damage */
+        bool                ok    = true;
 
         /* Omission not allowed here! */
         if( rfc_ctx->wl_omission > 0.0 )
@@ -1917,7 +2101,14 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
             return RFC_error_raise( rfc_ctx, RFC_ERROR_INVARG );
         }
 
-        for( j = (int)class_count - 1; j >= -1; j-- )
+        /* Backup WL parameters */
+        RFC_wl_param_get( rfc_ctx, &wl );
+
+        /* Remove fatigue strength temporarily */
+        rfc_ctx->wl_sd = 0.0;
+        rfc_ctx->wl_nd = DBL_MAX;
+
+        for( j = (int)class_count - 1; j >= -1 && ok; j-- )
         {
             double D_j = 0.0;  /* Damage for partial histogram */
             double Sa_j;       /* New fatigue strength */
@@ -1951,7 +2142,8 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
                 
                 if( !RFC_damage_calc_amplitude( rfc_ctx, Sa_i, &D_i ) )
                 {
-                    return false;
+                    ok = false;
+                    break;
                 }
 
                 D_j += D_i * counts[i];
@@ -1963,12 +2155,65 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
             }
         }
 
+        /* Restore WL parameters */
+        RFC_wl_param_set( rfc_ctx, &wl );
+
+        if( !ok ) return false;
+
         /* Get the final damage value */
         D = 1.0 / D_inv;
     }
-    else
-#endif /*!RFC_MINIMAL*/
-    if( rp_calc_type == RFC_RP_DAMAGE_CALC_TYPE_DEFAULT )
+    else if( rp_calc_type == RFC_RP_DAMAGE_CALC_TYPE_ELEMENTAR )
+    {
+        rfc_wl_param_s  wl;
+        bool ok;
+
+        (void)RFC_wl_param_get( rfc_ctx, &wl );
+
+        rfc_ctx->wl_sd = 0.0;
+        rfc_ctx->wl_nd = DBL_MAX;
+        rfc_ctx->wl_k2 = rfc_ctx->wl_k;
+        rfc_ctx->wl_q2 = rfc_ctx->wl_q2;
+
+#if RFC_DAMAGE_FAST
+        {
+            rfc_ctx->damage_lut_inapt++;
+            ok = RFC_damage_from_rp( rfc_ctx, counts, Sa, damage, RFC_RP_DAMAGE_CALC_TYPE_DEFAULT );
+            rfc_ctx->damage_lut_inapt--;
+        }
+#else /*!RFC_DAMAGE_FAST*/
+        ok = RFC_damage_from_rp( rfc_ctx, counts, Sa, damage, RFC_RP_DAMAGE_CALC_TYPE_DEFAULT );
+#endif /*RFC_DAMAGE_FAST*/
+
+        (void)RFC_wl_param_set( rfc_ctx, &wl );
+
+        return ok;
+    }
+    else if( rp_calc_type == RFC_RP_DAMAGE_CALC_TYPE_MODIFIED)
+    {
+        rfc_wl_param_s wl;
+        bool ok;
+
+        (void)RFC_wl_param_get( rfc_ctx, &wl );
+
+        rfc_ctx->wl_sd = 0.0;
+        rfc_ctx->wl_nd = DBL_MAX;
+
+#if RFC_DAMAGE_FAST
+        {
+            rfc_ctx->damage_lut_inapt++;
+            ok = RFC_damage_from_rp( rfc_ctx, counts, Sa, damage, RFC_RP_DAMAGE_CALC_TYPE_DEFAULT );
+            rfc_ctx->damage_lut_inapt--;
+        }
+#else /*!RFC_DAMAGE_FAST*/
+        ok = RFC_damage_from_rp( rfc_ctx, counts, Sa, damage, RFC_RP_DAMAGE_CALC_TYPE_DEFAULT );
+#endif /*RFC_DAMAGE_FAST*/
+
+        (void)RFC_wl_param_set( rfc_ctx, &wl );
+
+        return ok;
+    }
+    else if( rp_calc_type == RFC_RP_DAMAGE_CALC_TYPE_DEFAULT )
     {
         for( i = 0; i < (int)class_count; i++ )
         {
@@ -2093,7 +2338,7 @@ bool RFC_wl_calc_sx( void *ctx, double s0, double n0, double k, double *sx, doub
         return false;
     }
 
-    nom = log(s0)*k + log(n0) - log(sd)*k2 - log(nd);
+    nom = log(s0)*k - log(sd)*k2 + log(n0) - log(nd);
     den = k - k2;
 
     if( den == 0.0 ) return false;
@@ -2133,7 +2378,7 @@ bool RFC_wl_calc_sd( void *ctx, double s0, double n0, double k, double sx, doubl
         return false;
     }
 
-    nom = log(s0)*k + log(n0) - log(sx)*(k-k2) - log(nd);
+    nom = log(s0)*k - log(sx)*(k-k2) + log(n0) - log(nd);
     den = k2;
 
     if( den == 0.0 ) return false;
@@ -2187,6 +2432,66 @@ bool RFC_wl_calc_k2( void *ctx, double s0, double n0, double k, double sx, doubl
     return true;
 }
 
+/**
+ * @brief      Calculate a point on a Woehler slope
+ *
+ * @param      ctx   The rainflow context
+ * @param      s0    Any point on the slope, Sa
+ * @param      n0    Any point on the slope, N
+ * @param      k     The Woehler slope
+ * @param      n     Given cycles for required Sa
+ * @param[out] sa    The buffer for Sa(N)
+ *
+ * @return     true on success
+ */
+bool RFC_wl_calc_sa( void *ctx, double s0, double n0, double k, double n, double *sa )
+{
+    /* (s0/Sa)^-k = n0/n */
+    /* (Sa/s0)^k  = n0/n */
+
+    k  = fabs(k);
+
+    if(    s0 <= 0.0    ||    n0 <= 0.0    ||
+           n  <= 0.0    ||   !sa )
+    {
+        return false;
+    }
+
+    *sa = pow( n0 / n, 1.0 / k ) * s0;
+
+    return true;
+}
+
+
+/**
+ * @brief      Calculate a point on a Woehler slope
+ *
+ * @param      ctx   The rainflow context
+ * @param      s0    Any point on the slope, Sa
+ * @param      n0    Any point on the slope, N
+ * @param      k     The Woehler slope
+ * @param      sa    Given amplitude Sa for required N
+ * @param[out] n     The buffer for N(Sa)
+ *
+ * @return     true on success
+ */
+bool RFC_wl_calc_n( void *ctx, double s0, double n0, double k, double sa, double *n )
+{
+    /* (Sa/s0)^-k = n/n0 */
+    /* (s0/Sa)^k  = n/n0 */
+
+    k  = fabs(k);
+
+    if(    s0 <= 0.0    ||    n0 <= 0.0    ||
+           sa <= 0.0    ||   !n )
+    {
+        return false;
+    }
+
+    *n = pow( s0 / sa, k ) * n0;
+
+    return true;
+}
 #endif /*!RFC_MINIMAL*/
 
 
@@ -2393,7 +2698,7 @@ void RFC_clear_count( rfc_ctx_s *rfc_ctx )
     rfc_ctx->internal.pos               = 0;
     rfc_ctx->internal.global_offset     = 0;
     
-    rfc_ctx->pseudo_damage              = 0.0;
+    rfc_ctx->damage                     = 0.0;
 
 #if RFC_HCM_SUPPORT
     /* Reset stack pointers */
@@ -2454,6 +2759,7 @@ void RFC_clear_lut( rfc_ctx_s *rfc_ctx )
     {
         memset( rfc_ctx->damage_lut, 0, sizeof(double) * rfc_ctx->class_count * rfc_ctx->class_count );
     }
+    rfc_ctx->damage_lut_inapt = 1;
 
 #if RFC_AT_SUPPORT
     if( rfc_ctx->amplitude_lut )
@@ -3265,17 +3571,7 @@ bool RFC_damage_calc_amplitude( rfc_ctx_s *rfc_ctx, double Sa, double *damage )
     assert( rfc_ctx->state >= RFC_STATE_INIT );
 
     do {
-        /* Constants for the Woehler curve */
-        const double SD_log = log(rfc_ctx->wl_sd);
-        const double ND_log = log(rfc_ctx->wl_nd);
-        const double k      = rfc_ctx->wl_k;
-#if !RFC_MINIMAL
-        const double SX_log = log(rfc_ctx->wl_sx);
-        const double NX_log = log(rfc_ctx->wl_nx);
-        const double k2 = rfc_ctx->wl_k2;
-#endif /*!RFC_MINIMAL*/
-
-        /* Pseudo damage */
+        /* Damage */
         double D = 0.0;
 
         if( Sa >= 0.0 )
@@ -3284,23 +3580,38 @@ bool RFC_damage_calc_amplitude( rfc_ctx_s *rfc_ctx, double Sa, double *damage )
             /* D = exp(  log(h /    ND)  + log( Sa /    SD)  * ABS(k) ) */
             /* D = exp( (log(h)-log(ND)) + (log(Sa)-log(SD)) * ABS(k) ) */
             /* D = exp(      0 -log(ND)  + (log(Sa)-log(SD)) * ABS(k) ) */
+
 #if !RFC_MINIMAL
             if( Sa > rfc_ctx->wl_omission )
             {
+                /* Constants for the Woehler curve */
+                const double SX_log = log(rfc_ctx->wl_sx);
+                const double NX_log = log(rfc_ctx->wl_nx);
+
                 if( Sa > rfc_ctx->wl_sx )
                 {
-                    /* Upper slope */
-                    D = exp( fabs(k)  * ( log(Sa) - SX_log ) - NX_log );
+                    const double k = rfc_ctx->wl_k;
+                    
+                    /* Upper slope, finite life scope */
+                    D = exp( fabs(k) * ( log(Sa) - SX_log ) - NX_log );
                 }
-                else
+                else if( Sa > rfc_ctx->wl_sd )
                 {
-                    /* Lower slope */
-                    D = exp( fabs(k2) * ( log(Sa) - SD_log ) - ND_log );
+                    const double k2 = rfc_ctx->wl_k2;
+
+                    /* Lower slope, transition scope, modified Miners' rule */
+                    D = exp( fabs(k2) * ( log(Sa) - SX_log ) - NX_log );
                 }
+                /* Amplitudes below fatigue strength have no influence */
             }
 #else /*RFC_MINIMAL*/
-            /* Miner elementary */
-            D = exp( fabs(k)  * ( log(Sa) - SD_log ) - ND_log );
+            /* Constants for the Woehler curve */
+            const double SX_log = log(rfc_ctx->wl_sx);
+            const double NX_log = log(rfc_ctx->wl_nx);
+            const double k      = rfc_ctx->wl_k;
+
+            /* Miner original */
+            D = exp( fabs(k)  * ( log(Sa) - SX_log ) - NX_log );
 #endif /*!RFC_MINIMAL*/
         }
         else
@@ -3440,14 +3751,14 @@ static
 bool RFC_damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_to, double *damage, double *Sa_ret )
 {
     double Sa = -1.0;  /* Negative amplitude indicates unset value */
-    double D  = 0.0;
+    double D  =  0.0;
 
     assert( damage );
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT );
 
 #if RFC_DAMAGE_FAST
-    if( rfc_ctx->damage_lut )
+    if( rfc_ctx->damage_lut && !rfc_ctx->damage_lut_inapt)
     {
         if( !RFC_damage_calc_fast( rfc_ctx, class_from, class_to, &D, &Sa ) )
         {
@@ -3555,7 +3866,8 @@ void RFC_damage_lut_init( rfc_ctx_s *rfc_ctx )
             }
         }
 
-        rfc_ctx->damage_lut = lut;
+        rfc_ctx->damage_lut       = lut;
+        rfc_ctx->damage_lut_inapt = 0;
     }
 }
 
@@ -3575,7 +3887,8 @@ void RFC_damage_lut_init( rfc_ctx_s *rfc_ctx )
 static
 bool RFC_damage_calc_fast( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_to, double *damage, double *Sa_ret )
 {
-    double D = 0.0;
+    double Sa = -1;    /* -1 means "uninitialized" */
+    double D  =  0.0;
 
     assert( damage );
     assert( rfc_ctx );
@@ -3583,22 +3896,21 @@ bool RFC_damage_calc_fast( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned cla
     assert( class_from < rfc_ctx->class_count );
     assert( class_to   < rfc_ctx->class_count );
 
-    if( rfc_ctx->damage_lut )
+    if( rfc_ctx->damage_lut && !rfc_ctx->damage_lut_inapt )
     {
         D = rfc_ctx->damage_lut[class_from * rfc_ctx->class_count + class_to];
-#if RFC_AT_SUPPORT
+
         if( Sa_ret )
         {
+#if RFC_AT_SUPPORT
             if( rfc_ctx->amplitude_lut )
             {
                 *Sa_ret = rfc_ctx->amplitude_lut[class_from * rfc_ctx->class_count + class_to];
             }
-            else
-            {
-                *Sa_ret = -1;
-            }
-        }
+#else /*!RFC_AT_SUPPORT*/
+            *Sa_ret = AMPLITUDE( rfc_ctx, fabs( (int)class_from - (int)class_to ) );
 #endif /*RFC_AT_SUPPORT*/
+        }
     }
     else
     {
@@ -3847,7 +4159,7 @@ void RFC_cycle_find( rfc_ctx_s *rfc_ctx, int flags )
 
 
 /**
- * @brief      Rainflow counting core (4-point-method).
+ * @brief      Rainflow counting core (4-point-method [3]).
  *
  * @param      rfc_ctx  The rainflow context
  * @param      flags    The flags
@@ -3881,6 +4193,7 @@ void RFC_cycle_find_4ptm( rfc_ctx_s *rfc_ctx, int flags )
             D = temp;
         }
 
+        /* Check for closed cycles [3] */
         if( A <= B && C <= D )
         {
             rfc_value_tuple_s *from = &rfc_ctx->residue[idx+1];
@@ -4029,7 +4342,8 @@ void RFC_cycle_process_lc( rfc_ctx_s *rfc_ctx, int flags )
 
 
 /**
- * @brief         Processes counts on a closing cycle
+ * @brief         Processes counts on a closing cycle and further modifications
+ *                due to the new damage value.
  *
  * @param         rfc_ctx  The rainflow context
  * @param[in,out] from     The starting data point
@@ -4084,36 +4398,74 @@ void RFC_cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_
             }
 
             /* Adding damage due to current cycle weight */
-            rfc_ctx->pseudo_damage += D_i / rfc_ctx->full_inc * rfc_ctx->curr_inc;
+            rfc_ctx->damage += D_i / rfc_ctx->full_inc * rfc_ctx->curr_inc;
 #if !RFC_MINIMAL
             /* Fatigue strength Sd(D) depresses in subject to cumulative damage D.
                Sd(D)/Sd = (1-D)^(1/q), [6] chapter 3.2.9, formula 3.2-44 and 3.2-46
                Only cycles exceeding Sd(D) have damaging effect. */
             if( Sa_i >= rfc_ctx->internal.wl.sd )
             {
-                rfc_wl_param_s wl;
-                double         D_mk;
-                double         k, q;
+                rfc_wl_param_s  wl_unimp;
+                rfc_wl_param_s *wl_imp = &rfc_ctx->internal.wl;
+                double          D_mk;
 
-                /* Backup Woehler curve parameters and use shadowed parameters */
-                RFC_wl_param_get( rfc_ctx, &wl );
-                RFC_wl_param_set( rfc_ctx, &rfc_ctx->internal.wl );
+                /* Backup Woehler curve parameters and use shadowed ones for the impaired part instead */
+                RFC_wl_param_get( rfc_ctx, &wl_unimp );
+                RFC_wl_param_set( rfc_ctx,  wl_imp );
 
-                (void)RFC_damage_calc( rfc_ctx, class_from, class_to, &D_mk, &Sa_i );
+#if RFC_DAMAGE_FAST
+                if( rfc_ctx->damage_lut )
+                {
+                    /* Disable lut temporarily, since it is only valid for Woehler parameters for unimpaired part */
+                    rfc_ctx->damage_lut_inapt++;
+                    (void)RFC_damage_calc_amplitude( rfc_ctx, Sa_i, &D_mk );
+                    rfc_ctx->damage_lut_inapt--;
+                }
+                else
+#endif /*RFC_DAMAGE_FAST*/
+                {
+                    (void)RFC_damage_calc_amplitude( rfc_ctx, Sa_i, &D_mk );
+                }
 
-                D_mk *= (double)rfc_ctx->curr_inc / rfc_ctx->full_inc;
+                D_mk += wl_imp->D;
 
-                if( D_mk > 1.0 ) D_mk = 1.0;
+                if( D_mk < 1.0 )
+                {
+                    /* Calculate new parameters for the Woehler curve, impaired part */
+                    if( wl_unimp.sx > 0.0 )
+                    {
+                        double q       =       wl_imp->q;
+                        double k       = fabs( wl_imp->k );
+                        rfc_ctx->wl_sx = wl_unimp.sx * pow( 1.0 - D_mk, 1.0 / q );
+                      //rfc_ctx->wl_nx = wl.nx * pow( 1.0 - D_mk, -( k - q ) / q );
 
-                /* Calculate new parameters for the Woehler curve, impaired part */
-                q = rfc_ctx->internal.wl.q;
-                k = fabs( rfc_ctx->internal.wl.k );
-                rfc_ctx->internal.wl.sd = wl.sd * pow( 1.0 - D_mk, 1.0 / q );
-                rfc_ctx->internal.wl.nd = wl.nd * pow( 1.0 - D_mk, -( k - q ) / q );
-                rfc_ctx->internal.wl.D  = D_mk;
+                        (void)RFC_wl_calc_n( rfc_ctx, 
+                                             wl_unimp.sx, 
+                                             wl_unimp.nx, 
+                                             k,
+                                             rfc_ctx->wl_sx,
+                                            &rfc_ctx->wl_nx );
+                    }
 
-                /* Restore Woehler curve parameters, unimpaired part */
-                RFC_wl_param_set( rfc_ctx, &wl );
+                    if( wl_unimp.sd > 0.0 )
+                    {
+                        double q2      =       wl_imp->q2;
+                        double k2      = fabs( wl_imp->k2 );
+                        rfc_ctx->wl_sd = wl_unimp.sd * pow( 1.0 - D_mk, 1.0 / q2 );
+                      //rfc_ctx->wl_nx = wl_unimp.nx * pow( 1.0 - D_mk, -( k2 - q2 ) / q2 );
+
+                        (void)RFC_wl_calc_n( rfc_ctx, 
+                                             wl_unimp.sd, 
+                                             wl_unimp.nd, 
+                                             k2,
+                                             rfc_ctx->wl_sd,
+                                            &rfc_ctx->wl_nd );
+                    }
+                }
+
+                RFC_wl_param_get( rfc_ctx, wl_imp );
+                rfc_ctx->internal.wl.D = D_mk;
+                RFC_wl_param_set( rfc_ctx, &wl_unimp );
             }
 #endif /*!RFC_MINIMAL*/
         }
@@ -4318,7 +4670,8 @@ bool RFC_tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc
     if( new_class_param )
     {
         assert( new_hysteresis >= rfc_ctx->hysteresis );
-        rfc_ctx->hysteresis = new_hysteresis;
+        rfc_ctx->hysteresis       = new_hysteresis;
+        rfc_ctx->damage_lut_inapt = 1;
 #if RFC_DAMAGE_FAST
         if( rfc_ctx->class_count != new_class_param->count )
         {
@@ -4663,11 +5016,14 @@ void RFC_wl_param_set( rfc_ctx_s *rfc_ctx, const rfc_wl_param_s *wl_param )
     assert( rfc_ctx && wl_param );
     assert( rfc_ctx->state >= RFC_STATE_INIT );
 
+    rfc_ctx->wl_sx          = wl_param->sx;
+    rfc_ctx->wl_nx          = wl_param->nx;
+    rfc_ctx->wl_k           = wl_param->k;
+    rfc_ctx->wl_q           = wl_param->q;
     rfc_ctx->wl_sd          = wl_param->sd;
     rfc_ctx->wl_nd          = wl_param->nd;
-    rfc_ctx->wl_k           = wl_param->k;
     rfc_ctx->wl_k2          = wl_param->k2;
-    rfc_ctx->wl_q           = wl_param->q;
+    rfc_ctx->wl_q2          = wl_param->q2;
     rfc_ctx->wl_omission    = wl_param->omission;
 }
 
@@ -4684,11 +5040,14 @@ void RFC_wl_param_get( rfc_ctx_s *rfc_ctx, rfc_wl_param_s *wl_param )
     assert( rfc_ctx && wl_param );
     assert( rfc_ctx->state >= RFC_STATE_INIT );
 
+    wl_param->sx            = rfc_ctx->wl_sx;
+    wl_param->nx            = rfc_ctx->wl_nx;
+    wl_param->k             = rfc_ctx->wl_k;
+    wl_param->q             = rfc_ctx->wl_q;
     wl_param->sd            = rfc_ctx->wl_sd;
     wl_param->nd            = rfc_ctx->wl_nd;
-    wl_param->k             = rfc_ctx->wl_k;
+    wl_param->q2            = rfc_ctx->wl_q2;
     wl_param->k2            = rfc_ctx->wl_k2;
-    wl_param->q             = rfc_ctx->wl_q;
     wl_param->omission      = rfc_ctx->wl_omission;
     wl_param->D             = 0.0;
 }
@@ -4835,7 +5194,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         if( plhs )
         {
             /* Pseudo damage */
-            plhs[0] = mxCreateDoubleScalar( rfc_ctx.pseudo_damage );
+            plhs[0] = mxCreateDoubleScalar( rfc_ctx.damage );
 
             /* Residue */
 #if RFC_HCM_SUPPORT
