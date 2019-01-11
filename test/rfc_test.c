@@ -1298,7 +1298,7 @@ TEST RFC_miner_consequent2( void )
         fprintf( file, "Miner modified: \t%g\n", D_mod );
         fprintf( file, "Miner consequent: \t%g\n", D_mk );
         fprintf( file, "Miner live: \t%g\n", ctx.internal.wl.D );
-        fprintf( file, "\nRepeats: \t%llu\n", repeats );
+        fprintf( file, "\nRepeats: \t%lu\n", (unsigned long)repeats );
         fprintf( file, "\nRP Histogram:\n" );
         fprintf( file, "#\tSa\tn\tN\tWL_orig\tWL_elem\tWL_mod\n" );
 
