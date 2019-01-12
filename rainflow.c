@@ -193,6 +193,7 @@ static void *               RFC_mem_alloc                       ( void *ptr, siz
 #if RFC_TP_SUPPORT
 /* Methods on turning points history */
 static bool                 RFC_tp_add                          ( rfc_ctx_s *, rfc_value_tuple_s *pt );
+static bool                 RFC_tp_inc_damage                   ( rfc_ctx_s *, size_t tp_pos, double damage );
 static void                 RFC_tp_lock                         ( rfc_ctx_s *, bool do_lock );
 static bool                 RFC_tp_refeed                       ( rfc_ctx_s *, RFC_value_type new_hysteresis, const rfc_class_param_s *new_class_param );
 #endif /*RFC_TP_SUPPORT*/
@@ -324,6 +325,7 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
 #if RFC_TP_SUPPORT
     rfc_ctx->tp_next_fcn                    = NULL;
     rfc_ctx->tp_add_fcn                     = NULL;
+    rfc_ctx->tp_inc_damage_fcn              = NULL;
 #endif /*RFC_TP_SUPPORT*/
     rfc_ctx->cycle_find_fcn                 = NULL;
     rfc_ctx->finalize_fcn                   = NULL;
@@ -1185,7 +1187,7 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
         tp.pos = ++rfc_ctx->internal.pos;
         tp.cls = QUANTIZE( rfc_ctx, tp.value );
 
-        if( tp.cls >= rfc_ctx->class_count )
+        if( tp.cls >= rfc_ctx->class_count && rfc_ctx->class_count )
         {
             return RFC_error_raise( rfc_ctx, RFC_ERROR_INVARG );
         }
@@ -1234,7 +1236,7 @@ bool RFC_feed_scaled( void *ctx, const RFC_value_type * data, size_t data_count,
         tp.cls = QUANTIZE( rfc_ctx, tp.value );
         tp.pos = ++rfc_ctx->internal.pos;
 
-        if( tp.cls >= rfc_ctx->class_count )
+        if( tp.cls >= rfc_ctx->class_count && rfc_ctx->class_count )
         {
             return RFC_error_raise( rfc_ctx, RFC_ERROR_INVARG );
         }
@@ -1274,7 +1276,7 @@ bool RFC_feed_tuple( void *ctx, rfc_value_tuple_s *data, size_t data_count )
     /* Process data */
     while( data_count-- )
     {
-        if( data->cls >= rfc_ctx->class_count )
+        if( data->cls >= rfc_ctx->class_count && rfc_ctx->class_count )
         {
             return RFC_error_raise( rfc_ctx, RFC_ERROR_INVARG );
         }
@@ -4644,6 +4646,48 @@ bool RFC_tp_add( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *tp )
 
 
 /**
+ * @brief      Increase damage for existing turning point.
+ *
+ * @param      rfc_ctx  The rainflow context
+ * @param[in]  tp_pos   The tp position (base 1)
+ * @param[in]  damage   The damage
+ *
+ * @return     true on success
+ */
+static
+bool RFC_tp_inc_damage( rfc_ctx_s *rfc_ctx, size_t tp_pos, double damage )
+{
+    assert( rfc_ctx );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
+
+    /* Add new turning point */
+
+#if RFC_USE_DELEGATES
+    /* Check for delegates */
+    if( rfc_ctx->tp_inc_damage_fcn )
+    {
+        /* Add turning point */
+        return rfc_ctx->tp_inc_damage_fcn( rfc_ctx, tp_pos, damage );
+    }
+    else
+#endif /*RFC_USE_DELEGATES*/
+    {
+        if( rfc_ctx->tp && !rfc_ctx->tp_locked )
+        {
+            if( tp_pos >= rfc_ctx->tp_cnt )
+            {
+                return RFC_error_raise( rfc_ctx, RFC_ERROR_TP );
+            }
+
+            rfc_ctx->tp[ tp_pos - 1 ].damage += damage;
+        }
+    }
+
+    return true;
+}
+
+
+/**
  * @brief      Lock turning points queue
  *
  * @param      rfc_ctx  The rainflow context
@@ -4795,11 +4839,8 @@ bool RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
             }
 
 #if RFC_TP_SUPPORT
-            if( rfc_ctx->tp )
-            {
-                rfc_ctx->tp[ from->tp_pos - 1 ].damage += damage_lhs;
-                rfc_ctx->tp[ to->tp_pos   - 1 ].damage += damage_rhs;
-            }
+            RFC_tp_inc_damage( rfc_ctx, from->tp_pos, damage_lhs );
+            RFC_tp_inc_damage( rfc_ctx, to->tp_pos,   damage_rhs );
 #endif /*RFC_TP_SUPPORT*/
 
 #if RFC_DH_SUPPORT
@@ -4819,9 +4860,10 @@ bool RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
         {
 #if RFC_TP_SUPPORT
             size_t  i,
-                    start, end, width, 
-                    tp_start, tp_end;
-            int     from_cls, to_cls;
+                    start, end,         /* Base 0 */
+                    width, 
+                    tp_start, tp_end;   /* Base 0 */
+            int     from_cls, to_cls;   /* Base 0 */
 
             /* Care about possible wrapping, caused by RFC_RES_REPEATED:
                 0         1
@@ -4849,13 +4891,13 @@ bool RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
             }
             
             /* Absolute position (input stream) */
-            start    = from->pos;
-            end      = to->pos;
+            start    = from->pos - 1;
+            end      = to->pos - 1;
             end     += ( start >= end ) ? rfc_ctx->internal.pos : 0;   /* internal.pos is not modified while repeated counting */
             width    = end - start;
             /* Position in turning point storage */
-            tp_start = from->tp_pos;
-            tp_end   = to->tp_pos;
+            tp_start = from->tp_pos - 1;
+            tp_end   = to->tp_pos - 1;
             tp_end  += ( tp_start >= tp_end ) ? rfc_ctx->tp_cnt : 0;   /* tp is modified while repeated counting, but tp_pos is consistent */
 
             D        = 0.0;
@@ -4865,14 +4907,15 @@ bool RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
             /* Iterate over turning points */
             for( i = tp_start; i <= tp_end; i++ )
             {
-                size_t tp_pos, pos;
-                double weight, D_new;
-                double D;
+                size_t tp_pos_0,        /* Turning point position, base 0 */
+                       pos_0;           /* Input stream position, base 0 */
+                double weight;
+                double D, D_new;
 
-                tp_pos = i % rfc_ctx->tp_cnt;
-                pos    = rfc_ctx->tp[tp_pos].pos;
-                pos   += ( start >= pos ) ? rfc_ctx->internal.pos : 0;
-                weight = (double)( pos - start ) / width;
+                tp_pos_0 = i % rfc_ctx->tp_cnt;
+                pos_0    = rfc_ctx->tp[ tp_pos_0 ].pos - 1;
+                pos_0   += ( start >= pos_0 ) ? rfc_ctx->internal.pos : 0;
+                weight   = (double)( pos_0 - start ) / width;
 
                 switch( rfc_ctx->spread_damage_method )
                 {
@@ -4898,7 +4941,13 @@ bool RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
 
                 if( D_new > D )
                 {
-                    rfc_ctx->tp[tp_pos].damage += D_new - D;
+#if RFC_DH_SUPPORT
+                    if( rfc_ctx->dh )
+                    {
+                        rfc_ctx->dh[ pos_0 ] += D_new - D;
+                    }
+#endif /*RFC_DH_SUPPORT*/
+                    RFC_tp_inc_damage( rfc_ctx, tp_pos_0 + 1, D_new - D );
                     D = D_new;
                 }
             }

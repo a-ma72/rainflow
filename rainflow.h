@@ -329,6 +329,7 @@ typedef  bool                   ( *rfc_finalize_fcn_t )      ( rfc_ctx_s *, int 
 typedef  rfc_value_tuple_s *    ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, const rfc_value_tuple_s * );
 #if RFC_TP_SUPPORT
 typedef  bool                   ( *rfc_tp_add_fcn_t )        ( rfc_ctx_s *, rfc_value_tuple_s * );
+typedef  bool                   ( *rfc_tp_inc_damage_fcn_t ) ( rfc_ctx_s *, size_t tp_pos, double damage );
 typedef  bool                   ( *rfc_tp_prune_fcn_t )      ( rfc_ctx_s *, size_t, int );
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT
@@ -443,11 +444,14 @@ typedef struct rfc_ctx
         RFC_ERROR_NOERROR               =  0,                       /**< No error */
         RFC_ERROR_INVARG                =  1,                       /**< Invalid arguments passed */
         RFC_ERROR_MEMORY                =  2,                       /**< Error on memory allocation */
+#if RFC_TP_SUPPORT
+        RFC_ERROR_TP                    =  3,                       /**< Error while amplitude transformation */
+#endif /*RFC_TP_SUPPORT*/
 #if RFC_AT_SUPPORT
-        RFC_ERROR_AT                    =  3,                       /**< Error while amplitude transformation */
+        RFC_ERROR_AT                    =  4,                       /**< Error while amplitude transformation */
 #endif /*RFC_AT_SUPPORT*/
 #if RFC_DAMAGE_FAST
-        RFC_ERROR_LUT                   =  4,                       /**< Error while accessing look up tables */
+        RFC_ERROR_LUT                   =  5,                       /**< Error while accessing look up tables */
 #endif /*RFC_DAMAGE_FAST*/
     }                                   error;                      /**< Error code */
 
@@ -531,6 +535,7 @@ typedef struct rfc_ctx
     rfc_tp_next_fcn_t                   tp_next_fcn;                /**< Test for new turning point */
 #if RFC_TP_SUPPORT
     rfc_tp_add_fcn_t                    tp_add_fcn;                 /**< Handling new turning points */
+    rfc_tp_inc_damage_fcn_t             tp_inc_damage_fcn;          /**< Increase damage for existing turning point */
     rfc_tp_prune_fcn_t                  tp_prune_fcn;               /**< Prune turning points */
 #endif /*RFC_TP_SUPPORT*/
     rfc_finalize_fcn_t                  finalize_fcn;               /**< Finalizing function */
