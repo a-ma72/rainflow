@@ -11,9 +11,10 @@ function validate
   enforce_margin    = 0;
   use_hcm           = 0;
   residual_method   = 0;
+  spread_damage     = -1;
 
   [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
-                          residual_method, enforce_margin, use_hcm );
+                          residual_method, enforce_margin, use_hcm, spread_damage );
 
   assert( sum( sum( rm ) ) == 0 );
 
@@ -34,9 +35,10 @@ function validate
   enforce_margin    = 0;
   use_hcm           = 0;
   residual_method   = 0;
+  spread_damage     = -1;
 
   [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
-                          residual_method, enforce_margin, use_hcm );
+                          residual_method, enforce_margin, use_hcm, spread_damage );
 
   assert( sum( sum( rm ) ) == 1 );
   assert( rm( 3,2 ) == 1 );
@@ -59,9 +61,10 @@ function validate
   enforce_margin    = 0;
   use_hcm           = 0;
   residual_method   = 0;
+  spread_damage     = -1;
 
   [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
-                          residual_method, enforce_margin, use_hcm );
+                          residual_method, enforce_margin, use_hcm, spread_damage );
 
   assert( sum( sum( rm ) ) == 1 );
   assert( rm( 2,3 ) == 1 );
@@ -84,9 +87,10 @@ function validate
   enforce_margin    = 0;
   use_hcm           = 0;
   residual_method   = 0;
+  spread_damage     = -1;
 
   [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
-                          residual_method, enforce_margin, use_hcm );
+                          residual_method, enforce_margin, use_hcm, spread_damage );
 
   assert( sum( sum( rm ) ) == 7 );
   assert( rm( 5,3 ) == 2 );
@@ -107,19 +111,33 @@ function validate
   x                 = export_series( name, cumsum( randn( 1e4, 1 ) ), class_count );
   x_max             = max(x);
   x_min             = min(x);
+  if 0
+  x                 = export_series( name, randn( 1e4, 1 ), class_count );
+  x_max             = max(x) * 1.03;
+  x_min             = min(x) * 1.03;
+  end
   class_width       = round( (x_max - x_min) / (class_count - 1), 2 );
   class_offset      = x_min - class_width / 2;
   hysteresis        = class_width;
   enforce_margin    = 0;
   use_hcm           = 0;
   residual_method   = 0;
+  spread_damage     = 5;
 
-  [pd,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
-                           residual_method, enforce_margin, use_hcm );
+  [pd,re,rm,rp,lc,tp] = ...
+    rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
+                residual_method, enforce_margin, use_hcm, spread_damage );
+              
+  assert( abs( sum( tp(:,3) ) / pd - 1 ) < 1e-10 );
 
   save( name, 'rm', 're' );
 
   close all
+  figure
+  plotyy( tp(:,1), tp(:,2), tp(:,1), cumsum( tp(:,3) ) );
+  grid
+  
+  figure
   plot( re );
   title( 'Residuum' );
   xlabel( 'Index' );

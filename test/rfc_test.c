@@ -1209,7 +1209,7 @@ TEST RFC_miner_consequent2( void )
     RFC_VALUE_TYPE      class_width;
     RFC_VALUE_TYPE      class_offset;
     RFC_VALUE_TYPE      hysteresis;
-    double              D_orig, D_mod, D_elem, D_mk;
+    double              D_elem, D_orig, D_mod, D_con;
     double              rp_hist[100];
     double              k, k2;
     size_t              i, j;
@@ -1261,7 +1261,9 @@ TEST RFC_miner_consequent2( void )
     ctx.wl_k2 = k2;
     ASSERT( RFC_damage_from_rp( &ctx, /* counts */ NULL, /* sa */ NULL, &D_mod,  RFC_RP_DAMAGE_CALC_TYPE_MODIFIED ) );
     ctx.wl_k2 = k;
-    ASSERT( RFC_damage_from_rp( &ctx, /* counts */ NULL, /* sa */ NULL, &D_mk,   RFC_RP_DAMAGE_CALC_TYPE_CONSEQUENT ) );
+    ASSERT( RFC_damage_from_rp( &ctx, /* counts */ NULL, /* sa */ NULL, &D_con,  RFC_RP_DAMAGE_CALC_TYPE_CONSEQUENT ) );
+
+    ASSERT( fabs( D_con / ctx.internal.wl.D - 1 ) < 1e-3 );
 
     for( j = 0; j < (int)class_count; j++ )
     {
@@ -1270,7 +1272,7 @@ TEST RFC_miner_consequent2( void )
 
     ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
 
-    if(1)
+    if(0)
     {
         FILE*   file = NULL;
         int     i;
@@ -1296,9 +1298,9 @@ TEST RFC_miner_consequent2( void )
         fprintf( file, "Miner original: \t%g\n", D_orig );
         fprintf( file, "Miner elementary: \t%g\n", D_elem );
         fprintf( file, "Miner modified: \t%g\n", D_mod );
-        fprintf( file, "Miner consequent: \t%g\n", D_mk );
+        fprintf( file, "Miner consequent: \t%g\n", D_con );
         fprintf( file, "Miner live: \t%g\n", ctx.internal.wl.D );
-        fprintf( file, "\nRepeats: \t%llu\n", repeats );
+        fprintf( file, "\nRepeats: \t%lu\n", (unsigned long)repeats );
         fprintf( file, "\nRP Histogram:\n" );
         fprintf( file, "#\tSa\tn\tN\tWL_orig\tWL_elem\tWL_mod\n" );
 

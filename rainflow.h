@@ -99,11 +99,24 @@
 /* This version is generated via coan (http://coan2.sourceforge.net/) */
 #endif /*COAN_INVOKED*/
 
-
+// Notes on mix C and C++ headers:
+// https://developers.redhat.com/blog/2016/02/29/why-cstdlib-is-more-complicated-than-you-might-think/
+// Avoid including C standard headers in a C++ namespace!
+#ifdef __cplusplus
+#include <cstdbool>  /* bool, true, false */
+#include <cstdint>   /* ULLONG_MAX */
+#include <climits>   /* ULLONG_MAX */
+#include <cstddef>   /* size_t, NULL */
+#ifndef RFC_CPP_NAMESPACE
+#define RFC_CPP_NAMESPACE rainflow_C
+#endif /*RFC_CPP_NAMESPACE*/
+namespace RFC_CPP_NAMESPACE {
+#else /*!__cplusplus*/
 #include <stdbool.h> /* bool, true, false */
 #include <stdint.h>  /* ULLONG_MAX */
 #include <limits.h>  /* ULLONG_MAX */
 #include <stddef.h>  /* size_t, NULL */
+#endif __cplusplus
 #include "config.h"  /* Configuration */
 
 
@@ -248,6 +261,9 @@ typedef struct rfc_wl_param     rfc_wl_param_s;      /** Woehler curve parameter
 typedef struct rfc_rfm_item     rfc_rfm_item_s;      /** Rainflow matrix element */
 #endif /*!RFC_MINIMAL*/
 
+#ifdef __cplusplus
+extern "C" {
+#endif /*__cplusplus*/
 
 /* Core functions */
 bool    RFC_init                ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
@@ -300,6 +316,10 @@ bool    RFC_at_init             ( void *ctx, const double *Sa, const double *Sm,
                                              double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
 bool    RFC_at_transform        ( void *ctx, double Sa, double Sm, double *Sa_transformed );
 #endif /*RFC_AT_SUPPORT*/
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif /*__cplusplus*/
 
 #if RFC_USE_DELEGATES
 /* Delegates typedef */
@@ -414,7 +434,7 @@ typedef struct rfc_ctx
         RFC_STATE_BUSY_INTERIM,                                     /**< In counting state, having still one interim turning point (not included) */
         RFC_STATE_FINALIZE,                                         /**< Finalizing */
         RFC_STATE_FINISHED,                                         /**< Counting finished, memory still allocated */
-        RFC_STATE_ERROR,                                            /**< An error occured */
+        RFC_STATE_ERROR,                                            /**< An error occurred */
     }                                   state;                      /**< Current counting state */
 
     enum
@@ -440,6 +460,7 @@ typedef struct rfc_ctx
 #if RFC_HCM_SUPPORT
         RFC_COUNTING_METHOD_HCM         =  2,                       /**< 3 point algorithm, Clormann/Seeger (HCM) method */
 #endif /*RFC_HCM_SUPPORT*/
+        RFC_COUNTING_METHOD_COUNT                                   /**< Number of options */
     }
                                         counting_method;
 #endif /*!RFC_MINIMAL*/
@@ -473,6 +494,7 @@ typedef struct rfc_ctx
         RFC_SD_FULL_P3                  =  6,                       /**< Assign damage to P3 */
         RFC_SD_TRANSIENT_23             =  7,                       /**< Spread damage transient according to amplitude over points between P2 and P3 */
         RFC_SD_TRANSIENT_23c            =  8,                       /**< Spread damage transient according to amplitude over points between P2 and P4 only until cycle is closed */
+        RFC_SD_COUNT                                                /**< Number of options */
     }
                                         spread_damage_method;
 #endif /*RFC_DH_SUPPORT*/
@@ -536,16 +558,16 @@ typedef struct rfc_ctx
 
 #if RFC_TP_SUPPORT
     /* Turning points storage (optional, may be NULL) */
-    rfc_value_tuple_s                  *tp;                         /**< Buffer for turning points, pointer may be changed thru memory reallocation! */
+    rfc_value_tuple_s                  *tp;                         /**< Buffer for turning points, pointer may be changed whilst memory reallocation! */
     size_t                              tp_cap;                     /**< Buffer capacity (number of elements) */
     size_t                              tp_cnt;                     /**< Number of turning points in buffer */
-    bool                                tp_locked;                  /**< If tp_locked, tp is freezed. Only RFC_tp_prune() may change content */
+    int                                 tp_locked;                  /**< If tp_locked > 0, tp is freezed. Only RFC_tp_prune() may change content */
     size_t                              tp_prune_size;              /**< Size for autoprune */
     size_t                              tp_prune_threshold;         /**< Threshold for (auto)pruning */
 #endif /*RFC_TP_SUPPORT*/
 
 #if RFC_DH_SUPPORT
-    double                             *dh;                         /**< Damage history, pointer may be changed thru memory reallocation! */
+    double                             *dh;                         /**< Damage history, pointer may be changed whilst memory reallocation! */
     size_t                              dh_cap;                     /**< Capacity of dh */
     size_t                              dh_cnt;                     /**< Number of values in dh */
 #endif /*RFC_DH_SUPPORT*/
@@ -587,7 +609,7 @@ typedef struct rfc_ctx
         size_t                          global_offset;              /**< Offset for pos */
         rfc_value_tuple_s               residue[3];                 /**< Static residue (if class_count is zero) */
         size_t                          residue_cap;                /**< Capacity of static residue */
-        bool                            res_static;                 /**< true, if static residue is in use */
+        bool                            res_static;                 /**< true, if .residue refers the static residue .internal.residue */
 #if !RFC_MINIMAL
         rfc_wl_param_s                  wl;                         /**< Shadowed Woehler curve parameters */
 #endif /*!RFC_MINIMAL*/
@@ -621,3 +643,7 @@ typedef struct rfc_ctx
     }
                                         internal;
 } rfc_ctx_s;
+
+#ifdef __cplusplus
+}  // namespace RFC_CPP_NAMESPACE
+#endif /*__cplusplus*/

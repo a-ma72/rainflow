@@ -156,7 +156,7 @@ static void                 RFC_cycle_find                      ( rfc_ctx_s *, i
 #endif /*!RFC_MINIMAL*/
 static bool                 RFC_feed_once                       ( rfc_ctx_s *, const rfc_value_tuple_s* tp, int flags );
 #if RFC_DH_SUPPORT
-static bool                 RFC_feed_once_dh                    ( rfc_ctx_s * );
+static bool                 RFC_feed_once_dh                    ( rfc_ctx_s *, const rfc_value_tuple_s* pt );
 #endif /*RFC_DH_SUPPORT*/
 #if RFC_TP_SUPPORT
 static bool                 RFC_feed_once_tp_check_margin       ( rfc_ctx_s *, const rfc_value_tuple_s* pt, rfc_value_tuple_s** tp_residue );
@@ -1182,9 +1182,14 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
         rfc_value_tuple_s tp = { *data++ };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
 
         /* Assign class and global position (base 1) */
-        tp.cls = QUANTIZE( rfc_ctx, tp.value );
         tp.pos = ++rfc_ctx->internal.pos;
+        tp.cls = QUANTIZE( rfc_ctx, tp.value );
 
+        if( tp.cls >= rfc_ctx->class_count )
+        {
+            return RFC_error_raise( rfc_ctx, RFC_ERROR_INVARG );
+        }
+        
         if( !RFC_feed_once( rfc_ctx, &tp, rfc_ctx->internal.flags ) ) return false;
     }
 
@@ -1229,6 +1234,11 @@ bool RFC_feed_scaled( void *ctx, const RFC_value_type * data, size_t data_count,
         tp.cls = QUANTIZE( rfc_ctx, tp.value );
         tp.pos = ++rfc_ctx->internal.pos;
 
+        if( tp.cls >= rfc_ctx->class_count )
+        {
+            return RFC_error_raise( rfc_ctx, RFC_ERROR_INVARG );
+        }
+        
         if( !RFC_feed_once( rfc_ctx, &tp, rfc_ctx->internal.flags ) ) return false;
     }
 
@@ -1264,6 +1274,11 @@ bool RFC_feed_tuple( void *ctx, rfc_value_tuple_s *data, size_t data_count )
     /* Process data */
     while( data_count-- )
     {
+        if( data->cls >= rfc_ctx->class_count )
+        {
+            return RFC_error_raise( rfc_ctx, RFC_ERROR_INVARG );
+        }
+        
         if( !RFC_feed_once( rfc_ctx, data++, rfc_ctx->internal.flags ) ) return false;
     }
 
@@ -2127,8 +2142,14 @@ bool RFC_damage_from_rp( void *ctx, const RFC_counts_type *counts, const RFC_val
             /* Forward until amplitude is below fatigue strength SD for the unimpaired part */
             if( Sa_j >= Sd && Sd > 0.0 ) continue;
 
-            /* Weighted damage
-               [6] chapter 3.2.9, formula 3.2-65 */
+            /**
+             *  The following lines of code doesn't reflect the original formula as in [6] chapter 3.2.9, formula 3.2-65.
+             *  This realisation resolves his approach to use partial damages instead of particular cycles from the histogram.
+             *  This solution benefits from inserting an abstraction layer, which permits to use any representation of 
+             *  a Woehler curve with a given fatigue strength limit.
+             */
+
+            /* Weighted damage */
             weight = pow( Sj / Sd, q ) - pow( Sa_j / Sd, q );
             Sj     = Sa_j;
 
@@ -2791,7 +2812,7 @@ bool RFC_feed_once( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt, int flags )
 
 #if RFC_DH_SUPPORT
     /* Resize damage history if necessary */
-    if( !RFC_feed_once_dh( rfc_ctx ) )
+    if( !RFC_feed_once_dh( rfc_ctx, pt ) )
     {
         return false;
     }
@@ -2854,30 +2875,36 @@ bool RFC_feed_once( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt, int flags )
  * @brief      Resize damage history if necessary.
  *
  * @param      rfc_ctx  The rainflow context
+ * @param[in]  pt       The point
  *
  * @return     true on success
  */
 static
-bool RFC_feed_once_dh( rfc_ctx_s *rfc_ctx )
+bool RFC_feed_once_dh( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt )
 {
     assert( rfc_ctx );
+    assert( pt );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
-    if( rfc_ctx->dh && rfc_ctx->dh_cnt > rfc_ctx->dh_cap )
+    if( rfc_ctx->dh )
     {
-        size_t new_cap = (size_t)1024 * ( rfc_ctx->dh_cap / 640 + 1 ); /* + 60% + 1024 */
-
-        rfc_ctx->dh = (double*)rfc_ctx->mem_alloc( rfc_ctx->dh, new_cap, 
-                                                   sizeof(RFC_value_type), RFC_MEM_AIM_DH );
-
-        if( !rfc_ctx->dh )
+        if( pt->pos > rfc_ctx->dh_cap )
         {
-            return RFC_error_raise( rfc_ctx, RFC_ERROR_MEMORY );
+            size_t new_cap = (size_t)1024 * ( pt->pos / 640 + 1 ); /* + 60% + 1024 */
+
+            rfc_ctx->dh = (double*)rfc_ctx->mem_alloc( rfc_ctx->dh, new_cap, 
+                                                       sizeof(RFC_value_type), RFC_MEM_AIM_DH );
+
+            if( !rfc_ctx->dh )
+            {
+                return RFC_error_raise( rfc_ctx, RFC_ERROR_MEMORY );
+            }
+
+            memset( rfc_ctx->dh + rfc_ctx->dh_cnt, 0, sizeof(RFC_value_type) * ( new_cap - rfc_ctx->dh_cap ) );
+            rfc_ctx->dh_cap = new_cap;
         }
 
-        memset( rfc_ctx->dh + rfc_ctx->dh_cnt, 0, sizeof(RFC_value_type) * ( new_cap - rfc_ctx->dh_cap ) );
-        rfc_ctx->dh_cap = new_cap;
-        rfc_ctx->dh_cnt++;
+        rfc_ctx->dh_cnt = pt->pos;
     }
 
     return true;
@@ -3426,8 +3453,10 @@ bool RFC_finalize_res_repeated( rfc_ctx_s *rfc_ctx, int flags )
             }
 
             rfc_ctx->internal.flags = flags;
-            /* Feed again with the copy */
+            /* Feed again with the copy, but don't generate new turning points, update existing ones instead */
+            rfc_ctx->tp_locked++;
             ok = RFC_feed_tuple( rfc_ctx, residue, cnt );
+            rfc_ctx->tp_locked--;
             rfc_ctx->internal.flags = old_flags;
 
             /* Free temporary residue */
@@ -4405,9 +4434,9 @@ void RFC_cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_
                Only cycles exceeding Sd(D) have damaging effect. */
             if( Sa_i >= rfc_ctx->internal.wl.sd )
             {
-                rfc_wl_param_s  wl_unimp;
-                rfc_wl_param_s *wl_imp = &rfc_ctx->internal.wl;
-                double          D_mk;
+                rfc_wl_param_s  wl_unimp;                          /* WL parameters unimpaired part */
+                rfc_wl_param_s *wl_imp = &rfc_ctx->internal.wl;    /* WL parameters impaired part */
+                double          D_con;                             /* Current damage, Miners' consequent rule */
 
                 /* Backup Woehler curve parameters and use shadowed ones for the impaired part instead */
                 RFC_wl_param_get( rfc_ctx, &wl_unimp );
@@ -4418,26 +4447,26 @@ void RFC_cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_
                 {
                     /* Disable lut temporarily, since it is only valid for Woehler parameters for unimpaired part */
                     rfc_ctx->damage_lut_inapt++;
-                    (void)RFC_damage_calc_amplitude( rfc_ctx, Sa_i, &D_mk );
+                    (void)RFC_damage_calc_amplitude( rfc_ctx, Sa_i, &D_con );
                     rfc_ctx->damage_lut_inapt--;
                 }
                 else
 #endif /*RFC_DAMAGE_FAST*/
                 {
-                    (void)RFC_damage_calc_amplitude( rfc_ctx, Sa_i, &D_mk );
+                    (void)RFC_damage_calc_amplitude( rfc_ctx, Sa_i, &D_con );
                 }
 
-                D_mk += wl_imp->D;
+                D_con += wl_imp->D;
 
-                if( D_mk < 1.0 )
+                if( D_con < 1.0 )
                 {
                     /* Calculate new parameters for the Woehler curve, impaired part */
                     if( wl_unimp.sx > 0.0 )
                     {
                         double q       =       wl_imp->q;
                         double k       = fabs( wl_imp->k );
-                        rfc_ctx->wl_sx = wl_unimp.sx * pow( 1.0 - D_mk, 1.0 / q );
-                      //rfc_ctx->wl_nx = wl.nx * pow( 1.0 - D_mk, -( k - q ) / q );
+                        rfc_ctx->wl_sx = wl_unimp.sx * pow( 1.0 - D_con, 1.0 / q );
+                     /* rfc_ctx->wl_nx = wl.nx * pow( 1.0 - D_con, -( k - q ) / q );  // Damage accumulation is done in D_con! */
 
                         (void)RFC_wl_calc_n( rfc_ctx, 
                                              wl_unimp.sx, 
@@ -4451,8 +4480,8 @@ void RFC_cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_
                     {
                         double q2      =       wl_imp->q2;
                         double k2      = fabs( wl_imp->k2 );
-                        rfc_ctx->wl_sd = wl_unimp.sd * pow( 1.0 - D_mk, 1.0 / q2 );
-                      //rfc_ctx->wl_nx = wl_unimp.nx * pow( 1.0 - D_mk, -( k2 - q2 ) / q2 );
+                        rfc_ctx->wl_sd = wl_unimp.sd * pow( 1.0 - D_con, 1.0 / q2 );
+                     /* rfc_ctx->wl_nx = wl_unimp.nx * pow( 1.0 - D_con, -( k2 - q2 ) / q2 );  // Damage accumulation is done in D_con! */
 
                         (void)RFC_wl_calc_n( rfc_ctx, 
                                              wl_unimp.sd, 
@@ -4464,7 +4493,7 @@ void RFC_cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_
                 }
 
                 RFC_wl_param_get( rfc_ctx, wl_imp );
-                rfc_ctx->internal.wl.D = D_mk;
+                rfc_ctx->internal.wl.D = D_con;
                 RFC_wl_param_set( rfc_ctx, &wl_unimp );
             }
 #endif /*!RFC_MINIMAL*/
@@ -4626,7 +4655,12 @@ void RFC_tp_lock( rfc_ctx_s *rfc_ctx, bool do_lock )
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
-    rfc_ctx->tp_locked = do_lock;
+    rfc_ctx->tp_locked += do_lock ? 1 : -1;
+
+    if( rfc_ctx->tp_locked < 0 )
+    {
+        rfc_ctx->tp_locked = 0;
+    }
 }
 
 
@@ -4761,8 +4795,11 @@ bool RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
             }
 
 #if RFC_TP_SUPPORT
-            from->damage += damage_lhs;
-            to->damage   += damage_rhs;
+            if( rfc_ctx->tp )
+            {
+                rfc_ctx->tp[ from->tp_pos - 1 ].damage += damage_lhs;
+                rfc_ctx->tp[ to->tp_pos   - 1 ].damage += damage_rhs;
+            }
 #endif /*RFC_TP_SUPPORT*/
 
 #if RFC_DH_SUPPORT
@@ -5071,7 +5108,7 @@ static
 void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 {
 #if !RFC_MINIMAL
-    if( nrhs != 8 )
+    if( nrhs != 9 )
     {
         mexErrMsgTxt( "Function needs exact 8 arguments!" );
 #else /*RFC_MINIMAL*/
@@ -5099,6 +5136,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         const mxArray  *mxResidualMethod = prhs[5];
         const mxArray  *mxEnforceMargin  = prhs[6];
         const mxArray  *mxUseHCM         = prhs[7];
+        const mxArray  *mxSpreadDamage   = prhs[8];
 #endif /*!RFC_MINIMAL*/        
 
         RFC_value_type *buffer           = NULL;
@@ -5112,6 +5150,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         int             residual_method  = (int)( mxGetScalar( mxResidualMethod ) + 0.5 );
         int             enforce_margin   = (int)mxGetScalar( mxEnforceMargin );
         int             use_hcm          = (int)mxGetScalar( mxUseHCM );
+        int             spread_damage    = (int)mxGetScalar( mxSpreadDamage );
 #else /*RFC_MINIMAL*/
         int             residual_method  = RFC_RES_NONE;
 #endif /*!RFC_MINIMAL*/
@@ -5120,6 +5159,23 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 
         mxAssert( residual_method >= RFC_RES_NONE && residual_method <= RFC_RES_COUNT, 
                   "Invalid residual method!" );
+
+#if RFC_HCM_SUPPORT
+        mxAssert( use_hcm == 0 || use_hcm == 1,
+                  "Invalid HCM flag, use 0 or 1!" );
+#else /*!RFC_HCM_SUPPORT*/
+        mxAssert( use_hcm == 0,
+                  "HCM not supported!" );
+#endif /*RFC_HCM_SUPPORT*/
+        
+
+#if RFC_DH_SUPPORT
+        mxAssert( spread_damage >= RFC_SD_NONE && spread_damage <= RFC_SD_COUNT,
+                  "Invalid spread damage method!" );
+#else /*!RFC_DH_SUPPORT*/
+        mxAssert( spread_damage == RFC_SD_NONE,
+                  "Invalid spread damage method, only %d accepted!", RFC_SD_NONE );
+#endif /*RFC_DH_SUPPORT*/
 
         ok = RFC_init( &rfc_ctx, 
                        class_count, (RFC_value_type)class_width, (RFC_value_type)class_offset, 
@@ -5139,6 +5195,10 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         {
             mexErrMsgTxt( "Error during initialization!" );
         }
+
+#if RFC_DH_SUPPORT
+        rfc_ctx.spread_damage_method = spread_damage;
+#endif /*RFC_DH_SUPPORT*/
 
         /* Cast values from double type to RFC_value_type */ 
         if( sizeof( RFC_value_type ) != sizeof(double) && data_len )  /* maybe unsafe! */
@@ -5283,17 +5343,26 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
             /* Turning points */
             if( nlhs > 5 && rfc_ctx.tp )
             {
+#if RFC_DH_SUPPORT
+                mxArray* tp = mxCreateDoubleMatrix( rfc_ctx.tp_cnt, 3, mxREAL );
+                double *dam = tp ? ( mxGetPr(tp) + 2 * rfc_ctx.tp_cnt ) : NULL;
+#else /*!RFC_DH_SUPPORT*/
                 mxArray* tp = mxCreateDoubleMatrix( rfc_ctx.tp_cnt, 2, mxREAL );
+#endif /*RFC_DH_SUPPORT*/
+
                 if( tp )
                 {
-                    size_t i;
-                    double *idx = mxGetPr(tp) + 0;
-                    double *val = mxGetPr(tp) + rfc_ctx.tp_cnt;
+                    size_t  i;
+                    double *idx = mxGetPr(tp) + 0 * rfc_ctx.tp_cnt;
+                    double *val = mxGetPr(tp) + 1 * rfc_ctx.tp_cnt;
 
                     for( i = 0; i < rfc_ctx.tp_cnt; i++ )
                     {
                         *val++ = (double)rfc_ctx.tp[i].value;
                         *idx++ = (double)rfc_ctx.tp[i].pos;
+#if RFC_DH_SUPPORT
+                        *dam++ = (double)rfc_ctx.tp[i].damage;
+#endif /*RFC_DH_SUPPORT*/
                     }
                     plhs[5] = tp;
                 }
