@@ -116,7 +116,7 @@ namespace RFC_CPP_NAMESPACE {
 #include <stdint.h>  /* ULLONG_MAX */
 #include <limits.h>  /* ULLONG_MAX */
 #include <stddef.h>  /* size_t, NULL */
-#endif __cplusplus
+#endif /*__cplusplus*/
 #include "config.h"  /* Configuration */
 
 
