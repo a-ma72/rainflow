@@ -121,8 +121,11 @@ function validate
   hysteresis        = class_width;
   enforce_margin    = 0;
   use_hcm           = 0;
-  residual_method   = 0;
+  residual_method   = 6;   % 0, 6
   spread_damage     = 5;
+  
+  x = [0,4,2,20];
+  %x(end) = x_max;
 
   [pd,re,rm,rp,lc,tp] = ...
     rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...

@@ -348,7 +348,7 @@ typedef struct rfc_value_tuple
     unsigned                            cls;                        /**< Class number, base 0 */
     size_t                              pos;                        /**< Absolute position in input data stream, base 1 */
 #if RFC_TP_SUPPORT
-    size_t                              tp_pos;                     /**< Position in tp storage, base 1 */
+    size_t                              tp_pos;                     /**< Position in tp storage, base 1. Not used in tp storage itself, always 0! */
 #if RFC_DH_SUPPORT
     double                              damage;                     /**< Damage accumulated to this turning point */
 #endif /*RFC_DH_SUPPORT*/    
@@ -473,14 +473,14 @@ typedef struct rfc_ctx
     {
         /* Don't change order! */
         RFC_RES_NONE                    = 0,                        /**< No residual method */
-        RFC_RES_IGNORE,                                             /**< Ignore residue (same as RFC_RES_NONE) */
+        RFC_RES_IGNORE                  = 1,                        /**< Ignore residue (same as RFC_RES_NONE) */
 #if !RFC_MINIMAL
-        RFC_RES_DISCARD,                                            /**< Discard residue (empty residue) */
-        RFC_RES_HALFCYCLES,                                         /**< ASTM */
-        RFC_RES_FULLCYCLES,                                         /**< Count half cycles as full cycles */
-        RFC_RES_CLORMANN_SEEGER,                                    /**< Clormann/Seeger method */
-        RFC_RES_REPEATED,                                           /**< Repeat residue and count closed cycles */
-        RFC_RES_RP_DIN45667,                                        /**< Count residue according to range pair in DIN-45667 */
+        RFC_RES_DISCARD                 = 2,                        /**< Discard residue (empty residue) */
+        RFC_RES_HALFCYCLES              = 3,                        /**< ASTM */
+        RFC_RES_FULLCYCLES              = 4,                        /**< Count half cycles as full cycles */
+        RFC_RES_CLORMANN_SEEGER         = 5,                        /**< Clormann/Seeger method */
+        RFC_RES_REPEATED                = 6,                        /**< Repeat residue and count closed cycles */
+        RFC_RES_RP_DIN45667             = 7,                        /**< Count residue according to range pair in DIN-45667 */
 #endif /*!RFC_MINIMAL*/
         RFC_RES_COUNT                                               /**< Number of options */
     }
@@ -566,7 +566,7 @@ typedef struct rfc_ctx
     rfc_value_tuple_s                  *tp;                         /**< Buffer for turning points, pointer may be changed whilst memory reallocation! */
     size_t                              tp_cap;                     /**< Buffer capacity (number of elements) */
     size_t                              tp_cnt;                     /**< Number of turning points in buffer */
-    int                                 tp_locked;                  /**< If tp_locked > 0, tp is freezed. Only RFC_tp_prune() may change content */
+    int                                 tp_locked;                  /**< If tp_locked > 0, no more points can be added. RFC_tp_prune() may delete content. Field .damage is always mutable */
     size_t                              tp_prune_size;              /**< Size for autoprune */
     size_t                              tp_prune_threshold;         /**< Threshold for (auto)pruning */
 #endif /*RFC_TP_SUPPORT*/

@@ -2036,7 +2036,7 @@ bool RFC_rp_from_rfm( void *ctx, RFC_counts_type *counts, RFC_value_type *class_
         for( j = i; j < class_count; j++ ) 
         {
             /* Count rising and falling slopes */
-            //!assert( sum < RFC_COUNTS_LIMIT - rfm[ j-i, j ] - rfm[ j, j-i ] );
+            assert( sum < ( RFC_COUNTS_LIMIT - rfm[ j-i, j ] - rfm[ j, j-i ] ) );
             sum += rfm[ j-i, j   ];
             sum += rfm[ j,   j-i ];
         }
@@ -2838,7 +2838,7 @@ bool RFC_feed_once( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt, int flags )
     if( tp_residue )
     {
 #if RFC_TP_SUPPORT
-        /* Add new turning point, position in field tp will be stored in tp_residue */
+        /* Add a copy of tp_residue to rfc_ctx->tp and alter tp_residue->tp_pos to its position in rfc_ctx->tp */
         if( !RFC_tp_add( rfc_ctx, tp_residue ) )
         {
             return false;
@@ -3423,10 +3423,14 @@ bool RFC_finalize_res_rp_DIN45667( rfc_ctx_s *rfc_ctx, int flags )
 static
 bool RFC_finalize_res_repeated( rfc_ctx_s *rfc_ctx, int flags )
 {
+    size_t tp_cnt;
+
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
-    /* Don't include interim turning point! */
+    /* Keep number of turning points. The only scenario in which the number increases, is where
+       the interim turning point gets a real turning point */
+    tp_cnt = rfc_ctx->tp_cnt;
 
     if( rfc_ctx->residue && rfc_ctx->residue_cnt && flags )
     {
@@ -3455,10 +3459,8 @@ bool RFC_finalize_res_repeated( rfc_ctx_s *rfc_ctx, int flags )
             }
 
             rfc_ctx->internal.flags = flags;
-            /* Feed again with the copy, but don't generate new turning points, update existing ones instead */
-            rfc_ctx->tp_locked++;
+            /* Feed again with the copy, no new turning points are generated, since residue[].tp_pos > 0 (except interim tp) */
             ok = RFC_feed_tuple( rfc_ctx, residue, cnt );
-            rfc_ctx->tp_locked--;
             rfc_ctx->internal.flags = old_flags;
 
             /* Free temporary residue */
@@ -3473,6 +3475,14 @@ bool RFC_finalize_res_repeated( rfc_ctx_s *rfc_ctx, int flags )
         {
             return RFC_error_raise( rfc_ctx, RFC_ERROR_MEMORY );
         }
+    }
+
+    if( rfc_ctx->tp_cnt > tp_cnt )
+    {
+        assert( rfc_ctx->tp_cnt == tp_cnt + 1 );
+
+        /* Interim turning point handled already */
+        rfc_ctx->state = RFC_STATE_BUSY;
     }
 
     /* Include interim turning point */
@@ -4176,6 +4186,7 @@ void RFC_cycle_find( rfc_ctx_s *rfc_ctx, int flags )
         }
     }
 
+    /* If no rainflow counting is done, just look out for turning points, discard residue */
     if( rfc_ctx->counting_method == RFC_COUNTING_METHOD_NONE || !rfc_ctx->class_count )
     {
         /* Prune residue */
@@ -4428,8 +4439,8 @@ void RFC_cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_
                 return;
             }
 
-            /* Adding damage due to current cycle weight */
-            rfc_ctx->damage += D_i / rfc_ctx->full_inc * rfc_ctx->curr_inc;
+            /* Adding damage for the current cycle, with its actual weight */
+            rfc_ctx->damage += D_i * rfc_ctx->curr_inc / rfc_ctx->full_inc;
 #if !RFC_MINIMAL
             /* Fatigue strength Sd(D) depresses in subject to cumulative damage D.
                Sd(D)/Sd = (1-D)^(1/q), [6] chapter 3.2.9, formula 3.2-44 and 3.2-46
@@ -4580,7 +4591,7 @@ void RFC_cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_
 
 #if RFC_TP_SUPPORT
 /**
- * @brief         Append one turning point to the queue
+ * @brief         Add a copy of tp to rfc_ctx->tp and alter tp->tp_pos to its position in rfc_ctx->tp
  *
  * @param         rfc_ctx  The rainflow context
  * @param[in,out] tp       New turning points
@@ -4592,6 +4603,12 @@ bool RFC_tp_add( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *tp )
 {
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
+
+    /* Check if tp already exists in .tp */
+    if( tp && tp->tp_pos )
+    {
+        return true;
+    }
 
     /* Add new turning point */
 
@@ -4631,8 +4648,8 @@ bool RFC_tp_add( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *tp )
                 }
             }
             /* Append turning point */
-            rfc_ctx->tp[ rfc_ctx->tp_cnt++ ] = *tp;
-            tp->tp_pos = rfc_ctx->tp_cnt; /* Turning point get its position index in tp, base 1 */
+            rfc_ctx->tp[ rfc_ctx->tp_cnt++ ] = *tp;  /* Make a copy of tp in .tp, tp->tp_pos remains unaltered */
+            tp->tp_pos = rfc_ctx->tp_cnt;            /* Turning point get its position index in tp, base 1 */
         }
 
         if( rfc_ctx->internal.flags & RFC_FLAGS_TPAUTOPRUNE && rfc_ctx->tp_cnt > rfc_ctx->tp_prune_threshold )
@@ -4672,7 +4689,7 @@ bool RFC_tp_inc_damage( rfc_ctx_s *rfc_ctx, size_t tp_pos, double damage )
     else
 #endif /*RFC_USE_DELEGATES*/
     {
-        if( rfc_ctx->tp && !rfc_ctx->tp_locked )
+        if( rfc_ctx->tp && tp_pos )
         {
             if( tp_pos >= rfc_ctx->tp_cnt )
             {
@@ -4802,13 +4819,24 @@ bool RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
                                             rfc_value_tuple_s *to, 
                                             rfc_value_tuple_s *next, int flags )
 {
+    int    spread_damage_method;
     double D = 0.0;
 
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
     assert( from && to );
 
-    switch( rfc_ctx->spread_damage_method )
+    spread_damage_method = rfc_ctx->spread_damage_method;
+
+    if( !from->tp_pos && !to->tp_pos )
+    {
+        return true;
+    }
+
+    if( !from->tp_pos ) spread_damage_method = RFC_SD_FULL_P3;
+    if( !to->tp_pos )   spread_damage_method = RFC_SD_FULL_P2;
+
+    switch( spread_damage_method  )
     {
         case RFC_SD_NONE:
             break;
@@ -4822,6 +4850,9 @@ bool RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
             {
                 return false;
             }
+
+            /* Current cycle weight */
+            D *= rfc_ctx->curr_inc / rfc_ctx->full_inc;
 
             if( rfc_ctx->spread_damage_method == RFC_SD_FULL_P2 )
             {
@@ -4839,15 +4870,30 @@ bool RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
             }
 
 #if RFC_TP_SUPPORT
-            RFC_tp_inc_damage( rfc_ctx, from->tp_pos, damage_lhs );
-            RFC_tp_inc_damage( rfc_ctx, to->tp_pos,   damage_rhs );
+            if( from->tp_pos && !RFC_tp_inc_damage( rfc_ctx, from->tp_pos, damage_lhs ) )
+            {
+                return false;
+            }
+
+            if( to->tp_pos && !RFC_tp_inc_damage( rfc_ctx, to->tp_pos, damage_rhs ) )
+            {
+                return false;
+            }
 #endif /*RFC_TP_SUPPORT*/
 
 #if RFC_DH_SUPPORT
             if( rfc_ctx->dh )
             {
-                rfc_ctx->dh[ from->pos - 1 ] += damage_lhs;
-                rfc_ctx->dh[ to->pos   - 1 ] += damage_rhs;
+                if( from->pos )
+                {
+                    rfc_ctx->dh[ from->pos - 1 ] += damage_lhs;
+                }
+                else damage_rhs += damage_lhs;
+
+                if( to->pos )
+                {
+                    rfc_ctx->dh[ to->pos - 1 ] += damage_rhs;
+                }
             }
 #endif /*RFC_DH_SUPPORT*/
 
@@ -4925,6 +4971,8 @@ bool RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
                         {
                             return false;
                         }
+                        /* Current cycle weight */
+                        D *= rfc_ctx->curr_inc / rfc_ctx->full_inc;
                         /* Di = 1/( ND*(Sa/SD*weight)^k ) = 1/( ND*(Sa/SD)^k ) * 1/weight^k */
                         D_new = D * pow( weight, -fabs(rfc_ctx->wl_k) );
                         break;
@@ -4934,6 +4982,8 @@ bool RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
                         {
                             return false;
                         }
+                        /* Current cycle weight */
+                        D *= rfc_ctx->curr_inc / rfc_ctx->full_inc;
                         /* Di = 1/( ND*(Sa/SD)^k ) * weight */
                         D_new = D * weight;
                         break;
@@ -4947,7 +4997,10 @@ bool RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
                         rfc_ctx->dh[ pos_0 ] += D_new - D;
                     }
 #endif /*RFC_DH_SUPPORT*/
-                    RFC_tp_inc_damage( rfc_ctx, tp_pos_0 + 1, D_new - D );
+                    if( !RFC_tp_inc_damage( rfc_ctx, tp_pos_0 + 1, D_new - D ) )
+                    {
+                        return false;
+                    }
                     D = D_new;
                 }
             }
@@ -5281,14 +5334,37 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         rfc_ctx.counting_method  = RFC_COUNTING_METHOD_4PTM;
 #endif /*!RFC_MINIMAL*/
 #endif /*RFC_HCM_SUPPORT*/
-        RFC_feed( &rfc_ctx, buffer, data_len );
-        RFC_finalize( &rfc_ctx, residual_method );
+        ok = RFC_feed( &rfc_ctx, buffer, data_len ) &&
+             RFC_finalize( &rfc_ctx, residual_method );
 
         /* Free temporary buffer (cast) */
         if( (void*)buffer != (void*)data )
         {
             RFC_mem_alloc( buffer, 0, 0, RFC_MEM_AIM_TEMP );
             buffer = NULL;
+        }
+
+        if( !ok )
+        {
+            int error = rfc_ctx.error;
+
+            RFC_deinit( &rfc_ctx );
+            switch( error )
+            {
+                case RFC_ERROR_INVARG:
+                    mexErrMsgTxt( "Invalid argument(s)!" );
+                case RFC_ERROR_MEMORY:
+                    mexErrMsgTxt( "Error during memory allocation!" );
+                case RFC_ERROR_AT:
+                    mexErrMsgTxt( "Error during amplitude transformation!" );
+                case RFC_ERROR_TP:
+                    mexErrMsgTxt( "Error during turning point access!" );
+                case RFC_ERROR_LUT:
+                    mexErrMsgTxt( "Error during lookup table access!" );
+                case RFC_ERROR_UNEXP:
+                default:
+                    mexErrMsgTxt( "Unexpected error occured!" );
+            }
         }
 
         /* Return results */
@@ -5393,26 +5469,29 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
             if( nlhs > 5 && rfc_ctx.tp )
             {
 #if RFC_DH_SUPPORT
-                mxArray* tp = mxCreateDoubleMatrix( rfc_ctx.tp_cnt, 3, mxREAL );
-                double *dam = tp ? ( mxGetPr(tp) + 2 * rfc_ctx.tp_cnt ) : NULL;
+                mxArray *tp  = mxCreateDoubleMatrix( rfc_ctx.tp_cnt, 3, mxREAL );
+                double  *dam = tp ? ( mxGetPr(tp) + 2 * rfc_ctx.tp_cnt ) : NULL;
 #else /*!RFC_DH_SUPPORT*/
-                mxArray* tp = mxCreateDoubleMatrix( rfc_ctx.tp_cnt, 2, mxREAL );
+                mxArray* tp  = mxCreateDoubleMatrix( rfc_ctx.tp_cnt, 2, mxREAL );
 #endif /*RFC_DH_SUPPORT*/
 
                 if( tp )
                 {
                     size_t  i;
-                    double *idx = mxGetPr(tp) + 0 * rfc_ctx.tp_cnt;
-                    double *val = mxGetPr(tp) + 1 * rfc_ctx.tp_cnt;
+                    double *idx  = mxGetPr(tp) + 0 * rfc_ctx.tp_cnt;
+                    double *val  = mxGetPr(tp) + 1 * rfc_ctx.tp_cnt;
+                    double  D    = 0.0;
 
                     for( i = 0; i < rfc_ctx.tp_cnt; i++ )
                     {
-                        *val++ = (double)rfc_ctx.tp[i].value;
-                        *idx++ = (double)rfc_ctx.tp[i].pos;
+                        *val++  = (double)rfc_ctx.tp[i].value;
+                        *idx++  = (double)rfc_ctx.tp[i].pos;
 #if RFC_DH_SUPPORT
-                        *dam++ = (double)rfc_ctx.tp[i].damage;
+                        *dam++  = (double)rfc_ctx.tp[i].damage;
+                         D     += (double)rfc_ctx.tp[i].damage;
 #endif /*RFC_DH_SUPPORT*/
                     }
+                    //assert( D == rfc_ctx.damage );
                     plhs[5] = tp;
                 }
             }
