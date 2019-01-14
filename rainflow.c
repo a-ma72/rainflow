@@ -4836,6 +4836,7 @@ bool RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
 
     spread_damage_method = rfc_ctx->spread_damage_method;
 
+#if RFC_TP_SUPPORT
     if( !from->tp_pos && !to->tp_pos )
     {
         return true;
@@ -4843,6 +4844,7 @@ bool RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
 
     if( !from->tp_pos ) spread_damage_method = RFC_SD_FULL_P3;
     if( !to->tp_pos )   spread_damage_method = RFC_SD_FULL_P2;
+#endif /*RFC_TP_SUPPORT*/
 
     switch( spread_damage_method  )
     {
