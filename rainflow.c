@@ -4703,8 +4703,9 @@ bool RFC_tp_inc_damage( rfc_ctx_s *rfc_ctx, size_t tp_pos, double damage )
             {
                 return RFC_error_raise( rfc_ctx, RFC_ERROR_TP );
             }
-
+#if RFC_DH_SUPPORT
             rfc_ctx->tp[ tp_pos - 1 ].damage += damage;
+#endif /*RFC_DH_SUPPORT*/
         }
     }
 
