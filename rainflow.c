@@ -2554,7 +2554,7 @@ bool RFC_at_transform( void *ctx, double Sa, double Sm, double *Sa_transformed )
     }
 #endif
 
-    if (!rfc_ctx->at.count)
+    if( !rfc_ctx->at.count )
     {
         /* No reference curve given, return original amplitude */
         *Sa_transformed = Sa;
