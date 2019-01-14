@@ -137,7 +137,7 @@ double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
         RFC_tp_init( &ctx, TP /* *tp */, TP_N /* tp_cap */, true /* is_static */ ) )           \
     {                                                                                          \
         RFC_VALUE_TYPE data[] = {INIT_ARRAY X};                                                \
-        ASSERT( RFC_feed( &ctx, data, sizeof(data)/sizeof(RFC_VALUE_TYPE) ) );                 \
+        ASSERT( RFC_feed( &ctx, data, NUMEL(data) ) );                                         \
         ASSERT( RFC_finalize( &ctx, RFC_RES_NONE /* residual_method */ ) );                    \
     }                                                                                          \
     else FAIL();
@@ -159,7 +159,7 @@ double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
         RFC_tp_init( &ctx, TP /* *tp */, TP_N /* tp_cap */, true /* is_static */ ) )           \
     {                                                                                          \
         RFC_VALUE_TYPE data[] = {INIT_ARRAY X};                                                \
-        ASSERT( RFC_feed( &ctx, data, sizeof(data)/sizeof(RFC_VALUE_TYPE) ) );                 \
+        ASSERT( RFC_feed( &ctx, data, NUMEL(data) ) );                                         \
         ASSERT( RFC_finalize( &ctx, RFC_RES_NONE /* residual_method */ ) );                    \
     }                                                                                          \
     else FAIL();
@@ -915,7 +915,7 @@ TEST RFC_res_DIN45667( void )
                         1 /* hysteresis */, RFC_FLAGS_DEFAULT ) )
     {
         RFC_VALUE_TYPE data[] = {4.9f, 6, 4, 7, 3, 9, 5, 8, 6.9f};
-        ASSERT( RFC_feed( &ctx, data, sizeof(data)/sizeof(RFC_VALUE_TYPE) ) );
+        ASSERT( RFC_feed( &ctx, data, NUMEL(data) ) );
     }
     else FAIL();
 
@@ -936,8 +936,256 @@ TEST RFC_res_DIN45667( void )
 
     PASS();
 }
-#endif /*!RFC_MINIMAL*/
 
+TEST RFC_res_repeated( void )
+{
+/*
+                                                           
+    8.5 ___________________________________________________
+                      +               o                    
+    7.5 ___________________________________________________
+                                                           
+    6.5 ___________________________________________________
+              +               o                            
+    5.5 ___________________________________________________
+                                                           
+    4.5 ___________________________________________________
+                  +               o                        
+    3.5 ___________________________________________________
+          +               o                                
+    2.5 ___________________________________________________
+
+*/
+
+    rfc_value_tuple_s tp[10];
+    double damage;
+    double damage_5_3;
+    double damage_7_2;
+
+    damage_5_3 = pow( ( (5.0-3.0)/2 / ctx.wl_sx ), fabs(ctx.wl_k) ) / ctx.wl_nx;
+    damage_7_2 = pow( ( (7.0-2.0)/2 / ctx.wl_sx ), fabs(ctx.wl_k) ) / ctx.wl_nx;
+    damage = damage_5_3 * 2 + damage_7_2;
+
+    if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, -0.5 /* class_offset */,
+                        1 /* hysteresis */, RFC_FLAGS_DEFAULT ) )
+    {
+        /*                       v--------v      */
+        /*                          v--v         */
+        RFC_VALUE_TYPE data[] = {2, 5, 3, 7};
+#if RFC_TP_SUPPORT
+        ASSERT( RFC_tp_init( &ctx, tp, NUMEL(tp), /*is_static*/ true ) );
+#endif /*RFC_TP_SUPPORT*/
+#if RFC_DH_SUPPORT
+        ASSERT( RFC_dh_init( &ctx, RFC_SD_FULL_P2, /*dh*/ NULL, /*dh_cap*/ 0, /*is_static*/ true ) );
+#endif /*RFC_DH_SUPPORT*/        
+        ASSERT( RFC_feed( &ctx, data, NUMEL(data) ) );
+    }
+    else FAIL();
+
+    ASSERT( ctx.state == RFC_STATE_BUSY_INTERIM );
+    ASSERT( ctx.residue_cnt == 3 );
+    ASSERT( ctx.damage == 0.0 );
+#if RFC_TP_SUPPORT
+    ASSERT( ctx.tp_cnt == 3 );
+    ASSERT( ctx.tp[0].tp_pos == 0 );
+    ASSERT( ctx.tp[1].tp_pos == 0 );
+    ASSERT( ctx.tp[2].tp_pos == 0 );
+#if RFC_DH_SUPPORT
+    ASSERT( ctx.tp[0].damage == 0.0 );
+    ASSERT( ctx.tp[1].damage == 0.0 );
+    ASSERT( ctx.tp[2].damage == 0.0 );
+#endif /*RFC_DH_SUPPORT*/        
+#endif /*RFC_TP_SUPPORT*/
+    ASSERT( ctx.residue[0].tp_pos == 1 );
+    ASSERT( ctx.residue[1].tp_pos == 2 );
+    ASSERT( ctx.residue[2].tp_pos == 3 );
+
+    ASSERT( RFC_finalize( &ctx, RFC_RES_REPEATED ) );
+    ASSERT( ctx.state == RFC_STATE_FINISHED );
+    ASSERT( ctx.residue_cnt == 0 );
+#if RFC_TP_SUPPORT
+    ASSERT( ctx.tp_cnt == 4 );
+    ASSERT( ctx.tp[0].tp_pos == 0 );
+    ASSERT( ctx.tp[1].tp_pos == 0 );
+    ASSERT( ctx.tp[2].tp_pos == 0 );
+    ASSERT( ctx.tp[3].tp_pos == 0 );
+#if RFC_DH_SUPPORT
+    ASSERT(       ctx.tp[0].damage == 0.0 );
+    ASSERT( fabs( ctx.tp[1].damage / (damage_5_3*2) - 1 ) < 1e-10 );
+    ASSERT(       ctx.tp[2].damage == 0.0 );
+    ASSERT( fabs( ctx.tp[3].damage /  damage_7_2    - 1 ) < 1e-10 );
+#endif /*RFC_DH_SUPPORT*/        
+#endif /*RFC_TP_SUPPORT*/
+    ASSERT( fabs( ctx.damage / damage - 1 ) < 1e-10 );
+    ASSERT( RFC_deinit( &ctx ) );
+
+    PASS();
+}
+
+TEST RFC_res_fullcycles( void )
+{
+/*
+                                                           
+    8.5 ___________________________________________________
+                      +                                    
+    7.5 ___________________________________________________
+                                                           
+    6.5 ___________________________________________________
+              +                                            
+    5.5 ___________________________________________________
+                                                           
+    4.5 ___________________________________________________
+                  +                                        
+    3.5 ___________________________________________________
+          +                                                
+    2.5 ___________________________________________________
+
+*/
+
+    rfc_value_tuple_s tp[10];
+    double damage;
+    double damage_5_3 = pow( ( (5.0-3.0)/2 / ctx.wl_sx ), fabs(ctx.wl_k) ) / ctx.wl_nx;
+    double damage_7_2 = pow( ( (7.0-2.0)/2 / ctx.wl_sx ), fabs(ctx.wl_k) ) / ctx.wl_nx;
+
+    if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, -0.5 /* class_offset */,
+                        1 /* hysteresis */, RFC_FLAGS_DEFAULT ) )
+    {
+        /*                       v--------v      */
+        /*                          v--v         */
+        RFC_VALUE_TYPE data[] = {2, 5, 3, 7};
+#if RFC_TP_SUPPORT
+        ASSERT( RFC_tp_init( &ctx, tp, NUMEL(tp), /*is_static*/ true ) );
+#endif /*RFC_TP_SUPPORT*/
+#if RFC_DH_SUPPORT
+        ASSERT( RFC_dh_init( &ctx, RFC_SD_HALF_23, /*dh*/ NULL, /*dh_cap*/ 0, /*is_static*/ true ) );
+#endif /*RFC_DH_SUPPORT*/        
+        ASSERT( RFC_feed( &ctx, data, NUMEL(data) ) );
+    }
+    else FAIL();
+
+    ASSERT( ctx.state == RFC_STATE_BUSY_INTERIM );
+    ASSERT( ctx.residue_cnt == 3 );
+    ASSERT( ctx.damage == 0.0 );
+#if RFC_TP_SUPPORT
+    ASSERT( ctx.tp_cnt == 3 );
+    ASSERT( ctx.tp[0].tp_pos == 0 );
+    ASSERT( ctx.tp[1].tp_pos == 0 );
+    ASSERT( ctx.tp[2].tp_pos == 0 );
+#if RFC_DH_SUPPORT
+    ASSERT( ctx.tp[0].damage == 0.0 );
+    ASSERT( ctx.tp[1].damage == 0.0 );
+    ASSERT( ctx.tp[2].damage == 0.0 );
+#endif /*RFC_DH_SUPPORT*/        
+#endif /*RFC_TP_SUPPORT*/
+    ASSERT( ctx.residue[0].tp_pos == 1 );
+    ASSERT( ctx.residue[1].tp_pos == 2 );
+    ASSERT( ctx.residue[2].tp_pos == 3 );
+
+    ASSERT( RFC_finalize( &ctx, RFC_RES_FULLCYCLES ) );
+    ASSERT( ctx.state == RFC_STATE_FINISHED );
+    ASSERT( ctx.residue_cnt == 0 );
+#if RFC_TP_SUPPORT
+    ASSERT( ctx.tp_cnt == 4 );
+    ASSERT( ctx.tp[0].tp_pos == 0 );
+    ASSERT( ctx.tp[1].tp_pos == 0 );
+    ASSERT( ctx.tp[2].tp_pos == 0 );
+    ASSERT( ctx.tp[3].tp_pos == 0 );
+#if RFC_DH_SUPPORT
+    ASSERT( fabs( ctx.tp[0].damage / ( damage_7_2/2 ) - 1 ) < 1e-10 );
+    ASSERT( fabs( ctx.tp[1].damage / ( damage_5_3/2 ) - 1 ) < 1e-10 );
+    ASSERT( fabs( ctx.tp[2].damage / ( damage_5_3/2 ) - 1 ) < 1e-10 );
+    ASSERT( fabs( ctx.tp[3].damage / ( damage_7_2/2 ) - 1 ) < 1e-10 );
+#endif /*RFC_DH_SUPPORT*/        
+#endif /*RFC_TP_SUPPORT*/
+    damage = damage_7_2 + damage_5_3;
+    ASSERT( fabs( ctx.damage / damage - 1 ) < 1e-10 );
+    ASSERT( RFC_deinit( &ctx ) );
+
+    PASS();
+}
+
+TEST RFC_res_halfcycles( void )
+{
+    /*
+
+    8.5 ___________________________________________________
+    +                                    
+    7.5 ___________________________________________________
+
+    6.5 ___________________________________________________
+    +                                            
+    5.5 ___________________________________________________
+
+    4.5 ___________________________________________________
+    +                                        
+    3.5 ___________________________________________________
+    +                                                
+    2.5 ___________________________________________________
+
+    */
+
+    rfc_value_tuple_s tp[10];
+    double damage;
+    double damage_5_3_half = pow( ( (5.0-3.0)/2 / ctx.wl_sx ), fabs(ctx.wl_k) ) / ctx.wl_nx / 2;
+    double damage_7_2_half = pow( ( (7.0-2.0)/2 / ctx.wl_sx ), fabs(ctx.wl_k) ) / ctx.wl_nx / 2;
+
+    if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, -0.5 /* class_offset */,
+        1 /* hysteresis */, RFC_FLAGS_DEFAULT ) )
+    {
+        /*                       v--------v      */
+        /*                          v--v         */
+        RFC_VALUE_TYPE data[] = {2, 5, 3, 7};
+#if RFC_TP_SUPPORT
+        ASSERT( RFC_tp_init( &ctx, tp, NUMEL(tp), /*is_static*/ true ) );
+#endif /*RFC_TP_SUPPORT*/
+#if RFC_DH_SUPPORT
+        ASSERT( RFC_dh_init( &ctx, RFC_SD_HALF_23, /*dh*/ NULL, /*dh_cap*/ 0, /*is_static*/ true ) );
+#endif /*RFC_DH_SUPPORT*/        
+        ASSERT( RFC_feed( &ctx, data, NUMEL(data) ) );
+    }
+    else FAIL();
+
+    ASSERT( ctx.state == RFC_STATE_BUSY_INTERIM );
+    ASSERT( ctx.residue_cnt == 3 );
+    ASSERT( ctx.damage == 0.0 );
+#if RFC_TP_SUPPORT
+    ASSERT( ctx.tp_cnt == 3 );
+    ASSERT( ctx.tp[0].tp_pos == 0 );
+    ASSERT( ctx.tp[1].tp_pos == 0 );
+    ASSERT( ctx.tp[2].tp_pos == 0 );
+#if RFC_DH_SUPPORT
+    ASSERT( ctx.tp[0].damage == 0.0 );
+    ASSERT( ctx.tp[1].damage == 0.0 );
+    ASSERT( ctx.tp[2].damage == 0.0 );
+#endif /*RFC_DH_SUPPORT*/        
+#endif /*RFC_TP_SUPPORT*/
+    ASSERT( ctx.residue[0].tp_pos == 1 );
+    ASSERT( ctx.residue[1].tp_pos == 2 );
+    ASSERT( ctx.residue[2].tp_pos == 3 );
+
+    ASSERT( RFC_finalize( &ctx, RFC_RES_HALFCYCLES ) );
+    ASSERT( ctx.state == RFC_STATE_FINISHED );
+    ASSERT( ctx.residue_cnt == 0 );
+#if RFC_TP_SUPPORT
+    ASSERT( ctx.tp_cnt == 4 );
+    ASSERT( ctx.tp[0].tp_pos == 0 );
+    ASSERT( ctx.tp[1].tp_pos == 0 );
+    ASSERT( ctx.tp[2].tp_pos == 0 );
+    ASSERT( ctx.tp[3].tp_pos == 0 );
+#if RFC_DH_SUPPORT
+    ASSERT( fabs( ctx.tp[0].damage / ( damage_7_2_half/2 ) - 1 ) < 1e-10 );  /* From residue */
+    ASSERT( fabs( ctx.tp[1].damage / ( damage_5_3_half   ) - 1 ) < 1e-10 );  /* From regular counting */
+    ASSERT( fabs( ctx.tp[2].damage / ( damage_5_3_half   ) - 1 ) < 1e-10 );  /* From regular counting */
+    ASSERT( fabs( ctx.tp[3].damage / ( damage_7_2_half/2 ) - 1 ) < 1e-10 );  /* From residue */
+#endif /*RFC_DH_SUPPORT*/        
+#endif /*RFC_TP_SUPPORT*/
+    damage = damage_7_2_half + damage_5_3_half * 2;
+    ASSERT( fabs( ctx.damage / damage - 1 ) < 1e-10 );
+    ASSERT( RFC_deinit( &ctx ) );
+
+    PASS();
+}
+#endif /*!RFC_MINIMAL*/
 
 #if RFC_AT_SUPPORT
 double at_transform( rfc_ctx_s *rfc_ctx, double Sa, double Sm )
@@ -1388,6 +1636,9 @@ SUITE( RFC_TEST_SUITE )
 #if !RFC_MINIMAL
     /* Residual methods */
     RUN_TEST( RFC_res_DIN45667 );
+    RUN_TEST( RFC_res_repeated );
+    RUN_TEST( RFC_res_fullcycles );
+    RUN_TEST( RFC_res_halfcycles );
     RUN_TEST( RFC_wl_math );
     /* "Miner consequent" approach */
     RUN_TEST( RFC_miner_consequent );

@@ -1,17 +1,8 @@
 
 /* Using Rainflow C-Library in a C++ context */
 
-//! \todo
-//namespace rainflow_C
-//{
-    // Notes on mix C and C++ headers:
-    // https://developers.redhat.com/blog/2016/02/29/why-cstdlib-is-more-complicated-than-you-might-think/
-    // extern "C"
-    //{
-//#define RFC_CPP_NAMESPACE rainflow_CC
-        #include "../rainflow.h"
-    //}
-//}
+#include "../rainflow.h"
+
 
 /* Made extern "C", so that C-Code (rfc_test.c) can access this function (in a C++ module)
    C++ functions are usually "name mangeled", that is averted here! */

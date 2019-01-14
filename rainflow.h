@@ -308,7 +308,7 @@ bool    RFC_tp_prune            ( void *ctx, size_t count, int flags );
 #endif /*RFC_TP_SUPPORT*/
 
 #if RFC_DH_SUPPORT
-bool    RFC_dh_init             ( void *ctx, double *dh, size_t dh_cap, bool is_static );
+bool    RFC_dh_init             ( void *ctx, int method, double *dh, size_t dh_cap, bool is_static );
 #endif /*RFC_DH_SUPPORT*/
 
 #if RFC_AT_SUPPORT

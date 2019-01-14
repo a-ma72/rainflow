@@ -111,22 +111,14 @@ function validate
   x                 = export_series( name, cumsum( randn( 1e4, 1 ) ), class_count );
   x_max             = max(x);
   x_min             = min(x);
-  if 0
-  x                 = export_series( name, randn( 1e4, 1 ), class_count );
-  x_max             = max(x) * 1.03;
-  x_min             = min(x) * 1.03;
-  end
   class_width       = round( (x_max - x_min) / (class_count - 1), 2 );
   class_offset      = x_min - class_width / 2;
   hysteresis        = class_width;
   enforce_margin    = 0;
   use_hcm           = 0;
-  residual_method   = 6;   % 0, 6
-  spread_damage     = 5;
+  residual_method   = 0;  % 0=RFC_RES_NONE
+  spread_damage     = 0;  % 0=RFC_SD_HALF_23
   
-  x = [0,4,2,20];
-  %x(end) = x_max;
-
   [pd,re,rm,rp,lc,tp] = ...
     rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
                 residual_method, enforce_margin, use_hcm, spread_damage );

@@ -867,13 +867,14 @@ bool RFC_tp_prune( void *ctx, size_t limit, int flags )
  * @brief      Initialize damage history storage
  *
  * @param      ctx        The rainflow context
+ * @param[in]  method     The mode, how to spread (RFC_SD_...)
  * @param      dh         The storage buffer
  * @param      dh_cap     The capacity of dh
  * @param      is_static  true, if dh is static and should not be freed
  *
  * @return     true on success
  */
-bool RFC_dh_init( void *ctx, double *dh, size_t dh_cap, bool is_static )
+bool RFC_dh_init( void *ctx, int method, double *dh, size_t dh_cap, bool is_static )
 {
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -887,11 +888,12 @@ bool RFC_dh_init( void *ctx, double *dh, size_t dh_cap, bool is_static )
         return false;
     }
 
-    rfc_ctx->dh     = dh;
-    rfc_ctx->dh_cap = dh_cap;
-    rfc_ctx->dh_cnt = 0;
+    rfc_ctx->spread_damage_method = method;
+    rfc_ctx->dh                   = dh;
+    rfc_ctx->dh_cap               = dh_cap;
+    rfc_ctx->dh_cnt               = 0;
 
-    rfc_ctx->internal.dh_static = is_static;
+    rfc_ctx->internal.dh_static   = is_static;
 
     return true;
 }
@@ -3219,6 +3221,12 @@ bool RFC_finalize_res_weight_cycles( rfc_ctx_s *rfc_ctx, RFC_counts_type weight,
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
+    /* Include interim turning point */
+    if( !RFC_feed_finalize( rfc_ctx ) )
+    {
+        return false;
+    }
+
     /* Count every unclosed cycle with the given weight */
     if( rfc_ctx->residue && rfc_ctx->residue_cnt >= 2 )
     {
@@ -3458,6 +3466,8 @@ bool RFC_finalize_res_repeated( rfc_ctx_s *rfc_ctx, int flags )
                 *to++ = *from++;
             }
 
+            residue[cnt-1].tp_pos = rfc_ctx->tp_cnt + 1;
+
             rfc_ctx->internal.flags = flags;
             /* Feed again with the copy, no new turning points are generated, since residue[].tp_pos > 0 (except interim tp) */
             ok = RFC_feed_tuple( rfc_ctx, residue, cnt );
@@ -3475,14 +3485,6 @@ bool RFC_finalize_res_repeated( rfc_ctx_s *rfc_ctx, int flags )
         {
             return RFC_error_raise( rfc_ctx, RFC_ERROR_MEMORY );
         }
-    }
-
-    if( rfc_ctx->tp_cnt > tp_cnt )
-    {
-        assert( rfc_ctx->tp_cnt == tp_cnt + 1 );
-
-        /* Interim turning point handled already */
-        rfc_ctx->state = RFC_STATE_BUSY;
     }
 
     /* Include interim turning point */
@@ -4691,7 +4693,7 @@ bool RFC_tp_inc_damage( rfc_ctx_s *rfc_ctx, size_t tp_pos, double damage )
     {
         if( rfc_ctx->tp && tp_pos )
         {
-            if( tp_pos >= rfc_ctx->tp_cnt )
+            if( tp_pos > rfc_ctx->tp_cnt )
             {
                 return RFC_error_raise( rfc_ctx, RFC_ERROR_TP );
             }
@@ -4852,7 +4854,7 @@ bool RFC_spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
             }
 
             /* Current cycle weight */
-            D *= rfc_ctx->curr_inc / rfc_ctx->full_inc;
+            D *= (double)rfc_ctx->curr_inc / rfc_ctx->full_inc;
 
             if( rfc_ctx->spread_damage_method == RFC_SD_FULL_P2 )
             {
@@ -5262,6 +5264,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         mxAssert( residual_method >= RFC_RES_NONE && residual_method <= RFC_RES_COUNT, 
                   "Invalid residual method!" );
 
+#if !RFC_MINIMAL
 #if RFC_HCM_SUPPORT
         mxAssert( use_hcm == 0 || use_hcm == 1,
                   "Invalid HCM flag, use 0 or 1!" );
@@ -5269,15 +5272,18 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         mxAssert( use_hcm == 0,
                   "HCM not supported!" );
 #endif /*RFC_HCM_SUPPORT*/
-        
+
 
 #if RFC_DH_SUPPORT
         mxAssert( spread_damage >= RFC_SD_NONE && spread_damage <= RFC_SD_COUNT,
                   "Invalid spread damage method!" );
 #else /*!RFC_DH_SUPPORT*/
-        mxAssert( spread_damage == RFC_SD_NONE,
-                  "Invalid spread damage method, only %d accepted!", RFC_SD_NONE );
+        if( spread_damage != RFC_SD_NONE )
+        {
+            mexErrMsgTxt( "Invalid spread damage method, only %d accepted!", RFC_SD_NONE );
+        }
 #endif /*RFC_DH_SUPPORT*/
+#endif /*!RFC_MINIMAL*/
 
         ok = RFC_init( &rfc_ctx, 
                        class_count, (RFC_value_type)class_width, (RFC_value_type)class_offset, 
@@ -5355,12 +5361,18 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                     mexErrMsgTxt( "Invalid argument(s)!" );
                 case RFC_ERROR_MEMORY:
                     mexErrMsgTxt( "Error during memory allocation!" );
+#if RFC_AT_SUPPORT
                 case RFC_ERROR_AT:
                     mexErrMsgTxt( "Error during amplitude transformation!" );
+#endif /*RFC_AT_SUPPORT*/
+#if RFC_TP_SUPPORT
                 case RFC_ERROR_TP:
                     mexErrMsgTxt( "Error during turning point access!" );
+#endif /*RFC_TP_SUPPORT*/
+#if RFC_DAMAGE_FAST
                 case RFC_ERROR_LUT:
                     mexErrMsgTxt( "Error during lookup table access!" );
+#endif /*RFC_DAMAGE_FAST*/
                 case RFC_ERROR_UNEXP:
                 default:
                     mexErrMsgTxt( "Unexpected error occured!" );
