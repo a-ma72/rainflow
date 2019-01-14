@@ -3431,14 +3431,18 @@ bool RFC_finalize_res_rp_DIN45667( rfc_ctx_s *rfc_ctx, int flags )
 static
 bool RFC_finalize_res_repeated( rfc_ctx_s *rfc_ctx, int flags )
 {
+#if RFC_TP_SUPPORT
     size_t tp_cnt;
+#endif /*RFC_TP_SUPPORT*/
 
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
+#if RFC_TP_SUPPORT
     /* Keep number of turning points. The only scenario in which the number increases, is where
        the interim turning point gets a real turning point */
     tp_cnt = rfc_ctx->tp_cnt;
+#endif /*RFC_TP_SUPPORT*/
 
     if( rfc_ctx->residue && rfc_ctx->residue_cnt && flags )
     {
@@ -3466,7 +3470,9 @@ bool RFC_finalize_res_repeated( rfc_ctx_s *rfc_ctx, int flags )
                 *to++ = *from++;
             }
 
+#if RFC_TP_SUPPORT
             residue[cnt-1].tp_pos = rfc_ctx->tp_cnt + 1;
+#endif /*RFC_TP_SUPPORT*/
 
             rfc_ctx->internal.flags = flags;
             /* Feed again with the copy, no new turning points are generated, since residue[].tp_pos > 0 (except interim tp) */
@@ -5278,9 +5284,9 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         mxAssert( spread_damage >= RFC_SD_NONE && spread_damage <= RFC_SD_COUNT,
                   "Invalid spread damage method!" );
 #else /*!RFC_DH_SUPPORT*/
-        if( spread_damage != RFC_SD_NONE )
+        if( spread_damage != 0 )
         {
-            mexErrMsgTxt( "Invalid spread damage method, only %d accepted!", RFC_SD_NONE );
+            mexErrMsgTxt( "Invalid spread damage method, only 0 accepted!" );
         }
 #endif /*RFC_DH_SUPPORT*/
 #endif /*!RFC_MINIMAL*/

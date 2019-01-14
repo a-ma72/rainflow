@@ -957,7 +957,9 @@ TEST RFC_res_repeated( void )
 
 */
 
+#if RFC_TP_SUPPORT
     rfc_value_tuple_s tp[10];
+#endif /*RFC_TP_SUPPORT*/
     double damage;
     double damage_5_3;
     double damage_7_2;
@@ -995,10 +997,10 @@ TEST RFC_res_repeated( void )
     ASSERT( ctx.tp[1].damage == 0.0 );
     ASSERT( ctx.tp[2].damage == 0.0 );
 #endif /*RFC_DH_SUPPORT*/        
-#endif /*RFC_TP_SUPPORT*/
     ASSERT( ctx.residue[0].tp_pos == 1 );
     ASSERT( ctx.residue[1].tp_pos == 2 );
     ASSERT( ctx.residue[2].tp_pos == 3 );
+#endif /*RFC_TP_SUPPORT*/
 
     ASSERT( RFC_finalize( &ctx, RFC_RES_REPEATED ) );
     ASSERT( ctx.state == RFC_STATE_FINISHED );
@@ -1042,7 +1044,9 @@ TEST RFC_res_fullcycles( void )
 
 */
 
+#if RFC_TP_SUPPORT
     rfc_value_tuple_s tp[10];
+#endif /*RFC_TP_SUPPORT*/
     double damage;
     double damage_5_3 = pow( ( (5.0-3.0)/2 / ctx.wl_sx ), fabs(ctx.wl_k) ) / ctx.wl_nx;
     double damage_7_2 = pow( ( (7.0-2.0)/2 / ctx.wl_sx ), fabs(ctx.wl_k) ) / ctx.wl_nx;
@@ -1076,10 +1080,10 @@ TEST RFC_res_fullcycles( void )
     ASSERT( ctx.tp[1].damage == 0.0 );
     ASSERT( ctx.tp[2].damage == 0.0 );
 #endif /*RFC_DH_SUPPORT*/        
-#endif /*RFC_TP_SUPPORT*/
     ASSERT( ctx.residue[0].tp_pos == 1 );
     ASSERT( ctx.residue[1].tp_pos == 2 );
     ASSERT( ctx.residue[2].tp_pos == 3 );
+#endif /*RFC_TP_SUPPORT*/
 
     ASSERT( RFC_finalize( &ctx, RFC_RES_FULLCYCLES ) );
     ASSERT( ctx.state == RFC_STATE_FINISHED );
@@ -1124,7 +1128,9 @@ TEST RFC_res_halfcycles( void )
 
     */
 
+#if RFC_TP_SUPPORT
     rfc_value_tuple_s tp[10];
+#endif /*RFC_TP_SUPPORT*/
     double damage;
     double damage_5_3_half = pow( ( (5.0-3.0)/2 / ctx.wl_sx ), fabs(ctx.wl_k) ) / ctx.wl_nx / 2;
     double damage_7_2_half = pow( ( (7.0-2.0)/2 / ctx.wl_sx ), fabs(ctx.wl_k) ) / ctx.wl_nx / 2;
@@ -1158,10 +1164,10 @@ TEST RFC_res_halfcycles( void )
     ASSERT( ctx.tp[1].damage == 0.0 );
     ASSERT( ctx.tp[2].damage == 0.0 );
 #endif /*RFC_DH_SUPPORT*/        
-#endif /*RFC_TP_SUPPORT*/
     ASSERT( ctx.residue[0].tp_pos == 1 );
     ASSERT( ctx.residue[1].tp_pos == 2 );
     ASSERT( ctx.residue[2].tp_pos == 3 );
+#endif /*RFC_TP_SUPPORT*/
 
     ASSERT( RFC_finalize( &ctx, RFC_RES_HALFCYCLES ) );
     ASSERT( ctx.state == RFC_STATE_FINISHED );
