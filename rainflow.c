@@ -4793,6 +4793,7 @@ void cycle_process_counts_internal( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
 }
 
 
+#if RFC_TP_SUPPORT
 /**
  * @brief      Get turning point reference
  *
@@ -4802,7 +4803,6 @@ void cycle_process_counts_internal( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
  *
  * @return     true on success
  */
-#if RFC_TP_SUPPORT
 static
 bool tp_get( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s **tp )
 {
@@ -5016,7 +5016,7 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc_cla
     if( new_class_param )
     {
         assert( new_hysteresis >= rfc_ctx->hysteresis );
-        rfc_ctx->hysteresis       = new_hysteresis;
+        rfc_ctx->hysteresis     = new_hysteresis;
 #if RFC_DAMAGE_FAST
         rfc_ctx->damage_lut_inapt = 1;
         if( rfc_ctx->class_count != new_class_param->count )
@@ -5092,23 +5092,22 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc_cla
         return ok;
     }
     else
-#else /*!RFC_USE_DELEGATES*/
+#endif /*!RFC_USE_DELEGATES*/
     {
-        size_t             ctx_tp_cnt = rfc_ctx->tp_cnt;
-        rfc_value_tuple_s *ctx_tp     = rfc_ctx->tp;
+        size_t             tp_cnt = rfc_ctx->tp_cnt;
+        rfc_value_tuple_s *tp     = rfc_ctx->tp;
 
-        for( i = 0; i < ctx_tp_cnt; i++, ctx_tp++ )
+        for( i = 0; i < tp_cnt; i++, tp++ )
         {
-            ctx_tp->cls    = QUANTIZE( rfc_ctx, ctx_tp->value );
+            tp->cls    = QUANTIZE( rfc_ctx, tp->value );
 #if RFC_DH_SUPPORT
-            ctx_tp->damage = 0.0;
+            tp->damage = 0.0;
 #endif /*RFC_DH_SUPPORT*/
         }
 
         rfc_ctx->tp_cnt = 0;
-        RFC_feed_tuple( rfc_ctx, ctx_tp, ctx_tp_cnt );
+        RFC_feed_tuple( rfc_ctx, tp, tp_cnt );
     }
-#endif /*!RFC_USE_DELEGATES*/
 }
 #endif /*RFC_TP_SUPPORT*/
 

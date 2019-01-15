@@ -236,7 +236,6 @@ enum
 #endif /*RFC_TP_SUPPORT*/
 };
 
-#if !RFC_MINIMAL
 /* See RFC_damage_from_rp() */
 enum
 {
@@ -247,7 +246,6 @@ enum
     RFC_RP_DAMAGE_CALC_TYPE_CONSEQUENT  = 3,
 #endif /*!RFC_MINIMAL*/
 };
-#endif /*!RFC_MINIMAL*/
     
 /* Memory allocation functions typedef */
 typedef void * ( *rfc_mem_alloc_fcn_t )( void *, size_t num, size_t size, int aim );
