@@ -1351,6 +1351,13 @@ TEST RFC_CPP_wrapper( void )
     PASS();
 }
 
+TEST RFC_CPP_wrapper2( void )
+{
+    extern bool wrapper_test2( void );
+    ASSERT( wrapper_test2() );
+    PASS();
+}
+
 #if !RFC_MINIMAL
 TEST RFC_wl_math( void )
 {
@@ -1639,6 +1646,7 @@ SUITE( RFC_TEST_SUITE )
     RUN_TEST1( RFC_long_series, 0 );
     /* Test C++ Wrapper */
     RUN_TEST( RFC_CPP_wrapper );
+    RUN_TEST( RFC_CPP_wrapper2 );
 #if !RFC_MINIMAL
     /* Residual methods */
     RUN_TEST( RFC_res_DIN45667 );
