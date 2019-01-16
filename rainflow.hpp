@@ -222,13 +222,7 @@ public:
 
         m_doSpreadDamage = SPRDAM_HALF_23;  
 
-        m_rfc_ctx                   = dummy;
-        m_rfc_ctx.internal.obj      = this;
-        m_rfc_ctx.tp_set_fcn        = tp_set;
-        m_rfc_ctx.tp_get_fcn        = tp_get;
-        m_rfc_ctx.tp_inc_damage_fcn = tp_inc_damage;
-        m_rfc_ctx.tp_prune_fcn      = tp_prune;
-
+        m_rfc_ctx = dummy;
 
         SetAmplTrans( DBL_NAN, DBL_NAN, false );
         ZeroInit();
@@ -1190,6 +1184,16 @@ void CRainflowT<T>::Parametrize( double range_min,         double range_max,
     }
 
     m_isParametrized = ( m_class_count > 0 ) && ( m_class_width > 0.0 );
+
+    if( m_isParametrized )
+    {
+        RF::RFC_init( &m_rfc_ctx, m_class_count, m_class_width, m_range_min, m_hysteresis, RF::RFC_FLAGS_DEFAULT );
+        m_rfc_ctx.internal.obj      = this;
+        m_rfc_ctx.tp_set_fcn        = tp_set;
+        m_rfc_ctx.tp_get_fcn        = tp_get;
+        m_rfc_ctx.tp_inc_damage_fcn = tp_inc_damage;
+        m_rfc_ctx.tp_prune_fcn      = tp_prune;
+    }
 } // end of Parametrize
 
 
