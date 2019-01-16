@@ -191,8 +191,8 @@ static void                 residue_remove_item             (       rfc_ctx_s *,
 static void *               mem_alloc                       ( void *ptr, size_t num, size_t size, int aim );
 #if RFC_TP_SUPPORT
 /* Methods on turning points history */
-static bool                 tp_get                          (       rfc_ctx_s *, size_t tp_pos, rfc_value_tuple_s **pt );
 static bool                 tp_set                          (       rfc_ctx_s *, size_t tp_pos, rfc_value_tuple_s *pt );
+static bool                 tp_get                          (       rfc_ctx_s *, size_t tp_pos, rfc_value_tuple_s **pt );
 static bool                 tp_inc_damage                   (       rfc_ctx_s *, size_t tp_pos, double damage );
 static void                 tp_lock                         (       rfc_ctx_s *, bool do_lock );
 static bool                 tp_refeed                       (       rfc_ctx_s *, RFC_value_type new_hysteresis, const rfc_class_param_s *new_class_param );
@@ -4795,6 +4795,109 @@ void cycle_process_counts_internal( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
 
 #if RFC_TP_SUPPORT
 /**
+ * @brief         Append or alter a turning point in its storage
+ *
+ * @param         rfc_ctx  The rainflow context
+ * @param[in]     tp_pos   The position, if 0 tp (if new) is appended. If >0 existing point is altered
+ * @param[in,out] tp       The turning point
+ *
+ * @return        true on success
+ */
+static
+bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
+{
+    assert( rfc_ctx );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
+    assert( tp );
+
+#if RFC_USE_DELEGATES
+    /* Check for delegates */
+    if( rfc_ctx->tp_set_fcn )
+    {
+        /* Add turning point */
+        return rfc_ctx->tp_set_fcn( rfc_ctx, tp_pos, tp );
+    }
+    else
+#endif /*RFC_USE_DELEGATES*/
+    {
+        if( !tp )
+        {
+            return false;
+        }
+
+        if( !rfc_ctx->tp || rfc_ctx->tp_locked )
+        {
+            /* Nothing to do */
+            return true;
+        }
+
+        /* Check to append or alter */
+        if( tp_pos )
+        {
+            /* Alter */
+            if( tp_pos != tp->tp_pos )
+            {
+                return false;
+            }
+            else
+            {
+                assert( tp_pos <= rfc_ctx->tp_cnt );
+                rfc_ctx->tp[ tp_pos - 1 ] = *tp;
+                return true;
+            }
+        }
+        else
+        {
+            /* Append */
+            if( tp->tp_pos )
+            {
+                /* Exists already */
+                return true;
+            }
+            else
+            {
+                tp_pos = ++rfc_ctx->tp_cnt;
+            }
+        }
+
+        /* Check if buffer needs to be resized */
+        if( rfc_ctx->tp_cnt >= rfc_ctx->tp_cap )
+        {
+            rfc_value_tuple_s  *tp_new;
+            size_t              tp_cap_new;
+            size_t              tp_cap_increment;
+
+            /* Reallocation */
+            tp_cap_increment = (size_t)1024 * ( rfc_ctx->tp_cap / 640 + 1 );  /* + 60% + 1024 */
+            tp_cap_new       = rfc_ctx->tp_cap + tp_cap_increment;
+            tp_new           = rfc_ctx->mem_alloc( rfc_ctx->tp, tp_cap_new, 
+                                                   sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TP );
+
+            if( tp_new )
+            {
+                rfc_ctx->tp     = tp_new;
+                rfc_ctx->tp_cap = tp_cap_new;
+            }
+            else
+            {
+                return error_raise( rfc_ctx, RFC_ERROR_MEMORY );
+            }
+        }
+        /* Append turning point */
+        rfc_ctx->tp[ tp_pos - 1 ] = *tp;      /* Make a copy of tp in .tp, tp->tp_pos remains unaltered */
+        tp->tp_pos                =  tp_pos;  /* Ping back turning point position index in tp, base 1 */
+
+        if( rfc_ctx->internal.flags & RFC_FLAGS_TPAUTOPRUNE && rfc_ctx->tp_cnt > rfc_ctx->tp_prune_threshold )
+        {
+            return RFC_tp_prune( rfc_ctx, rfc_ctx->tp_prune_size, RFC_FLAGS_TPPRUNE_PRESERVE_POS );
+        }
+
+        return true;
+    }
+}
+
+
+/**
  * @brief      Get turning point reference
  *
  * @param      rfc_ctx  The rainflow context
@@ -4836,85 +4939,6 @@ bool tp_get( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s **tp )
     }
 
     return true;
-}
-
-
-/**
- * @brief         Add a copy of tp to rfc_ctx->tp and alter tp->tp_pos to its
- *                position in rfc_ctx->tp
- *
- * @param         rfc_ctx  The rainflow context
- * @param[in]     tp_pos   The position, base 1
- * @param[in,out] tp       New turning points
- *
- * @return        true on success
- */
-static
-bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
-{
-    assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
-
-    /* Check if tp already exists in .tp */
-    if( tp_pos && tp->tp_pos )
-    {
-        return true;
-    }
-
-    /* Add new turning point */
-
-#if RFC_USE_DELEGATES
-    /* Check for delegates */
-    if( rfc_ctx->tp_set_fcn )
-    {
-        /* Add turning point */
-        return rfc_ctx->tp_set_fcn( rfc_ctx, tp_pos, tp );
-    }
-    else
-#endif /*RFC_USE_DELEGATES*/
-    {
-        if( tp && rfc_ctx->tp && !rfc_ctx->tp_locked )
-        {
-            if( !tp_pos || tp_pos > rfc_ctx->tp_cnt )
-            {
-                tp_pos = ++rfc_ctx->tp_cnt;
-            }
-
-            /* Check if buffer needs to be resized */
-            if( rfc_ctx->tp_cnt >= rfc_ctx->tp_cap )
-            {
-                rfc_value_tuple_s  *tp_new;
-                size_t              tp_cap_new;
-                size_t              tp_cap_increment;
-
-                /* Reallocation */
-                tp_cap_increment = (size_t)1024 * ( rfc_ctx->tp_cap / 640 + 1 );  /* + 60% + 1024 */
-                tp_cap_new       = rfc_ctx->tp_cap + tp_cap_increment;
-                tp_new           = rfc_ctx->mem_alloc( rfc_ctx->tp, tp_cap_new, 
-                                                       sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TP );
-
-                if( tp_new )
-                {
-                    rfc_ctx->tp     = tp_new;
-                    rfc_ctx->tp_cap = tp_cap_new;
-                }
-                else
-                {
-                    return error_raise( rfc_ctx, RFC_ERROR_MEMORY );
-                }
-            }
-            /* Append turning point */
-            rfc_ctx->tp[ tp_pos - 1 ] = *tp;   /* Make a copy of tp in .tp, tp->tp_pos remains unaltered */
-            tp->tp_pos                =  tp_pos;  /* Turning point get its position index in tp, base 1 */
-        }
-
-        if( rfc_ctx->internal.flags & RFC_FLAGS_TPAUTOPRUNE && rfc_ctx->tp_cnt > rfc_ctx->tp_prune_threshold )
-        {
-            return RFC_tp_prune( rfc_ctx, rfc_ctx->tp_prune_size, RFC_FLAGS_TPPRUNE_PRESERVE_POS );
-        }
-
-        return true;
-    }
 }
 
 

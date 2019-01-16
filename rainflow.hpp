@@ -24,20 +24,25 @@
 #include "rainflow.h"
 
 #ifndef DBL_NAN
+#if _WIN32
 #if _MSC_VER
 #define DBL_NAN (_Nan._Double)
-#else
+#endif /*_MSC_VER*/
+#else /*!_WIN32*/
 #define DBL_NAN NAN
-#endif
-#endif
+#endif /*_WIN32*/
+#endif /*DBL_NAN*/
 
 #ifndef DBL_ISFINITE
-#if MSC_VER
+#if _WIN32
+#if _MSC_VER
 #define DBL_ISFINITE(x) (_finite(x))
-#else
+#endif /*_MSC_VER*/
+#else /*!_WIN32*/
 #define DBL_ISFINITE(x) (std::isfinite(x))
-#endif
-#endif
+#endif /*_WIN32*/
+#endif /*DBL_NAN*/
+
 
 /** Returns 1, if \a a >= 0, otherwise -1 */
 #define SIGN2(a) ( ( (a) >= 0 ) ? 1 : -1 )
@@ -59,6 +64,12 @@ namespace RF = RFC_CPP_NAMESPACE;
 
 template<class T> class CRainflowT;
 typedef CRainflowT<RF::RFC_value_type> CRainflow;
+
+extern "C" static bool tp_set           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp );
+extern "C" static bool tp_get           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp );
+extern "C" static bool tp_inc_damage    ( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage );
+extern "C" static bool tp_prune         ( RF::rfc_ctx_s *ctx, size_t count, int flags );
+
 
 template<class T>
 class CRainflowT 
@@ -122,6 +133,7 @@ public:
         size_t nIdx_TP;             /* Position in m_TurningPoints, base 1 */
     } t_res;
 
+
     typedef struct 
     {
       double ND, SD, k1, k2;
@@ -151,6 +163,9 @@ public:
         DEFAULT_ROUNDOFF    =  1000000    /* Fuer Vergleichbarkeit mit LMS TecWare */
     }; // end enum
 
+    static const RF::RFC_counts_type HALF_CYCLE_INCREMENT = RFC_HALF_CYCLE_INCREMENT;
+    static const RF::RFC_counts_type FULL_CYCLE_INCREMENT = RFC_FULL_CYCLE_INCREMENT;
+
 protected:
     // Eingangsparameter
     T                           m_range_min, m_class_width;       /* Klassierbereichsuntergrenze, Klassenbreite */   
@@ -163,6 +178,7 @@ protected:
     int                         m_doSpreadDamage;                 /* >0 = Schaedigung ueber Teilbereich verteilen, statt nur auf die ausseren TP */
 
     // Ausgangswerte
+    VectorTurningPoints         m_TurningPoints;                  /* Umkehrpunktfolge */
     bool                        m_isParametrized;                 /* Klassierparameter gesetzt? */
     e_residuum                  m_eResiduum;                      /* Wie wurde das Residuum bewertet */
     int                         m_iProgressState;                 /* Aktueller Fortschritt in Prozent (0-100) */
@@ -179,6 +195,11 @@ protected:
                                 CRainflowT                    ( const CRainflowT &RainflowMatrix );  /* Disable Standard Constructor */
                                 CRainflowT& operator=         ( const CRainflowT &RainflowMatrix );  /* Disable Copy Constructor */
 
+    inline T                    Min                                 ( T A, T B ) const { return ( A < B ) ? A : B; }
+    inline T                    Max                                 ( T A, T B ) const { return ( A > B ) ? A : B; }
+    inline T                    Sign                                ( T A ) const { return ( A < 0 ) ? -1 : 1; }
+    inline T                    Abs                                 ( T A ) const { return fabs( (double) A ); }
+    inline T                    Ceil                                ( T A ) const { return (int) ceil( A ); }
 
 public:
     explicit 
@@ -192,7 +213,15 @@ public:
         m_SNCurve.k1 = DEFAULT_WL_k;
         m_SNCurve.k2 = DEFAULT_WL_k;
 
-        m_rfc_ctx = dummy;
+        m_doSpreadDamage = SPRDAM_HALF_23;  
+
+        m_rfc_ctx                   = dummy;
+        m_rfc_ctx.internal.obj      = this;
+        m_rfc_ctx.tp_set_fcn        = tp_set;
+        m_rfc_ctx.tp_get_fcn        = tp_get;
+        m_rfc_ctx.tp_inc_damage_fcn = tp_inc_damage;
+        m_rfc_ctx.tp_prune_fcn      = tp_prune;
+
 
         SetAmplTrans( DBL_NAN, DBL_NAN, false );
         ZeroInit();
@@ -202,25 +231,57 @@ public:
     virtual ~CRainflowT()                                            
     { 
         RF::RFC_deinit( &m_rfc_ctx );
+        ClearTurningPoints();
     } // end of ~CRainflowT
+    
+
+    // Berechnet die Klassennummer k (k>=0) fuer einen Messwert
+    // bin(k) definiert die Klassengrenzen
+    // bin(0) = m_range_min
+    // bin(1) = m_range_min + m_class_width
+    // k(x) => bin(k) <= x < bin(k+1)
+    inline 
+    int ClassNo( T value ) const
+    {
+        int cno = (int) floor( ( value - m_range_min ) / m_class_width );
+        
+        cno = MIN( cno, m_class_count - 1 );
+        cno = MAX( cno, 0 );
+        
+        return cno;
+    } // end of ClassNo
+    
+
+    inline 
+    RF::RFC_counts_type* GetMatrix() const
+    {
+        return m_rfc_ctx.rfm;
+    } // end of GetMatrix
     
 
     // Gibt Anzahl Schwingspiele x FULL_CYCLE_INCREMENT zurueck!
     int GetCountIncrements( int from, int to ) const
     {
         RF::RFC_counts_type counts;
+        RF::RFC_counts_type *prf = GetMatrix();
 
-        ASSERT( m_isParametrized && m_rfc_ctx.rfm );
+        ASSERT( m_isParametrized );
 
-        return m_rfc_ctx.rfm[ m_class_count * from + to ];
+        if( prf != NULL && m_class_count > 0 ) 
+        {
+            counts  = prf[ m_class_count * from + to ]; // Rainflowzaehlung
+        } // end if
+
+        return counts;
     } // end of GetCountIncrements
     
 
     void SetCounts( int from, int to, int counts )
     {
-        ASSERT( counts >= 0 );
-        ASSERT( m_isParametrized && m_rfc_ctx.rfm );
+        ASSERT( m_isParametrized );
         ASSERT( from < m_class_count && from >= 0 && to < m_class_count && to >= 0 );
+
+        int *prf = GetMatrix();
 
         if( m_isSymmetric && to < from ) 
         {
@@ -229,7 +290,8 @@ public:
             from = temp;
         } // end if
 
-        m_rfc_ctx.rfm[ m_class_count * from + to ];
+        ASSERT( prf && prf[ m_class_count * from + to ] == 0 );
+        prf[ m_class_count * from + to ] = counts * FULL_CYCLE_INCREMENT;
     } // end of SetCounts
     
 
@@ -347,8 +409,10 @@ public:
     inline 
     void AddCycles( int from, int to, int cycles )
     {
-        ASSERT( m_isParametrized && m_rfc_ctx.rfm );
+        ASSERT( m_isParametrized );
         ASSERT( from < m_class_count && from >= 0 && to < m_class_count && to >= 0 );
+
+        RF::RFC_counts_type *prf = GetMatrix();
 
         if( m_isSymmetric && to < from ) 
         {
@@ -357,15 +421,19 @@ public:
             from = temp;
         } // end if
 
-        m_rfc_ctx.rfm[ m_class_count * from + to ] += m_rfc_ctx.full_inc * cycles;
+        ASSERT( prf );
+        
+        prf[ m_class_count * from + to ] += cycles * FULL_CYCLE_INCREMENT;
     } // end of AddCycles
     
 
     inline 
     void AddHalfCycle( int from, int to )
     {
-        ASSERT( m_isParametrized && m_rfc_ctx.rfm );
+        ASSERT( m_isParametrized );
         ASSERT( from < m_class_count && from >= 0 && to < m_class_count && to >= 0 );
+
+        RF::RFC_counts_type *prf = GetMatrix();
 
         if( m_isSymmetric && to < from ) 
         {
@@ -374,10 +442,13 @@ public:
             from = temp;
         } // end if
 
-        m_rfc_ctx.rfm[ m_class_count * from + to ] += m_rfc_ctx.half_inc;
+        ASSERT( prf );
+        prf[ m_class_count * from + to ] += HALF_CYCLE_INCREMENT;
     } // end of AddHalfCycle
     
     
+    double    NoValue                      () const { return DBL_NAN; }
+    void      ClearTurningPoints           ();
     void      ZeroInit                     ();
     int       EntriesCount                 () const;
     void      MakeSymmetric                ();
@@ -429,8 +500,39 @@ public:
     double    GetShapeValue                ( const VectorStufenAmpl &Stufen ) const;
     double    GetSumH                      () const;
     double    GetSumH                      ( const VectorStufenAmpl &Stufen ) const;
-    
-    
+    bool      TpSet                        ( size_t tp_pos, RF::rfc_value_tuple_s *tp )
+    {
+        m_TurningPoints.push_back( *tp );
+        tp->tp_pos = m_TurningPoints.size();
+
+        return true;
+    }
+
+    bool      TpGet                        ( size_t tp_pos, RF::rfc_value_tuple_s **tp )
+    {
+        ASSERT( tp_pos <= m_TurningPoints.size() );
+
+        *tp = &m_TurningPoints[tp_pos-1];
+
+        return true;
+    }
+
+    bool      TpIncDamage                  ( size_t tp_pos, double damage )
+    {
+        ASSERT( tp_pos <= m_TurningPoints.size() );
+
+        m_TurningPoints[tp_pos-1].damage += damage;
+
+        return true;
+    }
+
+    bool      TpPrune( size_t counts, int flags )
+    {
+        ASSERT( false );
+        return true;
+    }
+
+
     template< typename ParameterMap >
     ParameterMap GetParameterMap() const
     {
@@ -459,8 +561,16 @@ public:
 
 
 template<class T>
+void CRainflowT<T>::ClearTurningPoints()
+{
+    m_TurningPoints.clear();
+} // end of ClearTurningPoints
+
+
+template<class T>
 void CRainflowT<T>::ZeroInit()
 {
+    ClearTurningPoints();
     m_hysteresis                =  0.0;
     m_dilation                  =  0.0;
     m_range_min = m_class_width =  0.0;
@@ -482,7 +592,7 @@ int CRainflowT<T>::EntriesCount() const
     int i, j;
     int entries_count = 0;
 
-    if( !m_isParametrized || !m_rfc_ctx.rfm ) 
+    if( !m_isParametrized ) 
     {
         ASSERT( false );
         return 0;
@@ -590,9 +700,14 @@ void CRainflowT<T>::GetStufen( VectorStufen &Stufen ) const
 {
     Stufen.clear();
 
-    if( !m_isParametrized || !m_rfc_ctx.rfm ) 
+    if( !m_isParametrized ) 
     {
         ASSERT( false );
+        return;
+    } // end if
+
+    if( !GetMatrix() ) 
+    {
         return;
     } // end if
 
@@ -604,7 +719,7 @@ void CRainflowT<T>::GetStufen( VectorStufen &Stufen ) const
             // pro Schwingspiel FULL_CYCLE_INCREMENT Zaehlungen vornehmen.
             // CountResiduum() nimmt eine Zaehlung (HALF_CYCLE_INCREMENT) fuer "RESIDUUM_HALFCYCLES" vor.
             // Die Schleifen decken die volle Matrix ab!
-            double counts = (double) GetCountIncrements( i, j ) / m_rfc_ctx.full_inc;
+            double counts = (double) GetCountIncrements( i, j ) / FULL_CYCLE_INCREMENT;
 
             if ( counts > 0.0 ) 
             {
@@ -612,7 +727,7 @@ void CRainflowT<T>::GetStufen( VectorStufen &Stufen ) const
                 /* ( i + 0.5 ) - ( j + 0.5 ) --> j - i
                  * ( i + 0.5 ) + ( j + 0.5 ) --> i + j + 1
                  */
-                double range = m_class_width * fabs( j - i );
+                double range = m_class_width * Abs( j - i );
                 double avrg  = m_class_width * ( i + j + 1 ) / 2.0 + m_range_min;
                 
                 t_stufe stufe;
@@ -632,7 +747,7 @@ void CRainflowT<T>::GetStufen( VectorStufenAmpl &Stufen ) const
 {
     Stufen.clear();
 
-    if( !m_isParametrized || !m_rfc_ctx.rfm ) 
+    if( !m_isParametrized || !GetMatrix() ) 
     {
         ASSERT( false );
         return;
@@ -648,11 +763,11 @@ void CRainflowT<T>::GetStufen( VectorStufenAmpl &Stufen ) const
             // pro Schwingspiel FULL_CYCLE_INCREMENT Zaehlungen vornehmen.
             // CountResiduum() nimmt eine Zaehlung (HALF_CYCLE_INCREMENT) fuer "RESIDUUM_HALFCYCLES" vor.
             // Die Schleifen decken die halbe Matrix ab (Dreieck)!
-            counts += (double) GetCountIncrements( j - i, j ) / m_rfc_ctx.full_inc;
-            counts += (double) GetCountIncrements( j, j - i ) / m_rfc_ctx.full_inc;
+            counts += (double) GetCountIncrements( j - i, j ) / FULL_CYCLE_INCREMENT;
+            counts += (double) GetCountIncrements( j, j - i ) / FULL_CYCLE_INCREMENT;
         } // end for
 
-        if ( counts > 0.0 ) 
+        if( counts > 0.0 ) 
         {
             /* Es wird mit den Klassenmitten gerechnet */
             double range = m_class_width * i;
@@ -672,9 +787,14 @@ void CRainflowT<T>::GetStufen( VectorStufenFromTo &Stufen ) const
 {
     Stufen.clear();
 
-    if( !m_isParametrized || m_rfc_ctx.rfm ) 
+    if( !m_isParametrized ) 
     {
         ASSERT( false );
+        return;
+    } // end if
+
+    if( !GetMatrix() ) 
+    {
         return;
     } // end if
 
@@ -683,7 +803,7 @@ void CRainflowT<T>::GetStufen( VectorStufenFromTo &Stufen ) const
         for( int j = 0; j < m_class_count; j++ ) 
         {
             // Schleifen decken die volle Matrix ab!
-            double counts = (double) GetCountIncrements( i, j ) / m_rfc_ctx.full_inc;
+            double counts = (double) GetCountIncrements( i, j ) / FULL_CYCLE_INCREMENT;
 
             if ( counts > 0.0 ) 
             {
@@ -751,13 +871,13 @@ void CRainflowT<T>::SetStufen( const VectorStufen &Stufen )
     for( i = 0; i < Stufen.size(); i++ ) 
     {
         t_stufe stufe = Stufen[i];
-        T from = (T)( stufe.dAvrg - stufe.dRange / 2.0 );
-        T   to = (T)( stufe.dAvrg + stufe.dRange / 2.0 );
+        int from = ClassNo( (T)( stufe.dAvrg - stufe.dRange / 2.0 ) );
+        int   to = ClassNo( (T)( stufe.dAvrg + stufe.dRange / 2.0 ) );
 
         ASSERT( from >= 0 && from < m_class_count 
                 && to >=0 && to < m_class_count );
 
-        AddCycles( from, to, stufe.dCounts );
+        AddCycles( from, to, (int)( stufe.dCounts + 0.5 ) );
     } // end for
 
     RF::RFC_rp_from_rfm( &m_rfc_ctx, m_rfc_ctx.rp, NULL, NULL );
@@ -788,7 +908,7 @@ void CRainflowT<T>::SetStufen( const VectorStufenFromTo &Stufen )
         ASSERT( from >= 0 && from < m_class_count 
                 && to >=0 && to < m_class_count );
 
-        AddCycles( from, to, stufe.dCounts );
+        AddCycles( from, to, (int)( stufe.dCounts + 0.5 ) );
     } // end for
 
     RF::RFC_rp_from_rfm( &m_rfc_ctx, m_rfc_ctx.rp, NULL, NULL );
@@ -918,13 +1038,13 @@ void CRainflowT<T>::Parametrize( double range_min,         double range_max,
         if( !DBL_ISFINITE( range ) ) 
         {
             if( is_range_max_fixed && is_range_min_fixed ) {
-                range = fabs( static_cast<T>( range_fixed_max ) - static_cast<T>( range_fixed_min ) );
+                range = Abs( static_cast<T>( range_fixed_max ) - static_cast<T>( range_fixed_min ) );
             } else if( is_range_max_fixed && !is_range_min_fixed ) {
-                range = fabs( static_cast<T>( range_fixed_max ) - static_cast<T>( range_min ) );
+                range = Abs( static_cast<T>( range_fixed_max ) - static_cast<T>( range_min ) );
             } else if( !is_range_max_fixed && is_range_min_fixed ) {
-                range = fabs( static_cast<T>( range_max ) - static_cast<T>( range_fixed_min ) );
+                range = Abs( static_cast<T>( range_max ) - static_cast<T>( range_fixed_min ) );
             } else {
-                range = fabs( static_cast<T>( range_max ) - static_cast<T>( range_min ) );
+                range = Abs( static_cast<T>( range_max ) - static_cast<T>( range_min ) );
             } // end if
         } /* end if */
     } else {
@@ -979,7 +1099,7 @@ void CRainflowT<T>::Parametrize( double range_min,         double range_max,
     if( is_class_width_fixed && !is_class_count_fixed ) 
     {
         ASSERT( class_width > 0.0 );
-        class_count = (int)ceil( static_cast<T>( range ) / static_cast<T>( class_width ) );
+        class_count = (int)Ceil( static_cast<T>( range ) / static_cast<T>( class_width ) );
     } /* end if */
     
     if( !is_class_count_fixed && !is_class_width_fixed ) 
@@ -1041,9 +1161,9 @@ void CRainflowT<T>::Parametrize( double range_min,         double range_max,
         class_no = floor( ( value - class_min ) / class_with ) + 1
     */
 
-    if( range < 1E-5 * 2 * std::max( 1.0, std::max( fabs( range_min ), fabs( range_max ) ) ) ) 
+    if( range < 1E-5 * 2 * Max( 1, Max( Abs( range_min ), Abs( range_max ) ) ) ) 
     {
-        range = 1E-5 * 2 * std::max( 1.0, std::max( fabs( range_min ), fabs( range_max ) ) );
+        range = 1E-5 * 2 * Max( 1, Max( Abs( range_min ), Abs( range_max ) ) );
     } /* end if */
     
     
@@ -1069,7 +1189,7 @@ void CRainflowT<T>::Parametrize( double range_min,         double range_max,
     } // end if
 
     if( !is_class_width_fixed ) class_width = static_cast<T>( range ) / IROUND( class_count );
-    if( !is_class_count_fixed ) class_count = (int)ceil( static_cast<T>( range ) / static_cast<T>( class_width ) );
+    if( !is_class_count_fixed ) class_count = (int)Ceil( static_cast<T>( range ) / static_cast<T>( class_width ) );
 
     if( !DBL_ISFINITE( hysteresis ) || hysteresis == DEFAULT_HYSTERESIS ) 
     {
@@ -1376,3 +1496,67 @@ double CRainflowT<T>::GetShapeValue() const
     
     return GetShapeValue( Stufen );
 } // end of GetShapeValue
+
+
+extern "C"
+static
+bool tp_set( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp )
+{
+    ASSERT( !tp_pos && tp );
+
+    if( !tp->tp_pos )
+    {
+        CRainflow *obj;
+
+        obj = static_cast<CRainflow*>( ctx->internal.obj );
+        return obj->TpSet( tp_pos, tp );
+    }
+
+    return false;
+}
+
+extern "C"
+static
+bool tp_get( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp )
+{
+    ASSERT( tp_pos && tp );
+
+    if( tp_pos )
+    {
+        CRainflow *obj;
+
+        obj = static_cast<CRainflow*>( ctx->internal.obj );
+        return obj->TpGet( tp_pos, tp );
+    }
+
+    return false;
+}
+
+extern "C"
+static
+bool tp_inc_damage( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage )
+{
+    ASSERT( tp_pos );
+
+    if( tp_pos )
+    {
+        CRainflow *obj;
+
+        obj = static_cast<CRainflow*>( ctx->internal.obj );
+        return obj->TpIncDamage( tp_pos, damage );
+    }
+
+    return false;
+}
+
+extern "C"
+static
+bool tp_prune( RF::rfc_ctx_s *ctx, size_t count, int flags )
+{
+    CRainflow *obj;
+
+    ASSERT( false );
+
+    obj = static_cast<CRainflow*>( ctx->internal.obj );
+    return obj->TpPrune( count, flags );
+}

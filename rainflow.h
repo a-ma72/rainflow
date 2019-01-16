@@ -333,8 +333,8 @@ typedef  bool                       ( *rfc_damage_calc_fcn_t )   ( rfc_ctx_s *, 
 typedef  bool                       ( *rfc_finalize_fcn_t )      ( rfc_ctx_s *, int residual_methods );
 typedef  rfc_value_tuple_s *        ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, const rfc_value_tuple_s * );
 #if RFC_TP_SUPPORT
-typedef  bool                       ( *rfc_tp_get_fcn_t )        ( rfc_ctx_s *, size_t tp_pos, rfc_value_tuple_s ** );
 typedef  bool                       ( *rfc_tp_set_fcn_t )        ( rfc_ctx_s *, size_t tp_pos, rfc_value_tuple_s * );
+typedef  bool                       ( *rfc_tp_get_fcn_t )        ( rfc_ctx_s *, size_t tp_pos, rfc_value_tuple_s ** );
 typedef  bool                       ( *rfc_tp_inc_damage_fcn_t ) ( rfc_ctx_s *, size_t tp_pos, double damage );
 typedef  bool                       ( *rfc_tp_prune_fcn_t )      ( rfc_ctx_s *, size_t, int );
 #endif /*RFC_TP_SUPPORT*/
@@ -540,8 +540,8 @@ typedef struct rfc_ctx
     /* Delegates (optional, may be NULL) */
     rfc_tp_next_fcn_t                   tp_next_fcn;                /**< Test for new turning point */
 #if RFC_TP_SUPPORT
-    rfc_tp_get_fcn_t                    tp_get_fcn;                 /**< Get turning point reference */
     rfc_tp_set_fcn_t                    tp_set_fcn;                 /**< Set new turning points */
+    rfc_tp_get_fcn_t                    tp_get_fcn;                 /**< Get turning point reference */
     rfc_tp_inc_damage_fcn_t             tp_inc_damage_fcn;          /**< Increase damage for existing turning point */
     rfc_tp_prune_fcn_t                  tp_prune_fcn;               /**< Prune turning points */
 #endif /*RFC_TP_SUPPORT*/
@@ -652,7 +652,9 @@ typedef struct rfc_ctx
             unsigned                    count;
         }                               at;
 #endif /*RFC_AT_SUPPORT*/
-
+#if RFC_USE_DELEGATES
+            void                       *obj;
+#endif /*RFC_USE_DELEGATES*/
     }
                                         internal;
 } rfc_ctx_s;
