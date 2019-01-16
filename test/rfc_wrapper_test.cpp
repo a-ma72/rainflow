@@ -7,7 +7,7 @@
 /* Made extern "C", so that C-Code (rfc_test.c) can access this function (in a C++ module)
    C++ functions are usually "name mangeled", that is averted here! */
 extern "C"
-bool wrapper_test( void )
+bool wrapper_test_easy( void )
 {
     namespace rf = rainflow_C;  /* Using a namespace alias to make it short */
 

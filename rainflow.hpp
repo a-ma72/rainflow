@@ -17,11 +17,17 @@
 
 #pragma once
 
+#undef ASSERT
+#include <assert.h>
+#define ASSERT(x) assert(x)
+
 #include <vector>
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
 #include "rainflow.h"
+
+namespace RF = RFC_CPP_NAMESPACE;
 
 #ifndef DBL_NAN
 #if _WIN32
@@ -44,6 +50,10 @@
 #endif /*DBL_NAN*/
 
 
+/** Returns the less value of \a a or \a b */
+#define MIN(a,b) ( (a) < (b) ? (a) : (b) )
+/** Returns the greater value of \a a or \a b */
+#define MAX(a,b) ( (a) > (b) ? (a) : (b) )
 /** Returns 1, if \a a >= 0, otherwise -1 */
 #define SIGN2(a) ( ( (a) >= 0 ) ? 1 : -1 )
 /** Returns \f$ {\mathop \rm \sgn}\left( a \right) \f$ */
@@ -56,19 +66,16 @@
 #define NROUND(a) ( (size_t)( fabs( (double) a ) + 0.5 ) )
 
 
-#undef ASSERT
-#include <assert.h>
-#define ASSERT(x) assert(x)
-
-namespace RF = RFC_CPP_NAMESPACE;
-
 template<class T> class CRainflowT;
 typedef CRainflowT<RF::RFC_value_type> CRainflow;
 
-extern "C" static bool tp_set           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp );
-extern "C" static bool tp_get           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp );
-extern "C" static bool tp_inc_damage    ( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage );
-extern "C" static bool tp_prune         ( RF::rfc_ctx_s *ctx, size_t count, int flags );
+extern "C"
+{
+    static bool tp_set           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp );
+    static bool tp_get           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp );
+    static bool tp_inc_damage    ( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage );
+    static bool tp_prune         ( RF::rfc_ctx_s *ctx, size_t count, int flags );
+}
 
 
 template<class T>
@@ -500,37 +507,10 @@ public:
     double    GetShapeValue                ( const VectorStufenAmpl &Stufen ) const;
     double    GetSumH                      () const;
     double    GetSumH                      ( const VectorStufenAmpl &Stufen ) const;
-    bool      TpSet                        ( size_t tp_pos, RF::rfc_value_tuple_s *tp )
-    {
-        m_TurningPoints.push_back( *tp );
-        tp->tp_pos = m_TurningPoints.size();
-
-        return true;
-    }
-
-    bool      TpGet                        ( size_t tp_pos, RF::rfc_value_tuple_s **tp )
-    {
-        ASSERT( tp_pos <= m_TurningPoints.size() );
-
-        *tp = &m_TurningPoints[tp_pos-1];
-
-        return true;
-    }
-
-    bool      TpIncDamage                  ( size_t tp_pos, double damage )
-    {
-        ASSERT( tp_pos <= m_TurningPoints.size() );
-
-        m_TurningPoints[tp_pos-1].damage += damage;
-
-        return true;
-    }
-
-    bool      TpPrune( size_t counts, int flags )
-    {
-        ASSERT( false );
-        return true;
-    }
+    bool      TpSet                        ( size_t tp_pos, RF::rfc_value_tuple_s *tp );
+    bool      TpGet                        ( size_t tp_pos, RF::rfc_value_tuple_s **tp );
+    bool      TpIncDamage                  ( size_t tp_pos, double damage );
+    bool      TpPrune                      ( size_t counts, int flags );
 
 
     template< typename ParameterMap >
@@ -1498,7 +1478,48 @@ double CRainflowT<T>::GetShapeValue() const
 } // end of GetShapeValue
 
 
-extern "C"
+template<class T>
+bool CRainflowT<T>::TpSet( size_t tp_pos, RF::rfc_value_tuple_s *tp )
+{
+    m_TurningPoints.push_back( *tp );
+    tp->tp_pos = m_TurningPoints.size();
+
+    return true;
+}
+
+
+template<class T>
+bool CRainflowT<T>::TpGet( size_t tp_pos, RF::rfc_value_tuple_s **tp )
+{
+    ASSERT( tp_pos <= m_TurningPoints.size() );
+
+    *tp = &m_TurningPoints[tp_pos-1];
+
+    return true;
+}
+
+
+template<class T>
+bool CRainflowT<T>::TpIncDamage( size_t tp_pos, double damage )
+{
+    ASSERT( tp_pos <= m_TurningPoints.size() );
+
+    m_TurningPoints[tp_pos-1].damage += damage;
+
+    return true;
+}
+
+
+template<class T>
+bool CRainflowT<T>::TpPrune( size_t counts, int flags )
+{
+    ASSERT( false );
+    return true;
+}
+
+
+extern "C" {
+
 static
 bool tp_set( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp )
 {
@@ -1515,7 +1536,6 @@ bool tp_set( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp )
     return false;
 }
 
-extern "C"
 static
 bool tp_get( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp )
 {
@@ -1532,7 +1552,6 @@ bool tp_get( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp )
     return false;
 }
 
-extern "C"
 static
 bool tp_inc_damage( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage )
 {
@@ -1549,7 +1568,6 @@ bool tp_inc_damage( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage )
     return false;
 }
 
-extern "C"
 static
 bool tp_prune( RF::rfc_ctx_s *ctx, size_t count, int flags )
 {
@@ -1560,3 +1578,5 @@ bool tp_prune( RF::rfc_ctx_s *ctx, size_t count, int flags )
     obj = static_cast<CRainflow*>( ctx->internal.obj );
     return obj->TpPrune( count, flags );
 }
+
+} // extern "C"

@@ -1,0 +1,119 @@
+{
+	"build_systems":
+	[
+		{
+			"file_regex": "(.+[^:]):(\\d+):(\\d+): (?:fatal )?((?:error|warning): .+)$",
+			"name": "rainflow (Linux)",
+			"shell_cmd": "make -j8",
+			"syntax": "Packages/CMakeBuilder/Syntax/Make.sublime-syntax",
+			"variants":
+			[
+				{
+					"name": "clean",
+					"shell_cmd": "make -j8 clean"
+				},
+				{
+					"name": "install/strip",
+					"shell_cmd": "make -j8 install/strip"
+				},
+				{
+					"name": "install",
+					"shell_cmd": "make -j8 install"
+				},
+				{
+					"name": "list_install_components",
+					"shell_cmd": "make -j8 list_install_components"
+				},
+				{
+					"name": "install/local",
+					"shell_cmd": "make -j8 install/local"
+				},
+				{
+					"name": "rfc_test",
+					"shell_cmd": "make -j8 rfc_test"
+				},
+				{
+					"name": "package",
+					"shell_cmd": "make -j8 package"
+				},
+				{
+					"name": "package_source",
+					"shell_cmd": "make -j8 package_source"
+				},
+				{
+					"name": "Rainflow",
+					"shell_cmd": "make -j8 Rainflow"
+				},
+				{
+					"name": "rebuild_cache",
+					"shell_cmd": "make -j8 rebuild_cache"
+				},
+				{
+					"name": "rainflow.o",
+					"shell_cmd": "make -j8 rainflow.o"
+				},
+				{
+					"name": "rainflow.i",
+					"shell_cmd": "make -j8 rainflow.i"
+				},
+				{
+					"name": "rainflow.s",
+					"shell_cmd": "make -j8 rainflow.s"
+				},
+				{
+					"name": "test/rfc_test.o",
+					"shell_cmd": "make -j8 test/rfc_test.o"
+				},
+				{
+					"name": "test/rfc_test.i",
+					"shell_cmd": "make -j8 test/rfc_test.i"
+				},
+				{
+					"name": "test/rfc_test.s",
+					"shell_cmd": "make -j8 test/rfc_test.s"
+				},
+				{
+					"name": "test/rfc_wrapper_test.o",
+					"shell_cmd": "make -j8 test/rfc_wrapper_test.o"
+				},
+				{
+					"name": "test/rfc_wrapper_test.i",
+					"shell_cmd": "make -j8 test/rfc_wrapper_test.i"
+				},
+				{
+					"name": "test/rfc_wrapper_test.s",
+					"shell_cmd": "make -j8 test/rfc_wrapper_test.s"
+				},
+				{
+					"name": "test/rfc_wrapper_test2.o",
+					"shell_cmd": "make -j8 test/rfc_wrapper_test2.o"
+				},
+				{
+					"name": "test/rfc_wrapper_test2.i",
+					"shell_cmd": "make -j8 test/rfc_wrapper_test2.i"
+				},
+				{
+					"name": "test/rfc_wrapper_test2.s",
+					"shell_cmd": "make -j8 test/rfc_wrapper_test2.s"
+				}
+			],
+			"working_dir": "${project_path}/build"
+		}
+	],
+	"folders":
+	[
+		{
+			"path": "."
+		}
+	],
+	"settings":
+	{
+		"cmake":
+		{
+			"build_folder": "${project_path}/build"
+		},
+
+		"sublimegdb_commandline": "gdb -nx -readnow -interpreter=mi -args /datadisk/git/rainflow/build/rfc_test",
+		"sublimegdb_workingdir": "/datadisk/git/rainflow/build/"
+ 	}
+}

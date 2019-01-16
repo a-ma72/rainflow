@@ -175,7 +175,7 @@ static void                 cycle_find_hcm                  (       rfc_ctx_s *,
 #if !RFC_MINIMAL
 static void                 cycle_process_lc                (       rfc_ctx_s *, int flags );
 #endif /*!RFC_MINIMAL*/
-static void                 cycle_process_counts_internal   (       rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags );
+static void                 cycle_process_counts            (       rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags );
 /* Methods on residue */
 static bool                 finalize_res_ignore             (       rfc_ctx_s *, int flags );
 #if !RFC_MINIMAL
@@ -1308,7 +1308,7 @@ bool RFC_cycle_process_counts( void *ctx, RFC_value_type from_val, RFC_value_typ
     from.cls = QUANTIZE( rfc_ctx, from_val );
     to.cls   = QUANTIZE( rfc_ctx, to_val );
 
-    cycle_process_counts_internal( rfc_ctx, &from, &to, /*next*/ NULL, flags );
+    cycle_process_counts( rfc_ctx, &from, &to, /*next*/ NULL, flags );
 
     return true;
 }
@@ -3438,7 +3438,7 @@ bool finalize_res_weight_cycles( rfc_ctx_s *rfc_ctx, RFC_counts_type weight, int
             rfc_value_tuple_s *to   = from + 1;
             rfc_value_tuple_s *next = ( i + 2 < rfc_ctx->residue_cnt ) ? to + 1 : NULL;
 
-            cycle_process_counts_internal( rfc_ctx, from, to, next, flags );
+            cycle_process_counts( rfc_ctx, from, to, next, flags );
 
             from = to;
         }
@@ -3493,7 +3493,7 @@ bool finalize_res_clormann_seeger( rfc_ctx_s *rfc_ctx, int flags )
                 rfc_value_tuple_s *from = &rfc_ctx->residue[idx+1];
                 rfc_value_tuple_s *to   = &rfc_ctx->residue[idx+2];
 
-                cycle_process_counts_internal( rfc_ctx, from, to, to + 1, flags );
+                cycle_process_counts( rfc_ctx, from, to, to + 1, flags );
 
                 /* Remove two inner turning points (idx+1 and idx+2) */
                 residue_remove_item( rfc_ctx, i + 1, 2 );
@@ -3603,7 +3603,7 @@ bool RFC_finalize_res_rp_DIN45667( rfc_ctx_s *rfc_ctx, int flags )
             }
 
             /* Do the countings for the matching slope */
-            cycle_process_counts_internal( rfc_ctx, slopes[j].lhs, slopes[j].rhs, NULL, flags );
+            cycle_process_counts( rfc_ctx, slopes[j].lhs, slopes[j].rhs, NULL, flags );
         }
 
         rfc_ctx->mem_alloc( slopes, 0, 0, RFC_MEM_AIM_TEMP );
@@ -4446,7 +4446,7 @@ void RFC_cycle_find_4ptm( rfc_ctx_s *rfc_ctx, int flags )
             rfc_value_tuple_s *to   = &rfc_ctx->residue[idx+2];
 
             /* Closed cycle found, process countings */
-            cycle_process_counts_internal( rfc_ctx, from, to, to + 1, flags );
+            cycle_process_counts( rfc_ctx, from, to, to + 1, flags );
 
             /* Remove two inner turning points (idx+1 and idx+2) */
             /* Move last turning point */
@@ -4518,7 +4518,7 @@ label_2:
                 if( fabs( (double)K->value - (double)J->value ) >= fabs( (double)J->value - (double)I->value) )
                 {
                     /* Cycle range is greater or equal to previous, register closed cycle */
-                    cycle_process_counts_internal( rfc_ctx, I, J, NULL, flags );
+                    cycle_process_counts( rfc_ctx, I, J, NULL, flags );
                     IZ -= 2;
                     /* Test further closed cycles */
                     goto label_2;
@@ -4581,7 +4581,7 @@ void cycle_process_lc( rfc_ctx_s *rfc_ctx, int flags )
     if( n > 1 && (flags & RFC_FLAGS_COUNT_LC) )
     {
         /* Do the level crossing counting */
-        cycle_process_counts_internal( rfc_ctx, &rfc_ctx->residue[n-2], &rfc_ctx->residue[n-1], NULL, flags & (RFC_FLAGS_COUNT_LC | RFC_FLAGS_ENFORCE_MARGIN) );
+        cycle_process_counts( rfc_ctx, &rfc_ctx->residue[n-2], &rfc_ctx->residue[n-1], NULL, flags & (RFC_FLAGS_COUNT_LC | RFC_FLAGS_ENFORCE_MARGIN) );
     }
 }
 #endif /*!RFC_MINIMAL*/
@@ -4598,7 +4598,7 @@ void cycle_process_lc( rfc_ctx_s *rfc_ctx, int flags )
  * @param         flags    Control flags
  */
 static
-void cycle_process_counts_internal( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags )
+void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags )
 {
     unsigned class_from, class_to;
 
