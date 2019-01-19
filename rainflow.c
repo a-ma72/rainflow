@@ -1,11 +1,14 @@
 /*
- *   |     .-.
- *   |    /   \         .-.
- *   |   /     \       /   \       .-.     .-.     _   _
- *   +--/-------\-----/-----\-----/---\---/---\---/-\-/-\/\/---
- *   | /         \   /       \   /     '-'     '-'
- *   |/           '-'         '-'
- *
+ *                                                               
+ *   |                     .-.                                   
+ *   |                    /   \                                  
+ *   |     .-.===========/     \         .-.                          
+ *   |    /   \         /       \       /   \                               
+ *   |   /     \       /         \     /     \         .-.                                                    
+ *   +--/-------\-----/-----------\---/-------\-------/---\----
+ *   | /         \   /             '-'=========\     /     \   /                                        
+ *   |/           '-'                           \   /       '-'                       
+ *   |                                           '-'            
  *          ____  ___    _____   __________    ____ _       __
  *         / __ \/   |  /  _/ | / / ____/ /   / __ \ |     / /
  *        / /_/ / /| |  / //  |/ / /_  / /   / / / / | /| / / 
@@ -745,40 +748,33 @@ bool RFC_tp_prune( void *ctx, size_t limit, int flags )
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
 
-#if RFC_USE_DELEGATES
-    if( rfc_ctx->tp_prune_fcn )
+    if( rfc_ctx->tp_cnt > limit )
     {
-        return rfc_ctx->tp_prune_fcn( rfc_ctx, limit, flags );
-    }
-#endif /*RFC_USE_DELEGATES*/
-
-    if( rfc_ctx->tp && rfc_ctx->tp_cnt > limit )
-    {
-        rfc_value_tuple_s   *src_beg_it,    /* Source (begin) */
-                            *src_end_it,    /* Source (end) */
-                            *src_it,        /* Source iterator */
-                            *dst_it,        /* Destination iterator */
-                            *res_it;        /* Residue iterator */
-        size_t               src_pos,       /* Source, position base 1 */
-                             dst_i,         /* New turning points, index base 0 */
-                             res_i;         /* Residue, index base 0 */
+        rfc_value_tuple_s   *src_beg_it,    /* Source (begin) (tp) */
+                            *src_end_it,    /* Source (end) (tp) */
+                            *src_it,        /* Source iterator (tp) */
+                            *dst_it,        /* Destination iterator (tp) */
+                            *res_it;        /* Residue iterator (res) */
+        size_t               src_i,         /* Source, position in tp base 0 */
+                             dst_i,         /* New turning points, index base 0 (tp) */
+                             res_i;         /* Residue, index base 0 (res) */
 
         size_t               removal;       /* Number of turning points to remove */
-        size_t               offset;        /* Position offset (minuend) */
+        size_t               pos_offset;    /* First position (stream) in tp and dh, base 0 */
         bool                 preserve_pos;  /* Don't justify position */
-        bool                 preserve_res;  /* Don't remove turning points, if referenced by resiude */
+        bool                 preserve_res;  /* Don't remove turning points, if referenced by residue */
 
         removal     = rfc_ctx->tp_cnt - limit;
         dst_it      = rfc_ctx->tp;
         dst_i       = 0;
-        src_beg_it  = dst_it + removal;
+        src_beg_it  = rfc_ctx->tp + removal;
         src_end_it  = rfc_ctx->tp + rfc_ctx->tp_cnt
                       + ( ( rfc_ctx->state == RFC_STATE_BUSY_INTERIM ) ? 1 : 0 );
         src_it      = src_beg_it;
-        src_pos     = removal + 1;
+        src_i       = removal;
         res_it      = rfc_ctx->residue;
         res_i       = 0;
-        offset      = 0;
+        pos_offset  = 0;
 
         preserve_pos = ( flags & RFC_FLAGS_TPPRUNE_PRESERVE_POS ) > 0;  /* Preserve (stream) position */
         preserve_res = ( flags & RFC_FLAGS_TPPRUNE_PRESERVE_RES ) > 0;  /* Preserve residual turning points */
@@ -787,39 +783,47 @@ bool RFC_tp_prune( void *ctx, size_t limit, int flags )
         while( src_it < src_end_it || res_i < rfc_ctx->residue_cnt )
         {
             /* Check if there are still residual points to consider */
-            while( res_i < rfc_ctx->residue_cnt && res_it->tp_pos <= src_pos )
+            while( res_i < rfc_ctx->residue_cnt && res_it->tp_pos <= src_i + 1 )
             {
                 /* Check if residue refers a turning point from removal area */
 
                 /* First new turning point delivers new offset */
                 if( !res_i && !preserve_pos )
                 {
-                    offset = res_it->pos;
-                    assert( offset );
-                    offset--;
+                    pos_offset = res_it->pos;  // pos is base 1
+                    assert( pos_offset );
+                    pos_offset--;
                 }
 
-                /* Residual point is at current source position? */
-                if( res_it->tp_pos == src_pos )
+                /* Residual point refers current source position? */
+                if( res_it->tp_pos == src_i + 1 )
                 {
+                    /* Turning will be processed in this inner loop */
                     src_it++;
-                    src_pos++;
+                    src_i++;
                 }
 
                 if( preserve_res )
                 {
                     /* Adjust residue reference information */
-                    res_it->tp_pos  = dst_i + 1;
-                    res_it->pos    -= offset;
-                    *dst_it++       = *res_it++;
+                    res_it->pos -= pos_offset;
+
+                    /* Set residual turning point */
+                    if( !tp_set( rfc_ctx, dst_i + 1, res_it ) )
+                    {
+                        return error_raise( rfc_ctx, RFC_ERROR_TP );
+                    }
+
+                    dst_it++;
                     dst_i++;
+                    res_it++;
                     res_i++;
                 }
                 else
                 {
                     /* Residual turning point refers first point now */
                     res_it->tp_pos  = 0;  /* Index 0 => "none" */
-                    res_it->pos    -= offset;
+                    res_it->pos    -= pos_offset;
                     res_it++;
                     res_i++;
                 }
@@ -827,34 +831,49 @@ bool RFC_tp_prune( void *ctx, size_t limit, int flags )
 
             if( src_it < src_end_it )
             {
+                rfc_value_tuple_s *cpy;
+
                 /* First new turning point delivers new offset */
                 if( !dst_i && !preserve_pos )
                 {
-                    offset = src_it->pos;
-                    assert( offset );
-                    offset--;
+                    pos_offset = src_it->pos;
+                    assert( pos_offset );
+                    pos_offset--;
                 }
 
                 /* Copy turning point from source */
-                src_it->tp_pos  = dst_i + 1;
-                src_it->pos    -= offset;
-                *dst_it++       = *src_it++;
+                if( !tp_get( rfc_ctx, src_i + 1, &cpy ) )
+                {
+                    return error_raise( rfc_ctx, RFC_ERROR_TP );
+                }
+
+                /* Adjust stream position */
+                cpy->pos -= pos_offset;
+
+                /* Move turning point in tp stack */
+                if( !tp_set( rfc_ctx, dst_i + 1, cpy ) )
+                {
+                    return error_raise( rfc_ctx, RFC_ERROR_TP );
+                }
+
+                dst_it++;
                 dst_i++;
-                src_pos++;
+                src_it++;
+                src_i++;
             }
         }
 
         rfc_ctx->tp_cnt                  = dst_i;
-        rfc_ctx->internal.pos           -= offset;
-        rfc_ctx->internal.global_offset += offset;
+        rfc_ctx->internal.pos           -= pos_offset;
+        rfc_ctx->internal.global_offset += pos_offset;
 
 #if RFC_DH_SUPPORT
         /* Shift damage history */
-        if( rfc_ctx->dh && offset )
+        if( rfc_ctx->dh && pos_offset )
         {
-            assert( rfc_ctx->dh_cnt >= offset );
-            memcpy( rfc_ctx->dh, rfc_ctx->dh + offset, rfc_ctx->dh_cnt - offset );
-            rfc_ctx->dh_cnt -= offset;
+            assert( rfc_ctx->dh_cnt >= pos_offset );
+            memcpy( rfc_ctx->dh, rfc_ctx->dh + pos_offset, rfc_ctx->dh_cnt - pos_offset );
+            rfc_ctx->dh_cnt -= pos_offset;
         }
 #endif /*RFC_DH_SUPPORT*/
     }
@@ -4807,7 +4826,7 @@ static
 bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
 {
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state <= RFC_STATE_FINISHED );
     assert( tp );
 
 #if RFC_USE_DELEGATES
@@ -4820,38 +4839,35 @@ bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
     else
 #endif /*RFC_USE_DELEGATES*/
     {
-        if( !tp )
+        if( !rfc_ctx->tp )
         {
-            return false;
+            return true;
         }
 
-        if( !rfc_ctx->tp || rfc_ctx->tp_locked )
+        if( !tp || rfc_ctx->tp_locked )
         {
-            /* Nothing to do */
-            return true;
+            return false;
         }
 
         /* Check to append or alter */
         if( tp_pos )
         {
             /* Alter */
-            if( tp_pos != tp->tp_pos )
-            {
-                return false;
-            }
-            else
-            {
-                assert( tp_pos <= rfc_ctx->tp_cnt );
-                rfc_ctx->tp[ tp_pos - 1 ] = *tp;
-                return true;
-            }
+            assert( tp_pos <= rfc_ctx->tp_cnt );
+            tp->tp_pos                = 0;
+            rfc_ctx->tp[ tp_pos - 1 ] = *tp;
+            tp->tp_pos                = tp_pos;
+
+            return true;
         }
         else
         {
             /* Append */
             if( tp->tp_pos )
             {
-                /* Exists already */
+                /* Already an element of tp stack */
+                assert( tp->tp_pos <= rfc_ctx->tp_cnt );
+
                 return true;
             }
             else
@@ -4883,6 +4899,9 @@ bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
                 return error_raise( rfc_ctx, RFC_ERROR_MEMORY );
             }
         }
+
+        assert( tp_pos <= rfc_ctx->tp_cnt );
+
         /* Append turning point */
         rfc_ctx->tp[ tp_pos - 1 ] = *tp;      /* Make a copy of tp in .tp, tp->tp_pos remains unaltered */
         tp->tp_pos                =  tp_pos;  /* Ping back turning point position index in tp, base 1 */
@@ -4910,7 +4929,7 @@ static
 bool tp_get( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s **tp )
 {
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state <= RFC_STATE_FINISHED );
 
     if( !tp_pos || tp_pos > rfc_ctx->tp_cnt )
     {
@@ -4934,6 +4953,7 @@ bool tp_get( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s **tp )
 
         if( tp )
         {
+            assert( tp_pos <= rfc_ctx->tp_cnt );
             *tp = &rfc_ctx->tp[ tp_pos - 1 ];
         }
     }

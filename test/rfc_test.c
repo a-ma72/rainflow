@@ -221,7 +221,7 @@ TEST RFC_tp_prune_test( int ccnt )
     ASSERT( RFC_tp_init( &ctx, tp, NUMEL(tp), /* is_static */ true ) );
     ASSERT( RFC_feed( &ctx, data, /* count */ data_len ) );
     ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
-
+    ctx.tp_locked = 0;;
     ASSERT( RFC_tp_prune( &ctx, /*count*/ 100, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS | RFC_FLAGS_TPPRUNE_PRESERVE_RES ) );
 
     ASSERT( ctx.tp_cnt == ccnt ? 107 : 100 );
@@ -231,7 +231,16 @@ TEST RFC_tp_prune_test( int ccnt )
 
     ASSERT( RFC_tp_prune( &ctx, /*count*/ 0, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS | RFC_FLAGS_TPPRUNE_PRESERVE_RES ) );
     ASSERT( ctx.tp_cnt == ctx.residue_cnt );
-    ASSERT_MEM_EQ( ctx.tp, ctx.residue, ctx.tp_cnt * sizeof(RFC_VALUE_TYPE) );
+
+    for( i = 0; i < ctx.residue_cnt; i++ )
+    {
+        ASSERT( ctx.tp[i].tp_pos == 0 );
+        ASSERT( ctx.residue[i].tp_pos == i + 1 );
+        ASSERT( ctx.tp[i].damage == 0.0 );
+        ASSERT( ctx.residue[i].damage == 0.0 );
+        ASSERT( ctx.tp[i].pos == ctx.residue[i].pos );
+        ASSERT( ctx.tp[i].value == ctx.residue[i].value );
+    }
 
     ASSERT( RFC_tp_prune( &ctx, /*count*/ 0, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS ) );
     ASSERT( ctx.tp_cnt == 0 );

@@ -1,11 +1,13 @@
 /*
- *   |     .-.
- *   |    /   \         .-.
- *   |   /     \       /   \       .-.     .-.     _   _
- *   +--/-------\-----/-----\-----/---\---/---\---/-\-/-\/\/---
- *   | /         \   /       \   /     '-'     '-'
- *   |/           '-'         '-'
- *
+ *   |                     .-.                                   
+ *   |                    /   \                                  
+ *   |     .-.===========/     \         .-.                          
+ *   |    /   \         /       \       /   \                               
+ *   |   /     \       /         \     /     \         .-.                                                    
+ *   +--/-------\-----/-----------\---/-------\-------/---\----
+ *   | /         \   /             '-'=========\     /     \   /                                        
+ *   |/           '-'                           \   /       '-'                       
+ *   |                                           '-'            
  *          ____  ___    _____   __________    ____ _       __
  *         / __ \/   |  /  _/ | / / ____/ /   / __ \ |     / /
  *        / /_/ / /| |  / //  |/ / /_  / /   / / / / | /| / / 
@@ -336,7 +338,6 @@ typedef  rfc_value_tuple_s *        ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, 
 typedef  bool                       ( *rfc_tp_set_fcn_t )        ( rfc_ctx_s *, size_t tp_pos, rfc_value_tuple_s * );
 typedef  bool                       ( *rfc_tp_get_fcn_t )        ( rfc_ctx_s *, size_t tp_pos, rfc_value_tuple_s ** );
 typedef  bool                       ( *rfc_tp_inc_damage_fcn_t ) ( rfc_ctx_s *, size_t tp_pos, double damage );
-typedef  bool                       ( *rfc_tp_prune_fcn_t )      ( rfc_ctx_s *, size_t, int );
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT
 typedef  void                       ( *rfc_spread_damage_fcn_t ) ( rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags );
@@ -543,7 +544,6 @@ typedef struct rfc_ctx
     rfc_tp_set_fcn_t                    tp_set_fcn;                 /**< Set new turning points */
     rfc_tp_get_fcn_t                    tp_get_fcn;                 /**< Get turning point reference */
     rfc_tp_inc_damage_fcn_t             tp_inc_damage_fcn;          /**< Increase damage for existing turning point */
-    rfc_tp_prune_fcn_t                  tp_prune_fcn;               /**< Prune turning points */
 #endif /*RFC_TP_SUPPORT*/
     rfc_finalize_fcn_t                  finalize_fcn;               /**< Finalizing function */
     rfc_cycle_find_fcn_t                cycle_find_fcn;             /**< Find next cycle(s) and process */
