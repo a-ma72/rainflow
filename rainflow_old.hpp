@@ -1,36 +1,16 @@
 /*
- *   |                     .-.                                   
- *   |                    /   \                                  
- *   |     .-.===========/     \         .-.                          
- *   |    /   \         /       \       /   \                               
- *   |   /     \       /         \     /     \         .-.                                                    
- *   +--/-------\-----/-----------\---/-------\-------/---\----
- *   | /         \   /             '-'=========\     /     \   /                                        
- *   |/           '-'                           \   /       '-'                       
- *   |                                           '-'            
- *          ____  ___    _____   __________    ____ _       __
- *         / __ \/   |  /  _/ | / / ____/ /   / __ \ |     / /
- *        / /_/ / /| |  / //  |/ / /_  / /   / / / / | /| / / 
- *       / _, _/ ___ |_/ // /|  / __/ / /___/ /_/ /| |/ |/ /  
- *      /_/ |_/_/  |_/___/_/ |_/_/   /_____/\____/ |__/|__/   
- *
- *    Rainflow Counting Algorithm (4-point-method), C99 compliant
+    Woehler:    (Sa/SD)^k == n/ND
+    Basquin:    C         == n * Sa^b       (C = 1e22 fuer SD=1e3, ND=1e7 und b=5)
 
-
-
-/*
-    Woehler formula :    (Sa/SD)^-|k| == n/ND
-    Basquin formula :    C            == n * Sa^b       (e.g. C = 2e21 if SD=1e3, ND=2e6 and b=5)
-
-    Simplified formula to calculate damage (Miner elementary):
-    Fatigue strength:                    SD (=1e3, e.g.)
-    Cycles @ SD:                         ND (=2e6, e.g.)
-    Woehler slope:                       k  (=5, e.g.)
-    Stress amplitude for class i:        Sa_i = ABS(from_i – to_i) * class_width/2
-    Cycle counts for class i:            h_i
-    Partial damage for class i:          D_i  = h_i/ND * (Sa_i/SD) ^ ABS(k)
-                                         D_i  = h_i * Sa ^ b / C
-    Damage for entire histogram:         D    = sum( D_i )
+    Einfache Berechnung der BKZ (elementar):
+    Eckschwingspielzahl:            ND (=1e7)
+    Amplitude bei ND:               SD (=1e3)
+    Neigung:                        k  (=-5)
+    Signalamplitude in Klasse i:    Sa_i = ABS(Startklasse_i – Zielklasse_i) * Klassenbreite/2
+    Zählung in Klasse i:            h_i
+    Teilschädigung in Klasse i:     D_i = h_i/ND * (Sa_i/SD) ^ ABS(k)
+                                    D_i = h_i * Sa ^ b / C
+    Schadenssumme (fikt.):          BKZ = Summe( D_i )
 */
 
 
@@ -91,10 +71,10 @@ typedef CRainflowT<RF::RFC_value_type> CRainflow;
 
 extern "C"
 {
-    static bool  tp_set           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp );
-    static bool  tp_get           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp );
-    static bool  tp_inc_damage    ( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage );
-    static void* mem_alloc        ( void *ptr, size_t num, size_t size, int aim );
+    static bool tp_set           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp );
+    static bool tp_get           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp );
+    static bool tp_inc_damage    ( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage );
+    static bool tp_prune         ( RF::rfc_ctx_s *ctx, size_t count, int flags );
 }
 
 
@@ -104,31 +84,25 @@ class CRainflowT
 public:
     typedef enum 
     {
-        /* Don't change order! */
-        RFC_RES_NONE                    = RF::rfc_ctx::RFC_RES_NONE            ,                       /**< No residual method */
-        RFC_RES_IGNORE                  = RF::rfc_ctx::RFC_RES_IGNORE          ,                       /**< Ignore residue (same as RFC_RES_NONE) */
-        RFC_RES_DISCARD                 = RF::rfc_ctx::RFC_RES_DISCARD         ,                       /**< Discard residue (empty residue) */
-        RFC_RES_HALFCYCLES              = RF::rfc_ctx::RFC_RES_HALFCYCLES      ,                       /**< ASTM */
-        RFC_RES_FULLCYCLES              = RF::rfc_ctx::RFC_RES_FULLCYCLES      ,                       /**< Count half cycles as full cycles */
-        RFC_RES_CLORMANN_SEEGER         = RF::rfc_ctx::RFC_RES_CLORMANN_SEEGER ,                       /**< Clormann/Seeger method */
-        RFC_RES_REPEATED                = RF::rfc_ctx::RFC_RES_REPEATED        ,                       /**< Repeat residue and count closed cycles */
-        RFC_RES_RP_DIN45667             = RF::rfc_ctx::RFC_RES_RP_DIN45667     ,                       /**< Count residue according to range pair in DIN-45667 */
-        RFC_RES_COUNT                   = RF::rfc_ctx::RFC_RES_COUNT           ,                       /**< Number of options */
+        RESIDUUM_NONE,             /* Kein Residuum, keine Matrix mit Residuum */
+        RESIDUUM_IGNORE,           /* Residuum verwerfen */
+        RESIDUUM_HALFCYCLES,       /* ASTM */
+        RESIDUUM_FULLCYCLES,       /* Residuum als volle Schwingspiele werten */
+        RESIDUUM_CLORMANN_SEEGER,  /* Bewertung nach Clormann-Seeger */
+        RESIDUUM_REPEATED,         /* Wiederholter Durchlauf */
+        RESIDUUM_RP_DIN,           /* Spannenpaar nach DIN */
     } e_residuum;
 
     typedef enum
     {
-        RFC_SD_NONE                     = -1,                       /**< No spread damage calculation */
-        RFC_SD_HALF_23                  =  0,                       /**< Equally split damage between P2 and P3 */
-        RFC_SD_RAMP_AMPLITUDE_23        =  1,                       /**< Spread damage according to amplitude over points between P2 and P3 */
-        RFC_SD_RAMP_DAMAGE_23           =  2,                       /**< Spread damage linearly over points between P2 and P3 */
-        RFC_SD_RAMP_AMPLITUDE_24        =  3,                       /**< Spread damage according to amplitude over points between P2 and P4 */  
-        RFC_SD_RAMP_DAMAGE_24           =  4,                       /**< Spread damage linearly over points between P2 and P4 */
-        RFC_SD_FULL_P2                  =  5,                       /**< Assign damage to P2 */
-        RFC_SD_FULL_P3                  =  6,                       /**< Assign damage to P3 */
-        RFC_SD_TRANSIENT_23             =  7,                       /**< Spread damage transient according to amplitude over points between P2 and P3 */
-        RFC_SD_TRANSIENT_23c            =  8,                       /**< Spread damage transient according to amplitude over points between P2 and P4 only until cycle is closed */
-        RFC_SD_COUNT                                                /**< Number of options */
+        SPRDAM_NONE              = -1,  /* Keine Schaedigung aufteilen */   
+        SPRDAM_HALF_23           =  0,  /* Schaedigung jeweils zur Haelfte auf P2 und P3 */   
+        SPRDAM_RAMP_AMPLITUDE_23 =  1,  /* Lineare Amplitude   ueber P2 bis P3 */   
+        SPRDAM_RAMP_DAMAGE_23    =  2,  /* Lineare Schaedigung ueber P2 bis P3 */   
+        SPRDAM_RAMP_AMPLITUDE_24 =  3,  /* Lineare Amplitude   ueber P2 bis P4 */   
+        SPRDAM_RAMP_DAMAGE_24    =  4,  /* Lineare Schaedigung ueber P2 bis P4 */
+        SPRDAM_FULL_P2           =  5,  /* Schaedigung auf P2 */
+        SPRDAM_FULL_P3           =  6,  /* Schaedigung auf P3 */
     } e_spread_damage;
 
     typedef struct 
@@ -196,8 +170,8 @@ public:
         DEFAULT_ROUNDOFF    =  1000000    /* Fuer Vergleichbarkeit mit LMS TecWare */
     }; // end enum
 
-    static const RF::RFC_counts_type    HALF_CYCLE_INCREMENT = RFC_HALF_CYCLE_INCREMENT;
-    static const RF::RFC_counts_type    FULL_CYCLE_INCREMENT = RFC_FULL_CYCLE_INCREMENT;
+    static const RF::RFC_counts_type HALF_CYCLE_INCREMENT = RFC_HALF_CYCLE_INCREMENT;
+    static const RF::RFC_counts_type FULL_CYCLE_INCREMENT = RFC_FULL_CYCLE_INCREMENT;
 
 protected:
     // Eingangsparameter
@@ -246,7 +220,7 @@ public:
         m_SNCurve.k1 = DEFAULT_WL_k;
         m_SNCurve.k2 = DEFAULT_WL_k;
 
-        m_doSpreadDamage = RFC_SD_HALF_23;  
+        m_doSpreadDamage = SPRDAM_HALF_23;  
 
         m_rfc_ctx = dummy;
 
@@ -577,7 +551,7 @@ void CRainflowT<T>::ZeroInit()
     m_class_count               =  0;
     m_isSymmetric               =  false;
     m_isParametrized            =  false;
-    m_eResiduum                 =  RFC_RES_IGNORE;
+    m_eResiduum                 =  RESIDUUM_IGNORE;
     m_bCountPending             =  false;
     m_amount                    =  0;
     m_CurrentPos                =  0;
@@ -834,21 +808,23 @@ void CRainflowT<T>::GetStufen( VectorStufenKGUZ &Stufen ) const
     } // end if
 
     VectorStufenKGUZ KGUZ_Temp( m_class_count - 1 );
+    RF::RFC_counts_type *lc     = new RF::RFC_counts_type[m_class_count];
+    RF::RFC_value_type  *level  = new RF::RFC_value_type[m_class_count];
 
-    std::vector<RF::RFC_counts_type> lc_counts( m_class_count );
-    std::vector<RF::RFC_value_type>  lc_level( m_class_count );
-
-    if( RF::RFC_lc_get( &m_rfc_ctx, &lc_counts[0], &lc_level[0] ) )
+    if( RF::RFC_lc_get( &m_rfc_ctx, lc, level ) )
     {
         for( int i = 0; i < m_class_count - 1; i++ ) 
         {
             // Erster Index [0] zaehlt das Durchschreiten der ersten oberen Klassengrenze.
-            KGUZ_Temp[i].dLevel  = lc_level[i];
-            KGUZ_Temp[i].dCounts = lc_counts[i];
+            KGUZ_Temp[i].dLevel  = level[i];
+            KGUZ_Temp[i].dCounts = lc[i];
         } // end for
     }
 
     Stufen = KGUZ_Temp;
+
+    delete[] lc;
+    delete[] level;
 } // end of GetStufen
 
 
@@ -1216,6 +1192,7 @@ void CRainflowT<T>::Parametrize( double range_min,         double range_max,
         m_rfc_ctx.tp_set_fcn        = tp_set;
         m_rfc_ctx.tp_get_fcn        = tp_get;
         m_rfc_ctx.tp_inc_damage_fcn = tp_inc_damage;
+        m_rfc_ctx.tp_prune_fcn      = tp_prune;
     }
 } // end of Parametrize
 
@@ -1223,8 +1200,10 @@ void CRainflowT<T>::Parametrize( double range_min,         double range_max,
 template<class T>
 void CRainflowT<T>::DoRainflow( const double *stream_in, size_t in_len, bool do_finalize ) 
 {
-    const   double *pin;          /* Pointer auf Zeitreihe (Eingangsdaten) */
-            double  dummy = 0.0;
+    const   double*             pin;                        /* Pointer auf Zeitreihe (Eingangsdaten) */
+            double              dummy = 0.0;
+            size_t              pos;                        /* Aktuelle Position in der Zeitreihe (pin) */
+            T                   d0, dl;                     /* Rueckwaertsgerichtete Gradienten ueber die letzten 3 Punkte (res[end-1],res[end],*pin) */
 
     if( !m_isParametrized || ( !stream_in && in_len ) ) 
     {
@@ -1256,19 +1235,19 @@ void CRainflowT<T>::DoRainflow( const double *stream_in, size_t in_len, bool do_
     {
         switch( m_eResiduum )
         {
-            case RFC_RES_NONE:
+            case RESIDUUM_NONE:
                 RF::RFC_finalize( &m_rfc_ctx, RF::rfc_ctx_s::RFC_RES_NONE ); break;
-            case RFC_RES_IGNORE:
+            case RESIDUUM_IGNORE:
                 RF::RFC_finalize( &m_rfc_ctx, RF::rfc_ctx_s::RFC_RES_IGNORE ); break;
-            case RFC_RES_HALFCYCLES:
+            case RESIDUUM_HALFCYCLES:
                 RF::RFC_finalize( &m_rfc_ctx, RF::rfc_ctx_s::RFC_RES_HALFCYCLES ); break;
-            case RFC_RES_FULLCYCLES:
+            case RESIDUUM_FULLCYCLES:
                 RF::RFC_finalize( &m_rfc_ctx, RF::rfc_ctx_s::RFC_RES_FULLCYCLES ); break;
-            case RFC_RES_REPEATED:
+            case RESIDUUM_REPEATED:
                 RF::RFC_finalize( &m_rfc_ctx, RF::rfc_ctx_s::RFC_RES_REPEATED ); break;
-            case RFC_RES_CLORMANN_SEEGER:
+            case RESIDUUM_CLORMANN_SEEGER:
                 RF::RFC_finalize( &m_rfc_ctx, RF::rfc_ctx_s::RFC_RES_CLORMANN_SEEGER ); break;
-            case RFC_RES_RP_DIN45667:
+            case RESIDUUM_RP_DIN:
                 RF::RFC_finalize( &m_rfc_ctx, RF::rfc_ctx_s::RFC_RES_RP_DIN45667 ); break;
             default:
                 ASSERT( false );
@@ -1593,31 +1572,15 @@ bool tp_inc_damage( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage )
     return false;
 }
 
-/**
- * @brief      (Re-)Allocate or free memory
- *
- * @param      ptr   Previous data pointer, or NULL, if unset
- * @param      num   The number of elements
- * @param      size  The size of one element in bytes
- * @param      aim   The aim
- *
- * @return     New memory pointer or NULL if either num or size is 0
- */
 static
-void * mem_alloc( void *ptr, size_t num, size_t size, int aim )
+bool tp_prune( RF::rfc_ctx_s *ctx, size_t count, int flags )
 {
-    if( !num || !size )
-    {
-        if( ptr )
-        {
-            std::free( ptr );
-        }
-        return NULL;
-    }
-    else
-    {
-        return ptr ? std::realloc( ptr, num * size ) : std::calloc( num, size );
-    }
+    CRainflow *obj;
+
+    ASSERT( false );
+
+    obj = static_cast<CRainflow*>( ctx->internal.obj );
+    return obj->TpPrune( count, flags );
 }
 
 } // extern "C"
