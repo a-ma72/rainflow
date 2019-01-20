@@ -1,18 +1,19 @@
 /*
- *   |                     .-.                                   
- *   |                    /   \                                  
- *   |     .-.===========/     \         .-.                          
- *   |    /   \         /       \       /   \                               
- *   |   /     \       /         \     /     \         .-.                                                    
- *   +--/-------\-----/-----------\---/-------\-------/---\----
- *   | /         \   /             '-'=========\     /     \   /                                        
- *   |/           '-'                           \   /       '-'                       
- *   |                                           '-'            
+ *
+ *   |                     .-.
+ *   |                    /   \
+ *   |     .-.===========/     \         .-.
+ *   |    /   \         /       \       /   \
+ *   |   /     \       /         \     /     \         .-.
+ *   +--/-------\-----/-----------\---/-------\-------/---\
+ *   | /         \   /             '-'=========\     /     \   /
+ *   |/           '-'                           \   /       '-'
+ *   |                                           '-'
  *          ____  ___    _____   __________    ____ _       __
  *         / __ \/   |  /  _/ | / / ____/ /   / __ \ |     / /
- *        / /_/ / /| |  / //  |/ / /_  / /   / / / / | /| / / 
- *       / _, _/ ___ |_/ // /|  / __/ / /___/ /_/ /| |/ |/ /  
- *      /_/ |_/_/  |_/___/_/ |_/_/   /_____/\____/ |__/|__/   
+ *        / /_/ / /| |  / //  |/ / /_  / /   / / / / | /| / /
+ *       / _, _/ ___ |_/ // /|  / __/ / /___/ /_/ /| |/ |/ /
+ *      /_/ |_/_/  |_/___/_/ |_/_/   /_____/\____/ |__/|__/
  *
  *    Rainflow Counting Algorithm (4-point-method), C99 compliant
  * 
@@ -178,7 +179,7 @@ namespace RFC_CPP_NAMESPACE {
 #endif /*RFC_MINIMAL*/
 
 /* Memory allocation aim info */
-enum
+enum rfc_mem_aim
 {
     RFC_MEM_AIM_TEMP                =  0,
     RFC_MEM_AIM_RESIDUE             =  1,
@@ -204,7 +205,7 @@ enum
 
 
 /* Flags */
-enum
+enum rfc_flags
 {
     RFC_FLAGS_DEFAULT               = -1,
     RFC_FLAGS_COUNT_RFM             = 1 << 0,                       /**< Count into rainflow matrix */
@@ -237,17 +238,16 @@ enum
     RFC_FLAGS_TPAUTOPRUNE           = 1 << 10,                      /**< Automatic prune on tp */
 #endif /*RFC_TP_SUPPORT*/
 };
-
-/* See RFC_damage_from_rp() */
-enum
-{
-    RFC_RP_DAMAGE_CALC_TYPE_DEFAULT     = 0,
 #if !RFC_MINIMAL
-    RFC_RP_DAMAGE_CALC_TYPE_ELEMENTAR   = 1,
-    RFC_RP_DAMAGE_CALC_TYPE_MODIFIED    = 2,
-    RFC_RP_DAMAGE_CALC_TYPE_CONSEQUENT  = 3,
+/* See RFC_damage_from_rp() */
+typedef enum rfc_rp_damage_method
+{
+    RFC_RP_DAMAGE_CALC_METHOD_DEFAULT     = 0,
+    RFC_RP_DAMAGE_CALC_METHOD_ELEMENTAR   = 1,
+    RFC_RP_DAMAGE_CALC_METHOD_MODIFIED    = 2,
+    RFC_RP_DAMAGE_CALC_METHOD_CONSEQUENT  = 3,
+} rfc_rp_damage_method_t;
 #endif /*!RFC_MINIMAL*/
-};
     
 /* Memory allocation functions typedef */
 typedef void * ( *rfc_mem_alloc_fcn_t )( void *, size_t num, size_t size, int aim );
@@ -269,7 +269,7 @@ extern "C" {
 
 /* Core functions */
 bool    RFC_init                    (       void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
-                                                       RFC_value_type hysteresis, int flags );
+                                                       RFC_value_type hysteresis, /*enum rfc_flags*/ int flags );
 bool    RFC_wl_init_elementary      (       void *ctx, double sx, double nx, double k );
 #if !RFC_MINIMAL
 bool    RFC_wl_init_original        (       void *ctx, double sd, double nd, double k );
@@ -280,11 +280,11 @@ bool    RFC_clear_counts            (       void *ctx );
 bool    RFC_deinit                  (       void *ctx );
 bool    RFC_feed                    (       void *ctx, const RFC_value_type* data, size_t count );
 #if !RFC_MINIMAL
-bool    RFC_cycle_process_counts    (       void *ctx, RFC_value_type from_val, RFC_value_type to_val, int flags );
+bool    RFC_cycle_process_counts    (       void *ctx, RFC_value_type from_val, RFC_value_type to_val, /*enum rfc_flags*/ int flags );
 bool    RFC_feed_scaled             (       void *ctx, const RFC_value_type* data, size_t count, double factor );
 bool    RFC_feed_tuple              (       void *ctx, rfc_value_tuple_s *data, size_t count );
 #endif /*!RFC_MINIMAL*/
-bool    RFC_finalize                (       void *ctx, int residual_method );
+bool    RFC_finalize                (       void *ctx, /*rfc_res_method*/ int residual_method );
 #if !RFC_MINIMAL
 /* Functions on rainflow matrix */
 bool    RFC_rfm_make_symmetric      (       void *ctx );
@@ -296,11 +296,11 @@ bool    RFC_rfm_sum                 ( const void *ctx, unsigned from_first, unsi
 bool    RFC_rfm_damage              ( const void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage );
 bool    RFC_rfm_check               ( const void *ctx );
 bool    RFC_lc_get                  ( const void *ctx, RFC_counts_type *lc, RFC_value_type *level );
-bool    RFC_lc_from_rfm             ( const void *ctx, RFC_counts_type *lc, RFC_value_type *level, const RFC_counts_type *rfm, int flags );
-bool    RFC_lc_from_residue         ( const void *ctx, RFC_counts_type *lc, RFC_value_type *level, int flags );
+bool    RFC_lc_from_rfm             ( const void *ctx, RFC_counts_type *lc, RFC_value_type *level, const RFC_counts_type *rfm, /*enum rfc_flags*/ int flags );
+bool    RFC_lc_from_residue         ( const void *ctx, RFC_counts_type *lc, RFC_value_type *level, /*enum rfc_flags*/ int flags );
 bool    RFC_rp_get                  ( const void *ctx, RFC_counts_type *rp, RFC_value_type *class_means );
 bool    RFC_rp_from_rfm             ( const void *ctx, RFC_counts_type *rp, RFC_value_type *class_means, const RFC_counts_type *rfm );
-bool    RFC_damage_from_rp          ( const void *ctx, const RFC_counts_type *counts, const RFC_value_type *Sa, double *damage, int rp_calc_type );
+bool    RFC_damage_from_rp          ( const void *ctx, const RFC_counts_type *counts, const RFC_value_type *Sa, double *damage, /*enum rfc_rp_damage_method*/ int rp_calc_type );
 bool    RFC_damage_from_rfm         ( const void *ctx, const RFC_counts_type *rfm, double *damage );
 bool    RFC_wl_calc_sx              ( const void *ctx, double s0, double n0, double k, double *sx, double nx, double  k2, double  sd, double nd );
 bool    RFC_wl_calc_sd              ( const void *ctx, double s0, double n0, double k, double  sx, double nx, double  k2, double *sd, double nd );
@@ -311,7 +311,7 @@ bool    RFC_wl_calc_n               ( const void *ctx, double s0, double n0, dou
 #if RFC_TP_SUPPORT
 bool    RFC_tp_init                 (       void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
 bool    RFC_tp_init_autoprune       (       void *ctx, bool autoprune, size_t size, size_t threshold );
-bool    RFC_tp_prune                (       void *ctx, size_t count, int flags );
+bool    RFC_tp_prune                (       void *ctx, size_t count, /*enum rfc_flags*/ int flags );
 #endif /*RFC_TP_SUPPORT*/
 
 #if RFC_DH_SUPPORT
@@ -330,7 +330,7 @@ bool    RFC_at_transform            ( const void *ctx, double Sa, double Sm, dou
 
 #if RFC_USE_DELEGATES
 /* Delegates typedef */
-typedef  void                       ( *rfc_cycle_find_fcn_t )    ( rfc_ctx_s *, int flags );
+typedef  void                       ( *rfc_cycle_find_fcn_t )    ( rfc_ctx_s *, /*enum rfc_flags*/ int flags );
 typedef  bool                       ( *rfc_damage_calc_fcn_t )   ( rfc_ctx_s *, unsigned from_class, unsigned to_class, double *damage, double *Sa_ret );
 typedef  bool                       ( *rfc_finalize_fcn_t )      ( rfc_ctx_s *, int residual_methods );
 typedef  rfc_value_tuple_s *        ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, const rfc_value_tuple_s * );
@@ -340,7 +340,7 @@ typedef  bool                       ( *rfc_tp_get_fcn_t )        ( rfc_ctx_s *, 
 typedef  bool                       ( *rfc_tp_inc_damage_fcn_t ) ( rfc_ctx_s *, size_t tp_pos, double damage );
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT
-typedef  void                       ( *rfc_spread_damage_fcn_t ) ( rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, int flags );
+typedef  void                       ( *rfc_spread_damage_fcn_t ) ( rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, /*enum rfc_flags*/ int flags );
 #endif /*RFC_DH_SUPPORT*/
 #if RFC_AT_SUPPORT
 typedef  bool                       ( *rfc_at_transform_fcn_t )  ( rfc_ctx_s *, double Sa, double Sm, double *Sa_transformed );
@@ -434,7 +434,7 @@ typedef struct rfc_ctx
 {
     size_t                              version;                    /**< Version number as sizeof(struct rfctx..), must be 1st field! */
 
-    enum
+    enum rfc_state
     {
         RFC_STATE_INIT0,                                            /**< Initialized with zeros */
         RFC_STATE_INIT,                                             /**< Initialized, memory allocated */
@@ -445,7 +445,7 @@ typedef struct rfc_ctx
         RFC_STATE_ERROR,                                            /**< An error occurred */
     }                                   state;                      /**< Current counting state */
 
-    enum
+    enum rfc_error
     {
         RFC_ERROR_UNEXP                 = -1,                       /**< Unexpected error */
         RFC_ERROR_NOERROR               =  0,                       /**< No error */
@@ -463,7 +463,7 @@ typedef struct rfc_ctx
     }                                   error;                      /**< Error code */
 
 #if !RFC_MINIMAL
-    enum
+    enum rfc_counting_method
     {
         RFC_COUNTING_METHOD_DELEGATED   = -1,                       /**< Method must be implemented via delegator, see member cycle_find_fcn */
         RFC_COUNTING_METHOD_NONE        =  0,                       /**< No counting */
@@ -476,7 +476,7 @@ typedef struct rfc_ctx
                                         counting_method;
 #endif /*!RFC_MINIMAL*/
 
-    enum 
+    enum rfc_res_method
     {
         /* Don't change order! */
         RFC_RES_NONE                    = 0,                        /**< No residual method */
@@ -491,9 +491,9 @@ typedef struct rfc_ctx
 #endif /*!RFC_MINIMAL*/
         RFC_RES_COUNT                                               /**< Number of options */
     }
-                                        residual_method;
+                                        residual_method;            /** Used on finalizing */
 #if RFC_DH_SUPPORT
-    enum
+    enum rfc_sd_method
     {
         RFC_SD_NONE                     = -1,                       /**< No spread damage calculation */
         RFC_SD_HALF_23                  =  0,                       /**< Equally split damage between P2 and P3 */
@@ -612,7 +612,7 @@ typedef struct rfc_ctx
     /* Internal usage */
     struct internal
     {
-        int                             flags;                      /**< Flags */
+        int                             flags;                      /**< Flags (enum rfc_flags) */
         int                             slope;                      /**< Current signal slope */
         rfc_value_tuple_s               extrema[2];                 /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
 #if RFC_GLOBAL_EXTREMA
@@ -650,7 +650,7 @@ typedef struct rfc_ctx
             double                      Sa[5];
             double                      Sm[5];
             unsigned                    count;
-        }                               at;
+        }                               at_haigh;
 #endif /*RFC_AT_SUPPORT*/
 #if RFC_USE_DELEGATES
             void                       *obj;
