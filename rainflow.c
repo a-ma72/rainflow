@@ -183,7 +183,7 @@ static void                 cycle_process_counts            (       rfc_ctx_s *,
 static bool                 finalize_res_ignore             (       rfc_ctx_s *, /*enum rfc_flags*/ int flags );
 #if !RFC_MINIMAL
 static bool                 finalize_res_discard            (       rfc_ctx_s *, /*enum rfc_flags*/ int flags );
-static bool                 finalize_res_weight_cycles      (       rfc_ctx_s *, RFC_counts_type weight, /*enum rfc_flags*/ int flags );
+static bool                 finalize_res_weight_cycles      (       rfc_ctx_s *, rfc_counts_t weight, /*enum rfc_flags*/ int flags );
 static bool                 finalize_res_clormann_seeger    (       rfc_ctx_s *, /*enum rfc_flags*/ int flags );
 static bool                 RFC_finalize_res_rp_DIN45667    (       rfc_ctx_s *, /*enum rfc_flags*/ int flags );
 static bool                 finalize_res_repeated           (       rfc_ctx_s *, /*enum rfc_flags*/ int flags );
@@ -198,7 +198,7 @@ static bool                 tp_set                          (       rfc_ctx_s *,
 static bool                 tp_get                          (       rfc_ctx_s *, size_t tp_pos, rfc_value_tuple_s **pt );
 static bool                 tp_inc_damage                   (       rfc_ctx_s *, size_t tp_pos, double damage );
 static void                 tp_lock                         (       rfc_ctx_s *, bool do_lock );
-static bool                 tp_refeed                       (       rfc_ctx_s *, RFC_value_type new_hysteresis, const rfc_class_param_s *new_class_param );
+static bool                 tp_refeed                       (       rfc_ctx_s *, rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param );
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT
 static bool                 spread_damage                   (       rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, /*enum rfc_flags*/ int flags );
@@ -221,7 +221,7 @@ static void                 damage_lut_init                 (       rfc_ctx_s * 
 static bool                 damage_calc_fast                (       rfc_ctx_s *, unsigned class_from, unsigned class_to, double *damage, double *Sa_ret );
 #endif /*RFC_DAMAGE_FAST*/
 static bool                 error_raise                     (       rfc_ctx_s *, /*enum rfc_error*/ int );
-static RFC_value_type       value_delta                     (       RFC_value_type from_val, RFC_value_type to, int *sign_ptr );
+static rfc_value_t          value_delta                     (       rfc_value_t from_val, rfc_value_t to, int *sign_ptr );
 
 
 #define QUANTIZE( r, v )    ( (unsigned)( ((v) - (r)->class_offset) / (r)->class_width ) )
@@ -260,8 +260,8 @@ static RFC_value_type       value_delta                     (       RFC_value_ty
  * @return     true on success
  */
 #endif /*!RFC_TP_SUPPORT*/
-bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
-                          RFC_value_type hysteresis, /*enum rfc_flags*/ int flags )
+bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
+                          rfc_value_t hysteresis, /*enum rfc_flags*/ int flags )
 {
     rfc_ctx_s         *rfc_ctx = (rfc_ctx_s*)ctx;
     rfc_value_tuple_s  nil     = { 0.0 };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
@@ -366,22 +366,22 @@ bool RFC_init( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_
         if( ok && ( flags & RFC_FLAGS_COUNT_RFM ) )
         {
             /* Non-sparse storages (optional, may be NULL) */
-            rfc_ctx->rfm                    = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count * class_count, 
-                                                                                    sizeof(RFC_counts_type), RFC_MEM_AIM_MATRIX );
+            rfc_ctx->rfm                    = (rfc_counts_t*)rfc_ctx->mem_alloc( NULL, class_count * class_count, 
+                                                                                 sizeof(rfc_counts_t), RFC_MEM_AIM_MATRIX );
             if( !rfc_ctx->rfm ) ok = false;
         }
 #if !RFC_MINIMAL
         if( ok && ( flags & RFC_FLAGS_COUNT_RP ) )
         {
-            rfc_ctx->rp                     = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count,
-                                                                                    sizeof(RFC_counts_type), RFC_MEM_AIM_RP );
+            rfc_ctx->rp                     = (rfc_counts_t*)rfc_ctx->mem_alloc( NULL, class_count,
+                                                                                 sizeof(rfc_counts_t), RFC_MEM_AIM_RP );
             if( !rfc_ctx->rp ) ok = false;
         }
 
         if( ok && ( flags & RFC_FLAGS_COUNT_LC ) )
         {
-            rfc_ctx->lc                     = (RFC_counts_type*)rfc_ctx->mem_alloc( NULL, class_count,
-                                                                                    sizeof(RFC_counts_type), RFC_MEM_AIM_LC );
+            rfc_ctx->lc                     = (rfc_counts_t*)rfc_ctx->mem_alloc( NULL, class_count,
+                                                                                 sizeof(rfc_counts_t), RFC_MEM_AIM_LC );
             if( !rfc_ctx->lc ) ok = false;
         }
 #endif /*!RFC_MINIMAL*/
@@ -1074,17 +1074,17 @@ bool RFC_clear_counts( void *ctx )
 
     if( rfc_ctx->rfm )
     {
-        memset( rfc_ctx->rfm, 0, sizeof(RFC_counts_type) * rfc_ctx->class_count * rfc_ctx->class_count );
+        memset( rfc_ctx->rfm, 0, sizeof(rfc_counts_t) * rfc_ctx->class_count * rfc_ctx->class_count );
     }
 
     if( rfc_ctx->rp )
     {
-        memset( rfc_ctx->rp, 0, sizeof(RFC_counts_type) * rfc_ctx->class_count );
+        memset( rfc_ctx->rp, 0, sizeof(rfc_counts_t) * rfc_ctx->class_count );
     }
 
     if( rfc_ctx->lc )
     {
-        memset( rfc_ctx->lc, 0, sizeof(RFC_counts_type) * rfc_ctx->class_count );
+        memset( rfc_ctx->lc, 0, sizeof(rfc_counts_t) * rfc_ctx->class_count );
     }
 
     rfc_ctx->residue_cnt                = 0;
@@ -1261,7 +1261,7 @@ bool RFC_deinit( void *ctx )
  *
  * @return     true on success
  */
-bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
+bool RFC_feed( void *ctx, const rfc_value_t * data, size_t data_count )
 {
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -1309,7 +1309,7 @@ bool RFC_feed( void *ctx, const RFC_value_type * data, size_t data_count )
  * @return     true on success
  */
 #if !RFC_MINIMAL
-bool RFC_cycle_process_counts( void *ctx, RFC_value_type from_val, RFC_value_type to_val, /*enum rfc_flags*/ int flags )
+bool RFC_cycle_process_counts( void *ctx, rfc_value_t from_val, rfc_value_t to_val, /*enum rfc_flags*/ int flags )
 {
     rfc_value_tuple_s from = {from_val}, to = {to_val};
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
@@ -1344,7 +1344,7 @@ bool RFC_cycle_process_counts( void *ctx, RFC_value_type from_val, RFC_value_typ
  *
  * @return     true on success
  */
-bool RFC_feed_scaled( void *ctx, const RFC_value_type * data, size_t data_count, double factor )
+bool RFC_feed_scaled( void *ctx, const rfc_value_t * data, size_t data_count, double factor )
 {
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -1523,9 +1523,9 @@ bool RFC_finalize( void *ctx, /*rfc_res_method*/ int residual_method )
 #if !RFC_MINIMAL
 bool RFC_rfm_make_symmetric( void *ctx )
 {
-    unsigned          class_count;
-    unsigned          from, to;
-    RFC_counts_type  *rfm;
+    unsigned       class_count;
+    unsigned       from, to;
+    rfc_counts_t  *rfm;
 
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -1574,11 +1574,11 @@ bool RFC_rfm_make_symmetric( void *ctx )
  */
 bool RFC_rfm_get( const void *ctx, rfc_rfm_item_s **buffer, unsigned *count )
 {
-    unsigned           class_count;
-    unsigned           from, to;
-    unsigned           count_old;
-    RFC_counts_type   *rfm_it;
-    rfc_rfm_item_s    *item;
+    unsigned            class_count;
+    unsigned            from, to;
+    unsigned            count_old;
+    rfc_counts_t       *rfm_it;
+    rfc_rfm_item_s     *item;
 
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -1658,7 +1658,7 @@ bool RFC_rfm_set( void *ctx, const rfc_rfm_item_s *buffer, unsigned count, bool 
 {
           unsigned           class_count, i;
     const rfc_rfm_item_s    *item;
-          RFC_counts_type   *rfm;
+          rfc_counts_t      *rfm;
 
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -1683,7 +1683,7 @@ bool RFC_rfm_set( void *ctx, const rfc_rfm_item_s *buffer, unsigned count, bool 
 
     if( !add_only )
     {
-        memset( rfm, (RFC_counts_type)0, sizeof(rfc_rfm_item_s) * class_count * class_count );
+        memset( rfm, (rfc_counts_t)0, sizeof(rfc_rfm_item_s) * class_count * class_count );
     }
 
     item = buffer;
@@ -1717,11 +1717,11 @@ bool RFC_rfm_set( void *ctx, const rfc_rfm_item_s *buffer, unsigned count, bool 
  *
  * @return     true on success
  */
-bool RFC_rfm_peek( const void *ctx, RFC_value_type from_val, RFC_value_type to_val, RFC_counts_type *count )
+bool RFC_rfm_peek( const void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t *count )
 {
     unsigned           from, to;
     unsigned           class_count;
-    RFC_counts_type   *rfm;
+    rfc_counts_t      *rfm;
 
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -1773,11 +1773,11 @@ bool RFC_rfm_peek( const void *ctx, RFC_value_type from_val, RFC_value_type to_v
  *
  * @return     true on success
  */
-bool RFC_rfm_poke( void *ctx, RFC_value_type from_val, RFC_value_type to_val, RFC_counts_type count, bool add_only )
+bool RFC_rfm_poke( void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t count, bool add_only )
 {
     unsigned           from, to;
     unsigned           class_count;
-    RFC_counts_type   *rfm;
+    rfc_counts_t      *rfm;
 
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -1834,11 +1834,11 @@ bool RFC_rfm_poke( void *ctx, RFC_value_type from_val, RFC_value_type to_val, RF
  *
  * @return     true on success
  */
-bool RFC_rfm_sum( const void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, RFC_counts_type *count )
+bool RFC_rfm_sum( const void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, rfc_counts_t *count )
 {
-    unsigned            from, to;
-    unsigned            class_count;
-    RFC_counts_type    *rfm;
+    unsigned         from, to;
+    unsigned         class_count;
+    rfc_counts_t    *rfm;
 
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -1870,7 +1870,7 @@ bool RFC_rfm_sum( const void *ctx, unsigned from_first, unsigned from_last, unsi
 
     if( count )
     {
-        RFC_counts_type sum = 0;
+        rfc_counts_t sum = 0;
 
         for( from = from_first; from <= from_last; from++ )
         {
@@ -1902,9 +1902,9 @@ bool RFC_rfm_sum( const void *ctx, unsigned from_first, unsigned from_last, unsi
  */
 bool RFC_rfm_damage( const void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage )
 {
-    unsigned             from, to;
-    unsigned             class_count;
-    RFC_counts_type     *rfm;
+    unsigned          from, to;
+    unsigned          class_count;
+    rfc_counts_t     *rfm;
 
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -1941,7 +1941,7 @@ bool RFC_rfm_damage( const void *ctx, unsigned from_first, unsigned from_last, u
         {
             for( to = to_first; to < to_last; to++ )
             {
-                RFC_counts_type count = rfm[ from * class_count + to ];
+                rfc_counts_t count = rfm[ from * class_count + to ];
                 double damage_i;
                 
                 if( !damage_calc( rfc_ctx, from, to, &damage_i, NULL /*Sa_ret*/ ) )
@@ -1969,8 +1969,8 @@ bool RFC_rfm_damage( const void *ctx, unsigned from_first, unsigned from_last, u
  */
 bool RFC_rfm_check( const void *ctx )
 {
-    unsigned             class_count;
-    RFC_counts_type     *rfm;
+    unsigned          class_count;
+    rfc_counts_t     *rfm;
 
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -2018,7 +2018,7 @@ bool RFC_rfm_check( const void *ctx )
  *
  * @return     true on success
  */
-bool RFC_lc_get( const void *ctx, RFC_counts_type *lc, RFC_value_type *level )
+bool RFC_lc_get( const void *ctx, rfc_counts_t *lc, rfc_value_t *level )
 {
     unsigned i;
     unsigned class_count;
@@ -2067,7 +2067,7 @@ bool RFC_lc_get( const void *ctx, RFC_counts_type *lc, RFC_value_type *level )
  *
  * @return     true on success
  */
-bool RFC_lc_from_rfm( const void *ctx, RFC_counts_type *lc, RFC_value_type *level, const RFC_counts_type *rfm, /*enum rfc_flags*/ int flags )
+bool RFC_lc_from_rfm( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, /*enum rfc_flags*/ int flags )
 {
     unsigned             from, to, i;
     unsigned             class_count;
@@ -2097,7 +2097,7 @@ bool RFC_lc_from_rfm( const void *ctx, RFC_counts_type *lc, RFC_value_type *leve
 
     for( i = 0; i < class_count; i++ ) 
     {
-        RFC_counts_type sum = 0;
+        rfc_counts_t sum = 0;
 
         /* First index (0) counts crossings of upper class limit of the first class */
         if( level )
@@ -2142,7 +2142,7 @@ bool RFC_lc_from_rfm( const void *ctx, RFC_counts_type *lc, RFC_value_type *leve
  *
  * @return     true on success
  */
-bool RFC_lc_from_residue( const void *ctx, RFC_counts_type* lc, RFC_value_type *level, /*enum rfc_flags*/ int flags )
+bool RFC_lc_from_residue( const void *ctx, rfc_counts_t* lc, rfc_value_t *level, /*enum rfc_flags*/ int flags )
 {
           unsigned           i;
           unsigned           class_count;
@@ -2169,7 +2169,7 @@ bool RFC_lc_from_residue( const void *ctx, RFC_counts_type* lc, RFC_value_type *
         return false;
     }
 
-    memset( lc, 0, sizeof(RFC_counts_type) * class_count );
+    memset( lc, 0, sizeof(rfc_counts_t) * class_count );
 
     if( level )
     {
@@ -2228,7 +2228,7 @@ bool RFC_lc_from_residue( const void *ctx, RFC_counts_type* lc, RFC_value_type *
  *
  * @return     true on success
  */
-bool RFC_rp_get( const void *ctx, RFC_counts_type *rp, RFC_value_type *class_means )
+bool RFC_rp_get( const void *ctx, rfc_counts_t *rp, rfc_value_t *class_means )
 {
     unsigned i;
     unsigned class_count;
@@ -2276,7 +2276,7 @@ bool RFC_rp_get( const void *ctx, RFC_counts_type *rp, RFC_value_type *class_mea
  *
  * @return     true on success
  */
-bool RFC_rp_from_rfm( const void *ctx, RFC_counts_type *rp, RFC_value_type *class_means, const RFC_counts_type *rfm )
+bool RFC_rp_from_rfm( const void *ctx, rfc_counts_t *rp, rfc_value_t *class_means, const rfc_counts_t *rfm )
 {
     unsigned    i, j;
     unsigned    class_count;
@@ -2307,7 +2307,7 @@ bool RFC_rp_from_rfm( const void *ctx, RFC_counts_type *rp, RFC_value_type *clas
 
     for( i = 0; i < class_count; i++ ) 
     {
-        RFC_counts_type sum = (RFC_counts_type)0;
+        rfc_counts_t sum = (rfc_counts_t)0;
 
         if( class_means )
         {
@@ -2343,7 +2343,7 @@ bool RFC_rp_from_rfm( const void *ctx, RFC_counts_type *rp, RFC_value_type *clas
  *
  * @return     true on success
  */
-bool RFC_damage_from_rp( const void *ctx, const RFC_counts_type *rp, const RFC_value_type *Sa, double *damage, /*enum rfc_rp_damage_method*/ int rp_calc_method )
+bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_value_t *Sa, double *damage, /*enum rfc_rp_damage_method*/ int rp_calc_method )
 {
     const unsigned    from = 0;
           unsigned    class_count;
@@ -2563,7 +2563,7 @@ bool RFC_damage_from_rp( const void *ctx, const RFC_counts_type *rp, const RFC_v
  *
  * @return     true on success
  */
-bool RFC_damage_from_rfm( const void *ctx, const RFC_counts_type *rfm, double *damage )
+bool RFC_damage_from_rfm( const void *ctx, const rfc_counts_t *rfm, double *damage )
 {
     unsigned    from, to;
     unsigned    class_count;
@@ -3114,14 +3114,14 @@ bool feed_once_dh( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt )
             size_t new_cap = (size_t)1024 * ( pt->pos / 640 + 1 ); /* + 60% + 1024 */
 
             rfc_ctx->dh = (double*)rfc_ctx->mem_alloc( rfc_ctx->dh, new_cap, 
-                                                       sizeof(RFC_value_type), RFC_MEM_AIM_DH );
+                                                       sizeof(rfc_value_t), RFC_MEM_AIM_DH );
 
             if( !rfc_ctx->dh )
             {
                 return error_raise( rfc_ctx, RFC_ERROR_MEMORY );
             }
 
-            memset( rfc_ctx->dh + rfc_ctx->dh_cnt, 0, sizeof(RFC_value_type) * ( new_cap - rfc_ctx->dh_cap ) );
+            memset( rfc_ctx->dh + rfc_ctx->dh_cnt, 0, sizeof(rfc_value_t) * ( new_cap - rfc_ctx->dh_cap ) );
             rfc_ctx->dh_cap = new_cap;
         }
 
@@ -3433,7 +3433,7 @@ bool finalize_res_discard( rfc_ctx_s *rfc_ctx, /*enum rfc_flags*/ int flags )
  * @return     true on success
  */
 static
-bool finalize_res_weight_cycles( rfc_ctx_s *rfc_ctx, RFC_counts_type weight, /*enum rfc_flags*/ int flags )
+bool finalize_res_weight_cycles( rfc_ctx_s *rfc_ctx, rfc_counts_t weight, /*enum rfc_flags*/ int flags )
 {
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
@@ -3450,7 +3450,7 @@ bool finalize_res_weight_cycles( rfc_ctx_s *rfc_ctx, RFC_counts_type weight, /*e
         size_t             i;
         int                flags    = rfc_ctx->internal.flags;
         rfc_value_tuple_s *from     = rfc_ctx->residue;
-        RFC_counts_type    old_inc  = rfc_ctx->curr_inc;
+        rfc_counts_t       old_inc  = rfc_ctx->curr_inc;
 
         rfc_ctx->curr_inc = weight;
 
@@ -4205,7 +4205,7 @@ static
 rfc_value_tuple_s * feed_filter_pt( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s *pt )
 {
     int                 slope;
-    RFC_value_type      delta;
+    rfc_value_t         delta;
     rfc_value_tuple_s  *new_tp    = NULL;
     int                 do_append = 0;
 
@@ -4441,21 +4441,21 @@ void RFC_cycle_find_4ptm( rfc_ctx_s *rfc_ctx, /*enum rfc_flags*/ int flags )
     {
         size_t idx = rfc_ctx->residue_cnt - 4;
 
-        RFC_value_type A = rfc_ctx->residue[idx+0].value;
-        RFC_value_type B = rfc_ctx->residue[idx+1].value;
-        RFC_value_type C = rfc_ctx->residue[idx+2].value;
-        RFC_value_type D = rfc_ctx->residue[idx+3].value;
+        rfc_value_t A = rfc_ctx->residue[idx+0].value;
+        rfc_value_t B = rfc_ctx->residue[idx+1].value;
+        rfc_value_t C = rfc_ctx->residue[idx+2].value;
+        rfc_value_t D = rfc_ctx->residue[idx+3].value;
 
         if( B > C )
         {
-            RFC_value_type temp = B;
+            rfc_value_t temp = B;
             B = C;
             C = temp;
         }
 
         if( A > D )
         {
-            RFC_value_type temp = A;
+            rfc_value_t temp = A;
             A = D;
             D = temp;
         }
@@ -5038,7 +5038,7 @@ void tp_lock( rfc_ctx_s *rfc_ctx, bool do_lock )
  * @return     true on success
  */
 static
-bool tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc_class_param_s *new_class_param )
+bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param )
 {
     size_t global_offset,
            i;
@@ -5068,14 +5068,14 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, RFC_value_type new_hysteresis, const rfc_cla
         if( rfc_ctx->class_count != new_class_param->count )
         {
             size_t num = rfc_ctx->class_count * rfc_ctx->class_count;
-            if( !rfc_ctx->mem_alloc( rfc_ctx->damage_lut, num, sizeof(RFC_counts_type), RFC_MEM_AIM_DLUT ) )
+            if( !rfc_ctx->mem_alloc( rfc_ctx->damage_lut, num, sizeof(rfc_counts_t), RFC_MEM_AIM_DLUT ) )
             {
                 return error_raise( rfc_ctx, RFC_ERROR_MEMORY );
             }
 #if RFC_AT_SUPPORT
             if( rfc_ctx->amplitude_lut )
             {
-                if( !rfc_ctx->mem_alloc( rfc_ctx->amplitude_lut, num, sizeof(RFC_counts_type), RFC_MEM_AIM_DLUT ) )
+                if( !rfc_ctx->mem_alloc( rfc_ctx->amplitude_lut, num, sizeof(rfc_counts_t), RFC_MEM_AIM_DLUT ) )
                 {
                     return error_raise( rfc_ctx, RFC_ERROR_MEMORY );
                 }
@@ -5428,7 +5428,7 @@ bool error_raise( rfc_ctx_s *rfc_ctx, /*enum rfc_error*/ int error )
  * @return     Returns the absolute difference of given values
  */
 static
-RFC_value_type value_delta( RFC_value_type from_val, RFC_value_type to_val, int *sign_ptr )
+rfc_value_t value_delta( rfc_value_t from_val, rfc_value_t to_val, int *sign_ptr )
 {
     double delta = (double)to_val - (double)from_val;
 
@@ -5437,7 +5437,7 @@ RFC_value_type value_delta( RFC_value_type from_val, RFC_value_type to_val, int 
         *sign_ptr = ( delta < 0.0 ) ? -1 : 1;
     }
 
-    return (RFC_value_type)fabs( delta );
+    return (rfc_value_t)fabs( delta );
 }
 
 
@@ -5606,7 +5606,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         const mxArray  *mxSpreadDamage   = prhs[8];
 #endif /*!RFC_MINIMAL*/        
 
-        RFC_value_type *buffer           = NULL;
+        rfc_value_t    *buffer           = NULL;
         double         *data             = mxGetPr( mxData );
         size_t          data_len         = mxGetNumberOfElements( mxData );
         unsigned        class_count      = (unsigned)( mxGetScalar( mxClassCount ) + 0.5 );
@@ -5649,8 +5649,8 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 #endif /*!RFC_MINIMAL*/
 
         ok = RFC_init( &rfc_ctx, 
-                       class_count, (RFC_value_type)class_width, (RFC_value_type)class_offset, 
-                       (RFC_value_type)hysteresis, RFC_FLAGS_DEFAULT );
+                       class_count, (rfc_value_t)class_width, (rfc_value_t)class_offset, 
+                       (rfc_value_t)hysteresis, RFC_FLAGS_DEFAULT );
 #if RFC_TP_SUPPORT
         if( ok )
         {
@@ -5671,11 +5671,11 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         rfc_ctx.spread_damage_method = spread_damage;
 #endif /*RFC_DH_SUPPORT*/
 
-        /* Cast values from double type to RFC_value_type */ 
-        if( sizeof( RFC_value_type ) != sizeof(double) && data_len )  /* maybe unsafe! */
+        /* Cast values from double type to rfc_value_t */ 
+        if( sizeof( rfc_value_t ) != sizeof(double) && data_len )  /* maybe unsafe! */
         {
-            buffer = (RFC_value_type *)mem_alloc( NULL, data_len, 
-                                                  sizeof(RFC_value_type), RFC_MEM_AIM_TEMP );
+            buffer = (rfc_value_t *)mem_alloc( NULL, data_len, 
+                                               sizeof(rfc_value_t), RFC_MEM_AIM_TEMP );
 
             if( !buffer )
             {
@@ -5685,10 +5685,10 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 
             for( i = 0; i < data_len; i++ )
             {
-                buffer[i] = (RFC_value_type)data[i];
+                buffer[i] = (rfc_value_t)data[i];
             }
         }
-        else buffer = (RFC_value_type*)data;
+        else buffer = (rfc_value_t*)data;
 
         /* Rainflow counting */
 

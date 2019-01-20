@@ -88,7 +88,7 @@ namespace RF = RFC_CPP_NAMESPACE;
 
 
 template<class T> class CRainflowT;
-typedef CRainflowT<RF::RFC_value_type> CRainflow;
+typedef CRainflowT<RF::rfc_value_t> CRainflow;
 
 extern "C"
 {
@@ -106,15 +106,15 @@ public:
     typedef enum 
     {
         /* Don't change order! */
-        RFC_RES_NONE                    = RF::rfc_ctx::RFC_RES_NONE            ,                       /**< No residual method */
-        RFC_RES_IGNORE                  = RF::rfc_ctx::RFC_RES_IGNORE          ,                       /**< Ignore residue (same as RFC_RES_NONE) */
-        RFC_RES_DISCARD                 = RF::rfc_ctx::RFC_RES_DISCARD         ,                       /**< Discard residue (empty residue) */
-        RFC_RES_HALFCYCLES              = RF::rfc_ctx::RFC_RES_HALFCYCLES      ,                       /**< ASTM */
-        RFC_RES_FULLCYCLES              = RF::rfc_ctx::RFC_RES_FULLCYCLES      ,                       /**< Count half cycles as full cycles */
-        RFC_RES_CLORMANN_SEEGER         = RF::rfc_ctx::RFC_RES_CLORMANN_SEEGER ,                       /**< Clormann/Seeger method */
-        RFC_RES_REPEATED                = RF::rfc_ctx::RFC_RES_REPEATED        ,                       /**< Repeat residue and count closed cycles */
-        RFC_RES_RP_DIN45667             = RF::rfc_ctx::RFC_RES_RP_DIN45667     ,                       /**< Count residue according to range pair in DIN-45667 */
-        RFC_RES_COUNT                   = RF::rfc_ctx::RFC_RES_COUNT           ,                       /**< Number of options */
+        RFC_RES_NONE                    = RF::RFC_RES_NONE            ,                       /**< No residual method */
+        RFC_RES_IGNORE                  = RF::RFC_RES_IGNORE          ,                       /**< Ignore residue (same as RFC_RES_NONE) */
+        RFC_RES_DISCARD                 = RF::RFC_RES_DISCARD         ,                       /**< Discard residue (empty residue) */
+        RFC_RES_HALFCYCLES              = RF::RFC_RES_HALFCYCLES      ,                       /**< ASTM */
+        RFC_RES_FULLCYCLES              = RF::RFC_RES_FULLCYCLES      ,                       /**< Count half cycles as full cycles */
+        RFC_RES_CLORMANN_SEEGER         = RF::RFC_RES_CLORMANN_SEEGER ,                       /**< Clormann/Seeger method */
+        RFC_RES_REPEATED                = RF::RFC_RES_REPEATED        ,                       /**< Repeat residue and count closed cycles */
+        RFC_RES_RP_DIN45667             = RF::RFC_RES_RP_DIN45667     ,                       /**< Count residue according to range pair in DIN-45667 */
+        RFC_RES_COUNT                   = RF::RFC_RES_COUNT           ,                       /**< Number of options */
     } e_residuum;
 
     typedef enum
@@ -197,8 +197,8 @@ public:
         DEFAULT_ROUNDOFF    =  1000000    /* Fuer Vergleichbarkeit mit LMS TecWare */
     }; // end enum
 
-    static const RF::RFC_counts_type    HALF_CYCLE_INCREMENT = RFC_HALF_CYCLE_INCREMENT;
-    static const RF::RFC_counts_type    FULL_CYCLE_INCREMENT = RFC_FULL_CYCLE_INCREMENT;
+    static const RF::rfc_counts_t    HALF_CYCLE_INCREMENT = RFC_HALF_CYCLE_INCREMENT;
+    static const RF::rfc_counts_t    FULL_CYCLE_INCREMENT = RFC_FULL_CYCLE_INCREMENT;
 
 protected:
     // Eingangsparameter
@@ -281,7 +281,7 @@ public:
     
 
     inline 
-    RF::RFC_counts_type* GetMatrix() const
+    RF::rfc_counts_t* GetMatrix() const
     {
         return m_rfc_ctx.rfm;
     } // end of GetMatrix
@@ -290,8 +290,8 @@ public:
     // Gibt Anzahl Schwingspiele x FULL_CYCLE_INCREMENT zurueck!
     int GetCountIncrements( int from, int to ) const
     {
-        RF::RFC_counts_type counts;
-        RF::RFC_counts_type *prf = GetMatrix();
+        RF::rfc_counts_t counts;
+        RF::rfc_counts_t *prf = GetMatrix();
 
         ASSERT( m_isParametrized );
 
@@ -440,7 +440,7 @@ public:
         ASSERT( m_isParametrized );
         ASSERT( from < m_class_count && from >= 0 && to < m_class_count && to >= 0 );
 
-        RF::RFC_counts_type *prf = GetMatrix();
+        RF::rfc_counts_t *prf = GetMatrix();
 
         if( m_isSymmetric && to < from ) 
         {
@@ -461,7 +461,7 @@ public:
         ASSERT( m_isParametrized );
         ASSERT( from < m_class_count && from >= 0 && to < m_class_count && to >= 0 );
 
-        RF::RFC_counts_type *prf = GetMatrix();
+        RF::rfc_counts_t *prf = GetMatrix();
 
         if( m_isSymmetric && to < from ) 
         {
@@ -836,8 +836,8 @@ void CRainflowT<T>::GetStufen( VectorStufenKGUZ &Stufen ) const
 
     VectorStufenKGUZ KGUZ_Temp( m_class_count - 1 );
 
-    std::vector<RF::RFC_counts_type> lc_counts( m_class_count );
-    std::vector<RF::RFC_value_type>  lc_level( m_class_count );
+    std::vector<RF::rfc_counts_t> lc_counts( m_class_count );
+    std::vector<RF::rfc_value_t>  lc_level( m_class_count );
 
     if( RF::RFC_lc_get( &m_rfc_ctx, &lc_counts[0], &lc_level[0] ) )
     {
@@ -1258,19 +1258,19 @@ void CRainflowT<T>::DoRainflow( const double *stream_in, size_t in_len, bool do_
         switch( m_eResiduum )
         {
             case RFC_RES_NONE:
-                RF::RFC_finalize( &m_rfc_ctx, RF::rfc_ctx_s::RFC_RES_NONE ); break;
+                RF::RFC_finalize( &m_rfc_ctx, RF::RFC_RES_NONE ); break;
             case RFC_RES_IGNORE:
-                RF::RFC_finalize( &m_rfc_ctx, RF::rfc_ctx_s::RFC_RES_IGNORE ); break;
+                RF::RFC_finalize( &m_rfc_ctx, RF::RFC_RES_IGNORE ); break;
             case RFC_RES_HALFCYCLES:
-                RF::RFC_finalize( &m_rfc_ctx, RF::rfc_ctx_s::RFC_RES_HALFCYCLES ); break;
+                RF::RFC_finalize( &m_rfc_ctx, RF::RFC_RES_HALFCYCLES ); break;
             case RFC_RES_FULLCYCLES:
-                RF::RFC_finalize( &m_rfc_ctx, RF::rfc_ctx_s::RFC_RES_FULLCYCLES ); break;
+                RF::RFC_finalize( &m_rfc_ctx, RF::RFC_RES_FULLCYCLES ); break;
             case RFC_RES_REPEATED:
-                RF::RFC_finalize( &m_rfc_ctx, RF::rfc_ctx_s::RFC_RES_REPEATED ); break;
+                RF::RFC_finalize( &m_rfc_ctx, RF::RFC_RES_REPEATED ); break;
             case RFC_RES_CLORMANN_SEEGER:
-                RF::RFC_finalize( &m_rfc_ctx, RF::rfc_ctx_s::RFC_RES_CLORMANN_SEEGER ); break;
+                RF::RFC_finalize( &m_rfc_ctx, RF::RFC_RES_CLORMANN_SEEGER ); break;
             case RFC_RES_RP_DIN45667:
-                RF::RFC_finalize( &m_rfc_ctx, RF::rfc_ctx_s::RFC_RES_RP_DIN45667 ); break;
+                RF::RFC_finalize( &m_rfc_ctx, RF::RFC_RES_RP_DIN45667 ); break;
             default:
                 ASSERT( false );
                 return;
