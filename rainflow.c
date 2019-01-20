@@ -152,11 +152,11 @@ static void                 clear_at                        (       rfc_ctx_s * 
 #if RFC_DAMAGE_FAST
 static void                 clear_lut                       (       rfc_ctx_s * );
 #endif /*RFC_DAMAGE_FAST*/
-static void                 cycle_find                      (       rfc_ctx_s *, /*enum rfc_flags*/ int flags );
+static void                 cycle_find                      (       rfc_ctx_s *, rfc_flags_e flags );
 #else /*RFC_MINIMAL*/
 #define cycle_find          cycle_find_4ptm
 #endif /*!RFC_MINIMAL*/
-static bool                 feed_once                       (       rfc_ctx_s *, const rfc_value_tuple_s* tp, /*enum rfc_flags*/ int flags );
+static bool                 feed_once                       (       rfc_ctx_s *, const rfc_value_tuple_s* tp, rfc_flags_e flags );
 #if RFC_DH_SUPPORT
 static bool                 feed_once_dh                    (       rfc_ctx_s *, const rfc_value_tuple_s* pt );
 #endif /*RFC_DH_SUPPORT*/
@@ -165,33 +165,33 @@ static bool                 feed_once_tp_check_margin       (       rfc_ctx_s *,
 #endif /*RFC_TP_SUPPORT*/
 static bool                 feed_finalize                   (       rfc_ctx_s * );
 #if RFC_TP_SUPPORT
-static bool                 feed_finalize_tp                (       rfc_ctx_s *, rfc_value_tuple_s *tp_interim, /*enum rfc_flags*/ int flags );
+static bool                 feed_finalize_tp                (       rfc_ctx_s *, rfc_value_tuple_s *tp_interim, rfc_flags_e flags );
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_HCM_SUPPORT
-static bool                 feed_finalize_hcm               (       rfc_ctx_s *, /*enum rfc_flags*/ int flags );
+static bool                 feed_finalize_hcm               (       rfc_ctx_s *, rfc_flags_e flags );
 #endif /*!RFC_HCM_SUPPORT*/
 static rfc_value_tuple_s *  feed_filter_pt                  (       rfc_ctx_s *, const rfc_value_tuple_s *pt );
-static void                 RFC_cycle_find_4ptm             (       rfc_ctx_s *, /*enum rfc_flags*/ int flags );
+static void                 RFC_cycle_find_4ptm             (       rfc_ctx_s *, rfc_flags_e flags );
 #if RFC_HCM_SUPPORT
-static void                 cycle_find_hcm                  (       rfc_ctx_s *, /*enum rfc_flags*/ int flags );
+static void                 cycle_find_hcm                  (       rfc_ctx_s *, rfc_flags_e flags );
 #endif /*RFC_HCM_SUPPORT*/
 #if !RFC_MINIMAL
-static void                 cycle_process_lc                (       rfc_ctx_s *, /*enum rfc_flags*/ int flags );
+static void                 cycle_process_lc                (       rfc_ctx_s *, rfc_flags_e flags );
 #endif /*!RFC_MINIMAL*/
-static void                 cycle_process_counts            (       rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, /*enum rfc_flags*/ int flags );
+static void                 cycle_process_counts            (       rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, rfc_flags_e flags );
 /* Methods on residue */
-static bool                 finalize_res_ignore             (       rfc_ctx_s *, /*enum rfc_flags*/ int flags );
+static bool                 finalize_res_ignore             (       rfc_ctx_s *, rfc_flags_e flags );
 #if !RFC_MINIMAL
-static bool                 finalize_res_discard            (       rfc_ctx_s *, /*enum rfc_flags*/ int flags );
-static bool                 finalize_res_weight_cycles      (       rfc_ctx_s *, rfc_counts_t weight, /*enum rfc_flags*/ int flags );
-static bool                 finalize_res_clormann_seeger    (       rfc_ctx_s *, /*enum rfc_flags*/ int flags );
-static bool                 RFC_finalize_res_rp_DIN45667    (       rfc_ctx_s *, /*enum rfc_flags*/ int flags );
-static bool                 finalize_res_repeated           (       rfc_ctx_s *, /*enum rfc_flags*/ int flags );
+static bool                 finalize_res_discard            (       rfc_ctx_s *, rfc_flags_e flags );
+static bool                 finalize_res_weight_cycles      (       rfc_ctx_s *, rfc_counts_t weight, rfc_flags_e flags );
+static bool                 finalize_res_clormann_seeger    (       rfc_ctx_s *, rfc_flags_e flags );
+static bool                 RFC_finalize_res_rp_DIN45667    (       rfc_ctx_s *, rfc_flags_e flags );
+static bool                 finalize_res_repeated           (       rfc_ctx_s *, rfc_flags_e flags );
 static bool                 residue_exchange                (       rfc_ctx_s *, rfc_value_tuple_s **residue, size_t *residue_cap, size_t *residue_cnt, bool restore );
 #endif /*!RFC_MINIMAL*/
 static void                 residue_remove_item             (       rfc_ctx_s *, size_t index, size_t count );
 /* Memory allocator */
-static void *               mem_alloc                       ( void *ptr, size_t num, size_t size, /*enum rfc_mem_aim*/ int aim );
+static void *               mem_alloc                       ( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim );
 #if RFC_TP_SUPPORT
 /* Methods on turning points history */
 static bool                 tp_set                          (       rfc_ctx_s *, size_t tp_pos, rfc_value_tuple_s *pt );
@@ -201,7 +201,7 @@ static void                 tp_lock                         (       rfc_ctx_s *,
 static bool                 tp_refeed                       (       rfc_ctx_s *, rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param );
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT
-static bool                 spread_damage                   (       rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, /*enum rfc_flags*/ int flags );
+static bool                 spread_damage                   (       rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, rfc_flags_e flags );
 #endif /*RFC_DH_SUPPORT*/
 #if RFC_AT_SUPPORT
 static bool                 at_R_to_Sm_norm                 (       rfc_ctx_s *, double R, double *Sm_norm );
@@ -220,7 +220,7 @@ static bool                 damage_calc                     (       rfc_ctx_s *,
 static void                 damage_lut_init                 (       rfc_ctx_s * );
 static bool                 damage_calc_fast                (       rfc_ctx_s *, unsigned class_from, unsigned class_to, double *damage, double *Sa_ret );
 #endif /*RFC_DAMAGE_FAST*/
-static bool                 error_raise                     (       rfc_ctx_s *, /*enum rfc_error*/ int );
+static bool                 error_raise                     (       rfc_ctx_s *, rfc_error_e );
 static rfc_value_t          value_delta                     (       rfc_value_t from_val, rfc_value_t to, int *sign_ptr );
 
 
@@ -261,7 +261,7 @@ static rfc_value_t          value_delta                     (       rfc_value_t 
  */
 #endif /*!RFC_TP_SUPPORT*/
 bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
-                          rfc_value_t hysteresis, /*enum rfc_flags*/ int flags )
+                          rfc_value_t hysteresis, rfc_flags_e flags )
 {
     rfc_ctx_s         *rfc_ctx = (rfc_ctx_s*)ctx;
     rfc_value_tuple_s  nil     = { 0.0 };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
@@ -739,7 +739,7 @@ bool RFC_tp_init_autoprune( void *ctx, bool autoprune, size_t size, size_t thres
  *
  * @return     true on success
  */
-bool RFC_tp_prune( void *ctx, size_t limit, /*enum rfc_flags*/ int flags )
+bool RFC_tp_prune( void *ctx, size_t limit, rfc_flags_e flags )
 {
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 
@@ -1309,7 +1309,7 @@ bool RFC_feed( void *ctx, const rfc_value_t * data, size_t data_count )
  * @return     true on success
  */
 #if !RFC_MINIMAL
-bool RFC_cycle_process_counts( void *ctx, rfc_value_t from_val, rfc_value_t to_val, /*enum rfc_flags*/ int flags )
+bool RFC_cycle_process_counts( void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_flags_e flags )
 {
     rfc_value_tuple_s from = {from_val}, to = {to_val};
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
@@ -1430,7 +1430,7 @@ bool RFC_feed_tuple( void *ctx, rfc_value_tuple_s *data, size_t data_count )
  *
  * @return     true on success
  */
-bool RFC_finalize( void *ctx, /*rfc_res_method*/ int residual_method )
+bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
 {
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
     double damage;
@@ -1713,11 +1713,11 @@ bool RFC_rfm_set( void *ctx, const rfc_rfm_item_s *buffer, unsigned count, bool 
  * @param      ctx       The rainflow context
  * @param      from_val  The cycles start value
  * @param      to_val    The cycles target value
- * @param[out] count     The corresponding value from the matrix element
+ * @param[out] counts    The corresponding value from the matrix element
  *
  * @return     true on success
  */
-bool RFC_rfm_peek( const void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t *count )
+bool RFC_rfm_peek( const void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t *counts )
 {
     unsigned           from, to;
     unsigned           class_count;
@@ -1753,9 +1753,9 @@ bool RFC_rfm_peek( const void *ctx, rfc_value_t from_val, rfc_value_t to_val, rf
     if( from > class_count ) from = class_count;
     if( to   > class_count ) to   = class_count;
 
-    if( count )
+    if( counts )
     {
-        *count = rfm[ from * class_count + to ];
+        *counts = rfm[ from * class_count + to ];
     }
 
     return true;
@@ -1768,12 +1768,12 @@ bool RFC_rfm_peek( const void *ctx, rfc_value_t from_val, rfc_value_t to_val, rf
  * @param      ctx       The rainflow context
  * @param      from_val  The cycles start value
  * @param      to_val    The cycles target value
- * @param      count     The count value for the matrix element
+ * @param      counts    The count value for the matrix element
  * @param      add_only  Value is added if set to true
  *
  * @return     true on success
  */
-bool RFC_rfm_poke( void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t count, bool add_only )
+bool RFC_rfm_poke( void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t counts, bool add_only )
 {
     unsigned           from, to;
     unsigned           class_count;
@@ -1811,11 +1811,11 @@ bool RFC_rfm_poke( void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_coun
 
     if( add_only )
     {
-        rfm[ from * class_count + to ] += count;
+        rfm[ from * class_count + to ] += counts;
     }
     else
     {
-        rfm[ from * class_count + to ] = count;
+        rfm[ from * class_count + to ] = counts;
     }
 
     return true;
@@ -2067,7 +2067,7 @@ bool RFC_lc_get( const void *ctx, rfc_counts_t *lc, rfc_value_t *level )
  *
  * @return     true on success
  */
-bool RFC_lc_from_rfm( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, /*enum rfc_flags*/ int flags )
+bool RFC_lc_from_rfm( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags )
 {
     unsigned             from, to, i;
     unsigned             class_count;
@@ -2142,7 +2142,7 @@ bool RFC_lc_from_rfm( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, con
  *
  * @return     true on success
  */
-bool RFC_lc_from_residue( const void *ctx, rfc_counts_t* lc, rfc_value_t *level, /*enum rfc_flags*/ int flags )
+bool RFC_lc_from_residue( const void *ctx, rfc_counts_t* lc, rfc_value_t *level, rfc_flags_e flags )
 {
           unsigned           i;
           unsigned           class_count;
@@ -2343,7 +2343,7 @@ bool RFC_rp_from_rfm( const void *ctx, rfc_counts_t *rp, rfc_value_t *class_mean
  *
  * @return     true on success
  */
-bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_value_t *Sa, double *damage, /*enum rfc_rp_damage_method*/ int rp_calc_method )
+bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_value_t *Sa, double *damage, rfc_rp_damage_method_e rp_calc_method )
 {
     const unsigned    from = 0;
           unsigned    class_count;
@@ -3024,7 +3024,7 @@ void clear_lut( rfc_ctx_s *rfc_ctx )
  * @return     true on success
  */
 static
-bool feed_once( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt, /*enum rfc_flags*/ int flags )
+bool feed_once( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt, rfc_flags_e flags )
 {
     rfc_value_tuple_s *tp_residue;  /* Pointer to residue element */
 
@@ -3285,7 +3285,7 @@ bool feed_finalize( rfc_ctx_s *rfc_ctx )
  * @return        true on success
  */
 static
-bool feed_finalize_tp( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *tp_interim, /*enum rfc_flags*/ int flags )
+bool feed_finalize_tp( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *tp_interim, rfc_flags_e flags )
 {
     bool do_margin;
 
@@ -3338,7 +3338,7 @@ bool feed_finalize_tp( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *tp_interim, /*enum
  * @return     true on success
  */
 static
-bool feed_finalize_hcm( rfc_ctx_s *rfc_ctx, /*enum rfc_flags*/ int flags )
+bool feed_finalize_hcm( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
 {
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
@@ -3384,7 +3384,7 @@ bool feed_finalize_hcm( rfc_ctx_s *rfc_ctx, /*enum rfc_flags*/ int flags )
  * @return     true on success
  */
 static
-bool finalize_res_ignore( rfc_ctx_s *rfc_ctx, /*enum rfc_flags*/ int flags )
+bool finalize_res_ignore( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
 {
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
@@ -3404,7 +3404,7 @@ bool finalize_res_ignore( rfc_ctx_s *rfc_ctx, /*enum rfc_flags*/ int flags )
  * @return     true on success
  */
 static
-bool finalize_res_discard( rfc_ctx_s *rfc_ctx, /*enum rfc_flags*/ int flags )
+bool finalize_res_discard( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
 {
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
@@ -3433,7 +3433,7 @@ bool finalize_res_discard( rfc_ctx_s *rfc_ctx, /*enum rfc_flags*/ int flags )
  * @return     true on success
  */
 static
-bool finalize_res_weight_cycles( rfc_ctx_s *rfc_ctx, rfc_counts_t weight, /*enum rfc_flags*/ int flags )
+bool finalize_res_weight_cycles( rfc_ctx_s *rfc_ctx, rfc_counts_t weight, rfc_flags_e flags )
 {
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
@@ -3483,7 +3483,7 @@ bool finalize_res_weight_cycles( rfc_ctx_s *rfc_ctx, rfc_counts_t weight, /*enum
  * @return     true on success
  */
 static
-bool finalize_res_clormann_seeger( rfc_ctx_s *rfc_ctx, /*enum rfc_flags*/ int flags )
+bool finalize_res_clormann_seeger( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
 {
     size_t i;
 
@@ -3540,7 +3540,7 @@ bool finalize_res_clormann_seeger( rfc_ctx_s *rfc_ctx, /*enum rfc_flags*/ int fl
  * @return     true on success
  */
 static
-bool RFC_finalize_res_rp_DIN45667( rfc_ctx_s *rfc_ctx, /*enum rfc_flags*/ int flags )
+bool RFC_finalize_res_rp_DIN45667( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
 {
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
@@ -3646,7 +3646,7 @@ bool RFC_finalize_res_rp_DIN45667( rfc_ctx_s *rfc_ctx, /*enum rfc_flags*/ int fl
  * @return     true on success
  */
 static
-bool finalize_res_repeated( rfc_ctx_s *rfc_ctx, /*enum rfc_flags*/ int flags )
+bool finalize_res_repeated( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
 {
 #if RFC_TP_SUPPORT
     size_t tp_cnt;
@@ -4377,7 +4377,7 @@ rfc_value_tuple_s * feed_filter_pt( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s 
  * @param      flags    The flags
  */
 static
-void cycle_find( rfc_ctx_s *rfc_ctx, /*enum rfc_flags*/ int flags )
+void cycle_find( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
 {
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
@@ -4432,7 +4432,7 @@ void cycle_find( rfc_ctx_s *rfc_ctx, /*enum rfc_flags*/ int flags )
  * @param      flags    The flags
  */
 static
-void RFC_cycle_find_4ptm( rfc_ctx_s *rfc_ctx, /*enum rfc_flags*/ int flags )
+void RFC_cycle_find_4ptm( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
 {
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
@@ -4492,7 +4492,7 @@ void RFC_cycle_find_4ptm( rfc_ctx_s *rfc_ctx, /*enum rfc_flags*/ int flags )
  * @param      flags    The flags
  */
 static
-void cycle_find_hcm( rfc_ctx_s *rfc_ctx, /*enum rfc_flags*/ int flags )
+void cycle_find_hcm( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
 {
     int IZ, IR;
 
@@ -4595,7 +4595,7 @@ label_2:
  * @param      flags    Control flags
  */
 static
-void cycle_process_lc( rfc_ctx_s *rfc_ctx, /*enum rfc_flags*/ int flags )
+void cycle_process_lc( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
 {
     size_t n = rfc_ctx->residue_cnt;
 
@@ -4619,7 +4619,7 @@ void cycle_process_lc( rfc_ctx_s *rfc_ctx, /*enum rfc_flags*/ int flags )
  * @param         flags    Control flags
  */
 static
-void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, /*enum rfc_flags*/ int flags )
+void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, rfc_flags_e flags )
 {
     unsigned class_from, class_to;
 
@@ -5173,7 +5173,7 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
 static 
 bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, 
                                         rfc_value_tuple_s *to, 
-                                        rfc_value_tuple_s *next, /*enum rfc_flags*/ int flags )
+                                        rfc_value_tuple_s *next, rfc_flags_e flags )
 {
     int    spread_damage_method;
     double D = 0.0;
@@ -5399,7 +5399,7 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
  * @return     false on error
  */
 static
-bool error_raise( rfc_ctx_s *rfc_ctx, /*enum rfc_error*/ int error )
+bool error_raise( rfc_ctx_s *rfc_ctx, rfc_error_e error )
 {
     if( error == RFC_ERROR_NOERROR ) return true;
 
@@ -5452,7 +5452,7 @@ rfc_value_t value_delta( rfc_value_t from_val, rfc_value_t to_val, int *sign_ptr
  * @return     New memory pointer or NULL if either num or size is 0
  */
 static
-void * mem_alloc( void *ptr, size_t num, size_t size, /*enum rfc_mem_aim*/ int aim )
+void * mem_alloc( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim )
 {
     if( !num || !size )
     {

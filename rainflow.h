@@ -182,25 +182,25 @@ namespace RFC_CPP_NAMESPACE {
 /* Memory allocation aim info */
 enum rfc_mem_aim
 {
-    RFC_MEM_AIM_TEMP                =  0,
-    RFC_MEM_AIM_RESIDUE             =  1,
-    RFC_MEM_AIM_MATRIX              =  2,
-    RFC_MEM_AIM_RP                  =  3,
-    RFC_MEM_AIM_LC                  =  4,
+    RFC_MEM_AIM_TEMP                =  0,                           /**< Error on accessing memory for temporary storage */
+    RFC_MEM_AIM_RESIDUE             =  1,                           /**< Error on accessing memory for residue */
+    RFC_MEM_AIM_MATRIX              =  2,                           /**< Error on accessing memory for rf matrix */
+    RFC_MEM_AIM_RP                  =  3,                           /**< Error on accessing memory for range pair counting */
+    RFC_MEM_AIM_LC                  =  4,                           /**< Error on accessing memory for level crossing */
 #if RFC_TP_SUPPORT
-    RFC_MEM_AIM_TP                  =  5,
+    RFC_MEM_AIM_TP                  =  5,                           /**< Error on accessing memory for turning points */
 #endif
 #if RFC_DAMAGE_FAST
-    RFC_MEM_AIM_DLUT                =  6,
+    RFC_MEM_AIM_DLUT                =  6,                           /**< Error on accessing memory for damage look-up table */
 #endif
 #if RFC_HCM_SUPPORT
-    RFC_MEM_AIM_HCM                 =  7,
+    RFC_MEM_AIM_HCM                 =  7,                           /**< Error on accessing memory for HCM algorithm */
 #endif
 #if RFC_DH_SUPPORT
-    RFC_MEM_AIM_DH                  =  8,
+    RFC_MEM_AIM_DH                  =  8,                           /**< Error on accessing memory for damage history */
 #endif
 #if !RFC_MINIMAL
-    RFC_MEM_AIM_RFM_ELEMENTS        =  9,
+    RFC_MEM_AIM_RFM_ELEMENTS        =  9,                           /**< Error on accessing memory for rf matrix elements */
 #endif /*!RFC_MINIMAL*/
 };
 
@@ -209,34 +209,34 @@ enum rfc_mem_aim
 enum rfc_flags
 {
     RFC_FLAGS_DEFAULT               = -1,
-    RFC_FLAGS_COUNT_RFM             = 1 << 0,                       /**< Count into rainflow matrix */
-    RFC_FLAGS_COUNT_DAMAGE          = 1 << 1,                       /**< Count damage */
+    RFC_FLAGS_COUNT_RFM             =  1 << 0,                      /**< Count into rainflow matrix */
+    RFC_FLAGS_COUNT_DAMAGE          =  1 << 1,                      /**< Count damage */
 #if !RFC_MINIMAL
 #if RFC_DH_SUPPORT
-    RFC_FLAGS_COUNT_DH              = 1 << 2,                       /**< Spread damage */
+    RFC_FLAGS_COUNT_DH              =  1 << 2,                      /**< Spread damage */
 #endif /*RFC_DH_SUPPORT*/
-    RFC_FLAGS_COUNT_RP              = 1 << 3,                       /**< Count into range pair */
-    RFC_FLAGS_COUNT_LC_UP           = 1 << 4,                       /**< Count into level crossing (only rising slopes) */
-    RFC_FLAGS_COUNT_LC_DN           = 1 << 5,                       /**< Count into level crossing (only falling slopes) */
-    RFC_FLAGS_COUNT_LC              = RFC_FLAGS_COUNT_LC_UP         /**< Count into level crossing (all slopes) */
-                                    | RFC_FLAGS_COUNT_LC_DN,
-    RFC_FLAGS_COUNT_MK              = 1 << 6,                       /**< Live damage counter (Miner consequent) */
-    RFC_FLAGS_ENFORCE_MARGIN        = 1 << 7,                       /**< Enforce first and last data point are turning points */
+    RFC_FLAGS_COUNT_RP              =  1 << 3,                      /**< Count into range pair */
+    RFC_FLAGS_COUNT_LC_UP           =  1 << 4,                      /**< Count into level crossing (only rising slopes) */
+    RFC_FLAGS_COUNT_LC_DN           =  1 << 5,                      /**< Count into level crossing (only falling slopes) */
+    RFC_FLAGS_COUNT_LC              =  RFC_FLAGS_COUNT_LC_UP        /**< Count into level crossing (all slopes) */
+                                    |  RFC_FLAGS_COUNT_LC_DN,
+    RFC_FLAGS_COUNT_MK              =  1 << 6,                      /**< Live damage counter (Miner consequent) */
+    RFC_FLAGS_ENFORCE_MARGIN        =  1  << 7,                     /**< Enforce first and last data point are turning points */
 #endif /*!RFC_MINIMAL*/
-    RFC_FLAGS_COUNT_ALL             = RFC_FLAGS_COUNT_RFM           /**< Count all */
-                                    | RFC_FLAGS_COUNT_DAMAGE
+    RFC_FLAGS_COUNT_ALL             =  RFC_FLAGS_COUNT_RFM          /**< Count all */
+                                    |  RFC_FLAGS_COUNT_DAMAGE
 #if RFC_DH_SUPPORT
-                                    | RFC_FLAGS_COUNT_DH
+                                    |  RFC_FLAGS_COUNT_DH
 #endif /*RFC_DH_SUPPORT*/
 #if !RFC_MINIMAL
-                                    | RFC_FLAGS_COUNT_RP
-                                    | RFC_FLAGS_COUNT_LC
-                                    | RFC_FLAGS_COUNT_MK,
+                                    |  RFC_FLAGS_COUNT_RP
+                                    |  RFC_FLAGS_COUNT_LC
+                                    |  RFC_FLAGS_COUNT_MK,
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
-    RFC_FLAGS_TPPRUNE_PRESERVE_POS  = 1 << 8,
-    RFC_FLAGS_TPPRUNE_PRESERVE_RES  = 1 << 9,
-    RFC_FLAGS_TPAUTOPRUNE           = 1 << 10,                      /**< Automatic prune on tp */
+    RFC_FLAGS_TPPRUNE_PRESERVE_POS  =  1 << 8,                      /**< Preserve stream position information on pruning */
+    RFC_FLAGS_TPPRUNE_PRESERVE_RES  =  1 << 9,                      /**< Preserve turning points that exist in resiude on pruning */
+    RFC_FLAGS_TPAUTOPRUNE           =  1 << 10,                     /**< Automatic prune on tp */
 #endif /*RFC_TP_SUPPORT*/
 };
 
@@ -255,30 +255,30 @@ enum rfc_rp_damage_method
 
 enum rfc_state
 {
-    RFC_STATE_INIT0,                                            /**< Initialized with zeros */
-    RFC_STATE_INIT,                                             /**< Initialized, memory allocated */
-    RFC_STATE_BUSY,                                             /**< In counting state */
-    RFC_STATE_BUSY_INTERIM,                                     /**< In counting state, having still one interim turning point (not included) */
-    RFC_STATE_FINALIZE,                                         /**< Finalizing */
-    RFC_STATE_FINISHED,                                         /**< Counting finished, memory still allocated */
-    RFC_STATE_ERROR,                                            /**< An error occurred */
+    RFC_STATE_INIT0,                                                /**< Initialized with zeros */
+    RFC_STATE_INIT,                                                 /**< Initialized, memory allocated */
+    RFC_STATE_BUSY,                                                 /**< In counting state */
+    RFC_STATE_BUSY_INTERIM,                                         /**< In counting state, having still one interim turning point (not included) */
+    RFC_STATE_FINALIZE,                                             /**< Finalizing */
+    RFC_STATE_FINISHED,                                             /**< Counting finished, memory still allocated */
+    RFC_STATE_ERROR,                                                /**< An error occurred */
 };
 
 
 enum rfc_error
 {
-    RFC_ERROR_UNEXP                 = -1,                       /**< Unexpected error */
-    RFC_ERROR_NOERROR               =  0,                       /**< No error */
-    RFC_ERROR_INVARG                =  1,                       /**< Invalid arguments passed */
-    RFC_ERROR_MEMORY                =  2,                       /**< Error on memory allocation */
+    RFC_ERROR_UNEXP                 = -1,                           /**< Unexpected error */
+    RFC_ERROR_NOERROR               =  0,                           /**< No error */
+    RFC_ERROR_INVARG                =  1,                           /**< Invalid arguments passed */
+    RFC_ERROR_MEMORY                =  2,                           /**< Error on memory allocation */
 #if RFC_TP_SUPPORT
-    RFC_ERROR_TP                    =  3,                       /**< Error while amplitude transformation */
+    RFC_ERROR_TP                    =  3,                           /**< Error while amplitude transformation */
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_AT_SUPPORT
-    RFC_ERROR_AT                    =  4,                       /**< Error while amplitude transformation */
+    RFC_ERROR_AT                    =  4,                           /**< Error while amplitude transformation */
 #endif /*RFC_AT_SUPPORT*/
 #if RFC_DAMAGE_FAST
-    RFC_ERROR_LUT                   =  5,                       /**< Error while accessing look up tables */
+    RFC_ERROR_LUT                   =  5,                           /**< Error while accessing look up tables */
 #endif /*RFC_DAMAGE_FAST*/
 };
 
@@ -286,13 +286,13 @@ enum rfc_error
 #if !RFC_MINIMAL
 enum rfc_counting_method
 {
-    RFC_COUNTING_METHOD_DELEGATED   = -1,                       /**< Method must be implemented via delegator, see member cycle_find_fcn */
-    RFC_COUNTING_METHOD_NONE        =  0,                       /**< No counting */
-    RFC_COUNTING_METHOD_4PTM        =  1,                       /**< 4 point algorithm (default) */
+    RFC_COUNTING_METHOD_DELEGATED   = -1,                           /**< Method must be implemented via delegator, see member cycle_find_fcn */
+    RFC_COUNTING_METHOD_NONE        =  0,                           /**< No counting */
+    RFC_COUNTING_METHOD_4PTM        =  1,                           /**< 4 point algorithm (default) */
 #if RFC_HCM_SUPPORT
-    RFC_COUNTING_METHOD_HCM         =  2,                       /**< 3 point algorithm, Clormann/Seeger (HCM) method */
+    RFC_COUNTING_METHOD_HCM         =  2,                           /**< 3 point algorithm, Clormann/Seeger (HCM) method */
 #endif /*RFC_HCM_SUPPORT*/
-    RFC_COUNTING_METHOD_COUNT                                   /**< Number of options */
+    RFC_COUNTING_METHOD_COUNT                                       /**< Number of options */
 };
 #endif /*!RFC_MINIMAL*/
 
@@ -300,58 +300,59 @@ enum rfc_counting_method
 enum rfc_res_method
 {
     /* Don't change order! */
-    RFC_RES_NONE                    = 0,                        /**< No residual method */
-    RFC_RES_IGNORE                  = 1,                        /**< Ignore residue (same as RFC_RES_NONE) */
+    RFC_RES_NONE                    = 0,                            /**< No residual method */
+    RFC_RES_IGNORE                  = 1,                            /**< Ignore residue (same as RFC_RES_NONE) */
 #if !RFC_MINIMAL
-    RFC_RES_DISCARD                 = 2,                        /**< Discard residue (empty residue) */
-    RFC_RES_HALFCYCLES              = 3,                        /**< ASTM */
-    RFC_RES_FULLCYCLES              = 4,                        /**< Count half cycles as full cycles */
-    RFC_RES_CLORMANN_SEEGER         = 5,                        /**< Clormann/Seeger method */
-    RFC_RES_REPEATED                = 6,                        /**< Repeat residue and count closed cycles */
-    RFC_RES_RP_DIN45667             = 7,                        /**< Count residue according to range pair in DIN-45667 */
+    RFC_RES_DISCARD                 = 2,                            /**< Discard residue (empty residue) */
+    RFC_RES_HALFCYCLES              = 3,                            /**< ASTM */
+    RFC_RES_FULLCYCLES              = 4,                            /**< Count half cycles as full cycles */
+    RFC_RES_CLORMANN_SEEGER         = 5,                            /**< Clormann/Seeger method */
+    RFC_RES_REPEATED                = 6,                            /**< Repeat residue and count closed cycles */
+    RFC_RES_RP_DIN45667             = 7,                            /**< Count residue according to range pair in DIN-45667 */
 #endif /*!RFC_MINIMAL*/
-    RFC_RES_COUNT                                               /**< Number of options */
+    RFC_RES_COUNT                                                   /**< Number of options */
 };
 
 
 #if RFC_DH_SUPPORT
 enum rfc_sd_method
 {
-    RFC_SD_NONE                     = -1,                       /**< No spread damage calculation */
-    RFC_SD_HALF_23                  =  0,                       /**< Equally split damage between P2 and P3 */
-    RFC_SD_RAMP_AMPLITUDE_23        =  1,                       /**< Spread damage according to amplitude over points between P2 and P3 */
-    RFC_SD_RAMP_DAMAGE_23           =  2,                       /**< Spread damage linearly over points between P2 and P3 */
-    RFC_SD_RAMP_AMPLITUDE_24        =  3,                       /**< Spread damage according to amplitude over points between P2 and P4 */  
-    RFC_SD_RAMP_DAMAGE_24           =  4,                       /**< Spread damage linearly over points between P2 and P4 */
-    RFC_SD_FULL_P2                  =  5,                       /**< Assign damage to P2 */
-    RFC_SD_FULL_P3                  =  6,                       /**< Assign damage to P3 */
-    RFC_SD_TRANSIENT_23             =  7,                       /**< Spread damage transient according to amplitude over points between P2 and P3 */
-    RFC_SD_TRANSIENT_23c            =  8,                       /**< Spread damage transient according to amplitude over points between P2 and P4 only until cycle is closed */
-    RFC_SD_COUNT                                                /**< Number of options */
+    RFC_SD_NONE                     = -1,                           /**< No spread damage calculation */
+    RFC_SD_HALF_23                  =  0,                           /**< Equally split damage between P2 and P3 */
+    RFC_SD_RAMP_AMPLITUDE_23        =  1,                           /**< Spread damage according to amplitude over points between P2 and P3 */
+    RFC_SD_RAMP_DAMAGE_23           =  2,                           /**< Spread damage linearly over points between P2 and P3 */
+    RFC_SD_RAMP_AMPLITUDE_24        =  3,                           /**< Spread damage according to amplitude over points between P2 and P4 */  
+    RFC_SD_RAMP_DAMAGE_24           =  4,                           /**< Spread damage linearly over points between P2 and P4 */
+    RFC_SD_FULL_P2                  =  5,                           /**< Assign damage to P2 */
+    RFC_SD_FULL_P3                  =  6,                           /**< Assign damage to P3 */
+    RFC_SD_TRANSIENT_23             =  7,                           /**< Spread damage transient according to amplitude over points between P2 and P3 */
+    RFC_SD_TRANSIENT_23c            =  8,                           /**< Spread damage transient according to amplitude over points between P2 and P4 only until cycle is closed */
+    RFC_SD_COUNT                                                    /**< Number of options */
 };
 #endif /*RFC_DH_SUPPORT*/
 
 
 /* Typedefs */
-/* Memory allocation functions typedef */
-typedef     void *   ( *rfc_mem_alloc_fcn_t )   ( void *, size_t num, size_t size, int aim );   /** */
-typedef                 RFC_VALUE_TYPE          rfc_value_t;                                    /** Input data value type */
-typedef                 RFC_COUNTS_VALUE_TYPE   rfc_counts_t;                                   /** Type of counting values */
-typedef     struct      rfc_value_tuple         rfc_value_tuple_s;                              /** Tuple of value and index position */
-typedef     struct      rfc_ctx                 rfc_ctx_s;                                      /** Forward declaration (rainflow context) */
-typedef     enum        rfc_mem_aim             rfc_mem_aim_e;                                  /** */
-typedef     enum        rfc_flags               rfc_flags_e;                                    /** */
-typedef     enum        rfc_state               rfc_state_e;                                    /** */
-typedef     enum        rfc_error               rfc_error_e;                                    /** */
-typedef     enum        rfc_res_method          rfc_res_method_e;                               /** */
+typedef                 RFC_VALUE_TYPE          rfc_value_t;                                                /** Input data value type */
+typedef                 RFC_COUNTS_VALUE_TYPE   rfc_counts_t;                                               /** Type of counting values */
+typedef     struct      rfc_value_tuple         rfc_value_tuple_s;                                          /** Tuple of value and index position */
+typedef     struct      rfc_ctx                 rfc_ctx_s;                                                  /** Forward declaration (rainflow context) */
+typedef     enum        rfc_mem_aim             rfc_mem_aim_e;                                              /** Memory accessing mode */
+typedef     enum        rfc_flags               rfc_flags_e;                                                /** Flags, see RFC_FLAGS... */
+typedef     enum        rfc_state               rfc_state_e;                                                /** Counting state, see RFC_STATE... */
+typedef     enum        rfc_error               rfc_error_e;                                                /** Recent error, see RFC_ERROR... */
+typedef     enum        rfc_res_method          rfc_res_method_e;                                           /** Method when count residue into matrix, see RFC_RES... */
 #if !RFC_MINIMAL
-typedef     enum        rfc_counting_method     rfc_counting_method_e;                          /** */
-typedef     enum        rfc_rp_damage_method    rfc_rp_damage_method_e;                         /** */
-typedef     enum        rfc_sd_method           rfc_sd_method_e;                                /** */
-typedef     struct      rfc_class_param         rfc_class_param_s;                              /** Class parameters (width, offset, count) */
-typedef     struct      rfc_wl_param            rfc_wl_param_s;                                 /** Woehler curve parameters (sd, nd, k, k2, omission) */
-typedef     struct      rfc_rfm_item            rfc_rfm_item_s;                                 /** Rainflow matrix element */
+typedef     enum        rfc_counting_method     rfc_counting_method_e;                                      /** Counting method, see RFC_COUNTING... */
+typedef     enum        rfc_rp_damage_method    rfc_rp_damage_method_e;                                     /** Method when calculating damage from range pair counting, see RFC_RP_DAMAGE_CALC_METHOD... */
+typedef     enum        rfc_sd_method           rfc_sd_method_e;                                            /** Spread damage method, see RFC_SD... */
+typedef     struct      rfc_class_param         rfc_class_param_s;                                          /** Class parameters (width, offset, count) */
+typedef     struct      rfc_wl_param            rfc_wl_param_s;                                             /** Woehler curve parameters (sd, nd, k, k2, omission) */
+typedef     struct      rfc_rfm_item            rfc_rfm_item_s;                                             /** Rainflow matrix element */
 #endif /*!RFC_MINIMAL*/
+
+/* Memory allocation functions typedef */
+typedef     void *   ( *rfc_mem_alloc_fcn_t )   ( void *, size_t num, size_t size, rfc_mem_aim_e aim );     /** Memory allocation functor */
 
 #ifdef __cplusplus
 extern "C" {
@@ -359,38 +360,38 @@ extern "C" {
 
 /* Core functions */
 bool    RFC_init                    (       void *ctx, unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
-                                                       rfc_value_t hysteresis, /*enum rfc_flags*/ int flags );
+                                                       rfc_value_t hysteresis, rfc_flags_e flags );
 bool    RFC_wl_init_elementary      (       void *ctx, double sx, double nx, double k );
 #if !RFC_MINIMAL
 bool    RFC_wl_init_original        (       void *ctx, double sd, double nd, double k );
 bool    RFC_wl_init_modified        (       void *ctx, double sx, double nx, double k, double k2 );
-bool    RFC_wl_init_any             (       void *ctx, const rfc_wl_param_s* );
+bool    RFC_wl_init_any             (       void *ctx, const rfc_wl_param_s* wl_param );
 bool    RFC_clear_counts            (       void *ctx );
 #endif /*!RFC_MINIMAL*/
 bool    RFC_deinit                  (       void *ctx );
 bool    RFC_feed                    (       void *ctx, const rfc_value_t* data, size_t count );
 #if !RFC_MINIMAL
-bool    RFC_cycle_process_counts    (       void *ctx, rfc_value_t from_val, rfc_value_t to_val, /*enum rfc_flags*/ int flags );
+bool    RFC_cycle_process_counts    (       void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_flags_e flags );
 bool    RFC_feed_scaled             (       void *ctx, const rfc_value_t* data, size_t count, double factor );
 bool    RFC_feed_tuple              (       void *ctx, rfc_value_tuple_s *data, size_t count );
 #endif /*!RFC_MINIMAL*/
-bool    RFC_finalize                (       void *ctx, /*rfc_res_method*/ int residual_method );
+bool    RFC_finalize                (       void *ctx, rfc_res_method_e residual_method );
 #if !RFC_MINIMAL
 /* Functions on rainflow matrix */
 bool    RFC_rfm_make_symmetric      (       void *ctx );
 bool    RFC_rfm_get                 ( const void *ctx, rfc_rfm_item_s **buffer, unsigned *count );
 bool    RFC_rfm_set                 (       void *ctx, const rfc_rfm_item_s *buffer, unsigned count, bool add_only );
-bool    RFC_rfm_peek                ( const void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t *count );
-bool    RFC_rfm_poke                (       void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t count, bool add_only );
+bool    RFC_rfm_peek                ( const void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t *counts );
+bool    RFC_rfm_poke                (       void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t counts, bool add_only );
 bool    RFC_rfm_sum                 ( const void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, rfc_counts_t *count );
 bool    RFC_rfm_damage              ( const void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage );
 bool    RFC_rfm_check               ( const void *ctx );
 bool    RFC_lc_get                  ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level );
-bool    RFC_lc_from_rfm             ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, /*enum rfc_flags*/ int flags );
-bool    RFC_lc_from_residue         ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, /*enum rfc_flags*/ int flags );
+bool    RFC_lc_from_rfm             ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags );
+bool    RFC_lc_from_residue         ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, rfc_flags_e flags );
 bool    RFC_rp_get                  ( const void *ctx, rfc_counts_t *rp, rfc_value_t *class_means );
 bool    RFC_rp_from_rfm             ( const void *ctx, rfc_counts_t *rp, rfc_value_t *class_means, const rfc_counts_t *rfm );
-bool    RFC_damage_from_rp          ( const void *ctx, const rfc_counts_t *counts, const rfc_value_t *Sa, double *damage, /*enum rfc_rp_damage_method*/ int rp_calc_type );
+bool    RFC_damage_from_rp          ( const void *ctx, const rfc_counts_t *counts, const rfc_value_t *Sa, double *damage, rfc_rp_damage_method_e rp_calc_type );
 bool    RFC_damage_from_rfm         ( const void *ctx, const rfc_counts_t *rfm, double *damage );
 bool    RFC_wl_calc_sx              ( const void *ctx, double s0, double n0, double k, double *sx, double nx, double  k2, double  sd, double nd );
 bool    RFC_wl_calc_sd              ( const void *ctx, double s0, double n0, double k, double  sx, double nx, double  k2, double *sd, double nd );
@@ -401,7 +402,7 @@ bool    RFC_wl_calc_n               ( const void *ctx, double s0, double n0, dou
 #if RFC_TP_SUPPORT
 bool    RFC_tp_init                 (       void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
 bool    RFC_tp_init_autoprune       (       void *ctx, bool autoprune, size_t size, size_t threshold );
-bool    RFC_tp_prune                (       void *ctx, size_t count, /*enum rfc_flags*/ int flags );
+bool    RFC_tp_prune                (       void *ctx, size_t count, rfc_flags_e flags );
 #endif /*RFC_TP_SUPPORT*/
 
 #if RFC_DH_SUPPORT
@@ -420,7 +421,7 @@ bool    RFC_at_transform            ( const void *ctx, double Sa, double Sm, dou
 
 #if RFC_USE_DELEGATES
 /* Delegates typedef */
-typedef  void                       ( *rfc_cycle_find_fcn_t )    ( rfc_ctx_s *, /*enum rfc_flags*/ int flags );
+typedef  void                       ( *rfc_cycle_find_fcn_t )    ( rfc_ctx_s *, rfc_flags_e flags );
 typedef  bool                       ( *rfc_damage_calc_fcn_t )   ( rfc_ctx_s *, unsigned from_class, unsigned to_class, double *damage, double *Sa_ret );
 typedef  bool                       ( *rfc_finalize_fcn_t )      ( rfc_ctx_s *, int residual_methods );
 typedef  rfc_value_tuple_s *        ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, const rfc_value_tuple_s * );
@@ -430,7 +431,7 @@ typedef  bool                       ( *rfc_tp_get_fcn_t )        ( rfc_ctx_s *, 
 typedef  bool                       ( *rfc_tp_inc_damage_fcn_t ) ( rfc_ctx_s *, size_t tp_pos, double damage );
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT
-typedef  void                       ( *rfc_spread_damage_fcn_t ) ( rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, /*enum rfc_flags*/ int flags );
+typedef  void                       ( *rfc_spread_damage_fcn_t ) ( rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, rfc_flags_e flags );
 #endif /*RFC_DH_SUPPORT*/
 #if RFC_AT_SUPPORT
 typedef  bool                       ( *rfc_at_transform_fcn_t )  ( rfc_ctx_s *, double Sa, double Sm, double *Sa_transformed );

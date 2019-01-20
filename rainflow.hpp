@@ -38,10 +38,6 @@
 
 #pragma once
 
-#undef ASSERT
-#include <assert.h>
-#define ASSERT(x) assert(x)
-
 #include <vector>
 #include <algorithm>
 #include <cfloat>
@@ -50,45 +46,6 @@
 
 namespace RF = RFC_CPP_NAMESPACE;
 
-#ifndef DBL_NAN
-#if _WIN32
-#if _MSC_VER
-#define DBL_NAN (_Nan._Double)
-#endif /*_MSC_VER*/
-#else /*!_WIN32*/
-#define DBL_NAN NAN
-#endif /*_WIN32*/
-#endif /*DBL_NAN*/
-
-#ifndef DBL_ISFINITE
-#if _WIN32
-#if _MSC_VER
-#define DBL_ISFINITE(x) (_finite(x))
-#endif /*_MSC_VER*/
-#else /*!_WIN32*/
-#define DBL_ISFINITE(x) (std::isfinite(x))
-#endif /*_WIN32*/
-#endif /*DBL_NAN*/
-
-
-/** Returns the less value of \a a or \a b */
-#define MIN(a,b) ( (a) < (b) ? (a) : (b) )
-/** Returns the greater value of \a a or \a b */
-#define MAX(a,b) ( (a) > (b) ? (a) : (b) )
-/** Returns 1, if \a a >= 0, otherwise -1 */
-#define SIGN2(a) ( ( (a) >= 0 ) ? 1 : -1 )
-/** Returns \f$ {\mathop \rm \sgn}\left( a \right) \f$ */
-#define SIGN3(a) ( ( (a) > 0 ) ? 1 : ( ( (a) < 0 ) ? -1 : 0 ) )
-/** Returns \a a rounded */
-#define ROUND(a) ( SIGN2(a) * floor( fabs( (double) a ) + 0.5 ) )
-/** Returns \a a rounded to nearest integer */
-#define IROUND(a) ( (int)SIGN2(a) * (int)( fabs( (double) a ) + 0.5 ) )
-/** Returns \a a rounded to nearest positive integer */
-#define NROUND(a) ( (size_t)( fabs( (double) a ) + 0.5 ) )
-
-
-template<class T> class CRainflowT;
-typedef CRainflowT<RF::rfc_value_t> CRainflow;
 
 extern "C"
 {
@@ -99,1526 +56,426 @@ extern "C"
 }
 
 
-template<class T>
-class CRainflowT 
+
+class Rainflow
 {
 public:
-    typedef enum 
+    /* Memory allocation aim info */
+    enum rfc_mem_aim
+    {
+        RFC_MEM_AIM_TEMP                        =  RF::RFC_MEM_AIM_TEMP,                        /**< Error on accessing memory for temporary storage */
+        RFC_MEM_AIM_RESIDUE                     =  RF::RFC_MEM_AIM_RESIDUE,                     /**< Error on accessing memory for residue */
+        RFC_MEM_AIM_MATRIX                      =  RF::RFC_MEM_AIM_MATRIX,                      /**< Error on accessing memory for rf matrix */
+        RFC_MEM_AIM_RP                          =  RF::RFC_MEM_AIM_RP,                          /**< Error on accessing memory for range pair counting */
+        RFC_MEM_AIM_LC                          =  RF::RFC_MEM_AIM_LC,                          /**< Error on accessing memory for level crossing */
+        RFC_MEM_AIM_TP                          =  RF::RFC_MEM_AIM_TP,                          /**< Error on accessing memory for turning points */
+        RFC_MEM_AIM_DLUT                        =  RF::RFC_MEM_AIM_DLUT,                        /**< Error on accessing memory for damage look-up table */
+        RFC_MEM_AIM_HCM                         =  RF::RFC_MEM_AIM_HCM,                         /**< Error on accessing memory for HCM algorithm */
+        RFC_MEM_AIM_DH                          =  RF::RFC_MEM_AIM_DH,                          /**< Error on accessing memory for damage history */
+        RFC_MEM_AIM_RFM_ELEMENTS                =  RF::RFC_MEM_AIM_RFM_ELEMENTS,                /**< Error on accessing memory for rf matrix elements */
+    };
+
+
+    /* Flags */
+    enum rfc_flags
+    {
+        RFC_FLAGS_DEFAULT                       = RF::RFC_FLAGS_DEFAULT,                         
+        RFC_FLAGS_COUNT_RFM                     = RF::RFC_FLAGS_COUNT_RFM,                      /**< Count into rainflow matrix */
+        RFC_FLAGS_COUNT_DAMAGE                  = RF::RFC_FLAGS_COUNT_DAMAGE,                   /**< Count damage */
+        RFC_FLAGS_COUNT_DH                      = RF::RFC_FLAGS_COUNT_DH,                       /**< Spread damage */
+        RFC_FLAGS_COUNT_RP                      = RF::RFC_FLAGS_COUNT_RP,                       /**< Count into range pair */
+        RFC_FLAGS_COUNT_LC_UP                   = RF::RFC_FLAGS_COUNT_LC_UP,                    /**< Count into level crossing (only rising slopes) */
+        RFC_FLAGS_COUNT_LC_DN                   = RF::RFC_FLAGS_COUNT_LC_DN,                    /**< Count into level crossing (only falling slopes) */
+        RFC_FLAGS_COUNT_LC                      = RF::RFC_FLAGS_COUNT_LC,                       /**< Count into level crossing (all slopes) */
+        RFC_FLAGS_COUNT_MK                      = RF::RFC_FLAGS_COUNT_MK,                       /**< Live damage counter (Miner consequent) */
+        RFC_FLAGS_ENFORCE_MARGIN                = RF::RFC_FLAGS_ENFORCE_MARGIN,                 /**< Enforce first and last data point are turning points */
+        RFC_FLAGS_COUNT_ALL                     = RF::RFC_FLAGS_COUNT_ALL,                      /**< Count all */
+        RFC_FLAGS_TPPRUNE_PRESERVE_POS          = RF::RFC_FLAGS_TPPRUNE_PRESERVE_POS,           /**< Preserve stream position information on pruning */
+        RFC_FLAGS_TPPRUNE_PRESERVE_RES          = RF::RFC_FLAGS_TPPRUNE_PRESERVE_RES,           /**< Preserve turning points that exist in resiude on pruning */
+        RFC_FLAGS_TPAUTOPRUNE                   = RF::RFC_FLAGS_TPAUTOPRUNE,                    /**< Automatic prune on tp */
+    };
+
+
+    /* See RFC_damage_from_rp() */
+    enum rfc_rp_damage_method
+    {
+        RFC_RP_DAMAGE_CALC_METHOD_DEFAULT       = RF::RFC_RP_DAMAGE_CALC_METHOD_DEFAULT,        /**< Use Woehler parameters from rfc_ctx */
+        RFC_RP_DAMAGE_CALC_METHOD_ELEMENTAR     = RF::RFC_RP_DAMAGE_CALC_METHOD_ELEMENTAR,      /**< Use Woehler parameters from rfc_ctx, but as Miner elementar */
+        RFC_RP_DAMAGE_CALC_METHOD_MODIFIED      = RF::RFC_RP_DAMAGE_CALC_METHOD_MODIFIED,       /**< Use Woehler parameters from rfc_ctx, but as Miner modified */
+        RFC_RP_DAMAGE_CALC_METHOD_CONSEQUENT    = RF::RFC_RP_DAMAGE_CALC_METHOD_CONSEQUENT,     /**< Use Woehler parameters from rfc_ctx, but as Miner consequent */
+    };
+
+
+    enum rfc_state
+    {
+        RFC_STATE_INIT0                         = RF::RFC_STATE_INIT0,                          /**< Initialized with zeros */
+        RFC_STATE_INIT                          = RF::RFC_STATE_INIT,                           /**< Initialized, memory allocated */
+        RFC_STATE_BUSY                          = RF::RFC_STATE_BUSY,                           /**< In counting state */
+        RFC_STATE_BUSY_INTERIM                  = RF::RFC_STATE_BUSY_INTERIM,                   /**< In counting state, having still one interim turning point (not included) */
+        RFC_STATE_FINALIZE                      = RF::RFC_STATE_FINALIZE,                       /**< Finalizing */
+        RFC_STATE_FINISHED                      = RF::RFC_STATE_FINISHED,                       /**< Counting finished, memory still allocated */
+        RFC_STATE_ERROR                         = RF::RFC_STATE_ERROR,                          /**< An error occurred */
+    };
+
+
+    enum rfc_error
+    {
+        RFC_ERROR_UNEXP                         = RF::RFC_ERROR_UNEXP,                          /**< Unexpected error */
+        RFC_ERROR_NOERROR                       = RF::RFC_ERROR_NOERROR,                        /**< No error */
+        RFC_ERROR_INVARG                        = RF::RFC_ERROR_INVARG,                         /**< Invalid arguments passed */
+        RFC_ERROR_MEMORY                        = RF::RFC_ERROR_MEMORY,                         /**< Error on memory allocation */
+        RFC_ERROR_TP                            = RF::RFC_ERROR_TP,                             /**< Error while amplitude transformation */
+        RFC_ERROR_AT                            = RF::RFC_ERROR_AT,                             /**< Error while amplitude transformation */
+        RFC_ERROR_LUT                           = RF::RFC_ERROR_LUT,                            /**< Error while accessing look up tables */
+    };
+
+
+    enum rfc_counting_method
+    {
+        RFC_COUNTING_METHOD_DELEGATED           = RF::RFC_COUNTING_METHOD_DELEGATED,            /**< Method must be implemented via delegator, see member cycle_find_fcn */
+        RFC_COUNTING_METHOD_NONE                = RF::RFC_COUNTING_METHOD_NONE,                 /**< No counting */
+        RFC_COUNTING_METHOD_4PTM                = RF::RFC_COUNTING_METHOD_4PTM,                 /**< 4 point algorithm (default) */
+        RFC_COUNTING_METHOD_HCM                 = RF::RFC_COUNTING_METHOD_HCM,                  /**< 3 point algorithm, Clormann/Seeger (HCM) method */
+        RFC_COUNTING_METHOD_COUNT               = RF::RFC_COUNTING_METHOD_COUNT,                /**< Number of options */
+    };
+
+
+    enum rfc_res_method
     {
         /* Don't change order! */
-        RFC_RES_NONE                    = RF::RFC_RES_NONE            ,                       /**< No residual method */
-        RFC_RES_IGNORE                  = RF::RFC_RES_IGNORE          ,                       /**< Ignore residue (same as RFC_RES_NONE) */
-        RFC_RES_DISCARD                 = RF::RFC_RES_DISCARD         ,                       /**< Discard residue (empty residue) */
-        RFC_RES_HALFCYCLES              = RF::RFC_RES_HALFCYCLES      ,                       /**< ASTM */
-        RFC_RES_FULLCYCLES              = RF::RFC_RES_FULLCYCLES      ,                       /**< Count half cycles as full cycles */
-        RFC_RES_CLORMANN_SEEGER         = RF::RFC_RES_CLORMANN_SEEGER ,                       /**< Clormann/Seeger method */
-        RFC_RES_REPEATED                = RF::RFC_RES_REPEATED        ,                       /**< Repeat residue and count closed cycles */
-        RFC_RES_RP_DIN45667             = RF::RFC_RES_RP_DIN45667     ,                       /**< Count residue according to range pair in DIN-45667 */
-        RFC_RES_COUNT                   = RF::RFC_RES_COUNT           ,                       /**< Number of options */
-    } e_residuum;
+        RFC_RES_NONE                            = RF::RFC_RES_NONE,                             /**< No residual method */
+        RFC_RES_IGNORE                          = RF::RFC_RES_IGNORE,                           /**< Ignore residue (same as RFC_RES_NONE) */
+        RFC_RES_DISCARD                         = RF::RFC_RES_DISCARD,                          /**< Discard residue (empty residue) */
+        RFC_RES_HALFCYCLES                      = RF::RFC_RES_HALFCYCLES,                       /**< ASTM */
+        RFC_RES_FULLCYCLES                      = RF::RFC_RES_FULLCYCLES,                       /**< Count half cycles as full cycles */
+        RFC_RES_CLORMANN_SEEGER                 = RF::RFC_RES_CLORMANN_SEEGER,                  /**< Clormann/Seeger method */
+        RFC_RES_REPEATED                        = RF::RFC_RES_REPEATED,                         /**< Repeat residue and count closed cycles */
+        RFC_RES_RP_DIN45667                     = RF::RFC_RES_RP_DIN45667,                      /**< Count residue according to range pair in DIN-45667 */
+        RFC_RES_COUNT                           = RF::RFC_RES_COUNT,                            /**< Number of options */
+    };
 
-    typedef enum
+
+    enum rfc_sd_method
     {
-        RFC_SD_NONE                     = -1,                       /**< No spread damage calculation */
-        RFC_SD_HALF_23                  =  0,                       /**< Equally split damage between P2 and P3 */
-        RFC_SD_RAMP_AMPLITUDE_23        =  1,                       /**< Spread damage according to amplitude over points between P2 and P3 */
-        RFC_SD_RAMP_DAMAGE_23           =  2,                       /**< Spread damage linearly over points between P2 and P3 */
-        RFC_SD_RAMP_AMPLITUDE_24        =  3,                       /**< Spread damage according to amplitude over points between P2 and P4 */  
-        RFC_SD_RAMP_DAMAGE_24           =  4,                       /**< Spread damage linearly over points between P2 and P4 */
-        RFC_SD_FULL_P2                  =  5,                       /**< Assign damage to P2 */
-        RFC_SD_FULL_P3                  =  6,                       /**< Assign damage to P3 */
-        RFC_SD_TRANSIENT_23             =  7,                       /**< Spread damage transient according to amplitude over points between P2 and P3 */
-        RFC_SD_TRANSIENT_23c            =  8,                       /**< Spread damage transient according to amplitude over points between P2 and P4 only until cycle is closed */
-        RFC_SD_COUNT                                                /**< Number of options */
-    } e_spread_damage;
+        RFC_SD_NONE                             = RF::RFC_SD_NONE,                              /**< No spread damage calculation */
+        RFC_SD_HALF_23                          = RF::RFC_SD_HALF_23,                           /**< Equally split damage between P2 and P3 */
+        RFC_SD_RAMP_AMPLITUDE_23                = RF::RFC_SD_RAMP_AMPLITUDE_23,                 /**< Spread damage according to amplitude over points between P2 and P3 */
+        RFC_SD_RAMP_DAMAGE_23                   = RF::RFC_SD_RAMP_DAMAGE_23,                    /**< Spread damage linearly over points between P2 and P3 */
+        RFC_SD_RAMP_AMPLITUDE_24                = RF::RFC_SD_RAMP_AMPLITUDE_24,                 /**< Spread damage according to amplitude over points between P2 and P4 */  
+        RFC_SD_RAMP_DAMAGE_24                   = RF::RFC_SD_RAMP_DAMAGE_24,                    /**< Spread damage linearly over points between P2 and P4 */
+        RFC_SD_FULL_P2                          = RF::RFC_SD_FULL_P2,                           /**< Assign damage to P2 */
+        RFC_SD_FULL_P3                          = RF::RFC_SD_FULL_P3,                           /**< Assign damage to P3 */
+        RFC_SD_TRANSIENT_23                     = RF::RFC_SD_TRANSIENT_23,                      /**< Spread damage transient according to amplitude over points between P2 and P3 */
+        RFC_SD_TRANSIENT_23c                    = RF::RFC_SD_TRANSIENT_23c,                     /**< Spread damage transient according to amplitude over points between P2 and P4 only until cycle is closed */
+        RFC_SD_COUNT                            = RF::RFC_SD_COUNT,                             /**< Number of options */
+    };
 
-    typedef struct 
-    {
-        double dRange;              /* Doppelamplitude */
-        double dAvrg;               /* Mittellast */
-        double dCounts;             /* Schwingspiele */
-    } t_stufe;
-
-    typedef struct 
-    {
-        double dAmpl;               /* Amplitude */
-        double dCounts;             /* Schwingspiele */
-    } t_stufe_ampl;
-
-    typedef struct 
-    {
-        double dLevel;              /* Klassengrenze */
-        double dCounts;             /* Schwingspiele */
-    } t_stufe_KGUZ;
-
-    typedef struct 
-    {
-        double dFrom;               /* Startklasse */
-        double dTo;                 /* Zielklasse */
-        double dCounts;             /* Schwingspiele */
-    } t_stufe_from_to;
-
-    typedef struct 
-    {
-        int    iCno;                /* Klassennummer, base 0 */
-        T      Value;               /* Messwert */
-        T      ClassMean;           /* Klassenmitte */
-        size_t nIdx;                /* Messwertposition, base 1 */
-        size_t nIdx_TP;             /* Position in m_TurningPoints, base 1 */
-    } t_res;
+    /* Typedefs */
+    typedef                 RFC_VALUE_TYPE          rfc_value_t;                                /** Input data value type */
+    typedef                 RFC_COUNTS_VALUE_TYPE   rfc_counts_t;                               /** Type of counting values */
+    typedef     struct      rfc_value_tuple         rfc_value_tuple_s;                          /** Tuple of value and index position */
+    typedef     struct      rfc_ctx                 rfc_ctx_s;                                  /** Forward declaration (rainflow context) */
+    typedef     enum        rfc_mem_aim             rfc_mem_aim_e;                              /** Memory accessing mode */
+    typedef     enum        rfc_flags               rfc_flags_e;                                /** Flags, see RFC_FLAGS... */
+    typedef     enum        rfc_state               rfc_state_e;                                /** Counting state, see RFC_STATE... */
+    typedef     enum        rfc_error               rfc_error_e;                                /** Recent error, see RFC_ERROR... */
+    typedef     enum        rfc_res_method          rfc_res_method_e;                           /** Method when count residue into matrix, see RFC_RES... */
+    typedef     enum        rfc_counting_method     rfc_counting_method_e;                      /** Counting method, see RFC_COUNTING... */
+    typedef     enum        rfc_rp_damage_method    rfc_rp_damage_method_e;                     /** Method when calculating damage from range pair counting, see RFC_RP_DAMAGE_CALC_METHOD... */
+    typedef     enum        rfc_sd_method           rfc_sd_method_e;                            /** Spread damage method, see RFC_SD... */
+    typedef     struct      rfc_class_param         rfc_class_param_s;                          /** Class parameters (width, offset, count) */
+    typedef     struct      rfc_wl_param            rfc_wl_param_s;                             /** Woehler curve parameters (sd, nd, k, k2, omission) */
+    typedef     struct      rfc_rfm_item            rfc_rfm_item_s;                             /** Rainflow matrix element */
 
 
-    typedef struct 
-    {
-      double ND, SD, k1, k2;
-    } t_sn_curve;
+    /* Memory allocation functions typedef */
+    typedef     void *   ( *rfc_mem_alloc_fcn_t )   ( void *, size_t num, size_t size, rfc_mem_aim_e aim );     /** Memory allocation functor */
 
-    typedef RF::rfc_value_tuple_s         t_turning_point;
-    typedef std::vector<double>           VectorData;
-    typedef std::vector<t_res>            VectorResiduum;
-    typedef std::vector<t_stufe>          VectorStufen;
-    typedef std::vector<t_stufe_ampl>     VectorStufenAmpl;
-    typedef std::vector<t_stufe_KGUZ>     VectorStufenKGUZ;
-    typedef std::vector<t_stufe_from_to>  VectorStufenFromTo;
-#if HAVE_NEOLIB
-    typedef HUGEVECTOR(t_turning_point)   VectorTurningPoints;
-#else
-    typedef std::vector<t_turning_point>  VectorTurningPoints;
-#endif
+    /* Core functions */
+    bool    init                    ( unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
+                                      rfc_value_t hysteresis, rfc_flags_e flags );
+    bool    wl_init_elementary      ( double sx, double nx, double k );
+    bool    wl_init_original        ( double sd, double nd, double k );
+    bool    wl_init_modified        ( double sx, double nx, double k, double k2 );
+    bool    wl_init_any             ( const rfc_wl_param_s* );
+    bool    clear_counts            ();
+    bool    deinit                  ();
+    bool    feed                    ( const rfc_value_t* data, size_t count );
+    bool    cycle_process_counts    ( rfc_value_t from_val, rfc_value_t to_val, rfc_flags_e flags );
+    bool    feed_scaled             ( const rfc_value_t* data, size_t count, double factor );
+    bool    feed_tuple              ( rfc_value_tuple_s *data, size_t count );
+    bool    finalize                ( rfc_res_method_e residual_method );
+    /* Functions on rainflow matrix */           
+    bool    rfm_make_symmetric      ();
+    bool    rfm_get                 ( rfc_rfm_item_s **buffer, unsigned *count );
+    bool    rfm_set                 ( const rfc_rfm_item_s *buffer, unsigned count, bool add_only );
+    bool    rfm_peek                ( rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t *count );
+    bool    rfm_poke                ( rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t count, bool add_only );
+    bool    rfm_sum                 ( unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, rfc_counts_t *count );
+    bool    rfm_damage              ( unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage );
+    bool    rfm_check               ();
+    bool    lc_get                  ( rfc_counts_t *lc, rfc_value_t *level );
+    bool    lc_from_rfm             ( rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags );
+    bool    lc_from_residue         ( rfc_counts_t *lc, rfc_value_t *level, rfc_flags_e flags );
+    bool    rp_get                  ( rfc_counts_t *rp, rfc_value_t *class_means );
+    bool    rp_from_rfm             ( rfc_counts_t *rp, rfc_value_t *class_means, const rfc_counts_t *rfm );
+    bool    damage_from_rp          ( const rfc_counts_t *counts, const rfc_value_t *Sa, double *damage, rfc_rp_damage_method_e rp_calc_type );
+    bool    damage_from_rfm         ( const rfc_counts_t *rfm, double *damage );
+    bool    wl_calc_sx              ( double s0, double n0, double k, double *sx, double nx, double  k2, double  sd, double nd );
+    bool    wl_calc_sd              ( double s0, double n0, double k, double  sx, double nx, double  k2, double *sd, double nd );
+    bool    wl_calc_k2              ( double s0, double n0, double k, double  sx, double nx, double *k2, double  sd, double nd );
+    bool    wl_calc_sa              ( double s0, double n0, double k, double  n,  double *sa );
+    bool    wl_calc_n               ( double s0, double n0, double k, double  sa, double *n );
+    bool    tp_init                 ( rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
+    bool    tp_init_autoprune       ( bool autoprune, size_t size, size_t threshold );
+    bool    tp_prune                ( size_t count, rfc_flags_e flags );
+    bool    dh_init                 ( int method, double *dh, size_t dh_cap, bool is_static );
+    bool    at_init                 ( const double *Sa, const double *Sm, unsigned count, 
+                                      double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
+    bool    at_transform            ( double Sa, double Sm, double *Sa_transformed );
 
-    enum 
-    { 
-        DEFAULT_HYSTERESIS  = -1,         /* Defaultwert wird zu jew. Klassenbreite! */
-        DEFAULT_CLASS_COUNT =  100,       /* Default fuer EGDB Streckenvergleich */
-        DEFAULT_DILATION    =  110,       /* Default fuer EGDB Streckenvergleich (in Prozent!)*/
-        DEFAULT_WL_SD       =  1000,      /* Default fuer EGDB Streckenvergleich --> 1E3 */
-        DEFAULT_WL_ND       =  10000000,  /* Default fuer EGDB Streckenvergleich --> 1E7 */
-        DEFAULT_WL_k        = -5,         /* Default fuer EGDB Streckenvergleich */
-        DEFAULT_ROUNDOFF    =  1000000    /* Fuer Vergleichbarkeit mit LMS TecWare */
-    }; // end enum
-
-    static const RF::rfc_counts_t    HALF_CYCLE_INCREMENT = RFC_HALF_CYCLE_INCREMENT;
-    static const RF::rfc_counts_t    FULL_CYCLE_INCREMENT = RFC_FULL_CYCLE_INCREMENT;
-
-protected:
-    // Eingangsparameter
-    T                           m_range_min, m_class_width;       /* Klassierbereichsuntergrenze, Klassenbreite */   
-    int                         m_class_count;                    /* Klassenzahl */   
-    T                           m_hysteresis;                     /* Rueckstellbreite */
-    T                           m_dilation;                       /* Aufschlag (10% bei EGDB Streckenvergleich) */
-    bool                        m_isSymmetric;                    /* Bei Symmetrie wird nur das Dreieck rechts oben der Matrix betrachtet */
-    t_sn_curve                  m_SNCurve;                        /* Woehlerlinienparameter */
-    size_t                      m_amount;                         /* Anzahl der zu klassierenden Samplepoints */
-    int                         m_doSpreadDamage;                 /* >0 = Schaedigung ueber Teilbereich verteilen, statt nur auf die ausseren TP */
-
-    // Ausgangswerte
-    VectorTurningPoints         m_TurningPoints;                  /* Umkehrpunktfolge */
-    bool                        m_isParametrized;                 /* Klassierparameter gesetzt? */
-    e_residuum                  m_eResiduum;                      /* Wie wurde das Residuum bewertet */
-    int                         m_iProgressState;                 /* Aktueller Fortschritt in Prozent (0-100) */
-    bool                        m_bCountPending;                  /* Bei mehrfachem Aufruf von DoRainflow() true */
-    size_t                      m_CurrentPos;                     /* Anzahl bisher behandelter Eingangsdaten */
-    double                      m_AmplTrans_dM;                   /* Mittelspannungseinfluss */
-    double                      m_AmplTrans_dR;                   /* Neues R */
-    double                      m_AmplTrans_dAvrg;                /* Neuer Mittelwert */
-    int                         m_AmplTrans_mode;                 /* 0 = Aus, 1 = Ziel ist R, 2 = Ziel ist Avrg */
-
-    // Rainflow
-    RF::rfc_ctx_s               m_rfc_ctx;                        /* Rainflow context */
-
-                                CRainflowT                    ( const CRainflowT &RainflowMatrix );  /* Disable Standard Constructor */
-                                CRainflowT& operator=         ( const CRainflowT &RainflowMatrix );  /* Disable Copy Constructor */
-
-    inline T                    Min                                 ( T A, T B ) const { return ( A < B ) ? A : B; }
-    inline T                    Max                                 ( T A, T B ) const { return ( A > B ) ? A : B; }
-    inline T                    Sign                                ( T A ) const { return ( A < 0 ) ? -1 : 1; }
-    inline T                    Abs                                 ( T A ) const { return fabs( (double) A ); }
-    inline T                    Ceil                                ( T A ) const { return (int) ceil( A ); }
-
-public:
-    explicit 
-    CRainflowT()
-    : m_iProgressState( -1 )
-    { 
-        RF::rfc_ctx_s dummy = { sizeof( RF::rfc_ctx_s ) };
-
-        m_SNCurve.SD = DEFAULT_WL_SD;
-        m_SNCurve.ND = DEFAULT_WL_ND;
-        m_SNCurve.k1 = DEFAULT_WL_k;
-        m_SNCurve.k2 = DEFAULT_WL_k;
-
-        m_doSpreadDamage = RFC_SD_HALF_23;  
-
-        m_rfc_ctx = dummy;
-
-        SetAmplTrans( DBL_NAN, DBL_NAN, false );
-        ZeroInit();
-    } // end of CRainflowT
-    
-
-    virtual ~CRainflowT()                                            
-    { 
-        RF::RFC_deinit( &m_rfc_ctx );
-        ClearTurningPoints();
-    } // end of ~CRainflowT
-    
-
-    // Berechnet die Klassennummer k (k>=0) fuer einen Messwert
-    // bin(k) definiert die Klassengrenzen
-    // bin(0) = m_range_min
-    // bin(1) = m_range_min + m_class_width
-    // k(x) => bin(k) <= x < bin(k+1)
-    inline 
-    int ClassNo( T value ) const
-    {
-        int cno = (int) floor( ( value - m_range_min ) / m_class_width );
-        
-        cno = MIN( cno, m_class_count - 1 );
-        cno = MAX( cno, 0 );
-        
-        return cno;
-    } // end of ClassNo
-    
-
-    inline 
-    RF::rfc_counts_t* GetMatrix() const
-    {
-        return m_rfc_ctx.rfm;
-    } // end of GetMatrix
-    
-
-    // Gibt Anzahl Schwingspiele x FULL_CYCLE_INCREMENT zurueck!
-    int GetCountIncrements( int from, int to ) const
-    {
-        RF::rfc_counts_t counts;
-        RF::rfc_counts_t *prf = GetMatrix();
-
-        ASSERT( m_isParametrized );
-
-        if( prf != NULL && m_class_count > 0 ) 
-        {
-            counts  = prf[ m_class_count * from + to ]; // Rainflowzaehlung
-        } // end if
-
-        return counts;
-    } // end of GetCountIncrements
-    
-
-    void SetCounts( int from, int to, int counts )
-    {
-        ASSERT( m_isParametrized );
-        ASSERT( from < m_class_count && from >= 0 && to < m_class_count && to >= 0 );
-
-        int *prf = GetMatrix();
-
-        if( m_isSymmetric && to < from ) 
-        {
-            int temp = from;
-            to = from;
-            from = temp;
-        } // end if
-
-        ASSERT( prf && prf[ m_class_count * from + to ] == 0 );
-        prf[ m_class_count * from + to ] = counts * FULL_CYCLE_INCREMENT;
-    } // end of SetCounts
-    
-
-    inline
-    void SetSNCurve( double SD, double ND, double k )
-    {
-        if( DBL_ISFINITE( SD ) && SD > 0.0 )
-        {
-            m_SNCurve.SD = SD;
-        } // end if
-        
-        if( DBL_ISFINITE( ND ) && ND > 0.0 )
-        {
-            m_SNCurve.ND = ND;
-        } // end if
-        
-        if( DBL_ISFINITE( k ) && fabs( k ) >= 1.0 )
-        {
-            m_SNCurve.k1  = -fabs( k );
-            m_SNCurve.k2  = -fabs( k );
-        } // end if
-
-        RF::RFC_wl_init_elementary( &m_rfc_ctx, SD, ND, k );
-    } // end of SetSNCurve
-    
-
-    inline
-    void SetSNCurve( double SD, double ND, double k1, double k2 )
-    {
-        if( DBL_ISFINITE( SD ) && SD > 0.0 )
-        {
-            m_SNCurve.SD = SD;
-        } // end if
-        
-        if( DBL_ISFINITE( ND ) && ND > 0.0 )
-        {
-            m_SNCurve.ND = ND;
-        } // end if
-        
-        if( DBL_ISFINITE( k1 ) && fabs( k1 ) >= 1.0 )
-        {
-            m_SNCurve.k1 = -fabs( k1 );
-        } // end if
-        
-        if( DBL_ISFINITE( k2 ) && fabs( k2 ) >= 1.0 )
-        {
-            m_SNCurve.k2 = -fabs( k2 );
-        }
-        else
-        {
-            m_SNCurve.k2 = -fabs(m_SNCurve.k1);
-        } // end if
-
-        RF::RFC_wl_init_modified( &m_rfc_ctx, SD, ND, k1, k2 );
-    } // end of SetSNCurve
-    
-
-    inline
-    void GetSNCurve( double& SD, double& ND, double& k ) const
-    {
-        SD = m_SNCurve.SD;
-        ND = m_SNCurve.ND;
-        k  = m_SNCurve.k1;
-    } // end of GetSNCurve
+    /* C++ specific extensions */
+    bool    feed                    ( const std::vector<rfc_value_t> data );
+private:
+    RF::rfc_ctx_s m_ctx;
+};
 
 
-    inline
-    void GetSNCurve( double& SD, double& ND, double& k1, double& k2 ) const
-    {
-        SD = m_SNCurve.SD;
-        ND = m_SNCurve.ND;
-        k1 = m_SNCurve.k1;
-        k2 = m_SNCurve.k2;
-    } // end of GetSNCurve
-
-
-    inline 
-    void SetAmplTrans( double dM, double dZiel, bool bZielItR )
-    {
-        if( !DBL_ISFINITE( dM ) || !DBL_ISFINITE( dZiel ) )
-        {
-            m_AmplTrans_mode  = 0;
-            m_AmplTrans_dM    = DBL_NAN;
-            m_AmplTrans_dR    = DBL_NAN;
-            m_AmplTrans_dAvrg = DBL_NAN;
-
-            m_rfc_ctx.at.count = 0;
-        }
-        else
-        {
-            if( bZielItR )
-            {
-                m_AmplTrans_mode  = 1;
-                m_AmplTrans_dM    = dM;
-                m_AmplTrans_dR    = dZiel;
-                m_AmplTrans_dAvrg = DBL_NAN;
-
-                RF::RFC_at_init( &m_rfc_ctx, /*Sa*/ NULL, /*Sm*/ NULL, /*count*/ 0, dM, 
-                                             /*Sm_rig*/ 0, /*R_rig*/ dZiel, /*R_pinned*/ true, /*symmetric*/ false );
-            }
-            else
-            {
-                m_AmplTrans_mode  = 2;
-                m_AmplTrans_dM    = dM;
-                m_AmplTrans_dR    = DBL_NAN;
-                m_AmplTrans_dAvrg = dZiel;
-
-                RF::RFC_at_init( &m_rfc_ctx, /*Sa*/ NULL, /*Sm*/ NULL, /*count*/ 0, dM, 
-                                             /*Sm_rig*/ dZiel, /*R_rig*/ -1, /*R_pinned*/ false, /*symmetric*/ false );
-            }
-        }
-    }
-    
-
-    inline 
-    void AddCycles( int from, int to, int cycles )
-    {
-        ASSERT( m_isParametrized );
-        ASSERT( from < m_class_count && from >= 0 && to < m_class_count && to >= 0 );
-
-        RF::rfc_counts_t *prf = GetMatrix();
-
-        if( m_isSymmetric && to < from ) 
-        {
-            int temp = from;
-            to = from;
-            from = temp;
-        } // end if
-
-        ASSERT( prf );
-        
-        prf[ m_class_count * from + to ] += cycles * FULL_CYCLE_INCREMENT;
-    } // end of AddCycles
-    
-
-    inline 
-    void AddHalfCycle( int from, int to )
-    {
-        ASSERT( m_isParametrized );
-        ASSERT( from < m_class_count && from >= 0 && to < m_class_count && to >= 0 );
-
-        RF::rfc_counts_t *prf = GetMatrix();
-
-        if( m_isSymmetric && to < from ) 
-        {
-            int temp = from;
-            to = from;
-            from = temp;
-        } // end if
-
-        ASSERT( prf );
-        prf[ m_class_count * from + to ] += HALF_CYCLE_INCREMENT;
-    } // end of AddHalfCycle
-    
-    
-    double    NoValue                      () const { return DBL_NAN; }
-    void      ClearTurningPoints           ();
-    void      ZeroInit                     ();
-    int       EntriesCount                 () const;
-    void      MakeSymmetric                ();
-    void      Parametrize                  ( double range_min,       double range_max,
-                                             double range_fixed_min, double range_fixed_max, double range, 
-                                             double class_count,     double class_width, 
-                                             double dilation,        double hysteresis );
-    int       IsParametrized               () { return m_isParametrized ? 1 : 0; }
-    T         GetRangeMin                  () const { return m_range_min; }
-    T         GetRangeMax                  () const { return GetRangeMin () + GetRange (); }
-    T         GetRange                     () const { return m_class_count * m_class_width; }
-    T         GetClassWidth                () const { return m_class_width; }
-    int       GetClassCount                () const { return m_class_count; }
-    T         GetHysteresis                () const { return m_hysteresis; }
-    T         GetDilation                  () const { return m_dilation; }
-    double    GetHysteresisToClassWidth    () const { return DBL_ISFINITE ( GetRange () ) ? ( m_hysteresis / GetRange () * GetClassCount () ) : DBL_NAN; }
-    void      SetHysteresis                ( double dHysteresis ) { m_hysteresis = dHysteresis; }
-    void      SetAmount                    ( size_t amount ) { m_amount = amount; }
-    void      SetSpreadDamage              ( int doSpread ) { m_doSpreadDamage = doSpread; }
-
-    void      GetStufenNewMean             ( VectorStufen &StufenOrig, VectorStufenAmpl &Stufen, double dNewMean, double dM ) const;
-    void      GetStufenNewR                ( VectorStufen &StufenOrig, VectorStufenAmpl &Stufen, double dNewR, double dM ) const;
-
-    void      DoRainflow                   ( const double *stream_in, size_t in_len, bool do_finalize = true );
-    void      DoRainflow                   ( const VectorData& stream );
-    template<class InputIt>
-    void      DoRainflow                   ( const InputIt first, const InputIt last );
-    void      CountResiduum                ( e_residuum how );
-    void      GetResiduum                  ( VectorResiduum &Residuum ) const;
-    void      SetResiduum                  ( const VectorResiduum &Residuum );
-    void      GetStufen                    ( VectorStufen &Stufen ) const;
-    void      GetStufen                    ( VectorStufenFromTo &Stufen ) const;
-    void      GetStufen                    ( VectorStufenAmpl &Stufen ) const;
-    void      GetStufen                    ( VectorStufenKGUZ &Stufen ) const;
-    void      SetStufen                    ( const VectorStufen &Stufen );
-    void      SetStufen                    ( const VectorStufenFromTo &Stufen );
-    void      GetResiduumStufen            ( VectorStufen &Stufen, e_residuum how ) const;
-    void      GetResiduumStufen            ( VectorStufenFromTo &Stufen, e_residuum how ) const;
-    void      GetTurningPoints             ( VectorTurningPoints& TurningPoints, size_t left = 0, size_t right = 0 ) const;
-    const VectorTurningPoints& 
-              GetTurningPoints             () const;
-    void      DetachTurningPoints          ( VectorTurningPoints &TurningPoints );
-    double    CalcDamage                   ( double dAmplitude, double dAvrg, double dCounts ) const;
-    double    GetBKZ                       () const;
-    double    GetBKZ                       ( const VectorStufen &Stufen ) const;
-    double    GetBKZ                       ( const VectorStufenAmpl &Stufen ) const;
-    double    GetShapeValue                () const;
-    double    GetShapeValue                ( const VectorStufenAmpl &Stufen, double &dAele ) const;
-    double    GetShapeValue                ( const VectorStufenAmpl &Stufen ) const;
-    double    GetSumH                      () const;
-    double    GetSumH                      ( const VectorStufenAmpl &Stufen ) const;
-    bool      TpSet                        ( size_t tp_pos, RF::rfc_value_tuple_s *tp );
-    bool      TpGet                        ( size_t tp_pos, RF::rfc_value_tuple_s **tp );
-    bool      TpIncDamage                  ( size_t tp_pos, double damage );
-    bool      TpPrune                      ( size_t counts, int flags );
-
-
-    template< typename ParameterMap >
-    ParameterMap GetParameterMap() const
-    {
-        ParameterMap PMap;
-
-        double SD, ND, k;
-        
-        GetSNCurve( SD, ND, k );
-
-        PMap[ "RFM.RangeMin" ]     = GetRangeMin();
-        PMap[ "RFM.RangeMax" ]     = GetRangeMax();
-        PMap[ "RFM.ClassWidth" ]   = GetClassWidth();
-        PMap[ "RFM.ClassCount" ]   = GetClassCount();
-        PMap[ "RFM.Hysteresis" ]   = GetHysteresis();
-        PMap[ "RFM.Dilation" ]     = GetDilation() - (int)GetDilation();
-        PMap[ "RFM.SNCurve.SD" ]   = SD;
-        PMap[ "RFM.SNCurve.ND" ]   = ND;
-        PMap[ "RFM.SNCurve.k" ]    = k;
-        PMap[ "RFM.BKZ" ]          = GetBKZ();
-        PMap[ "RFM.H" ]            = GetSumH();
-        PMap[ "RFM.v" ]            = GetShapeValue();  // Voelligkeit
-
-        return PMap;
-    } // end of GetParameterMap
-}; // end of class CRainflowT
-
-
-template<class T>
-void CRainflowT<T>::ClearTurningPoints()
+bool Rainflow::init( unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
+                     rfc_value_t hysteresis, rfc_flags_e flags = RFC_FLAGS_DEFAULT )
 {
-    m_TurningPoints.clear();
-} // end of ClearTurningPoints
+    RF::rfc_ctx_s ctx = { sizeof( RF::rfc_ctx_s ) };
 
+    m_ctx = ctx;
 
-template<class T>
-void CRainflowT<T>::ZeroInit()
-{
-    ClearTurningPoints();
-    m_hysteresis                =  0.0;
-    m_dilation                  =  0.0;
-    m_range_min = m_class_width =  0.0;
-    m_class_count               =  0;
-    m_isSymmetric               =  false;
-    m_isParametrized            =  false;
-    m_eResiduum                 =  RFC_RES_IGNORE;
-    m_bCountPending             =  false;
-    m_amount                    =  0;
-    m_CurrentPos                =  0;
-
-    RF::RFC_clear_counts( &m_rfc_ctx );
-} // end of ZeroInit
-
-
-template<class T>
-int CRainflowT<T>::EntriesCount() const
-{
-    int i, j;
-    int entries_count = 0;
-
-    if( !m_isParametrized ) 
-    {
-        ASSERT( false );
-        return 0;
-    } // end if
-
-    for( i = 0; i < m_class_count; i++ ) 
-    {
-        for( j = 0; j < m_class_count; j++ ) 
-        {
-            if( GetCountIncrements( i, j ) > 0 ) 
-            {
-                entries_count++;
-            } // end if
-        } /* end for */
-    } /* end for */
-
-    return entries_count;
-} // end of EntriesCount
-
-
-// Nur fuer Matrix nach Residuenbehandlung!
-// MakeSymmetric() beeinflusst nicht die Ergebnisse aus den Zaehlverfahren:
-// KGUZ und BPZ (GetStufen) zaehlen stehende und haengende Hystereseaeste!
-template<class T>
-void CRainflowT<T>::MakeSymmetric() 
-{
-    if( !m_isParametrized ) 
-    {
-        ASSERT( false );
-        return;
-    } // end if
-
-    RF::RFC_rfm_make_symmetric( &m_rfc_ctx );
-} /* end of MakeSymmetric() */
-
-
-template<class T>
-void CRainflowT<T>::GetStufenNewR( VectorStufen &StufenOrig, VectorStufenAmpl &Stufen, 
-                                   double dNewR, double dM ) const
-{
-    t_stufe_ampl stufe;
-
-    Stufen.clear();
-
-    if( RF::RFC_at_init( &m_rfc_ctx, /*Sa*/ NULL, /*Sm*/ NULL, /*count*/ 0, dM, 
-                                     /*Sm_rig*/ 0.0, dNewR, /*R_pinned*/ true, /*symmetric*/ false ) )
-    {
-        for( int i = 0; i < (int)StufenOrig.size(); i++ ) 
-        {
-            double dTransformedAmpl;
-
-            if( RF::RFC_at_transform( &m_rfc_ctx, StufenOrig[i].dRange / 2.0, StufenOrig[i].dAvrg, &dTransformedAmpl ) )
-            {
-                stufe.dAmpl   = dTransformedAmpl;
-                stufe.dCounts = StufenOrig[i].dCounts;
-            } else {
-                stufe.dAmpl   = 0;
-                stufe.dCounts = -1;  // TBD: Gibts eine bessere Loesung?
-            } // end if
-
-            Stufen.push_back( stufe );
-        } // end for
-    }
-
-    RF::RFC_at_init( &m_rfc_ctx, /*Sa*/ NULL, /*Sm*/ NULL, /*count*/ 0, m_AmplTrans_dM, 
-                                 /*Sm_rig*/ m_AmplTrans_dAvrg, /*R_rig*/ m_AmplTrans_dR, /*R_pinned*/ m_AmplTrans_mode = 2, /*symmetric*/ false );
-} // end of GetStufenNewR
-
-
-template<class T>
-void CRainflowT<T>::GetStufenNewMean( VectorStufen &StufenOrig, VectorStufenAmpl &Stufen, 
-                                      double dNewMean, double dM ) const
-{
-    t_stufe_ampl stufe;
-
-    Stufen.clear();
-
-    if( RF::RFC_at_init( &m_rfc_ctx, /*Sa*/ NULL, /*Sm*/ NULL, /*count*/ 0, dM, 
-                                     /*Sm_rig*/ dNewMean, /*R_rig*/ -1, /*R_pinned*/ false, /*symmetric*/ false ) )
-    {
-        for( int i = 0; i < (int)StufenOrig.size(); i++ ) 
-        {
-            double dTransformedAmpl;
-
-            if( RF::RFC_at_transform( &m_rfc_ctx, StufenOrig[i].dRange / 2.0, StufenOrig[i].dAvrg, &dTransformedAmpl ) )
-            {
-                stufe.dAmpl   = dTransformedAmpl;
-                stufe.dCounts = StufenOrig[i].dCounts;
-            } else {
-                stufe.dAmpl   = 0;
-                stufe.dCounts = -1;  // TBD: Gibts eine bessere Loesung?
-            } // end if
-
-            Stufen.push_back( stufe );
-        } // end for
-    }
-
-    RF::RFC_at_init( &m_rfc_ctx, /*Sa*/ NULL, /*Sm*/ NULL, /*count*/ 0, m_AmplTrans_dM, 
-                                 /*Sm_rig*/ m_AmplTrans_dAvrg, /*R_rig*/ m_AmplTrans_dR, /*R_pinned*/ m_AmplTrans_mode = 2, /*symmetric*/ false );
-} // end of GetStufenNewMean
-
-
-template<class T>
-void CRainflowT<T>::GetStufen( VectorStufen &Stufen ) const
-{
-    Stufen.clear();
-
-    if( !m_isParametrized ) 
-    {
-        ASSERT( false );
-        return;
-    } // end if
-
-    if( !GetMatrix() ) 
-    {
-        return;
-    } // end if
-
-    for( int i = 0; i < m_class_count; i++ ) 
-    {
-        for( int j = 0; j < m_class_count; j++ ) 
-        {
-            // Haeufigkeiten durch FULL_CYCLE_INCREMENT dividieren, da DoRainflow(), und SetValue()
-            // pro Schwingspiel FULL_CYCLE_INCREMENT Zaehlungen vornehmen.
-            // CountResiduum() nimmt eine Zaehlung (HALF_CYCLE_INCREMENT) fuer "RESIDUUM_HALFCYCLES" vor.
-            // Die Schleifen decken die volle Matrix ab!
-            double counts = (double) GetCountIncrements( i, j ) / FULL_CYCLE_INCREMENT;
-
-            if ( counts > 0.0 ) 
-            {
-                /* Es wird mit den Klassenmitten gerechnet */
-                /* ( i + 0.5 ) - ( j + 0.5 ) --> j - i
-                 * ( i + 0.5 ) + ( j + 0.5 ) --> i + j + 1
-                 */
-                double range = m_class_width * Abs( j - i );
-                double avrg  = m_class_width * ( i + j + 1 ) / 2.0 + m_range_min;
-                
-                t_stufe stufe;
-                stufe.dRange  = range;
-                stufe.dAvrg   = avrg;
-                stufe.dCounts = counts;
-
-                Stufen.push_back( stufe );
-            } // end if
-        } // end for
-    } // end for
-} // end of GetStufen
-
-
-template<class T>
-void CRainflowT<T>::GetStufen( VectorStufenAmpl &Stufen ) const
-{
-    Stufen.clear();
-
-    if( !m_isParametrized || !GetMatrix() ) 
-    {
-        ASSERT( false );
-        return;
-    } // end if
-
-    for( int i = 0; i < m_class_count; i++ ) 
-    {
-        double counts = 0.0;
-
-        for( int j = i; j < m_class_count; j++ ) 
-        {
-            // Haeufigkeiten durch FULL_CYCLE_INCREMENT dividieren, da DoRainflow(), und SetValue()
-            // pro Schwingspiel FULL_CYCLE_INCREMENT Zaehlungen vornehmen.
-            // CountResiduum() nimmt eine Zaehlung (HALF_CYCLE_INCREMENT) fuer "RESIDUUM_HALFCYCLES" vor.
-            // Die Schleifen decken die halbe Matrix ab (Dreieck)!
-            counts += (double) GetCountIncrements( j - i, j ) / FULL_CYCLE_INCREMENT;
-            counts += (double) GetCountIncrements( j, j - i ) / FULL_CYCLE_INCREMENT;
-        } // end for
-
-        if( counts > 0.0 ) 
-        {
-            /* Es wird mit den Klassenmitten gerechnet */
-            double range = m_class_width * i;
-            
-            t_stufe_ampl stufe;
-            stufe.dAmpl   = range / 2.0;
-            stufe.dCounts = counts;
-
-            Stufen.push_back( stufe );
-        } // end if
-    } // end for
-} // end of GetStufen
-
-
-template<class T>
-void CRainflowT<T>::GetStufen( VectorStufenFromTo &Stufen ) const
-{
-    Stufen.clear();
-
-    if( !m_isParametrized ) 
-    {
-        ASSERT( false );
-        return;
-    } // end if
-
-    if( !GetMatrix() ) 
-    {
-        return;
-    } // end if
-
-    for( int i = 0; i < m_class_count; i++ ) 
-    {
-        for( int j = 0; j < m_class_count; j++ ) 
-        {
-            // Schleifen decken die volle Matrix ab!
-            double counts = (double) GetCountIncrements( i, j ) / FULL_CYCLE_INCREMENT;
-
-            if ( counts > 0.0 ) 
-            {
-                double from = m_class_width * ( 0.5 + i ) + m_range_min;
-                double   to = m_class_width * ( 0.5 + j ) + m_range_min;
-                
-                t_stufe_from_to stufe;
-                stufe.dFrom   = from;
-                stufe.dTo     = to;
-                stufe.dCounts = counts;
-
-                Stufen.push_back( stufe );
-            } // end if
-        } // end for
-    } // end for
-} // end of GetStufen
-
-
-template<class T>
-void CRainflowT<T>::GetStufen( VectorStufenKGUZ &Stufen ) const
-{
-    Stufen.clear();
-
-    if( !m_isParametrized ) 
-    {
-        ASSERT( false );
-        return;
-    } // end if
-
-    VectorStufenKGUZ KGUZ_Temp( m_class_count - 1 );
-
-    std::vector<RF::rfc_counts_t> lc_counts( m_class_count );
-    std::vector<RF::rfc_value_t>  lc_level( m_class_count );
-
-    if( RF::RFC_lc_get( &m_rfc_ctx, &lc_counts[0], &lc_level[0] ) )
-    {
-        for( int i = 0; i < m_class_count - 1; i++ ) 
-        {
-            // Erster Index [0] zaehlt das Durchschreiten der ersten oberen Klassengrenze.
-            KGUZ_Temp[i].dLevel  = lc_level[i];
-            KGUZ_Temp[i].dCounts = lc_counts[i];
-        } // end for
-    }
-
-    Stufen = KGUZ_Temp;
-} // end of GetStufen
-
-
-template<class T>
-void CRainflowT<T>::SetStufen( const VectorStufen &Stufen )
-{
-    size_t i;
-
-    if( !m_isParametrized || !m_rfc_ctx.rp || !m_rfc_ctx.lc ) 
-    {
-        ASSERT( false );
-        return;
-    } // end if
-
-    RF::RFC_clear_counts( &m_rfc_ctx );
-
-    // Rangepair
-    for( i = 0; i < Stufen.size(); i++ ) 
-    {
-        t_stufe stufe = Stufen[i];
-        int from = ClassNo( (T)( stufe.dAvrg - stufe.dRange / 2.0 ) );
-        int   to = ClassNo( (T)( stufe.dAvrg + stufe.dRange / 2.0 ) );
-
-        ASSERT( from >= 0 && from < m_class_count 
-                && to >=0 && to < m_class_count );
-
-        AddCycles( from, to, (int)( stufe.dCounts + 0.5 ) );
-    } // end for
-
-    RF::RFC_rp_from_rfm( &m_rfc_ctx, m_rfc_ctx.rp, NULL, NULL );
-    RF::RFC_lc_from_rfm( &m_rfc_ctx, m_rfc_ctx.lc, NULL, NULL, RF::RFC_FLAGS_COUNT_LC );
-    RF::RFC_damage_from_rfm( &m_rfc_ctx, NULL, &m_rfc_ctx.damage );
-} // end of SetStufen
-
-
-template<class T>
-void CRainflowT<T>::SetStufen( const VectorStufenFromTo &Stufen )
-{
-    size_t i;
-
-    if( !m_isParametrized || !m_rfc_ctx.rp || !m_rfc_ctx.lc ) 
-    {
-        ASSERT( false );
-        return;
-    } // end if
-
-    RF::RFC_clear_counts( &m_rfc_ctx );
-
-    for( i = 0; i < Stufen.size(); i++ ) 
-    {
-        t_stufe_from_to stufe = Stufen[i];
-        int from = stufe.dFrom;
-        int   to = stufe.dTo;
-
-        ASSERT( from >= 0 && from < m_class_count 
-                && to >=0 && to < m_class_count );
-
-        AddCycles( from, to, (int)( stufe.dCounts + 0.5 ) );
-    } // end for
-
-    RF::RFC_rp_from_rfm( &m_rfc_ctx, m_rfc_ctx.rp, NULL, NULL );
-    RF::RFC_lc_from_rfm( &m_rfc_ctx, m_rfc_ctx.lc, NULL, NULL, RF::RFC_FLAGS_COUNT_LC );
-    RF::RFC_damage_from_rfm( &m_rfc_ctx, NULL, &m_rfc_ctx.damage );
-} // end of SetStufen
-
-
-template<class T>
-void CRainflowT<T>::GetResiduum( VectorResiduum &Residuum ) const
-{
-    Residuum.clear();
-
-    for( int i = 0; i < m_rfc_ctx.residue_cnt; i++ )
-    {
-        t_res res;
-
-        res.iCno      = m_rfc_ctx.residue[i].cls;                                   /* Klassennummer, base 0 */
-        res.Value     = m_rfc_ctx.residue[i].value;                                 /* Messwert */
-        res.ClassMean = m_rfc_ctx.class_width * res.iCno + m_rfc_ctx.class_offset;  /* Klassenmitte */
-        res.nIdx      = m_rfc_ctx.residue[i].pos;                                   /* Messwertposition, base 1 */
-        res.nIdx_TP   = m_rfc_ctx.residue[i].tp_pos;                                /* Position in m_TurningPoints, base 1 */
-
-        Residuum.push_back( res );
-    }
-} // end of GetResiduum
-
-
-/*
-template<class T>
-const typename CRainflowT<T>::VectorTurningPoints& CRainflowT<T>::GetTurningPoints() const
-{
-    return m_TurningPoints[0];
+    return RF::RFC_init( &m_ctx, class_count, class_width, class_offset, hysteresis, (RF::rfc_flags_e)flags );
 }
 
 
-template<class T>
-void CRainflowT<T>::GetTurningPoints( VectorTurningPoints &TurningPoints, size_t left, size_t right ) const
+bool Rainflow::wl_init_elementary( double sx, double nx, double k )
 {
-    if( !left && !right )
-    {
-        VectorTurningPoints aCopy( m_TurningPoints[0] );
-        TurningPoints.swap( aCopy );
-    }
-    else
-    {
-        typename VectorTurningPoints::const_iterator it;
-        size_t count = 0;
-
-        TurningPoints.clear();
-
-#if !HAVE_NEOLIB
-        if( !m_TurningPoints[0].empty() )
-        {
-            if( !left )  left  = m_TurningPoints[0].front().nIdx;
-            if( !right ) right = m_TurningPoints[0].back().nIdx;
-        } // end if
-
-        // Count number of values first...
-        for( it = m_TurningPoints[0].begin(); it != m_TurningPoints[0].end(); it++ )
-        {
-            if( it->nIdx >= left && it->nIdx <= right )
-            {
-                count++;
-            }
-        } // end for
-
-        // ...then allocate space 
-        TurningPoints.reserve( count );
-#endif
-
-
-        for( it = m_TurningPoints[0].begin(); it != m_TurningPoints[0].end(); it++ )
-        {
-            if( it->nIdx >= left && it->nIdx <= right )
-            {
-                TurningPoints.push_back( *it );
-            }
-        } // end for
-    } // end if
-} // end of GetTurningPoints
-*/
-
-template<class T>
-void CRainflowT<T>::Parametrize( double range_min,         double range_max,
-                                 double range_fixed_min,   double range_fixed_max, double range_fixed, 
-                                 double class_count,       double class_width, 
-                                 double dilation,          double hysteresis ) 
-{
-    if( class_count > 0.0 ) 
-    {
-        class_count = floor( class_count + 0.5 );
-    } else {
-        class_count = DBL_NAN;
-    } // end if
-
-    int is_range_min_fixed      = DBL_ISFINITE( range_fixed_min );
-    int is_range_max_fixed      = DBL_ISFINITE( range_fixed_max );
-    int is_range_fixed          = DBL_ISFINITE( range_fixed );
-    int is_class_count_fixed    = DBL_ISFINITE( class_count );
-    int is_class_width_fixed    = DBL_ISFINITE( class_width );
-    int is_dilation_fixed       = DBL_ISFINITE( dilation );
-
-    double dilation_trunc;  // Ganzzahlanteil des Klassierbereichaufschlages
-    double dilation_frac;   // Restanteil des Klassierbereichaufschlages
-    
-    double range = DBL_NAN;
-
-    ZeroInit();
-
-    if( // !DBL_ISFINITE( range_min ) || !DBL_ISFINITE( range_max ) ||
-        is_range_fixed && is_range_min_fixed && is_range_max_fixed || 
-        is_range_fixed && is_class_count_fixed && is_class_width_fixed ) 
-    {
-        ASSERT( false );
-    } /* end if */
-
-    /*
-     *
-     *   range
-     *
-     */
-    if( !is_range_fixed ) 
-    {
-        range = static_cast<T>( class_width ) * class_count;
-        
-        if( !DBL_ISFINITE( range ) ) 
-        {
-            if( is_range_max_fixed && is_range_min_fixed ) {
-                range = Abs( static_cast<T>( range_fixed_max ) - static_cast<T>( range_fixed_min ) );
-            } else if( is_range_max_fixed && !is_range_min_fixed ) {
-                range = Abs( static_cast<T>( range_fixed_max ) - static_cast<T>( range_min ) );
-            } else if( !is_range_max_fixed && is_range_min_fixed ) {
-                range = Abs( static_cast<T>( range_max ) - static_cast<T>( range_fixed_min ) );
-            } else {
-                range = Abs( static_cast<T>( range_max ) - static_cast<T>( range_min ) );
-            } // end if
-        } /* end if */
-    } else {
-        range = range_fixed;
-    } /* end if */
-
-    ASSERT( DBL_ISFINITE( range ) );
-    
-    /*
-     *
-     *   range_min & range_max
-     *
-     */
-    if( !is_range_min_fixed ) 
-    {
-        if( is_range_max_fixed ) 
-        {
-            range_min = static_cast<T>( range_fixed_max ) - static_cast<T>( range );
-        } else if( DBL_ISFINITE( range_max ) ) {
-            range_min = static_cast<T>( range_max ) - static_cast<T>( range );
-        } // end if
-    } else {
-        range_min = range_fixed_min;
-    } /* end if */
-    
-    if( !is_range_max_fixed ) 
-    {
-        if( is_range_min_fixed ) 
-        {
-            range_max = static_cast<T>( range_fixed_min ) + static_cast<T>( range );
-        } else if( DBL_ISFINITE( range_min ) ) {
-            range_max = static_cast<T>( range_min ) + static_cast<T>( range );
-        } // end if
-    } else {
-        range_max = range_fixed_max;
-    } /* end if */
-
-    ASSERT( DBL_ISFINITE ( range_min + range_max ) );
-    ASSERT( range_max >= range_min );
-    range = range_max - range_min;
-
-    if( is_range_max_fixed && is_range_min_fixed ) 
-    {
-        is_range_fixed = true;
-    } // end if
-    
-    /*
-     *
-     *   class_count
-     *
-     */
-    if( is_class_width_fixed && !is_class_count_fixed ) 
-    {
-        ASSERT( class_width > 0.0 );
-        class_count = (int)Ceil( static_cast<T>( range ) / static_cast<T>( class_width ) );
-    } /* end if */
-    
-    if( !is_class_count_fixed && !is_class_width_fixed ) 
-    {
-        class_count = DEFAULT_CLASS_COUNT;
-        is_class_count_fixed = 1;
-    } /* end if */
-
-    if( !is_dilation_fixed ) 
-    {
-        dilation = (double)DEFAULT_DILATION / 100.0;
-        is_dilation_fixed = 1;
-    } // end if
-    
-    dilation       = fabs( dilation );
-    dilation_trunc = (int)(dilation + 1e-4);     // Ganzzahlanteil des Klassierbereichsaufschlages
-    dilation_frac  = dilation - dilation_trunc;  // Restanteil des Klassierbereichsaufschlages
-    dilation_frac  = ( dilation_frac < 0.0 ) ? 0.0 : dilation_frac;
-    
-    dilation = dilation_trunc + dilation_frac;
-    
-    //ASSERT( class_count > 2 );
-    ASSERT( DBL_ISFINITE( dilation ) && dilation >= 0.0 );
-
-    /* Defaultwerte aus dem LMS TecWare "Streckenvergleich"
-     * - 100 Klassen
-     * - Range (Max-Min) + Dilation  (--> 10%)
-     * - Hysterese = 1x Klassenbreite
-     */
-    
-
-    /* Algorithmus LMS TecWare:
-        range_min = min(Originaldaten)
-        range_max = max(Originaldaten)
-        range = range_max - range_min
-        class_width = range / ( class_count - 1 ) 
-        range_min = range_min - class_width / 2.0 
-        range_max = range_max + class_width / 2.0 
-        range = range_max - range_min 
-
-                                v--- wo kommt dilation her?
-                                     DilationPercent ist Parameter (z.B. 10 %)
-                                     dilation = abs(range_max - range_min)  * DilationPercent / 100.0
-
-        range_min = range_min - dilation / 2.0  
-        range_max = range_max + dilation / 2.0 
-
-        range = range_max - range_min
-
-        range_min = floor( range_min * 1E6 ) / 1E6 
-        range_max = floor( ( range_min + range ) * 1E6 ) / 1E6      
-                                               ^-- simuliert float Rechnung, passiert bei uns aber 
-                                                   implizit und mit 6.5 signifikanten Stellen, das 
-                                                   koennte man mit 3162277 statt 1E6 probieren...
-        range = range_max - range_min 
-        class_width = range / class_count
-
-        In der Klassierung werden die Punkte quantifiziert (Klassen 1 bis 100):
-        class_no = floor( ( value - class_min ) / class_with ) + 1
-    */
-
-    if( range < 1E-5 * 2 * Max( 1, Max( Abs( range_min ), Abs( range_max ) ) ) ) 
-    {
-        range = 1E-5 * 2 * Max( 1, Max( Abs( range_min ), Abs( range_max ) ) );
-    } /* end if */
-    
-    
-    /* Einfache Klassenbreite, 2x halbe Klassenbreite Zuschlag, wenn dilation_trunc==1 */
-    if( !is_class_width_fixed ) class_width = static_cast<T>( range ) / IROUND( class_count - dilation_trunc );
-    /* Halbe Klassenbreite auch an den Klassiergrenzen aufschlagen */
-    if( !is_range_min_fixed )   range_min  -= static_cast<T>( class_width ) * dilation_trunc / 2.0f;
-    if( !is_range_max_fixed )   range_max  += static_cast<T>( class_width ) * dilation_trunc / 2.0f;
-    /* Klassierbereich neu bestimmen */
-    if( !is_range_fixed)        range       = static_cast<T>( range_max ) - static_cast<T>( range_min );
-
-    // Dilation unabhaengig von fixierten Werten immer anwenden (muss auf 0 gesetzt werden, wenn nicht gewuenscht!)
-    range_min -= static_cast<T>( range )     * static_cast<T>( dilation_frac ) / 2.0f;
-    range_max += static_cast<T>( range )     * static_cast<T>( dilation_frac ) / 2.0f;
-    range      = static_cast<T>( range_max ) - static_cast<T>( range_min );
-
-    
-    if( DEFAULT_ROUNDOFF > 0 ) 
-    {
-        range_min = static_cast<T>( floor( static_cast<T>( range_min ) * DEFAULT_ROUNDOFF ) / DEFAULT_ROUNDOFF );
-        range_max = static_cast<T>( floor( static_cast<T>( range_max ) * DEFAULT_ROUNDOFF ) / DEFAULT_ROUNDOFF );
-        range = static_cast<T>( range_max ) - static_cast<T>( range_min );
-    } // end if
-
-    if( !is_class_width_fixed ) class_width = static_cast<T>( range ) / IROUND( class_count );
-    if( !is_class_count_fixed ) class_count = (int)Ceil( static_cast<T>( range ) / static_cast<T>( class_width ) );
-
-    if( !DBL_ISFINITE( hysteresis ) || hysteresis == DEFAULT_HYSTERESIS ) 
-    {
-        hysteresis = class_width;
-    } /* end if */
-
-    ASSERT( DBL_ISFINITE( hysteresis ) && hysteresis >= 0.0 );
-
-    m_class_count = IROUND( class_count );
-    m_class_width = static_cast<T>( class_width );
-    m_hysteresis  = static_cast<T>( hysteresis );
-    m_range_min   = static_cast<T>( range_min );
-    m_dilation    = static_cast<T>( dilation );
-
-    if( m_class_width <= 0.0 )
-    {
-        m_class_width = 10.0 * DBL_EPSILON;
-    }
-
-    m_isParametrized = ( m_class_count > 0 ) && ( m_class_width > 0.0 );
-
-    if( m_isParametrized )
-    {
-        RF::RFC_init( &m_rfc_ctx, m_class_count, m_class_width, m_range_min, m_hysteresis, RF::RFC_FLAGS_DEFAULT );
-        m_rfc_ctx.internal.obj      = this;
-        m_rfc_ctx.tp_set_fcn        = tp_set;
-        m_rfc_ctx.tp_get_fcn        = tp_get;
-        m_rfc_ctx.tp_inc_damage_fcn = tp_inc_damage;
-    }
-} // end of Parametrize
-
-
-template<class T>
-void CRainflowT<T>::DoRainflow( const double *stream_in, size_t in_len, bool do_finalize ) 
-{
-    const   double *pin;          /* Pointer auf Zeitreihe (Eingangsdaten) */
-            double  dummy = 0.0;
-
-    if( !m_isParametrized || ( !stream_in && in_len ) ) 
-    {
-        ASSERT( false );
-        return;
-    } // end if
-
-    ASSERT( m_class_width > 0.0 && m_class_count > 1 );
-
-    pin = stream_in ? stream_in : &dummy;
-
-    if( !m_bCountPending ) 
-    {
-        m_CurrentPos = 0;
-
-        //ReDimMatrix();             /* Neue Matrix anlegen */
-        //ClearResiduum(0);          /* Altes Residuum loeschen */
-        //ClearTurningPoints(0);     /* Umkehrpunkte loeschen */
-        
-        m_bCountPending = !do_finalize;
-    }
-    
-    ASSERT( pin );
-
-    /* Schleife ueber alle Punkte */
-    RF::RFC_feed( &m_rfc_ctx, pin, in_len );
-
-    if( do_finalize )
-    {
-        switch( m_eResiduum )
-        {
-            case RFC_RES_NONE:
-                RF::RFC_finalize( &m_rfc_ctx, RF::RFC_RES_NONE ); break;
-            case RFC_RES_IGNORE:
-                RF::RFC_finalize( &m_rfc_ctx, RF::RFC_RES_IGNORE ); break;
-            case RFC_RES_HALFCYCLES:
-                RF::RFC_finalize( &m_rfc_ctx, RF::RFC_RES_HALFCYCLES ); break;
-            case RFC_RES_FULLCYCLES:
-                RF::RFC_finalize( &m_rfc_ctx, RF::RFC_RES_FULLCYCLES ); break;
-            case RFC_RES_REPEATED:
-                RF::RFC_finalize( &m_rfc_ctx, RF::RFC_RES_REPEATED ); break;
-            case RFC_RES_CLORMANN_SEEGER:
-                RF::RFC_finalize( &m_rfc_ctx, RF::RFC_RES_CLORMANN_SEEGER ); break;
-            case RFC_RES_RP_DIN45667:
-                RF::RFC_finalize( &m_rfc_ctx, RF::RFC_RES_RP_DIN45667 ); break;
-            default:
-                ASSERT( false );
-                return;
-        }
-    }
+    return RF::RFC_wl_init_elementary( &m_ctx, sx, nx, k );
 }
 
 
-template<class T>
-void CRainflowT<T>::DoRainflow( const VectorData& stream ) 
+bool Rainflow::wl_init_original( double sd, double nd, double k )
 {
-    if( !stream.empty () ) 
-    {
-        DoRainflow( &stream[0], stream.size() );
-    }
-    else
-    {
-        double dDummy = 0.0;
-
-        DoRainflow( &dDummy, /*in_len*/ 0, true );
-    } // end if
-} // end of DoRainflow
-
-
-template<class T>
-template<class InputIt>
-void CRainflowT<T>::DoRainflow( InputIt first, InputIt last )
-{
-    size_t distance = 0;
-    std::vector<T> stride( 1024 );
-    
-    if( first == last )
-    {
-        double dDummy = 0.0;
-        DoRainflow( &dDummy, /*in_len*/ 0, /*do_finalize*/ true );
-    } else {
-        for( InputIt it = first; it != last; it += distance )
-        {
-            distance = std::min<size_t>( std::distance( it, last ), stride.size() );
-            std::copy( it, it + distance, stride.begin() );
-            DoRainflow( &stride[0], distance, /*do_finalize*/ it + distance == last );
-        }
-    }
+    return RF::RFC_wl_init_original( &m_ctx, sd, nd, k );
 }
 
 
-template<class T> 
-double CRainflowT<T>::CalcDamage( double dAmplitude, double dAvrg, double dCounts ) const
+bool Rainflow::wl_init_modified( double sx, double nx, double k, double k2 )
 {
-    double dDamage;
-    double dLW;
-
-    RF::RFC_at_transform( (void*)&m_rfc_ctx, dAmplitude, dAvrg, &dAmplitude );
-
-    if( dAmplitude > m_SNCurve.SD )
-    {
-        dLW = pow( dAmplitude / m_SNCurve.SD, m_SNCurve.k1 ) * m_SNCurve.ND;
-    }
-    else
-    {
-        dLW = pow( dAmplitude / m_SNCurve.SD, m_SNCurve.k2 ) * m_SNCurve.ND;
-    }
-
-    dDamage = dCounts / dLW;
-    
-    return dDamage;
-} // end of CalcDamage
-
-
-template<class T>
-double CRainflowT<T>::GetBKZ( const VectorStufen& Stufen ) const 
-{
-    double dDamageSum = 0.0;
-
-    if( !m_isParametrized ) 
-    {
-        ASSERT( false );
-        return -1.0;
-    } // end if
-
-    for( int i = 0; i < (int)Stufen.size(); i++ ) 
-    {
-        dDamageSum += CalcDamage( Stufen[i].dRange / 2.0, Stufen[i].dAvrg, Stufen[i].dCounts );
-    } // end for
-
-    return dDamageSum;
-} // end of GetBKZ
-
-
-template<class T>
-double CRainflowT<T>::GetBKZ( const VectorStufenAmpl& Stufen ) const 
-{
-    double dDamageSum = 0.0;
-
-    if( !m_isParametrized ) 
-    {
-        ASSERT( false );
-        return -1.0;
-    } // end if
-
-    for( int i = 0; i < (int)Stufen.size(); i++ ) 
-    {
-        dDamageSum += CalcDamage( Stufen[i].dAmpl, 0.0 /* dAvrg */, Stufen[i].dCounts );
-    } // end for
-
-    return dDamageSum;
-} // end of GetBKZ
-
-
-template<class T>
-double CRainflowT<T>::GetBKZ() const 
-{
-    if( !m_isParametrized ) 
-    {
-        ASSERT( false );
-        return -1.0;
-    } // end if
-
-    VectorStufen Stufen;
-    GetStufen( Stufen );
-
-    return GetBKZ( Stufen );
-} // end of GetBKZ
-
-
-template<class T>
-double CRainflowT<T>::GetSumH( const VectorStufenAmpl& Stufen ) const 
-{
-    double dAmount = 0.0;
-
-    if( !m_isParametrized ) 
-    {
-        ASSERT( false );
-        return -1.0;
-    } // end if
-
-    for( int i = 0; i < (int)Stufen.size(); i++ ) 
-    {
-        dAmount += Stufen[i].dCounts;
-    } // end for
-
-    return dAmount;
-} // end of GetAmount
-
-
-template<class T>
-double CRainflowT<T>::GetSumH() const 
-{
-    if( !m_isParametrized ) 
-    {
-        ASSERT( false );
-        return -1.0;
-    } // end if
-
-    VectorStufenAmpl Stufen;
-    GetStufen( Stufen );
-
-    return GetSumH( Stufen );
-} // end of GetAmount
-
-
-template<class T>
-double CRainflowT<T>::GetShapeValue( const VectorStufenAmpl& Stufen, double& dAele ) const 
-{
-    double dV       = 0.0;
-    double dMaxAmpl = 0;    // Sa,1
-    double dSumH    = GetSumH( Stufen );
-    double dSNk1    = fabs( m_SNCurve.k1 );
-    double dSNk2    = fabs( m_SNCurve.k2 );
-    double dSD      = m_SNCurve.SD;
-
-    if( !m_isParametrized ) 
-    {
-        ASSERT( false );
-        return -1.0;
-    } // end if
-
-    // Maximale Amplitude im Kollektiv suchen
-    for( int i = 0; i < (int)Stufen.size(); i++ ) 
-    {
-        if( Stufen[i].dCounts > 0 && Stufen[i].dAmpl > dMaxAmpl )
-        {
-            dMaxAmpl = Stufen[i].dAmpl;
-        } // end if
-    } // end for
-
-    // Voelligkeitsgrad berechnen 
-    // (Betriebsfestigkeit, Verfahren und Daten zur Bauteilberechnung, Erwin Haibach (2006), Springer Verlag)
-    for( int i = 0; i < (int)Stufen.size(); i++ ) 
-    {
-        if( Stufen[i].dAmpl > dSD )
-        {
-            dV += Stufen[i].dCounts / dSumH * pow( Stufen[i].dAmpl / dMaxAmpl, dSNk1 );
-        }
-        else
-        {
-            // dV += Stufen[i].dCounts / dSumH * pow( Stufen[i].dAmpl / dMaxAmpl, dSNk2 );  // TODO
-            dV += Stufen[i].dCounts / dSumH * pow( Stufen[i].dAmpl / dMaxAmpl, dSNk1 );
-        }
-    } // end for
-
-    dAele = 1.0 / dV;  // Abstand zwischen Bauteil- und Lebensdauerlinie, Miner-elementar
-
-    // Voelligkeitsmass zurueckgeben
-    return pow( dV, 1.0 / dSNk1 );  // TODO
-} // end of GetShapeValue
-
-
-template<class T>
-double CRainflowT<T>::GetShapeValue( const VectorStufenAmpl& Stufen ) const 
-{
-    double dAele;
-
-    return GetShapeValue( Stufen, dAele );
+    return RF::RFC_wl_init_modified( &m_ctx, sx, nx, k, k2 );
 }
 
 
-template<class T>
-double CRainflowT<T>::GetShapeValue() const 
+bool Rainflow::wl_init_any( const rfc_wl_param_s* wl_param )
 {
-    if( !m_isParametrized ) 
-    {
-        ASSERT( false );
-        return -1.0;
-    } // end if
-
-    VectorStufenAmpl Stufen;
-    GetStufen( Stufen );
-    
-    return GetShapeValue( Stufen );
-} // end of GetShapeValue
-
-
-template<class T>
-bool CRainflowT<T>::TpSet( size_t tp_pos, RF::rfc_value_tuple_s *tp )
-{
-    m_TurningPoints.push_back( *tp );
-    tp->tp_pos = m_TurningPoints.size();
-
-    return true;
+    return RF::RFC_wl_init_any( &m_ctx, (const RF::rfc_wl_param_s*) wl_param );
 }
 
 
-template<class T>
-bool CRainflowT<T>::TpGet( size_t tp_pos, RF::rfc_value_tuple_s **tp )
+bool Rainflow::clear_counts()
 {
-    ASSERT( tp_pos <= m_TurningPoints.size() );
-
-    *tp = &m_TurningPoints[tp_pos-1];
-
-    return true;
+    return RF::RFC_clear_counts( &m_ctx );
 }
 
 
-template<class T>
-bool CRainflowT<T>::TpIncDamage( size_t tp_pos, double damage )
+bool Rainflow::deinit()
 {
-    ASSERT( tp_pos <= m_TurningPoints.size() );
-
-    m_TurningPoints[tp_pos-1].damage += damage;
-
-    return true;
+    return RF::RFC_deinit( &m_ctx );
 }
 
 
-template<class T>
-bool CRainflowT<T>::TpPrune( size_t counts, int flags )
+bool Rainflow::feed( const rfc_value_t* data, size_t count )
 {
-    ASSERT( false );
-    return true;
+    return RF::RFC_feed( &m_ctx, (const RF::rfc_value_t*)data, count );
 }
 
 
-extern "C" {
-
-static
-bool tp_set( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp )
+bool Rainflow::cycle_process_counts( rfc_value_t from_val, rfc_value_t to_val, rfc_flags_e flags )
 {
-    ASSERT( !tp_pos && tp );
-
-    if( !tp->tp_pos )
-    {
-        CRainflow *obj;
-
-        obj = static_cast<CRainflow*>( ctx->internal.obj );
-        return obj->TpSet( tp_pos, tp );
-    }
-
-    return false;
+    return RF::RFC_cycle_process_counts( &m_ctx, (RF::rfc_value_t)from_val, (RF::rfc_value_t)to_val, (RF::rfc_flags_e)flags );
 }
 
-static
-bool tp_get( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp )
+
+bool Rainflow::feed_scaled( const rfc_value_t* data, size_t count, double factor )
 {
-    ASSERT( tp_pos && tp );
-
-    if( tp_pos )
-    {
-        CRainflow *obj;
-
-        obj = static_cast<CRainflow*>( ctx->internal.obj );
-        return obj->TpGet( tp_pos, tp );
-    }
-
-    return false;
+    return RF::RFC_feed_scaled( &m_ctx, (const RF::rfc_value_t*)data, count, factor );
 }
 
-static
-bool tp_inc_damage( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage )
+
+bool Rainflow::feed_tuple( rfc_value_tuple_s *data, size_t count )
 {
-    ASSERT( tp_pos );
-
-    if( tp_pos )
-    {
-        CRainflow *obj;
-
-        obj = static_cast<CRainflow*>( ctx->internal.obj );
-        return obj->TpIncDamage( tp_pos, damage );
-    }
-
-    return false;
+    return RF::RFC_feed_tuple( &m_ctx, (RF::rfc_value_tuple_s *)data, count );
 }
 
-/**
- * @brief      (Re-)Allocate or free memory
- *
- * @param      ptr   Previous data pointer, or NULL, if unset
- * @param      num   The number of elements
- * @param      size  The size of one element in bytes
- * @param      aim   The aim
- *
- * @return     New memory pointer or NULL if either num or size is 0
- */
-static
-void * mem_alloc( void *ptr, size_t num, size_t size, int aim )
+
+bool Rainflow::finalize( rfc_res_method_e residual_method = RFC_RES_IGNORE )
 {
-    if( !num || !size )
-    {
-        if( ptr )
-        {
-            std::free( ptr );
-        }
-        return NULL;
-    }
-    else
-    {
-        return ptr ? std::realloc( ptr, num * size ) : std::calloc( num, size );
-    }
+    return RF::RFC_finalize( &m_ctx, (RF::rfc_res_method_e)residual_method );
 }
 
-} // extern "C"
+
+bool Rainflow::rfm_make_symmetric()
+{
+    return RF::RFC_rfm_make_symmetric( &m_ctx );
+}
+
+
+bool Rainflow::rfm_get( rfc_rfm_item_s **buffer, unsigned *count )
+{
+    return RF::RFC_rfm_get( &m_ctx, (RF::rfc_rfm_item_s **)buffer, count );
+}
+
+
+bool Rainflow::rfm_set( const rfc_rfm_item_s *buffer, unsigned count, bool add_only )
+{
+    return RF::RFC_rfm_set( &m_ctx, (const RF::rfc_rfm_item_s *)buffer, count, add_only );
+}
+
+
+bool Rainflow::rfm_peek( rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t *counts )
+{
+    return RF::RFC_rfm_peek( &m_ctx, (RF::rfc_value_t)from_val, (RF::rfc_value_t)to_val, (RF::rfc_counts_t *)counts );
+}
+
+
+bool Rainflow::rfm_poke( rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t counts, bool add_only )
+{
+    return RF::RFC_rfm_poke( &m_ctx, (RF::rfc_value_t)from_val, (RF::rfc_value_t)to_val, (RF::rfc_counts_t)counts, add_only );
+}
+
+
+bool Rainflow::rfm_sum( unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, rfc_counts_t *count )
+{
+    return RF::RFC_rfm_sum( &m_ctx, from_first, from_last, to_first, to_last, (RF::rfc_counts_t *)count );
+}
+
+
+bool Rainflow::rfm_damage( unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage )
+{
+    return RF::RFC_rfm_damage( &m_ctx, from_first, from_last, to_first, to_last, damage );
+}
+
+
+bool Rainflow::rfm_check()
+{
+    return RF::RFC_rfm_check( &m_ctx );
+}
+
+
+bool Rainflow::lc_get( rfc_counts_t *lc, rfc_value_t *level )
+{
+    return RF::RFC_lc_get( &m_ctx, (RF::rfc_counts_t *)lc, (RF::rfc_value_t *)level );
+}
+
+
+bool Rainflow::lc_from_rfm( rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags )
+{
+    return RF::RFC_lc_from_rfm( &m_ctx, (RF::rfc_counts_t *)lc, (RF::rfc_value_t *)level, (const RF::rfc_counts_t *)rfm, (RF::rfc_flags_e)flags );
+}
+
+
+bool Rainflow::lc_from_residue( rfc_counts_t *lc, rfc_value_t *level, rfc_flags_e flags )
+{
+    return RF::RFC_lc_from_residue( &m_ctx, (RF::rfc_counts_t *)lc, (RF::rfc_value_t *)level, (RF::rfc_flags_e) flags );
+}
+
+
+bool Rainflow::rp_get( rfc_counts_t *rp, rfc_value_t *class_means )
+{
+    return RF::RFC_rp_get( &m_ctx, (RF::rfc_counts_t *)rp, (RF::rfc_value_t *)class_means );
+}
+
+
+bool Rainflow::rp_from_rfm( rfc_counts_t *rp, rfc_value_t *class_means, const rfc_counts_t *rfm )
+{
+    return RF::RFC_rp_from_rfm( &m_ctx, (RF::rfc_counts_t *)rp, (RF::rfc_value_t *)class_means, (const RF::rfc_counts_t *)rfm );
+}
+
+
+bool Rainflow::damage_from_rp( const rfc_counts_t *counts, const rfc_value_t *Sa, double *damage, rfc_rp_damage_method_e rp_calc_type )
+{
+    return RF::RFC_damage_from_rp( &m_ctx, (const RF::rfc_counts_t *)counts, (const RF::rfc_value_t *)Sa, damage, (RF::rfc_rp_damage_method_e)rp_calc_type );
+}
+
+
+bool Rainflow::damage_from_rfm( const rfc_counts_t *rfm, double *damage )
+{
+    return RF::RFC_damage_from_rfm( &m_ctx, (const RF::rfc_counts_t *)rfm, damage );
+}
+
+
+bool Rainflow::wl_calc_sx( double s0, double n0, double k, double *sx, double nx, double  k2, double  sd, double nd )
+{
+    RF::RFC_wl_calc_sx( &m_ctx, s0, n0, k, sx, nx, k2, sd, nd );
+}
+
+
+bool Rainflow::wl_calc_sd( double s0, double n0, double k, double  sx, double nx, double  k2, double *sd, double nd )
+{
+    return RF::RFC_wl_calc_sd( &m_ctx, s0, n0, k, sx, nx, k2, sd, nd );
+}
+
+
+bool Rainflow::wl_calc_k2( double s0, double n0, double k, double  sx, double nx, double *k2, double  sd, double nd )
+{
+    RF::RFC_wl_calc_k2( &m_ctx, s0, n0, k, sx, nx, k2, sd, nd );
+}
+
+
+bool Rainflow::wl_calc_sa( double s0, double n0, double k, double  n,  double *sa )
+{
+    return RF::RFC_wl_calc_sa( &m_ctx, s0, n0, k, n,  sa );
+}
+
+
+bool Rainflow::wl_calc_n( double s0, double n0, double k, double  sa, double *n )
+{
+    return RF::RFC_wl_calc_n( &m_ctx, s0, n0, k, sa, n );
+}
+
+
+bool Rainflow::tp_init( rfc_value_tuple_s *tp, size_t tp_cap, bool is_static )
+{
+    return RF::RFC_tp_init( &m_ctx, (RF::rfc_value_tuple_s *)tp, tp_cap, is_static );
+}
+
+
+bool Rainflow::tp_init_autoprune( bool autoprune, size_t size, size_t threshold )
+{
+    return RF::RFC_tp_init_autoprune( &m_ctx, autoprune, size, threshold );
+}
+
+
+bool Rainflow::tp_prune( size_t count, rfc_flags_e flags )
+{
+    return RF::RFC_tp_prune( &m_ctx, count, (RF::rfc_flags_e) flags );
+}
+
+
+bool Rainflow::dh_init( int method, double *dh, size_t dh_cap, bool is_static )
+{
+    return RF::RFC_dh_init( &m_ctx, method, dh, dh_cap, is_static );
+}
+
+
+bool Rainflow::at_init( const double *Sa, const double *Sm, unsigned count,
+                        double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric )
+{
+    return RF::RFC_at_init( &m_ctx, Sa, Sm, count, M, Sm_rig, R_rig, R_pinned, symmetric );
+}
+
+
+bool Rainflow::at_transform( double Sa, double Sm, double *Sa_transformed )
+{
+    return RF::RFC_at_transform( &m_ctx, Sa, Sm, Sa_transformed );
+}
+
+
+bool Rainflow::feed( const std::vector<rfc_value_t> data )
+{
+    return RF::RFC_feed( &m_ctx, &data[0], data.size() );
+}

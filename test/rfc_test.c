@@ -96,7 +96,7 @@ void export_tp( const char *filename, rfc_value_tuple_s* data, size_t count )
         while( count-- )
         {
             //fprintf(fid, "%g\t%lu\t%lu\t%lu\t%g\n", data->value, data->class, data->tp_pos, data->pos, data->damage);
-            fprintf(fid, "%g\t%d\t%llu\t%llu\n", 
+            fprintf( fid, "%g\t%d\t%llu\t%llu\n", 
                           data->value, data->cls, 
                          (long long unsigned int)data->tp_pos, (long long unsigned int)data->pos );
             data++;
@@ -110,7 +110,7 @@ void export_tp( const char *filename, rfc_value_tuple_s* data, size_t count )
 
 double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 {
-    RFC_counts_type counts;
+    rfc_counts_t counts;
 
     counts = rfc_ctx->rfm[ rfc_ctx->class_count * (from-1) + (to-1) ];
     return (double)counts / rfc_ctx->full_inc;
@@ -1415,7 +1415,7 @@ TEST RFC_miner_consequent( void )
     /* =================================================================================================================== */
     /* Amplitude-counts histogram */
     double          Sa_rel[]        = { 0.000,  0.125,   0.275,   0.425,  0.575,  0.725,  0.850,  0.950,  1.000 };
-    RFC_counts_type Sa_counts[]     = { 0,      605000,  280000,  92000,  20000,  2720,   280,    16,     2 };
+    rfc_counts_t Sa_counts[]     = { 0,      605000,  280000,  92000,  20000,  2720,   280,    16,     2 };
     /* Various representations for the histogram defined above */
     double          Sa_hat[]        = { 100, 105, 110, 115, 125, 150, 175, 200, 250, 300, 350, 400, 500, 600, 700, 800 };
     double          A_expected[]    = { 89199.590, 24445.830, 14414.850, 6980.954, 2089.658, 556.181, 253.551, 219.482, 
@@ -1427,7 +1427,7 @@ TEST RFC_miner_consequent( void )
     /* =================================================================================================================== */
 
     unsigned        class_count     = NUMEL(Sa_counts);
-    RFC_value_type  class_offset    = 0.0,
+    rfc_value_t  class_offset    = 0.0,
                     hysteresis      = 0.0;
     double          D_mk;
     int             i;
@@ -1435,7 +1435,7 @@ TEST RFC_miner_consequent( void )
     /* Check each representation */
     for( i = 0; i < NUMEL(Sa_hat); i++ )
     {
-        RFC_value_type  class_width = Sa_hat[i] * 2.0 / ( class_count - 1 );
+        rfc_value_t  class_width = Sa_hat[i] * 2.0 / ( class_count - 1 );
         double          Sa[10];
         int             j;
         double          N_bar;
