@@ -54,11 +54,12 @@ include_directories( ${Matlab_INCLUDE_DIRS} )
 configure_file( ${CMAKE_SOURCE_DIR}/config.h.in ${CMAKE_SOURCE_DIR}/config.h )
 
 matlab_add_mex( NAME ${CMAKE_PROJECT_NAME} SRC rainflow.c OUTPUT_NAME rfc )
-target_compile_definitions( ${CMAKE_PROJECT_NAME} PRIVATE -DMATLAB_MEX_FILE )
+target_compile_definitions( ${CMAKE_PROJECT_NAME} PRIVATE MATLAB_MEX_FILE _SCL_SECURE_NO_WARNINGS )
 target_link_libraries( ${CMAKE_PROJECT_NAME} ${Matlab_LIBRARIES} ${MATH_LIB} )
 
 # Test application, start project for MSVC
 add_executable( rfc_test rainflow.c test/rfc_test.c test/rfc_wrapper_test.cpp test/rfc_wrapper_test2.cpp )
+target_compile_definitions( rfc_test PRIVATE _SCL_SECURE_NO_WARNINGS )
 target_link_libraries( rfc_test ${MATH_LIB} )
 target_sources( rfc_test PUBLIC greatest/greatest.h )
 set_target_properties( rfc_test PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS YES )

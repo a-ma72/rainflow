@@ -895,7 +895,7 @@ bool RFC_tp_prune( void *ctx, size_t limit, rfc_flags_e flags )
  *
  * @return     true on success
  */
-bool RFC_dh_init( void *ctx, int method, double *dh, size_t dh_cap, bool is_static )
+bool RFC_dh_init( void *ctx, rfc_sd_method_e method, double *dh, size_t dh_cap, bool is_static )
 {
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
 

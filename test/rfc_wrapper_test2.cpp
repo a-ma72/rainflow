@@ -1,7 +1,10 @@
 
 /* Using Rainflow C-Library in a C++ context */
 
+#define RFC_TP_STORAGE std::vector<RF::rfc_value_tuple_s>
+
 #include "../rainflow.hpp"
+//#include "../neolib/segmented_array.hpp"
 
 #define NUMEL(x) (sizeof(x)/sizeof(*(x)))
 
