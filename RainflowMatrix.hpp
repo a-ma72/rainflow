@@ -1,10 +1,3 @@
-/* Literatur:
-1. Hack, M: Schädigungsbasierte Hysteresefilter; D386 (Diss Univ. Kaiserslautern), Shaker Verlag Aachen, 1998, ISBN 3-8265-3936-2
-2. Brokate, M; Sprekels, J, Hysteresis and Phase Transition, Applied Mathematical Sciences 121, Springer,  New York, 1996
-3. Brokate, M; Dressler, K; Krejci, P: Rainflow counting and energy dissipation in elastoplasticity, Eur. J. Mech. A/Solids 15, pp. 705-737, 1996
-4. Scott, D.: Multivariate Density Estimation: Theory, Practice and Visualization. New York, Chichester, Wiley & Sons, 1992
-*/
-
 /*
     Woehler:    (Sa/SD)^k == n/ND
     Basquin:    C         == n * Sa^b       (C = 1e22 fuer SD=1e3, ND=1e7 und b=5)
@@ -24,44 +17,83 @@
 
 #pragma once
 
+#undef ASSERT
+#include <assert.h>
+#define ASSERT(x) assert(x)
+
 #include <vector>
 #include <algorithm>
-#include "AmplTransform.hpp"  /* ROUND, IROUND, DBL_ISFINITE, DBL_NAN, MIN, MAX */
+#include <cfloat>
+#include <cmath>
 
-#undef ASSERT
-#ifndef ASSERT
-  #include <assert.h>
-  #define ASSERT(x) assert(x)
+#if HAVE_NEOLIB
+    #define RFC_TP_STORAGE      HUGEVECTOR(RF::rfc_value_tuple_s)
+#else
+    #define RFC_TP_STORAGE      std::vector<RF::rfc_value_tuple_s>
 #endif
+#include "rainflow.hpp"
 
-template<class T> class CRainflowMatrixT;
-typedef CRainflowMatrixT<double> CRainflowMatrix;
+#ifndef DBL_NAN
+#if _WIN32
+#if _MSC_VER
+#define DBL_NAN (_Nan._Double)
+#endif /*_MSC_VER*/
+#else /*!_WIN32*/
+#define DBL_NAN NAN
+#endif /*_WIN32*/
+#endif /*DBL_NAN*/
 
-template<class T>
-class CRainflowMatrixT 
+#ifndef DBL_ISFINITE
+#if _WIN32
+#if _MSC_VER
+#define DBL_ISFINITE(x) (_finite(x))
+#endif /*_MSC_VER*/
+#else /*!_WIN32*/
+#define DBL_ISFINITE(x) (std::isfinite(x))
+#endif /*_WIN32*/
+#endif /*DBL_NAN*/
+
+
+/** Returns the less value of \a a or \a b */
+#define MIN(a,b) ( (a) < (b) ? (a) : (b) )
+/** Returns the greater value of \a a or \a b */
+#define MAX(a,b) ( (a) > (b) ? (a) : (b) )
+/** Returns 1, if \a a >= 0, otherwise -1 */
+#define SIGN2(a) ( ( (a) >= 0 ) ? 1 : -1 )
+/** Returns \f$ {\mathop \rm \sgn}\left( a \right) \f$ */
+#define SIGN3(a) ( ( (a) > 0 ) ? 1 : ( ( (a) < 0 ) ? -1 : 0 ) )
+/** Returns \a a rounded */
+#define ROUND(a) ( SIGN2(a) * floor( fabs( (double) a ) + 0.5 ) )
+/** Returns \a a rounded to nearest integer */
+#define IROUND(a) ( (int)SIGN2(a) * (int)( fabs( (double) a ) + 0.5 ) )
+/** Returns \a a rounded to nearest positive integer */
+#define NROUND(a) ( (size_t)( fabs( (double) a ) + 0.5 ) )
+
+
+class CRainflow : private Rainflow
 {
 public:
     typedef enum 
     {
-        RESIDUUM_NONE,             /* Kein Residuum, keine Matrix mit Residuum */
-        RESIDUUM_IGNORE,           /* Residuum verwerfen */
-        RESIDUUM_HALFCYCLES,       /* ASTM */
-        RESIDUUM_FULLCYCLES,       /* Residuum als volle Schwingspiele werten */
-        RESIDUUM_CLORMANN_SEEGER,  /* Bewertung nach Clormann-Seeger */
-        RESIDUUM_REPEATED,         /* Wiederholter Durchlauf */
-        RESIDUUM_RP_DIN,           /* Spannenpaar nach DIN */
+        RESIDUUM_NONE                   = RFC_RES_NONE,             /* Kein Residuum, keine Matrix mit Residuum */
+        RESIDUUM_IGNORE                 = RFC_RES_IGNORE,           /* Residuum verwerfen */
+        RESIDUUM_HALFCYCLES             = RFC_RES_HALFCYCLES,       /* ASTM */
+        RESIDUUM_FULLCYCLES             = RFC_RES_FULLCYCLES,       /* Residuum als volle Schwingspiele werten */
+        RESIDUUM_CLORMANN_SEEGER        = RFC_RES_CLORMANN_SEEGER,  /* Bewertung nach Clormann-Seeger */
+        RESIDUUM_REPEATED               = RFC_RES_REPEATED,         /* Wiederholter Durchlauf */
+        RESIDUUM_RP_DIN                 = RFC_RES_RP_DIN45667,      /* Spannenpaar nach DIN */
     } e_residuum;
 
     typedef enum
     {
-        SPRDAM_NONE              = -1,  /* Keine Schaedigung aufteilen */   
-        SPRDAM_HALF_23           =  0,  /* Schaedigung jeweils zur Haelfte auf P2 und P3 */   
-        SPRDAM_RAMP_AMPLITUDE_23 =  1,  /* Lineare Amplitude   ueber P2 bis P3 */   
-        SPRDAM_RAMP_DAMAGE_23    =  2,  /* Lineare Schaedigung ueber P2 bis P3 */   
-        SPRDAM_RAMP_AMPLITUDE_24 =  3,  /* Lineare Amplitude   ueber P2 bis P4 */   
-        SPRDAM_RAMP_DAMAGE_24    =  4,  /* Lineare Schaedigung ueber P2 bis P4 */
-        SPRDAM_FULL_P2           =  5,  /* Schaedigung auf P2 */
-        SPRDAM_FULL_P3           =  6,  /* Schaedigung auf P3 */
+        SPRDAM_NONE              = RFC_SD_NONE,                 /* Keine Schaedigung aufteilen */   
+        SPRDAM_HALF_23           = RFC_SD_HALF_23,              /* Schaedigung jeweils zur Haelfte auf P2 und P3 */   
+        SPRDAM_RAMP_AMPLITUDE_23 = RFC_SD_RAMP_AMPLITUDE_23,    /* Lineare Amplitude   ueber P2 bis P3 */   
+        SPRDAM_RAMP_DAMAGE_23    = RFC_SD_RAMP_DAMAGE_23,       /* Lineare Schaedigung ueber P2 bis P3 */   
+        SPRDAM_RAMP_AMPLITUDE_24 = RFC_SD_RAMP_AMPLITUDE_24,    /* Lineare Amplitude   ueber P2 bis P4 */   
+        SPRDAM_RAMP_DAMAGE_24    = RFC_SD_RAMP_DAMAGE24,        /* Lineare Schaedigung ueber P2 bis P4 */
+        SPRDAM_FULL_P2           = RFC_SD_FULL_P2,              /* Schaedigung auf P2 */
+        SPRDAM_FULL_P3           = RFC_SD_FULL_P3,              /* Schaedigung auf P3 */
     } e_spread_damage;
 
     typedef struct 
@@ -92,89 +124,54 @@ public:
 
     typedef struct 
     {
-        int    iCno;                /* Klassennummer, base 0 */
-        T      Value;               /* Messwert */
-        T      ClassMean;           /* Klassenmitte */
-        size_t nIdx;                /* Messwertposition, base 1 */
-        size_t nIdx_TP;             /* Position in m_TurningPoints, base 1 */
+        rfc_value_t     Value;               /* Messwert */
+        int             iCno;                /* Klassennummer, base 0 */
+        rfc_value_t     ClassMean;           /* Klassenmitte */
+        size_t          nIdx;                /* Messwertposition, base 1 */
+        size_t          nIdx_TP;             /* Position in m_TurningPoints, base 1 */
     } t_res;
 
-    typedef struct t_slope 
-    {
-        double dAmplitude;          /* Amplitude */
-        t_res  from, to;            /* Start- und Zielklasse */
-        
-        /* Vergleichsoperator fuer absteigendes Sortieren */
-        int operator< ( const t_slope &B ) const
-        {
-            return dAmplitude > B.dAmplitude;
-        } // end of operator<
-    } t_slope;
-    
-    typedef struct 
-    {
-        T      Value;               /* Messwert */
-        T      Avrg;                /* Mittellast der Teilschaedigung */
-        T      BKZ;                 /* Teilschaedigung am Umkehrpunkt */
-        size_t nIdx;                /* Messwertposition, base 1 */
-        size_t nIdxAdj;             /* Messwertposition schliessender TP, base 1 */
-    } t_turning_point;
 
-    typedef struct 
-    {
-        int        *m_rf_matrix_no_res;     /* Rainflowmatrix ohne eingerechnetes Residuum */
-        int        *m_rf_matrix;            /* Aktuelle Rainflowmatrix */
-        e_residuum  m_eResiduum;            /* Art der Residuumbehandlung */
-    } t_matrix_backup;
-    
     typedef struct 
     {
       double ND, SD, k1, k2;
     } t_sn_curve;
 
-    typedef std::vector<double>           VectorData;
+    typedef rfc_tp_storage                VectorTurningPoints
+    typedef rfc_value_tuple_s             t_turning_point;
+    typedef rfc_double_v                  VectorData;
     typedef std::vector<t_res>            VectorResiduum;
     typedef std::vector<t_stufe>          VectorStufen;
     typedef std::vector<t_stufe_ampl>     VectorStufenAmpl;
     typedef std::vector<t_stufe_KGUZ>     VectorStufenKGUZ;
     typedef std::vector<t_stufe_from_to>  VectorStufenFromTo;
-#if HAVE_NEOLIB
-    typedef HUGEVECTOR(t_turning_point)   VectorTurningPoints;
-#else
-    typedef std::vector<t_turning_point>  VectorTurningPoints;
-#endif
 
     enum 
     { 
-        DEFAULT_HYSTERESIS  = -1,        /* Defaultwert wird zu jew. Klassenbreite! */
-        DEFAULT_CLASS_COUNT = 100,       /* Default fuer EGDB Streckenvergleich */
-        DEFAULT_DILATION    = 110,       /* Default fuer EGDB Streckenvergleich (in Prozent!)*/
-        DEFAULT_WL_SD       = 1000,      /* Default fuer EGDB Streckenvergleich --> 1E3 */
-        DEFAULT_WL_ND       = 10000000,  /* Default fuer EGDB Streckenvergleich --> 1E7 */
-        DEFAULT_WL_k        = -5,        /* Default fuer EGDB Streckenvergleich */
-        DEFAULT_ROUNDOFF    = 1000000    /* Fuer Vergleichbarkeit mit LMS TecWare */
-    }; // end enum
+        DEFAULT_HYSTERESIS  = -1,         /* Defaultwert wird zu jew. Klassenbreite! */
+        DEFAULT_CLASS_COUNT =  100,       /* Default fuer EGDB Streckenvergleich */
+        DEFAULT_DILATION    =  110,       /* Default fuer EGDB Streckenvergleich (in Prozent!)*/
+        DEFAULT_WL_SD       =  1000,      /* Default fuer EGDB Streckenvergleich --> 1E3 */
+        DEFAULT_WL_ND       =  10000000,  /* Default fuer EGDB Streckenvergleich --> 1E7 */
+        DEFAULT_WL_k        = -5,         /* Default fuer EGDB Streckenvergleich */
+        DEFAULT_ROUNDOFF    =  1000000    /* Fuer Vergleichbarkeit mit LMS TecWare */
+    };
 
-    static const int HALF_CYCLE_INCREMENT = 1;
-    static const int FULL_CYCLE_INCREMENT = 2;
+    static const rfc_counts_t HALF_CYCLE_INCREMENT = RFC_HALF_CYCLE_INCREMENT;
+    static const rfc_counts_t FULL_CYCLE_INCREMENT = RFC_FULL_CYCLE_INCREMENT;
 
 protected:
     // Eingangsparameter
-    T                           m_range_min, m_class_width;       /* Klassierbereichsuntergrenze, Klassenbreite */   
+    rfc_value_t                 m_range_min, m_class_width;       /* Klassierbereichsuntergrenze, Klassenbreite */   
     int                         m_class_count;                    /* Klassenzahl */   
-    T                           m_hysteresis;                     /* Rueckstellbreite */
-    T                           m_dilation;                       /* Aufschlag (10% bei EGDB Streckenvergleich) */
+    rfc_value_t                 m_hysteresis;                     /* Rueckstellbreite */
+    rfc_value_t                 m_dilation;                       /* Aufschlag (10% bei EGDB Streckenvergleich) */
     bool                        m_isSymmetric;                    /* Bei Symmetrie wird nur das Dreieck rechts oben der Matrix betrachtet */
     t_sn_curve                  m_SNCurve;                        /* Woehlerlinienparameter */
     size_t                      m_amount;                         /* Anzahl der zu klassierenden Samplepoints */
     int                         m_doSpreadDamage;                 /* >0 = Schaedigung ueber Teilbereich verteilen, statt nur auf die ausseren TP */
 
     // Ausgangswerte
-    int                         *m_rf_matrix_no_res;              /* Zaehlmatrix, ohne Residuum */   
-    int                         *m_rf_matrix;                     /* Zaehlmatrix, nach Zaehlung des Residuums */   
-    t_matrix_backup             m_matrix_backup;                  /* Backupinformation fuer PushMatrix() und RestoreMatrix() */   
-    VectorResiduum              m_Residuum[2];                    /* Residuum, 2x wegen "wiederholter Durchlauf" */
-    VectorTurningPoints         m_TurningPoints[2];               /* Umkehrpunkte, 2x wegen "wiederholter Durchlauf" */
     bool                        m_isParametrized;                 /* Klassierparameter gesetzt? */
     e_residuum                  m_eResiduum;                      /* Wie wurde das Residuum bewertet */
     int                         m_iProgressState;                 /* Aktueller Fortschritt in Prozent (0-100) */
@@ -183,49 +180,37 @@ protected:
     double                      m_AmplTrans_dM;                   /* Mittelspannungseinfluss */
     double                      m_AmplTrans_dR;                   /* Neues R */
     double                      m_AmplTrans_dAvrg;                /* Neuer Mittelwert */
-    int                         m_AmplTrans_mode;                 /* 0 = Aus, 1 = Ziel ist R, 2 = Ziel ist Avrg
+    int                         m_AmplTrans_mode;                 /* 0 = Aus, 1 = Ziel ist R, 2 = Ziel ist Avrg */
 
+    // Rainflow
+                                CRainflow                           ( const CRainflow &other );  /* Disable Standard Constructor */
+                                CRainflow& operator=                ( const CRainflow &other );  /* Disable Copy Constructor */
 
-                                CRainflowMatrixT                    ( const CRainflowMatrixT &RainflowMatrix );  /* Disable Standard Constructor */
-                                CRainflowMatrixT& operator=         ( const CRainflowMatrixT &RainflowMatrix );  /* Disable Copy Constructor */
-
-    inline T                    Min                                 ( T A, T B ) const { return ( A < B ) ? A : B; }
-    inline T                    Max                                 ( T A, T B ) const { return ( A > B ) ? A : B; }
-    inline T                    Sign                                ( T A ) const { return ( A < 0 ) ? -1 : 1; }
-    inline T                    Abs                                 ( T A ) const { return fabs( (double) A ); }
-    inline T                    Ceil                                ( T A ) const { return (int) ceil( A ); }
-
+    inline rfc_value_t          Min                                 ( rfc_value_t A, rfc_value_t B ) const { return ( A < B ) ? A : B; }
+    inline rfc_value_t          Max                                 ( rfc_value_t A, rfc_value_t B ) const { return ( A > B ) ? A : B; }
+    inline rfc_value_t          Sign                                ( rfc_value_t A ) const { return ( A < 0 ) ? -1 : 1; }
+    inline rfc_value_t          Abs                                 ( rfc_value_t A ) const { return fabs( (double) A ); }
+    inline rfc_value_t          Ceil                                ( rfc_value_t A ) const { return (int) ceil( A ); }
 
 public:
     explicit 
-    CRainflowMatrixT()
-    : m_rf_matrix( NULL ), 
-      m_rf_matrix_no_res( NULL ), 
-      m_iProgressState( -1 )
+    CRainflowT()
+    : m_iProgressState( -1 ),
+      m_doSpreadDamage( SPRDAM_HALF_23 )
     { 
-        m_matrix_backup.m_rf_matrix_no_res = NULL;
-        m_matrix_backup.m_rf_matrix        = NULL;
-        m_matrix_backup.m_eResiduum        = RESIDUUM_NONE;
+        Rainflow::init( /*class_count*/ 0, /*class_width*/ 0, /*class_offset*/ 0, /*hysteresis*/ 0 );
         
-        m_SNCurve.SD = DEFAULT_WL_SD;
-        m_SNCurve.ND = DEFAULT_WL_ND;
-        m_SNCurve.k1 = DEFAULT_WL_k;
-        m_SNCurve.k2 = DEFAULT_WL_k;
-
-        m_doSpreadDamage = SPRDAM_HALF_23;  
-
+        SetSNCurve( DEFAULT_WL_SD, DEFAULT_WL_ND, DEFAULT_WL_k );
         SetAmplTrans( DBL_NAN, DBL_NAN, false );
-        ZeroInit(); 
-    } // end of CRainflowMatrixT
+        ZeroInit();
+    }
     
 
-    virtual ~CRainflowMatrixT()                                            
+    virtual ~CRainflowT()                                            
     { 
-        RestoreMatrix();
-        FreeMatrix();
-        ClearResiduum();
+        Rainflow::deinit( &m_rfc_ctx );
         ClearTurningPoints();
-    } // end of ~CRainflowMatrixT                                         
+    }
     
 
     // Berechnet die Klassennummer k (k>=0) fuer einen Messwert
@@ -234,7 +219,7 @@ public:
     // bin(1) = m_range_min + m_class_width
     // k(x) => bin(k) <= x < bin(k+1)
     inline 
-    int ClassNo( T value ) const
+    int ClassNo( rfc_value_t value ) const
     {
         int cno = (int) floor( ( value - m_range_min ) / m_class_width );
         
@@ -242,26 +227,28 @@ public:
         cno = MAX( cno, 0 );
         
         return cno;
-    } // end of ClassNo
+    }
     
 
     inline 
-    int* GetMatrix() const
+    const rfc_counts_t* GetMatrix() const
     {
-        if( m_eResiduum && m_rf_matrix ) 
-        {
-            return m_rf_matrix;
-        } /* end if */
+        return m_ctx.rfm;
+    }
+    
 
-        return m_rf_matrix_no_res;
-    } // end of GetMatrix
+    inline 
+    rfc_counts_t* GetMatrix()
+    {
+        return m_ctx.rfm;
+    }
     
 
     // Gibt Anzahl Schwingspiele x FULL_CYCLE_INCREMENT zurueck!
     int GetCountIncrements( int from, int to ) const
     {
-        int counts = 0;
-        int *prf = GetMatrix();
+        rfc_counts_t counts;
+        const rfc_counts_t *prf = GetMatrix();
 
         ASSERT( m_isParametrized );
 
@@ -271,7 +258,7 @@ public:
         } // end if
 
         return counts;
-    } // end of GetCountIncrements
+    }
     
 
     void SetCounts( int from, int to, int counts )
@@ -286,11 +273,11 @@ public:
             int temp = from;
             to = from;
             from = temp;
-        } // end if
+        }
 
         ASSERT( prf && prf[ m_class_count * from + to ] == 0 );
         prf[ m_class_count * from + to ] = counts * FULL_CYCLE_INCREMENT;
-    } // end of SetCounts
+    }
     
 
     inline
@@ -299,19 +286,21 @@ public:
         if( DBL_ISFINITE( SD ) && SD > 0.0 )
         {
             m_SNCurve.SD = SD;
-        } // end if
+        }
         
         if( DBL_ISFINITE( ND ) && ND > 0.0 )
         {
             m_SNCurve.ND = ND;
-        } // end if
+        }
         
         if( DBL_ISFINITE( k ) && fabs( k ) >= 1.0 )
         {
             m_SNCurve.k1  = -fabs( k );
             m_SNCurve.k2  = -fabs( k );
-        } // end if
-    } // end of SetSNCurve
+        }
+
+        Rainflow::wl_init_elementary( SD, ND, k );
+    }
     
 
     inline
@@ -320,17 +309,17 @@ public:
         if( DBL_ISFINITE( SD ) && SD > 0.0 )
         {
             m_SNCurve.SD = SD;
-        } // end if
+        }
         
         if( DBL_ISFINITE( ND ) && ND > 0.0 )
         {
             m_SNCurve.ND = ND;
-        } // end if
+        }
         
         if( DBL_ISFINITE( k1 ) && fabs( k1 ) >= 1.0 )
         {
             m_SNCurve.k1 = -fabs( k1 );
-        } // end if
+        }
         
         if( DBL_ISFINITE( k2 ) && fabs( k2 ) >= 1.0 )
         {
@@ -339,8 +328,10 @@ public:
         else
         {
             m_SNCurve.k2 = -fabs(m_SNCurve.k1);
-        } // end if
-    } // end of SetSNCurve
+        }
+
+        Rainflow::wl_init_modified( SD, ND, k1, k2 );
+    }
     
 
     inline
@@ -349,7 +340,7 @@ public:
         SD = m_SNCurve.SD;
         ND = m_SNCurve.ND;
         k  = m_SNCurve.k1;
-    } // end of GetSNCurve
+    }
 
 
     inline
@@ -359,7 +350,7 @@ public:
         ND = m_SNCurve.ND;
         k1 = m_SNCurve.k1;
         k2 = m_SNCurve.k2;
-    } // end of GetSNCurve
+    }
 
 
     inline 
@@ -371,6 +362,8 @@ public:
             m_AmplTrans_dM    = DBL_NAN;
             m_AmplTrans_dR    = DBL_NAN;
             m_AmplTrans_dAvrg = DBL_NAN;
+
+            m_rfc_ctx.at.count = 0;
         }
         else
         {
@@ -380,6 +373,9 @@ public:
                 m_AmplTrans_dM    = dM;
                 m_AmplTrans_dR    = dZiel;
                 m_AmplTrans_dAvrg = DBL_NAN;
+
+                Rainflow::at_init( /*Sa*/ NULL, /*Sm*/ NULL, /*count*/ 0, dM, 
+                                   /*Sm_rig*/ 0, /*R_rig*/ dZiel, /*R_pinned*/ true, /*symmetric*/ false );
             }
             else
             {
@@ -387,6 +383,9 @@ public:
                 m_AmplTrans_dM    = dM;
                 m_AmplTrans_dR    = DBL_NAN;
                 m_AmplTrans_dAvrg = dZiel;
+
+                Rainflow::at_init( /*Sa*/ NULL, /*Sm*/ NULL, /*count*/ 0, dM, 
+                                   /*Sm_rig*/ dZiel, /*R_rig*/ -1, /*R_pinned*/ false, /*symmetric*/ false );
             }
         }
     }
@@ -398,19 +397,19 @@ public:
         ASSERT( m_isParametrized );
         ASSERT( from < m_class_count && from >= 0 && to < m_class_count && to >= 0 );
 
-        int *prf = GetMatrix();
+        rfc_counts_t *prf = GetMatrix();
 
         if( m_isSymmetric && to < from ) 
         {
             int temp = from;
             to = from;
             from = temp;
-        } // end if
+        }
 
         ASSERT( prf );
         
         prf[ m_class_count * from + to ] += cycles * FULL_CYCLE_INCREMENT;
-    } // end of AddCycles
+    }
     
 
     inline 
@@ -419,237 +418,75 @@ public:
         ASSERT( m_isParametrized );
         ASSERT( from < m_class_count && from >= 0 && to < m_class_count && to >= 0 );
 
-        int *prf = GetMatrix();
+        rfc_counts_t *prf = GetMatrix();
 
         if( m_isSymmetric && to < from ) 
         {
             int temp = from;
             to = from;
             from = temp;
-        } // end if
+        }
 
         ASSERT( prf );
         prf[ m_class_count * from + to ] += HALF_CYCLE_INCREMENT;
-    } // end of AddHalfCycle
-    
-    
-    inline
-    void AlignTurningPointsStack( int &iStack, size_t& TP_left, size_t& TP_right )
-    {
-        if( m_TurningPoints[1].size() )
-        {
-            // TP des 2. Durchlaufes auf die TP des ersten mappen
-            // in m_Residuum[1] ist der Ursprung der Daten, nur hier stehen die
-            // tats. Indexpositionen.
-            // Zuerst die Indexposition im Stream (=2x altes Residuum) holen, dann 
-            // die Referenz auf die turning points abwickeln.
-            TP_left  = ( m_TurningPoints[0][TP_left].nIdx - 1 ) % m_Residuum[1].size();
-            TP_left  = m_Residuum[1][TP_left].nIdx_TP - 1;  // base 0
-            TP_right = ( m_TurningPoints[0][TP_right].nIdx - 1 ) % m_Residuum[1].size();
-            TP_right = m_Residuum[1][TP_right].nIdx_TP - 1;  // base 0
-
-            iStack = 1;
-        }
-        else iStack = 0;
-    }
-
-
-    inline
-    void AddTurningPoint( const t_turning_point& tp, bool with_ref = true ) 
-    {
-        // Only add turning point, if it references a new data point
-        if( !m_TurningPoints[0].size() || m_TurningPoints[0].back().nIdx != tp.nIdx )
-        {
-            m_TurningPoints[0].push_back( tp );
-            if( with_ref )
-            {
-                m_Residuum[0].back().nIdx_TP = m_TurningPoints[0].size();
-            }
-        }
-    } // end of AddTurningPoint
-
-
-    inline
-    void SetAdjacentTurningPoint( size_t TP_left, size_t TP_right )
-    {
-        int iStack = 0;
-
-        TP_left--;   // Make base 0
-        TP_right--;  // Make base 0
-
-        AlignTurningPointsStack( iStack, TP_left, TP_right );
-
-        // Given turning points close one cycle
-        ASSERT(m_TurningPoints[iStack][TP_left].nIdxAdj == 0);
-        ASSERT(TP_left <= m_TurningPoints[iStack].size() );
-        ASSERT(TP_right <= m_TurningPoints[iStack].size() );
-        m_TurningPoints[iStack][TP_left].nIdxAdj = TP_right + 1;
     }
     
-
-    inline
-    void AttachDamageToTurningPoint( int iStack, size_t tpnr, double dDamage, double dAvrg ) 
-    {
-        VectorTurningPoints& TurningPoints( m_TurningPoints[iStack] );
-
-        if( TurningPoints.size() >= tpnr ) 
-        {
-            TurningPoints[ tpnr - 1 ].BKZ += dDamage;
-
-            if( DBL_ISFINITE( dAvrg ) )
-            {
-                TurningPoints[ tpnr - 1 ].Avrg = dAvrg;
-            }
-        } // end if
-    } // end of AttachDamageToTurningPoint
-
-
-    inline
-    void YieldDamageOverTurningPoints( size_t nIdx_TP_first, size_t nIdx_TP_last, double dAmplitude, double dAvrg, double dCounts = 1.0 )
-    {
-        int iStack = 0;
-        double dDamage = 0.0;
-
-        if( m_doSpreadDamage <= SPRDAM_NONE || m_doSpreadDamage > SPRDAM_FULL_P3 ) return;
-
-        ASSERT( nIdx_TP_first > 0 && nIdx_TP_last > 0 );
-
-        /* nIdx_TP_first and nIdx_TP_last are base 1 */
-        nIdx_TP_first--;  // convert base 0
-        nIdx_TP_last--;
-
-        AlignTurningPointsStack( iStack, nIdx_TP_first, nIdx_TP_last );
-
-        VectorTurningPoints& TurningPoints( m_TurningPoints[iStack] );
-
-        // P2 and P3 get the half damage each
-        if( SPRDAM_HALF_23 == m_doSpreadDamage )
-        {
-            dDamage = CalcDamage( dAmplitude, dAvrg, dCounts );
-            AttachDamageToTurningPoint( iStack, nIdx_TP_first + 1, dDamage / 2 , DBL_NAN );
-            AttachDamageToTurningPoint( iStack, nIdx_TP_last + 1, dDamage / 2, DBL_NAN );
-            return;
-        }
-
-        // P2 get the full damage
-        if( SPRDAM_FULL_P2 == m_doSpreadDamage )
-        {
-            dDamage = CalcDamage( dAmplitude, dAvrg, dCounts );
-            AttachDamageToTurningPoint( iStack, nIdx_TP_first + 1, dDamage , DBL_NAN );
-            return;
-        }
-
-        // P3 get the full damage
-        if( SPRDAM_FULL_P3 == m_doSpreadDamage )
-        {
-            dDamage = CalcDamage( dAmplitude, dAvrg, dCounts );
-            AttachDamageToTurningPoint( iStack, nIdx_TP_last + 1, dDamage, DBL_NAN );
-            return;
-        }
-
-        // Spread damage over turning points
-        if( std::max( nIdx_TP_last, nIdx_TP_first ) < TurningPoints.size() )
-        {
-            size_t ref = TurningPoints[nIdx_TP_first].nIdx;
-            size_t len = TurningPoints.back().nIdx;
-            size_t nWidth = ( TurningPoints[nIdx_TP_last].nIdx + len - ref ) % len;
-            size_t count = nWidth + 1;
-
-            for( size_t nIdx_TP = nIdx_TP_first ; count > 0 ; count--, nIdx_TP = ++nIdx_TP % TurningPoints.size() )
-            {
-                size_t pos = ( TurningPoints[nIdx_TP].nIdx + len - ref ) % len;
-                double dFaktor = (double)pos / nWidth;
-                double dNewDamage;
-
-                switch( m_doSpreadDamage )
-                {
-                    case SPRDAM_HALF_23:
-                        assert( false );
-                        break;
-                    case SPRDAM_RAMP_AMPLITUDE_23:
-                    case SPRDAM_RAMP_AMPLITUDE_24:
-                        dNewDamage = CalcDamage( dAmplitude * dFaktor, dAvrg, dCounts );
-                        break;
-                    case SPRDAM_RAMP_DAMAGE_23:
-                    case SPRDAM_RAMP_DAMAGE_24:
-                        dNewDamage = CalcDamage( dAmplitude, dAvrg, dCounts * dFaktor );
-                        break;
-                    default:
-                        assert( false );
-                        break;
-                }
-
-                assert( DBL_ISFINITE( dNewDamage ) );
-
-                AttachDamageToTurningPoint( iStack, nIdx_TP + 1, dNewDamage - dDamage, DBL_NAN );
-                dDamage = dNewDamage;
-
-                if( nIdx_TP == nIdx_TP_last ) break;
-            }
-        }
-    }
     
+    double              NoValue                      () const { return DBL_NAN; }
+    void                ClearTurningPoints           ();
+    void                ZeroInit                     ();
+    int                 EntriesCount                 () const;
+    void                MakeSymmetric                ();
+    void                Parametrize                  ( double range_min,       double range_max,
+                                                       double range_fixed_min, double range_fixed_max, double range, 
+                                                       double class_count,     double class_width, 
+                                                       double dilation,        double hysteresis );
+    int                 IsParametrized               () { return m_isParametrized ? 1 : 0; }
+    rfc_value_t         GetRangeMin                  () const { return m_range_min; }
+    rfc_value_t         GetRangeMax                  () const { return GetRangeMin () + GetRange (); }
+    rfc_value_t         GetRange                     () const { return m_class_count * m_class_width; }
+    rfc_value_t         GetClassWidth                () const { return m_class_width; }
+    int                 GetClassCount                () const { return m_class_count; }
+    rfc_value_t         GetHysteresis                () const { return m_hysteresis; }
+    rfc_value_t         GetDilation                  () const { return m_dilation; }
+    double              GetHysteresisToClassWidth    () const { return DBL_ISFINITE ( GetRange () ) ? ( m_hysteresis / GetRange () * GetClassCount () ) : DBL_NAN; }
+    void                SetHysteresis                ( double dHysteresis ) { m_hysteresis = dHysteresis; }
+    void                SetAmount                    ( size_t amount ) { m_amount = amount; }
+    void                SetSpreadDamage              ( int doSpread ) { m_doSpreadDamage = doSpread; }
 
-    double    NoValue                      () const { return DBL_NAN; }
-    void      ClearResiduum                ( int iStack = -1 );
-    void      ClearTurningPoints           ( int iStack = -1 );
-    void      FreeMatrix                   ( bool bFreeAll = true );
-    void      ZeroInit                     ();
-    void      PushMatrix                   ( t_matrix_backup *pMatrixBackup = NULL ); 
-    void      RestoreMatrix                ( t_matrix_backup *pMatrixBackup = NULL );
-    void      ReDimMatrix                  ();
-    void      EntriesCount                 () const;
-    void      MakeSymmetric                ();
-    void      Parametrize                  ( double range_min,       double range_max,
-                                             double range_fixed_min, double range_fixed_max, double range, 
-                                             double class_count,     double class_width, 
-                                             double dilation,        double hysteresis );
-    int       IsParametrized               () { return m_isParametrized ? 1 : 0; }
-    T         GetRangeMin                  () const { return m_range_min; }
-    T         GetRangeMax                  () const { return GetRangeMin () + GetRange (); }
-    T         GetRange                     () const { return m_class_count * m_class_width; }
-    T         GetClassWidth                () const { return m_class_width; }
-    int       GetClassCount                () const { return m_class_count; }
-    T         GetHysteresis                () const { return m_hysteresis; }
-    T         GetDilation                  () const { return m_dilation; }
-    double    GetHysteresisToClassWidth    () const { return DBL_ISFINITE ( GetRange () ) ? ( m_hysteresis / GetRange () * GetClassCount () ) : DBL_NAN; }
-    void      SetHysteresis                ( double dHysteresis ) { m_hysteresis = dHysteresis; }
-    void      SetAmount                    ( size_t amount ) { m_amount = amount; }
-    void      SetSpreadDamage              ( int doSpread ) { m_doSpreadDamage = doSpread; }
+    void                GetStufenNewMean             ( VectorStufen &StufenOrig, VectorStufenAmpl &Stufen, double dNewMean, double dM ) const;
+    void                GetStufenNewR                ( VectorStufen &StufenOrig, VectorStufenAmpl &Stufen, double dNewR, double dM ) const;
 
-    void      GetStufenNewMean             ( VectorStufen &StufenOrig, VectorStufenAmpl &Stufen, double dNewMean, double dM ) const;
-    void      GetStufenNewR                ( VectorStufen &StufenOrig, VectorStufenAmpl &Stufen, double dNewR, double dM ) const;
-
-    void      DoRainflow                   ( const double *stream_in, size_t in_len, bool do_finalize = true );
-    void      DoRainflow                   ( const VectorData& stream );
+    void                DoRainflow                   ( const double *stream_in, size_t in_len, bool do_finalize = true );
+    void                DoRainflow                   ( const VectorData& stream );
     template<class InputIt>
-    void      DoRainflow                   ( const InputIt first, const InputIt last );
-    void      CountResiduum                ( e_residuum how );
-    void      GetResiduum                  ( VectorResiduum &Residuum ) const;
-    void      SetResiduum                  ( const VectorResiduum &Residuum );
-    void      GetStufen                    ( VectorStufen &Stufen ) const;
-    void      GetStufen                    ( VectorStufenFromTo &Stufen ) const;
-    void      GetStufen                    ( VectorStufenAmpl &Stufen ) const;
-    void      GetStufen                    ( VectorStufenKGUZ &Stufen ) const;
-    void      SetStufen                    ( const VectorStufen &Stufen );
-    void      SetStufen                    ( const VectorStufenFromTo &Stufen );
-    void      GetResiduumStufen            ( VectorStufen &Stufen, e_residuum how ) const;
-    void      GetResiduumStufen            ( VectorStufenFromTo &Stufen, e_residuum how ) const;
-    void      GetTurningPoints             ( VectorTurningPoints& TurningPoints, size_t left = 0, size_t right = 0 ) const;
+    void                DoRainflow                   ( const InputIt first, const InputIt last );
+    void                CountResiduum                ( e_residuum how );
+    void                GetResiduum                  ( VectorResiduum &Residuum ) const;
+    void                SetResiduum                  ( const VectorResiduum &Residuum );
+    void                GetStufen                    ( VectorStufen &Stufen ) const;
+    void                GetStufen                    ( VectorStufenFromTo &Stufen ) const;
+    void                GetStufen                    ( VectorStufenAmpl &Stufen ) const;
+    void                GetStufen                    ( VectorStufenKGUZ &Stufen ) const;
+    void                SetStufen                    ( const VectorStufen &Stufen );
+    void                SetStufen                    ( const VectorStufenFromTo &Stufen );
+    void                GetResiduumStufen            ( VectorStufen &Stufen, e_residuum how ) const;
+    void                GetResiduumStufen            ( VectorStufenFromTo &Stufen, e_residuum how ) const;
+    void                GetTurningPoints             ( VectorTurningPoints& TurningPoints, size_t left = 0, size_t right = 0 ) const;
     const VectorTurningPoints& 
-              GetTurningPoints             () const;
-    void      DetachTurningPoints          ( VectorTurningPoints &TurningPoints );
-    double    CalcDamage                   ( double dAmplitude, double dAvrg, double dCounts ) const;
-    double    GetBKZ                       () const;
-    double    GetBKZ                       ( const VectorStufen &Stufen ) const;
-    double    GetBKZ                       ( const VectorStufenAmpl &Stufen ) const;
-    double    GetShapeValue                () const;
-    double    GetShapeValue                ( const VectorStufenAmpl &Stufen, double &dAele ) const;
-    double    GetShapeValue                ( const VectorStufenAmpl &Stufen ) const;
-    double    GetSumH                      () const;
-    double    GetSumH                      ( const VectorStufenAmpl &Stufen ) const;
-    
-    
+                        GetTurningPoints             () const;
+    void                DetachTurningPoints          ( VectorTurningPoints &TurningPoints );
+    double              CalcDamage                   ( double dAmplitude, double dAvrg, double dCounts ) const;
+    double              GetBKZ                       () const;
+    double              GetBKZ                       ( const VectorStufen &Stufen ) const;
+    double              GetBKZ                       ( const VectorStufenAmpl &Stufen ) const;
+    double              GetShapeValue                () const;
+    double              GetShapeValue                ( const VectorStufenAmpl &Stufen, double &dAele ) const;
+    double              GetShapeValue                ( const VectorStufenAmpl &Stufen ) const;
+    double              GetSumH                      () const;
+    double              GetSumH                      ( const VectorStufenAmpl &Stufen ) const;
+
+
     template< typename ParameterMap >
     ParameterMap GetParameterMap() const
     {
@@ -673,62 +510,20 @@ public:
         PMap[ "RFM.v" ]            = GetShapeValue();  // Voelligkeit
 
         return PMap;
-    } // end of GetParameterMap
-}; // end of class CRainflowMatrixT
-
-
-template<class T>
-void CRainflowMatrixT<T>::FreeMatrix( bool bFreeAll ) 
-{
-    if ( bFreeAll && m_rf_matrix_no_res ) 
-    {
-        free( m_rf_matrix_no_res );
-        m_rf_matrix_no_res = NULL;
-    } /* end if */
-
-    if ( m_rf_matrix ) 
-    {
-        free( m_rf_matrix );
-        m_rf_matrix = NULL;
-        m_eResiduum = RESIDUUM_NONE;
-    } /* end if */
-} // end of FreeMatrix
-
-
-template<class T>
-void CRainflowMatrixT<T>::ClearResiduum( int iStack /*=-1*/ )
-{
-    if( iStack < 0 )
-    {
-        m_Residuum[0].clear();
-        m_Residuum[1].clear();
-    } else {
-        m_Residuum[iStack].clear();
     }
-} // end of ClearResiduum
+};
 
 
-template<class T>
-void CRainflowMatrixT<T>::ClearTurningPoints( int iStack /*=-1*/ )
+void CRainflow::ClearTurningPoints()
 {
-    if( iStack < 0 )
-    {
-        m_TurningPoints[0].clear();
-        m_TurningPoints[1].clear();
-    } else {
-        m_TurningPoints[iStack].clear();
-    }
-} // end of ClearTurningPoints
+    m_TurningPoints.clear();
+}
 
 
-template<class T>
-void CRainflowMatrixT<T>::ZeroInit()
+
+void CRainflow::ZeroInit()
 {
-    RestoreMatrix();
-    FreeMatrix();
-    ClearResiduum();
     ClearTurningPoints();
-
     m_hysteresis                =  0.0;
     m_dilation                  =  0.0;
     m_range_min = m_class_width =  0.0;
@@ -739,60 +534,15 @@ void CRainflowMatrixT<T>::ZeroInit()
     m_bCountPending             =  false;
     m_amount                    =  0;
     m_CurrentPos                =  0;
-} // end of ZeroInit
+
+    m_ctx.residual_method       = m_eResiduum;
+
+    Rainflow::clear_counts();
+}
 
 
-template<class T>
-void CRainflowMatrixT<T>::PushMatrix( t_matrix_backup *pMatrixBackup ) 
-{ 
-    ASSERT( m_isParametrized );
 
-    if( pMatrixBackup == NULL ) {
-        pMatrixBackup = &m_matrix_backup;
-    } // end if
-
-    t_matrix_backup backup = { m_rf_matrix_no_res, m_rf_matrix, m_eResiduum };
-
-    *pMatrixBackup = backup;
-
-    m_rf_matrix = NULL; 
-    m_rf_matrix_no_res = NULL; 
-    m_eResiduum = RESIDUUM_NONE;
-} // end of PushMatrix
-
-
-template<class T>
-void CRainflowMatrixT<T>::RestoreMatrix( t_matrix_backup *pMatrixBackup )
-{
-    if( pMatrixBackup == NULL ) 
-    {
-        pMatrixBackup = &m_matrix_backup;
-    } // end if
-
-    t_matrix_backup null = { 0 };
-
-    FreeMatrix();
-    m_rf_matrix_no_res = pMatrixBackup->m_rf_matrix_no_res;
-    m_rf_matrix = pMatrixBackup->m_rf_matrix;
-    m_eResiduum = pMatrixBackup->m_eResiduum;
-
-    *pMatrixBackup = null;
-} // end of RestoreMatrix
-
-
-template<class T>
-void CRainflowMatrixT<T>::ReDimMatrix()
-{
-    ASSERT( m_isParametrized );
-
-    FreeMatrix();
-    
-    m_rf_matrix_no_res = (int*)calloc( m_class_count * m_class_count, sizeof( int ) );
-} // end of ReDimMatrix
-
-
-template<class T>
-void CRainflowMatrixT<T>::EntriesCount() const
+int CRainflow::EntriesCount() const
 {
     int i, j;
     int entries_count = 0;
@@ -800,7 +550,7 @@ void CRainflowMatrixT<T>::EntriesCount() const
     if( !m_isParametrized ) 
     {
         ASSERT( false );
-        return;
+        return 0;
     } // end if
 
     for( i = 0; i < m_class_count; i++ ) 
@@ -810,106 +560,98 @@ void CRainflowMatrixT<T>::EntriesCount() const
             if( GetCountIncrements( i, j ) > 0 ) 
             {
                 entries_count++;
-            } // end if
-        } /* end for */
-    } /* end for */
+            }
+        }
+    }
 
     return entries_count;
-} // end of EntriesCount
+}
 
 
 // Nur fuer Matrix nach Residuenbehandlung!
 // MakeSymmetric() beeinflusst nicht die Ergebnisse aus den Zaehlverfahren:
 // KGUZ und BPZ (GetStufen) zaehlen stehende und haengende Hystereseaeste!
-template<class T>
-void CRainflowMatrixT<T>::MakeSymmetric() 
-{
-    int i, j;
-    int *prf = GetMatrix();
 
+void CRainflow::MakeSymmetric() 
+{
     if( !m_isParametrized ) 
     {
         ASSERT( false );
         return;
     } // end if
 
-    ASSERT( prf );
-    
-    /* Matrix entlang der Diagonalen "falten" */
-    for ( i = 0; i < m_class_count; i++ )   // from
-    {
-        for ( j = i + 1; j < m_class_count; j++ )   // to
-        {
-            // j immer > i !
-            prf[ i * m_class_count + j ] += prf[ j * m_class_count + i ];
-            prf[ j * m_class_count + i ] = 0;  // Negative Aeste zu Null setzen
-        } /* end for */
-    } /* end for */
-} /* end of MakeSymmetric() */
+    Rainfow::rfm_make_symmetric();
+}
 
 
-template<class T>
-void CRainflowMatrixT<T>::GetStufenNewR( VectorStufen &StufenOrig, VectorStufenAmpl &Stufen, 
-                                         double dNewR, double dM ) const
+
+void CRainflow::GetStufenNewR( VectorStufen &StufenOrig, VectorStufenAmpl &Stufen, 
+                             double dNewR, double dM ) const
 {
-    AmplTransform AmplTransform;
     t_stufe_ampl stufe;
 
     Stufen.clear();
 
-    for( int i = 0; i < (int)StufenOrig.size(); i++ ) 
+    if( Rainflow::at_init( /*Sa*/ NULL, /*Sm*/ NULL, /*count*/ 0, dM, 
+                           /*Sm_rig*/ 0.0, dNewR, /*R_pinned*/ true, /*symmetric*/ false ) )
     {
-        double dTransformedAmpl;
-
-        dTransformedAmpl = AmplTransform.Calc( StufenOrig[i].dRange / 2.0, 
-                                               StufenOrig[i].dAvrg, 
-                                               dM, dNewR, true );
-        if( DBL_ISFINITE( dTransformedAmpl ) )
+        for( int i = 0; i < (int)StufenOrig.size(); i++ ) 
         {
-            stufe.dAmpl   = dTransformedAmpl;
-            stufe.dCounts = StufenOrig[i].dCounts;
-        } else {
-            stufe.dAmpl   = 0;
-            stufe.dCounts = -1;  // TBD: Gibts eine bessere Loesung?
-        } // end if
+            double dTransformedAmpl;
 
-        Stufen.push_back( stufe );
-    } // end for
-} // end of GetStufenNewR
+            if( Rainflow::at_transform( StufenOrig[i].dRange / 2.0, StufenOrig[i].dAvrg, &dTransformedAmpl ) )
+            {
+                stufe.dAmpl   = dTransformedAmpl;
+                stufe.dCounts = StufenOrig[i].dCounts;
+            } else {
+                stufe.dAmpl   = 0;
+                stufe.dCounts = -1;  // TBD: Gibts eine bessere Loesung?
+            }
+
+            Stufen.push_back( stufe );
+        }
+    }
+
+    Rainflow::at_init( /*Sa*/ NULL, /*Sm*/ NULL, /*count*/ 0, m_AmplTrans_dM, 
+                       /*Sm_rig*/ m_AmplTrans_dAvrg, /*R_rig*/ m_AmplTrans_dR, /*R_pinned*/ m_AmplTrans_mode = 2, /*symmetric*/ false );
+}
 
 
-template<class T>
-void CRainflowMatrixT<T>::GetStufenNewMean( VectorStufen &StufenOrig, VectorStufenAmpl &Stufen, 
-                                            double dNewMean, double dM ) const
+
+void CRainflow::GetStufenNewMean( VectorStufen &StufenOrig, VectorStufenAmpl &Stufen, 
+                                double dNewMean, double dM ) const
 {
-    AmplTransform AmplTransform;
     t_stufe_ampl stufe;
 
     Stufen.clear();
 
-    for( int i = 0; i < (int)StufenOrig.size(); i++ ) 
+    if( Rainflow::at_init( /*Sa*/ NULL, /*Sm*/ NULL, /*count*/ 0, dM, 
+                           /*Sm_rig*/ dNewMean, /*R_rig*/ -1, /*R_pinned*/ false, /*symmetric*/ false ) )
     {
-        double dTransformedAmpl;
-
-        dTransformedAmpl = AmplTransform.Calc( StufenOrig[i].dRange / 2.0, 
-                                               StufenOrig[i].dAvrg, 
-                                               dM, dNewMean, false );
-        if( DBL_ISFINITE( dTransformedAmpl ) )
+        for( int i = 0; i < (int)StufenOrig.size(); i++ ) 
         {
-            stufe.dAmpl   = dTransformedAmpl;
-            stufe.dCounts = StufenOrig[i].dCounts;
-        } else {
-            stufe.dAmpl   = 0;
-            stufe.dCounts = -1;  // TBD: Gibts eine bessere Loesung?
-        } // end if
+            double dTransformedAmpl;
 
-        Stufen.push_back( stufe );
-    } // end for
-} // end of GetStufenNewMean
+            if( Rainflow::at_transform( StufenOrig[i].dRange / 2.0, StufenOrig[i].dAvrg, &dTransformedAmpl ) )
+            {
+                stufe.dAmpl   = dTransformedAmpl;
+                stufe.dCounts = StufenOrig[i].dCounts;
+            } else {
+                stufe.dAmpl   = 0;
+                stufe.dCounts = -1;  // TBD: Gibts eine bessere Loesung?
+            }
+
+            Stufen.push_back( stufe );
+        }
+    }
+
+    Rainflow::at_init( /*Sa*/ NULL, /*Sm*/ NULL, /*count*/ 0, m_AmplTrans_dM, 
+                       /*Sm_rig*/ m_AmplTrans_dAvrg, /*R_rig*/ m_AmplTrans_dR, /*R_pinned*/ m_AmplTrans_mode = 2, /*symmetric*/ false );
+}
 
 
-template<class T>
-void CRainflowMatrixT<T>::GetStufen( VectorStufen &Stufen ) const
+
+void CRainflow::GetStufen( VectorStufen &Stufen ) const
 {
     Stufen.clear();
 
@@ -917,12 +659,12 @@ void CRainflowMatrixT<T>::GetStufen( VectorStufen &Stufen ) const
     {
         ASSERT( false );
         return;
-    } // end if
+    }
 
     if( !GetMatrix() ) 
     {
         return;
-    } // end if
+    }
 
     for( int i = 0; i < m_class_count; i++ ) 
     {
@@ -949,14 +691,14 @@ void CRainflowMatrixT<T>::GetStufen( VectorStufen &Stufen ) const
                 stufe.dCounts = counts;
 
                 Stufen.push_back( stufe );
-            } // end if
-        } // end for
-    } // end for
-} // end of GetStufen
+            }
+        }
+    }
+}
 
 
-template<class T>
-void CRainflowMatrixT<T>::GetStufen( VectorStufenAmpl &Stufen ) const
+
+void CRainflow::GetStufen( VectorStufenAmpl &Stufen ) const
 {
     Stufen.clear();
 
@@ -964,7 +706,7 @@ void CRainflowMatrixT<T>::GetStufen( VectorStufenAmpl &Stufen ) const
     {
         ASSERT( false );
         return;
-    } // end if
+    }
 
     for( int i = 0; i < m_class_count; i++ ) 
     {
@@ -978,9 +720,9 @@ void CRainflowMatrixT<T>::GetStufen( VectorStufenAmpl &Stufen ) const
             // Die Schleifen decken die halbe Matrix ab (Dreieck)!
             counts += (double) GetCountIncrements( j - i, j ) / FULL_CYCLE_INCREMENT;
             counts += (double) GetCountIncrements( j, j - i ) / FULL_CYCLE_INCREMENT;
-        } // end for
+        }
 
-        if ( counts > 0.0 ) 
+        if( counts > 0.0 ) 
         {
             /* Es wird mit den Klassenmitten gerechnet */
             double range = m_class_width * i;
@@ -990,13 +732,13 @@ void CRainflowMatrixT<T>::GetStufen( VectorStufenAmpl &Stufen ) const
             stufe.dCounts = counts;
 
             Stufen.push_back( stufe );
-        } // end if
-    } // end for
-} // end of GetStufen
+        }
+    }
+}
 
 
-template<class T>
-void CRainflowMatrixT<T>::GetStufen( VectorStufenFromTo &Stufen ) const
+
+void CRainflow::GetStufen( VectorStufenFromTo &Stufen ) const
 {
     Stufen.clear();
 
@@ -1004,12 +746,12 @@ void CRainflowMatrixT<T>::GetStufen( VectorStufenFromTo &Stufen ) const
     {
         ASSERT( false );
         return;
-    } // end if
+    }
 
     if( !GetMatrix() ) 
     {
         return;
-    } // end if
+    }
 
     for( int i = 0; i < m_class_count; i++ ) 
     {
@@ -1029,14 +771,14 @@ void CRainflowMatrixT<T>::GetStufen( VectorStufenFromTo &Stufen ) const
                 stufe.dCounts = counts;
 
                 Stufen.push_back( stufe );
-            } // end if
-        } // end for
-    } // end for
-} // end of GetStufen
+            }
+        }
+    }
+}
 
 
-template<class T>
-void CRainflowMatrixT<T>::GetStufen( VectorStufenKGUZ &Stufen ) const
+
+void CRainflow::GetStufen( VectorStufenKGUZ &Stufen ) const
 {
     Stufen.clear();
 
@@ -1044,109 +786,69 @@ void CRainflowMatrixT<T>::GetStufen( VectorStufenKGUZ &Stufen ) const
     {
         ASSERT( false );
         return;
-    } // end if
+    }
 
     VectorStufenKGUZ KGUZ_Temp( m_class_count - 1 );
+    rfc_value_v lc, level;
 
-    if( m_rf_matrix_no_res ) 
+    if( Rainflow::lc_get( lc, level ) )
     {
-        for( int i = 1; i < m_class_count; i++ ) 
+        for( int i = 0; i < m_class_count - 1; i++ ) 
         {
-            double dCounts = 0.0;
-            
             // Erster Index [0] zaehlt das Durchschreiten der ersten oberen Klassengrenze.
-            KGUZ_Temp[ i - 1 ].dLevel = i * m_class_width + m_range_min;
-            
-            for( int j = i; j < m_class_count; j++ )  // To
-            {
-                for( int k = 0; k < i; k++ )          // From
-                {
-                    // Immer symmetrisch berechnen (Schleife deckt nur die Haelfte (Dreieck) ab!)
-                    // Wichtiger Hinweis: 
-                    // Die hier verwendete Matrix ist keine reine(!) Uebergangsmatrix wie z.B. in der 
-                    // FVA Richtlinie "Zaehlverfahren 2010" beschrieben! Da geschlossene Hysteresen gezaehlt werden
-                    // gibt es zu einer negativen Flanke auch immer eine positive. Daher muessen die Haeufigkeiten
-                    // aus beiden Matrixhaelften beruecksichtigt werden:
-                    dCounts += (double) m_rf_matrix_no_res[ k * m_class_count + j ] / FULL_CYCLE_INCREMENT;
-                    dCounts += (double) m_rf_matrix_no_res[ j * m_class_count + k ] / FULL_CYCLE_INCREMENT;
-                } // end for
-            } // end for
+            KGUZ_Temp[i].dLevel  = level[i];
+            KGUZ_Temp[i].dCounts = lc[i];
+        }
+    }
 
-            KGUZ_Temp[ i - 1 ].dCounts = dCounts;
-        } // end for
-    } // end if
-
-    /* Residuum einrechnen */
-    if( m_Residuum[0].size() >= 2 ) 
-    {
-        t_res from, to;
-
-        from = m_Residuum[0][0];
-        for ( size_t n = 1; n < m_Residuum[0].size(); n++ ) 
-        {
-            to = m_Residuum[0][n];
-            if( from.iCno < to.iCno ) 
-            {
-                /* Nur die aufsteigenden Aeste beruecksichtigen */
-                for( int i = from.iCno; i < to.iCno; i++ ) 
-                {
-                    KGUZ_Temp[ i ].dCounts += 1.0;
-                } /* end for */
-            } /* end if */
-            from = to;
-        } /* end for */
-    } /* end if */
-
-    for ( size_t n = 0; n < KGUZ_Temp.size(); n++ ) 
-    {
-        if( KGUZ_Temp[ n ].dCounts > 0.0 ) 
-        {
-            Stufen.push_back( KGUZ_Temp[ n ] );
-        } // end if
-    } // end for
-} // end of GetStufen
+    Stufen = KGUZ_Temp;
+}
 
 
-template<class T>
-void CRainflowMatrixT<T>::SetStufen( const VectorStufen &Stufen )
+
+void CRainflow::SetStufen( const VectorStufen &Stufen )
 {
     size_t i;
 
-    if( !m_isParametrized ) 
+    if( !m_isParametrized || !m_rfc_ctx.rp || !m_rfc_ctx.lc ) 
     {
         ASSERT( false );
         return;
-    } // end if
+    }
 
-    ReDimMatrix();
+    Rainflow::clear_counts();
 
     // Rangepair
     for( i = 0; i < Stufen.size(); i++ ) 
     {
         t_stufe stufe = Stufen[i];
-        int from = ClassNo( (T)( stufe.dAvrg - stufe.dRange / 2.0 ) );
-        int   to = ClassNo( (T)( stufe.dAvrg + stufe.dRange / 2.0 ) );
+        int from = ClassNo( (rfc_value_t)( stufe.dAvrg - stufe.dRange / 2.0 ) );
+        int   to = ClassNo( (rfc_value_t)( stufe.dAvrg + stufe.dRange / 2.0 ) );
 
         ASSERT( from >= 0 && from < m_class_count 
                 && to >=0 && to < m_class_count );
 
         AddCycles( from, to, (int)( stufe.dCounts + 0.5 ) );
-    } // end for
-} // end of SetStufen
+    }
+
+    Rainflow::rp_from_rfm( m_rfc_ctx.rp, NULL, NULL );
+    Rainflow::lc_from_rfm( m_rfc_ctx.lc, NULL, NULL, RF::RFC_FLAGS_COUNT_LC );
+    Rainflow::damage_from_rfm( NULL, &m_rfc_ctx.damage );
+}
 
 
-template<class T>
-void CRainflowMatrixT<T>::SetStufen( const VectorStufenFromTo &Stufen )
+
+void CRainflow::SetStufen( const VectorStufenFromTo &Stufen )
 {
     size_t i;
 
-    if( !m_isParametrized ) 
+    if( !m_isParametrized || !m_rfc_ctx.rp || !m_rfc_ctx.lc ) 
     {
         ASSERT( false );
         return;
-    } // end if
+    }
 
-    ReDimMatrix();
+    Rainflow::clear_counts();
 
     for( i = 0; i < Stufen.size(); i++ ) 
     {
@@ -1158,97 +860,46 @@ void CRainflowMatrixT<T>::SetStufen( const VectorStufenFromTo &Stufen )
                 && to >=0 && to < m_class_count );
 
         AddCycles( from, to, (int)( stufe.dCounts + 0.5 ) );
-    } // end for
-} // end of SetStufen
+    }
 
-
-template<class T>
-void CRainflowMatrixT<T>::GetResiduum( VectorResiduum &Residuum ) const
-{
-    Residuum = m_Residuum[0];
-} // end of GetResiduum
-
-
-template<class T>
-void CRainflowMatrixT<T>::SetResiduum( const VectorResiduum &Residuum )
-{
-    if( !m_isParametrized ) 
-    {
-        ASSERT( false );
-        return;
-    } // end if
-
-    m_Residuum[0] = Residuum;
-} // end of SetResiduum
-
-
-template<class T>
-void CRainflowMatrixT<T>::GetResiduumStufen( VectorStufen &Stufen, e_residuum how ) const
-{
-    if( !m_isParametrized ) 
-    {
-        ASSERT( false );
-        return;
-    } // end if
-
-    int *backup[] = { m_rf_matrix_no_res, m_rf_matrix };
-    e_residuum old_residuum = m_eResiduum;
-
-    ReDimMatrix();
-    CountResiduum( how );
-    GetStufen( Stufen );
-    FreeMatrix();
-
-    m_eResiduum = old_residuum;
-    m_rf_matrix_no_res = backup[0];
-    m_rf_matrix = backup[1];
-} // end of GetResiduumStufen
-
-
-template<class T>
-void CRainflowMatrixT<T>::GetResiduumStufen( VectorStufenFromTo &Stufen, e_residuum how ) const
-{
-    if( !m_isParametrized ) 
-    {
-        ASSERT( false );
-        return;
-    } // end if
-
-    int *backup[] = { m_rf_matrix_no_res, m_rf_matrix };
-    e_residuum old_residuum = m_eResiduum;
-
-    ReDimMatrix();
-    CountResiduum( how );
-    GetStufenFromTo( Stufen );
-    FreeMatrix();
-
-    m_eResiduum = old_residuum;
-    m_rf_matrix_no_res = backup[0];
-    m_rf_matrix = backup[1];
-} // end of GetResiduumStufen
-
-
-template<class T>
-const typename CRainflowMatrixT<T>::VectorTurningPoints& CRainflowMatrixT<T>::GetTurningPoints() const
-{
-    return m_TurningPoints[0];
+    Rainflow::rp_from_rfm( m_rfc_ctx.rp, NULL, NULL );
+    Rainflow::lc_from_rfm( m_rfc_ctx.lc, NULL, NULL, RF::RFC_FLAGS_COUNT_LC );
+    Rainflow::damage_from_rfm( NULL, &m_rfc_ctx.damage );
 }
 
 
-template<class T>
-void CRainflowMatrixT<T>::DetachTurningPoints( VectorTurningPoints &TurningPoints )
+
+void CRainflow::GetResiduum( VectorResiduum &Residuum ) const
 {
-    TurningPoints.swap( m_TurningPoints[0] );
-    m_TurningPoints[0].clear();
+    Residuum.clear();
+
+    for( int i = 0; i < m_rfc_ctx.residue_cnt; i++ )
+    {
+        t_res res;
+
+        res.iCno      = m_rfc_ctx.residue[i].cls;                                   /* Klassennummer, base 0 */
+        res.Value     = m_rfc_ctx.residue[i].value;                                 /* Messwert */
+        res.ClassMean = m_rfc_ctx.class_width * res.iCno + m_rfc_ctx.class_offset;  /* Klassenmitte */
+        res.nIdx      = m_rfc_ctx.residue[i].pos;                                   /* Messwertposition, base 1 */
+        res.nIdx_TP   = m_rfc_ctx.residue[i].tp_pos;                                /* Position in m_TurningPoints, base 1 */
+
+        Residuum.push_back( res );
+    }
 }
 
 
-template<class T>
-void CRainflowMatrixT<T>::GetTurningPoints( VectorTurningPoints &TurningPoints, size_t left, size_t right ) const
+const typename CRainflow::VectorTurningPoints& CRainflow::GetTurningPoints() const
+{
+    return m_tp;
+}
+
+
+
+void CRainflow::GetTurningPoints( VectorTurningPoints &TurningPoints, size_t left, size_t right ) const
 {
     if( !left && !right )
     {
-        VectorTurningPoints aCopy( m_TurningPoints[0] );
+        VectorTurningPoints aCopy( m_tp );
         TurningPoints.swap( aCopy );
     }
     else
@@ -1259,49 +910,49 @@ void CRainflowMatrixT<T>::GetTurningPoints( VectorTurningPoints &TurningPoints, 
         TurningPoints.clear();
 
 #if !HAVE_NEOLIB
-        if( !m_TurningPoints[0].empty() )
+        if( !m_tp.empty() )
         {
-            if( !left )  left  = m_TurningPoints[0].front().nIdx;
-            if( !right ) right = m_TurningPoints[0].back().nIdx;
-        } // end if
+            if( !left )  left  = m_tp.front().pos;
+            if( !right ) right = m_tp.back().pos;
+        }
 
         // Count number of values first...
-        for( it = m_TurningPoints[0].begin(); it != m_TurningPoints[0].end(); it++ )
+        for( it = m_tp.begin(); it != m_tp.end(); it++ )
         {
-            if( it->nIdx >= left && it->nIdx <= right )
+            if( it->pos >= left && it->pos <= right )
             {
                 count++;
             }
-        } // end for
+        }
 
         // ...then allocate space 
         TurningPoints.reserve( count );
 #endif
 
 
-        for( it = m_TurningPoints[0].begin(); it != m_TurningPoints[0].end(); it++ )
+        for( it = m_tp.begin(); it != m_tp.end(); it++ )
         {
-            if( it->nIdx >= left && it->nIdx <= right )
+            if( it->pos >= left && it->pos <= right )
             {
                 TurningPoints.push_back( *it );
             }
-        } // end for
-    } // end if
-} // end of GetTurningPoints
+        }
+    }
+}
 
 
-template<class T>
-void CRainflowMatrixT<T>::Parametrize( double range_min,         double range_max,
-                                       double range_fixed_min,   double range_fixed_max, double range_fixed, 
-                                       double class_count,       double class_width, 
-                                       double dilation,          double hysteresis ) 
+
+void CRainflow::Parametrize( double range_min,         double range_max,
+                             double range_fixed_min,   double range_fixed_max, double range_fixed, 
+                             double class_count,       double class_width, 
+                             double dilation,          double hysteresis ) 
 {
     if( class_count > 0.0 ) 
     {
         class_count = floor( class_count + 0.5 );
     } else {
         class_count = DBL_NAN;
-    } // end if
+    }
 
     int is_range_min_fixed      = DBL_ISFINITE( range_fixed_min );
     int is_range_max_fixed      = DBL_ISFINITE( range_fixed_max );
@@ -1322,7 +973,7 @@ void CRainflowMatrixT<T>::Parametrize( double range_min,         double range_ma
         is_range_fixed && is_class_count_fixed && is_class_width_fixed ) 
     {
         ASSERT( false );
-    } /* end if */
+    }
 
     /*
      *
@@ -1331,23 +982,23 @@ void CRainflowMatrixT<T>::Parametrize( double range_min,         double range_ma
      */
     if( !is_range_fixed ) 
     {
-        range = static_cast<T>( class_width ) * class_count;
+        range = static_cast<rfc_value_t>( class_width ) * class_count;
         
         if( !DBL_ISFINITE( range ) ) 
         {
             if( is_range_max_fixed && is_range_min_fixed ) {
-                range = Abs( static_cast<T>( range_fixed_max ) - static_cast<T>( range_fixed_min ) );
+                range = Abs( static_cast<rfc_value_t>( range_fixed_max ) - static_cast<rfc_value_t>( range_fixed_min ) );
             } else if( is_range_max_fixed && !is_range_min_fixed ) {
-                range = Abs( static_cast<T>( range_fixed_max ) - static_cast<T>( range_min ) );
+                range = Abs( static_cast<rfc_value_t>( range_fixed_max ) - static_cast<rfc_value_t>( range_min ) );
             } else if( !is_range_max_fixed && is_range_min_fixed ) {
-                range = Abs( static_cast<T>( range_max ) - static_cast<T>( range_fixed_min ) );
+                range = Abs( static_cast<rfc_value_t>( range_max ) - static_cast<rfc_value_t>( range_fixed_min ) );
             } else {
-                range = Abs( static_cast<T>( range_max ) - static_cast<T>( range_min ) );
-            } // end if
-        } /* end if */
+                range = Abs( static_cast<rfc_value_t>( range_max ) - static_cast<rfc_value_t>( range_min ) );
+            }
+        }
     } else {
         range = range_fixed;
-    } /* end if */
+    }
 
     ASSERT( DBL_ISFINITE( range ) );
     
@@ -1360,25 +1011,25 @@ void CRainflowMatrixT<T>::Parametrize( double range_min,         double range_ma
     {
         if( is_range_max_fixed ) 
         {
-            range_min = static_cast<T>( range_fixed_max ) - static_cast<T>( range );
+            range_min = static_cast<rfc_value_t>( range_fixed_max ) - static_cast<rfc_value_t>( range );
         } else if( DBL_ISFINITE( range_max ) ) {
-            range_min = static_cast<T>( range_max ) - static_cast<T>( range );
-        } // end if
+            range_min = static_cast<rfc_value_t>( range_max ) - static_cast<rfc_value_t>( range );
+        }
     } else {
         range_min = range_fixed_min;
-    } /* end if */
+    }
     
     if( !is_range_max_fixed ) 
     {
         if( is_range_min_fixed ) 
         {
-            range_max = static_cast<T>( range_fixed_min ) + static_cast<T>( range );
+            range_max = static_cast<rfc_value_t>( range_fixed_min ) + static_cast<rfc_value_t>( range );
         } else if( DBL_ISFINITE( range_min ) ) {
-            range_max = static_cast<T>( range_min ) + static_cast<T>( range );
-        } // end if
+            range_max = static_cast<rfc_value_t>( range_min ) + static_cast<rfc_value_t>( range );
+        }
     } else {
         range_max = range_fixed_max;
-    } /* end if */
+    }
 
     ASSERT( DBL_ISFINITE ( range_min + range_max ) );
     ASSERT( range_max >= range_min );
@@ -1387,7 +1038,7 @@ void CRainflowMatrixT<T>::Parametrize( double range_min,         double range_ma
     if( is_range_max_fixed && is_range_min_fixed ) 
     {
         is_range_fixed = true;
-    } // end if
+    }
     
     /*
      *
@@ -1397,20 +1048,20 @@ void CRainflowMatrixT<T>::Parametrize( double range_min,         double range_ma
     if( is_class_width_fixed && !is_class_count_fixed ) 
     {
         ASSERT( class_width > 0.0 );
-        class_count = (int)Ceil( static_cast<T>( range ) / static_cast<T>( class_width ) );
+        class_count = (int)Ceil( static_cast<rfc_value_t>( range ) / static_cast<rfc_value_t>( class_width ) );
     } /* end if */
     
     if( !is_class_count_fixed && !is_class_width_fixed ) 
     {
         class_count = DEFAULT_CLASS_COUNT;
         is_class_count_fixed = 1;
-    } /* end if */
+    }
 
     if( !is_dilation_fixed ) 
     {
         dilation = (double)DEFAULT_DILATION / 100.0;
         is_dilation_fixed = 1;
-    } // end if
+    }
     
     dilation       = fabs( dilation );
     dilation_trunc = (int)(dilation + 1e-4);     // Ganzzahlanteil des Klassierbereichsaufschlages
@@ -1462,45 +1113,45 @@ void CRainflowMatrixT<T>::Parametrize( double range_min,         double range_ma
     if( range < 1E-5 * 2 * Max( 1, Max( Abs( range_min ), Abs( range_max ) ) ) ) 
     {
         range = 1E-5 * 2 * Max( 1, Max( Abs( range_min ), Abs( range_max ) ) );
-    } /* end if */
+    }
     
     
     /* Einfache Klassenbreite, 2x halbe Klassenbreite Zuschlag, wenn dilation_trunc==1 */
-    if( !is_class_width_fixed ) class_width = static_cast<T>( range ) / IROUND( class_count - dilation_trunc );
+    if( !is_class_width_fixed ) class_width = static_cast<rfc_value_t>( range ) / IROUND( class_count - dilation_trunc );
     /* Halbe Klassenbreite auch an den Klassiergrenzen aufschlagen */
-    if( !is_range_min_fixed )   range_min  -= static_cast<T>( class_width ) * dilation_trunc / 2.0f;
-    if( !is_range_max_fixed )   range_max  += static_cast<T>( class_width ) * dilation_trunc / 2.0f;
+    if( !is_range_min_fixed )   range_min  -= static_cast<rfc_value_t>( class_width ) * dilation_trunc / 2.0f;
+    if( !is_range_max_fixed )   range_max  += static_cast<rfc_value_t>( class_width ) * dilation_trunc / 2.0f;
     /* Klassierbereich neu bestimmen */
-    if( !is_range_fixed)        range       = static_cast<T>( range_max ) - static_cast<T>( range_min );
+    if( !is_range_fixed)        range       = static_cast<rfc_value_t>( range_max ) - static_cast<rfc_value_t>( range_min );
 
     // Dilation unabhaengig von fixierten Werten immer anwenden (muss auf 0 gesetzt werden, wenn nicht gewuenscht!)
-    range_min -= static_cast<T>( range )     * static_cast<T>( dilation_frac ) / 2.0f;
-    range_max += static_cast<T>( range )     * static_cast<T>( dilation_frac ) / 2.0f;
-    range      = static_cast<T>( range_max ) - static_cast<T>( range_min );
+    range_min -= static_cast<rfc_value_t>( range )     * static_cast<rfc_value_t>( dilation_frac ) / 2.0f;
+    range_max += static_cast<rfc_value_t>( range )     * static_cast<rfc_value_t>( dilation_frac ) / 2.0f;
+    range      = static_cast<rfc_value_t>( range_max ) - static_cast<rfc_value_t>( range_min );
 
     
     if( DEFAULT_ROUNDOFF > 0 ) 
     {
-        range_min = static_cast<T>( floor( static_cast<T>( range_min ) * DEFAULT_ROUNDOFF ) / DEFAULT_ROUNDOFF );
-        range_max = static_cast<T>( floor( static_cast<T>( range_max ) * DEFAULT_ROUNDOFF ) / DEFAULT_ROUNDOFF );
-        range = static_cast<T>( range_max ) - static_cast<T>( range_min );
-    } // end if
+        range_min = static_cast<rfc_value_t>( floor( static_cast<rfc_value_t>( range_min ) * DEFAULT_ROUNDOFF ) / DEFAULT_ROUNDOFF );
+        range_max = static_cast<rfc_value_t>( floor( static_cast<rfc_value_t>( range_max ) * DEFAULT_ROUNDOFF ) / DEFAULT_ROUNDOFF );
+        range = static_cast<rfc_value_t>( range_max ) - static_cast<rfc_value_t>( range_min );
+    }
 
-    if( !is_class_width_fixed ) class_width = static_cast<T>( range ) / IROUND( class_count );
-    if( !is_class_count_fixed ) class_count = (int)Ceil( static_cast<T>( range ) / static_cast<T>( class_width ) );
+    if( !is_class_width_fixed ) class_width = static_cast<rfc_value_t>( range ) / IROUND( class_count );
+    if( !is_class_count_fixed ) class_count = (int)Ceil( static_cast<rfc_value_t>( range ) / static_cast<rfc_value_t>( class_width ) );
 
     if( !DBL_ISFINITE( hysteresis ) || hysteresis == DEFAULT_HYSTERESIS ) 
     {
         hysteresis = class_width;
-    } /* end if */
+    }
 
     ASSERT( DBL_ISFINITE( hysteresis ) && hysteresis >= 0.0 );
 
     m_class_count = IROUND( class_count );
-    m_class_width = static_cast<T>( class_width );
-    m_hysteresis  = static_cast<T>( hysteresis );
-    m_range_min   = static_cast<T>( range_min );
-    m_dilation    = static_cast<T>( dilation );
+    m_class_width = static_cast<rfc_value_t>( class_width );
+    m_hysteresis  = static_cast<rfc_value_t>( hysteresis );
+    m_range_min   = static_cast<rfc_value_t>( range_min );
+    m_dilation    = static_cast<rfc_value_t>( dilation );
 
     if( m_class_width <= 0.0 )
     {
@@ -1508,23 +1159,44 @@ void CRainflowMatrixT<T>::Parametrize( double range_min,         double range_ma
     }
 
     m_isParametrized = ( m_class_count > 0 ) && ( m_class_width > 0.0 );
-} // end of Parametrize
+
+    if( m_isParametrized )
+    {
+        Rainflow::init( m_class_count, m_class_width, m_range_min, m_hysteresis, RFC_FLAGS_DEFAULT );
+
+        SetSNCurve( m_SNCurve.SD, m_SNCurve.ND, m_SNCurve.k, m_SNCurve.k2 );
+
+        switch( m_AmplTrans_mode )
+        {
+            case 0:
+                SetAmplTrans( DBL_NAN, DBL_NAN, false );
+                break;
+            case 1:
+                SetAmplTrans( m_AmplTrans_dM, m_AmplTrans_dR, true );
+                break;
+            case 2:
+                SetAmplTrans( m_AmplTrans_dM, m_AmplTrans_dAvrg, false );
+                break;
+            default:
+                ASSERT( false );
+        }
+    }
+}
 
 
-template<class T>
-void CRainflowMatrixT<T>::DoRainflow( const double *stream_in, size_t in_len, bool do_finalize ) 
+
+void CRainflow::DoRainflow( const double *stream_in, size_t in_len, bool do_finalize ) 
 {
     const   double*             pin;                        /* Pointer auf Zeitreihe (Eingangsdaten) */
             double              dummy = 0.0;
             size_t              pos;                        /* Aktuelle Position in der Zeitreihe (pin) */
-            T                   d0, dl;                     /* Rueckwaertsgerichtete Gradienten ueber die letzten 3 Punkte (res[end-1],res[end],*pin) */
-            VectorResiduum&     Residuum( m_Residuum[0] );  /* Residuum */
+            rfc_value_t                   d0, dl;                     /* Rueckwaertsgerichtete Gradienten ueber die letzten 3 Punkte (res[end-1],res[end],*pin) */
 
     if( !m_isParametrized || ( !stream_in && in_len ) ) 
     {
         ASSERT( false );
         return;
-    } // end if
+    }
 
     ASSERT( m_class_width > 0.0 && m_class_count > 1 );
 
@@ -1534,312 +1206,40 @@ void CRainflowMatrixT<T>::DoRainflow( const double *stream_in, size_t in_len, bo
     {
         m_CurrentPos = 0;
 
-        ReDimMatrix();             /* Neue Matrix anlegen */
-        ClearResiduum(0);          /* Altes Residuum loeschen */
-        ClearTurningPoints(0);     /* Umkehrpunkte loeschen */
+        //ReDimMatrix();             /* Neue Matrix anlegen */
+        //ClearResiduum(0);          /* Altes Residuum loeschen */
+        //ClearTurningPoints(0);     /* Umkehrpunkte loeschen */
         
         m_bCountPending = !do_finalize;
     }
-    else
-    {
-        if( Residuum.size() > 1 )
-        {
-            // Gradient am Ende des Residuums
-            d0 = Residuum.back().Value - ( Residuum.rbegin() + 1 )->Value;
-        } // end if
-    } // end if
     
-    ASSERT( m_rf_matrix_no_res && pin );
+    ASSERT( pin );
 
     /* Schleife ueber alle Punkte */
-    for( pos = 0; pos <= in_len; pos++, pin++ ) 
+    Rainflow::feed( pin, in_len );
+
+    if( do_finalize )
     {
-        /* Letzter Messpunkt im Arbeitsstack ist kein endgueltiger Umkehrpunkt.
-        /* Da der Aufruf mehrfach fuer kontinuierliche Messsignale
-        /* aufgerufen werden kann, muss kenntlich gemacht werden, wenn
-        /* keine weiteren Daten reingereicht werden. In diesem Fall muss
-        /* der letzte Punkt des Arbeitsstackes als endgueltiger Umkehrpunkt
-        /* betrachtet werden (do_finalize).
-        */
-        bool    read_pin = true;
-        size_t  nIdx     = m_CurrentPos + pos + 1;  /* Index, base 1 */
-        size_t  tp_last  = 0;
-        
-        if( pos == in_len ) 
+        switch( m_eResiduum )
         {
-            read_pin = false;
-            if( !do_finalize ) 
-            {
-                /* Wenn noch weitere Daten folgen werden, dann hier abbrechen */
-                break;
-            } /* end if */
-        } /* end if */
-
-        if( !read_pin ) 
-        {
-            size_t st_count = Residuum.size();
-
-            /* lokales Ende des Streams erreicht, tp_last == 0 */
-            if( do_finalize && st_count )
-            {
-                /* Hier ist das (globale) Ende des Streams erreicht. Der Letzte Punkt wird noch aktualisiert und
-                   als Umkehrpunkt eingetragen.
-                   Aber nur aktualisieren, wenn sich der Punkt von dem voherigen unterscheidet */
-                T value = Residuum.back().Value;
-                Residuum.back().iCno = ClassNo( value );
-
-                t_turning_point tp;
-                tp.Value   = Residuum.back().Value;
-                tp.Avrg    = tp.Value;
-                tp.nIdx    = Residuum.back().nIdx;  /* Index, base 1 */
-                tp.nIdxAdj = 0;                     /* Index, base 1 */
-                tp.BKZ     = 0.0; 
-                AddTurningPoint( tp );  // Veraendert Residuum.back()
-
-                tp_last = Residuum.size(); /* Letzter verwertbarer Umkehrpunkt im Stack, base 1 */
-            }
-        } 
-        else 
-        {  /* if( !read_pin ) */
-            size_t st_count = Residuum.size();
-            
-            if( !DBL_ISFINITE(*pin) ) 
-            {
-                continue;
-            }
-
-            /* Naechsten Messpunkt holen.
-             * Mind. 2 Punkte werden fuer die Suche nach turning points benoetigt.
-             * Wenn der Arbeitsstack 2 Punkte aufgenommen hat, werden es nie wieder
-             * weniger als 2 sein, da eine geschlossene Hysterese nur durch mind. 4
-             * Datenpunkte erkannt werden kann und dann auch nur 2 Punkte entfernt werden.
-             */
-            if( st_count < 2 ) 
-            {
-                t_res res;
-
-                res.Value   = static_cast<T>( *pin );
-                res.iCno    = ClassNo( res.Value );
-                res.nIdx    = nIdx;
-                res.nIdx_TP = 0;                       /* Index Turning Points, base 1 */
-
-                if( !st_count )
-                {
-                    /* 
-                     * Der erste Datenpunkt ueberhaupt, das ist auf jeden Fall 
-                     * ein Unkehrpunkt.
-                     */
-                    t_turning_point tp;
-                    tp.Value   = res.Value;
-                    tp.Avrg    = tp.Value;
-                    tp.nIdx    = res.nIdx;  /* Index, base 1 */
-                    tp.nIdxAdj = 0;         /* Index, base 1 */
-                    tp.BKZ     = 0.0; 
-                    Residuum.push_back( res );
-                    AddTurningPoint( tp );  // Veraendert Residuum.back()
-                } else {
-                    /* 
-                     * Neuen Wert nur annehmen, wenn Hysterese ueberschritten und
-                     * zurueckliegende Klasse verlassen wurde.
-                     * Dieser ist aber noch nicht automatisch ein Umkehrpunkt!
-                     */
-                    d0 = res.Value - Residuum.front().Value;
-                    if( Abs( d0 ) >= m_hysteresis )
-                    {
-                        // Ab hier Umkehrpunkt (Turning Point) imm Sinne der Hysteresebreite
-                        if( res.iCno != Residuum.front().iCno )
-                        {
-                            // Ab hier Umkehrpunkt im Sinne der Rainflowzaehlung
-                            Residuum.push_back( res );
-                        } // end if
-                    } // end if
-                } // end if
-                
-                continue;
-            } /* end if */
-
-            /* Ab hier sind mind. 2 Punkte im Arbeitsstack */
-            dl = (double)(static_cast<T>( *pin ) - Residuum.back().Value);  /* Delta zum letzten Umkehrpunkt */
-
-            if ( Sign( dl ) == Sign( d0 ) ) 
-            {
-                /*
-                Der urspruengliche Verlauf wird fortgesetzt.
-                Amplitude ist automatisch groesser und braucht daher nicht ueberprueft
-                zu werden!
-                */
-
-                /*
-                 *
-                 *        *     pin[0]
-                 *       /      dl
-                 *      *       stack[st_count-1]
-                 *   \ /        d0
-                 *    *         stack[st_count-2]
-                 *
-                 */
-
-                //d0 += dl;
-                d0 = static_cast<T>( *pin ) - Residuum.back().Value;
-
-                /* Letzten lokalen Umkehrpunkt korrigieren */
-                Residuum.back().nIdx   = nIdx; /* Index, base 1 */
-                Residuum.back().Value  = static_cast<T>( *pin );
-                Residuum.back().iCno   = -1; /* speed improvement reason */
-
-                /* Es hat sich nur der letzte Punkt im Arbeitsstack geaendert
-                /* weiter geht es mit dem naechsten Messpunkt...
-                 */
-                continue;
-
-            } else {
-                int cno_this;
-
-                if( Abs( dl ) <= m_hysteresis ) 
-                {
-                    /* Abstand zum letzten Punkt noch zu gering --> Kein neuer Umkehrpunkt */
-                    continue;
-                } /* end if */
-
-                cno_this = ClassNo( static_cast<T>( *pin ) );
-
-                if( Residuum.back().iCno < 0 ) 
-                {
-                    T value = Residuum.back().Value;
-                    Residuum.back().iCno = ClassNo( value );
-                } /* end if */
-
-                if( cno_this == Residuum.back().iCno ) 
-                {
-                    /* Faellt in selbe Klasse wie letztr TP --> Kein neuer Umkehrpunkt */
-                    continue;
-                } /* end if */
-
-                /*   Neuen Umkehrpunkt gefunden!
-                 *
-                 *                         *      stack[st_count-1]
-                 *                        / \
-                 *   d0                \ /   \    dl
-                 *   stack[st_count-2]  *     *   pin[0]
-                 *
-                 */
-
-                /* Der letzte Umkehrpunkt im Arbeitsstack wird zum Umkehrpunkt */
-                t_turning_point tp;
-                tp.Value   = Residuum.back().Value;
-                tp.Avrg    = tp.Value;
-                tp.nIdx    = Residuum.back().nIdx;  /* Index, base 1 */
-                tp.nIdxAdj = 0;                     /* Index, base 1 */
-                tp.BKZ     = 0.0; 
-                AddTurningPoint( tp );  // Veraendert Residuum.back()
-                
-                /* Neuer Wert wird neuer Umkehrpunkt im Arbeitsstack */
-                t_res res;
-                res.Value   = static_cast<T>( *pin );
-                res.iCno    = cno_this;
-                res.nIdx    = nIdx;                    /* Index, base 1 */
-                res.nIdx_TP = 0;                       /* Index Turning Points, base 1 */
-                Residuum.push_back( res );
-
-                d0 = dl;
-
-                tp_last = Residuum.size() - 1; /* Letzter verwertbarer Umkehrpunkt im Stack, base 1 (letzter Wert gehoert noch nicht dazu!)*/
-            } /* end if ( Sign( dl ) == Sign( d0 ) ) */
-        } /* end if ( read_pin ) */
-
-        /* Stack hat neuen Umkehrpunkt. Daher 4P-Algorithmus
-        /* zur Suche nach geschlossenen Hysteresen anstossen.
-         */
-
-        /* 4 Punkte im Arbeitsstack erforderlich -> 4P-Algorithmus */
-        while( tp_last >= 4 ) 
-        {
-            int p1, p2, p3, p4;
-
-            p1  = Residuum[ tp_last - 4 ].iCno;
-            p2  = Residuum[ tp_last - 3 ].iCno;
-            p3  = Residuum[ tp_last - 2 ].iCno;
-            p4  = Residuum[ tp_last - 1 ].iCno;
-
-            ASSERT( p1 >= 0 && p1 < m_class_count &&
-                    p2 >= 0 && p2 < m_class_count &&
-                    p3 >= 0 && p3 < m_class_count &&
-                    p4 >= 0 && p4 < m_class_count );
-
-            if ( Min( p2, p3 ) < Min( p1, p4 ) ||
-                 Max( p2, p3 ) > Max( p1, p4 ) ) 
-            {
-
-                break;
-            } /* end if */
-
-            /* Ein Schwingspiel in die Matrix From->To eintragen */
-            AddCycles( p2, p3, 1 );
-
-            SetAdjacentTurningPoint( Residuum[ tp_last - 3 ].nIdx_TP, Residuum[ tp_last - 2 ].nIdx_TP );
-            
-            //int idx;
-            double dAmplitude  = Abs( p2 - p3 )     * m_class_width / 2.0;
-            double dAvrg       = Abs( p2 + p3 + 1 ) * m_class_width / 2.0 + m_range_min;
-            
-            /* Schaedigung den verantwortlichen Umkehrpunkten zuordnen */
-            if( m_doSpreadDamage == SPRDAM_RAMP_DAMAGE_24 ||
-                m_doSpreadDamage == SPRDAM_RAMP_AMPLITUDE_24 )
-            {
-                YieldDamageOverTurningPoints( Residuum[ tp_last - 3 ].nIdx_TP,   // Von P2
-                                              Residuum[ tp_last - 1 ].nIdx_TP,   // Zu P4
-                                              dAmplitude, dAvrg );
-            } else {
-                YieldDamageOverTurningPoints( Residuum[ tp_last - 3 ].nIdx_TP,   // Von P2
-                                              Residuum[ tp_last - 2 ].nIdx_TP,   // Zu P3
-                                              dAmplitude, dAvrg );
-            }
-            
-
-            /* Umkehrpunkte p2 und p3 aus dem Residuum loeschen */
-            if(0) 
-            {
-              for( size_t i = tp_last; i <= Residuum.size(); i++ ) 
-              {
-                  Residuum[ i - 3 ] = Residuum[ i - 1 ];
-              } /* end for */
-
-              Residuum.pop_back();
-              Residuum.pop_back();
-
-              tp_last -= 2;
-            } else {
-              Residuum.erase( Residuum.begin() + tp_last - 3, Residuum.begin() + tp_last - 1 );
-              tp_last -= 2;
-            } // end if
-
-        } /* end while, 4P Alg.*/
-    } /* end for, pin */
-
-    /* Liegt noch ein Residuum vor? */
-    if ( Residuum.size() ) 
-    {
-        typename VectorResiduum::iterator It;
-        
-        /* Klassenmitten nachtraeglich berechnen */
-        for ( It = Residuum.begin(); It != Residuum.end(); It++ ) 
-        {
-            It->ClassMean = (T)( (double)It->iCno + 0.5 ) * m_class_width + m_range_min;
-        } /* end for */
-    } /* end if */
-
-    m_CurrentPos += MIN( pos, in_len );
-
-    if( do_finalize ) 
-    {
-        m_bCountPending = false;
-        m_iProgressState = 100;
-    } // end if
-} // end of DoRainflow
+            case RESIDUUM_NONE:
+            case RESIDUUM_IGNORE:
+            case RESIDUUM_HALFCYCLES:
+            case RESIDUUM_FULLCYCLES:
+            case RESIDUUM_REPEATED:
+            case RESIDUUM_CLORMANN_SEEGER:
+            case RESIDUUM_RP_DIN:
+                Rainflow::finalize( m_eResiduum ); break;
+            default:
+                ASSERT( false );
+                return;
+        }
+    }
+}
 
 
-template<class T>
-void CRainflowMatrixT<T>::DoRainflow( const VectorData& stream ) 
+
+void CRainflow::DoRainflow( const VectorData& stream ) 
 {
     if( !stream.empty () ) 
     {
@@ -1850,16 +1250,16 @@ void CRainflowMatrixT<T>::DoRainflow( const VectorData& stream )
         double dDummy = 0.0;
 
         DoRainflow( &dDummy, /*in_len*/ 0, true );
-    } // end if
-} // end of DoRainflow
+    }
+}
 
 
-template<class T>
+
 template<class InputIt>
-void CRainflowMatrixT<T>::DoRainflow( InputIt first, InputIt last )
+void CRainflow::DoRainflow( InputIt first, InputIt last )
 {
     size_t distance = 0;
-    std::vector<T> stride( 1024 );
+    std::vector<rfc_value_t> stride( 1024 );
     
     if( first == last )
     {
@@ -1876,260 +1276,13 @@ void CRainflowMatrixT<T>::DoRainflow( InputIt first, InputIt last )
 }
 
 
-template<class T>
-void CRainflowMatrixT<T>::CountResiduum( e_residuum how ) 
-{
-    VectorResiduum& Residuum( m_Residuum[0] );
-
-    if( !m_isParametrized ) 
-    {
-        ASSERT( false );
-        return;
-    } // end if
-
-    ASSERT( m_rf_matrix_no_res );
-
-    FreeMatrix( false ); // Nur Matrix mit Residuum loeschen
-    m_eResiduum = how;
-
-    if( how == RESIDUUM_NONE ) 
-    {
-        return;
-    } // end if
-
-    m_rf_matrix = (int*)calloc( m_class_count * m_class_count, sizeof( int ) );
-    memcpy( m_rf_matrix, m_rf_matrix_no_res, sizeof( int ) * m_class_count * m_class_count );
-
-    if( !Residuum.size() || how == RESIDUUM_IGNORE ) 
-    {
-        return;
-    } // end if
-
-    switch( m_eResiduum ) 
-    {
-        case RESIDUUM_HALFCYCLES:
-            /* ASTM method */
-            if( Residuum.size() >= 2 ) 
-            {
-                typename VectorResiduum::const_iterator It;
-                t_res from, to;
-                
-                from = Residuum[0];
-                for ( It = Residuum.begin() + 1; It != Residuum.end(); It++ ) 
-                {
-                    to = *It;
-                    AddHalfCycle( from.iCno, to.iCno );
-                    
-                    double dAmplitude = Abs( from.iCno - to.iCno )     * m_class_width / 2.0;
-                    double dAvrg      = Abs( from.iCno + to.iCno + 1 ) * m_class_width / 2.0 + m_range_min;
-                    double dCounts    = 0.5;
-                    
-                    YieldDamageOverTurningPoints( from.nIdx_TP, to.nIdx_TP, dAmplitude, dAvrg, dCounts );
-                    
-                    from = to;
-                } /* end for */
-            } /* end if */
-            break;
-            
-        case RESIDUUM_FULLCYCLES:
-            if( Residuum.size() >= 2 ) 
-            {
-                typename VectorResiduum::const_iterator It;
-                t_res from, to;
-                
-                from = Residuum[0];
-                for ( It = Residuum.begin() + 1; It != Residuum.end(); It++ ) 
-                {
-                    to = *It;
-                    AddCycles( from.iCno, to.iCno, 1 );
-                    
-                    double dAmplitude = Abs( from.iCno - to.iCno )     * m_class_width / 2.0;
-                    double dAvrg      = Abs( from.iCno + to.iCno + 1 ) * m_class_width / 2.0 + m_range_min;
-                    
-                    YieldDamageOverTurningPoints( from.nIdx_TP, to.nIdx_TP, dAmplitude, dAvrg );
-                    
-                    from = to;
-                } /* end for */
-            } /* end if */
-            break;
-            
-        case RESIDUUM_CLORMANN_SEEGER:
-            // Zaehlt zusaetzlich Hysteresen aus Memory 1 Verhalten mit wechselndem Vorzeichen
-            if( Residuum.size() >= 3 ) 
-            {
-                VectorResiduum res, stack;
-                t_res first;
-                size_t i, tail;
-
-                // Die tatsaechlichen Werte in first sind irrelevant, da dieser nachfolgend niemals verrechnet wird
-                first.iCno      = ClassNo( static_cast<T>( 0.0 ) );
-                first.ClassMean = ( static_cast<T>( (double)first.iCno ) + 0.5 ) * m_class_width + m_range_min;
-
-                res.push_back( first );
-                res.insert( res.end(), Residuum.begin(), Residuum.end() );
-                
-                for ( i = 0; i < res.size(); i++ ) 
-                {
-                    bool do_loop;
-                    stack.push_back( res[ i ] );
-                    tail = stack.size();
-
-                    do 
-                    {
-                        do_loop = tail >= 4;
-                        if( do_loop ) 
-                        {
-                            double y1 = stack[ tail - 4 ].ClassMean;
-                            double y2 = stack[ tail - 3 ].ClassMean;
-                            double y3 = stack[ tail - 2 ].ClassMean;
-                            double y4 = stack[ tail - 1 ].ClassMean;
-                            t_res y4s = stack[ tail - 1 ];
-
-                            do_loop = y2 * y3 < 0 && Abs( y4 ) >= Abs( y2 ) && Abs( y2 ) >= Abs( y3 );
-                            if( do_loop ) 
-                            {
-                                t_res from = stack[ tail - 3 ]; /* y2 */
-                                t_res to   = stack[ tail - 2 ]; /* y3 */
-                                AddCycles( from.iCno, to.iCno, 1 );
-                    
-                                //size_t idx;
-                                double dAmplitude  = Abs( from.iCno - to.iCno )     * m_class_width / 2.0;
-                                double dAvrg       = Abs( from.iCno + to.iCno + 1 ) * m_class_width / 2.0 + m_range_min;
-                    
-                                YieldDamageOverTurningPoints( from.nIdx_TP, to.nIdx_TP, dAmplitude, dAvrg );
-                    
-                                stack[ tail - 3 ] = y4s;
-                                stack.pop_back();
-                                stack.pop_back();
-                                tail -= 2;
-                            } /* end if */
-                        } /* end if */
-                    } while( do_loop );
-                } /* end for */
-            } /* end if */
-            break;
-                
-        case RESIDUUM_REPEATED:
-            /* "simplified version" */
-            if ( Residuum.size() >= 2 ) 
-            {
-                VectorData stream;
-                
-                t_matrix_backup backup;
-                int* residuum_matrix;
-
-                /* Wiederholter Durchlauf: Das Residuum wird 2x
-                 * hintereinander kopiert */
-                for( size_t n = 0; n < Residuum.size(); n++ ) 
-                {
-                    stream.push_back( Residuum[n].ClassMean );
-                } /* end for */
-                stream.insert( stream.end(), stream.begin(), stream.end() ); 
-
-                m_TurningPoints[1].swap( m_TurningPoints[0] );
-                m_Residuum[1].swap( m_Residuum[0] );
-                // m_TurningPoints[0] und Residuum[0] wird von DoRainflow() geleert
-                
-                /* Klassierung durchfuehren */
-                PushMatrix( &backup );
-                DoRainflow( &stream[0], stream.size() );
-
-                residuum_matrix = m_rf_matrix_no_res;
-                m_rf_matrix_no_res = NULL;  // Vor dem RestoreMatrix() in Sicherheit bringen
-
-                ASSERT( residuum_matrix != NULL );
-
-                RestoreMatrix( &backup );
-                m_TurningPoints[1].swap( m_TurningPoints[0] );
-                m_Residuum[1].swap( m_Residuum[0] );
-
-                /* Die zusaetzlichen Punkte in die 
-                 * Matrix uebernehmen */
-                for( int i = 0; i < m_class_count; i++ ) 
-                {
-                    for( int j = 0; j < m_class_count; j++ ) 
-                    {
-                        m_rf_matrix[ i * m_class_count + j ] += residuum_matrix[ i * m_class_count + j ];
-                    } // end for
-                } // end for
-
-                free( residuum_matrix );
-            } /* end if */
-            break;
-
-        case RESIDUUM_RP_DIN:
-            /* Aequivalenz zu "Spannenpaar nach DIN 45667" */
-            if( Residuum.size() > 2 ) 
-            {
-                size_t n, up_len = 0, down_len = 0;
-                std::vector<t_slope> up, down;
-                
-                for( n = 1; n < Residuum.size(); n++ ) 
-                {
-                    t_res from = Residuum[n-1];
-                    t_res to   = Residuum[n];
-                    t_slope slope;
-
-                    slope.dAmplitude = Abs( from.ClassMean - to.ClassMean );
-                    slope.from = from;
-                    slope.to = to;
-                    
-                    if( from.iCno > to.iCno ) 
-                    {
-                        /* Absteigende Aeste */
-                        down.push_back( slope );
-                    } else {
-                        /* Aufsteigende Aeste */
-                        up.push_back( slope );
-                    } /* end if */
-                } /* end for */
-                
-                /* Aufsteigende Aeste nach Amplitude sortieren */
-                std::sort( up.begin(), up.end() );
-
-                /* Absteigende Aeste nach Amplitude sortieren */
-                std::sort( down.begin(), down.end() ); 
-                
-                /* amplitude stripping */
-                /* Ref: LMS TecWare Manual, Volume 2 - Analysis, Section 4.2.4, Page 315 */
-                for( n = 0; n < MIN( up.size(), down.size() ); n++ ) 
-                {
-                    t_slope temp = ( up[n].dAmplitude > down[n].dAmplitude ) ? down[n] : up[n];
-                    AddCycles( temp.from.iCno, temp.to.iCno, 1 );
-
-                    double dAmplitude = Abs( temp.from.iCno - temp.to.iCno ) * m_class_width / 2.0;
-                    double dAvrg      = Abs( temp.from.iCno + temp.to.iCno + 1 ) * m_class_width / 2.0 + m_range_min;
-
-                    YieldDamageOverTurningPoints( temp.from.nIdx_TP, temp.to.nIdx_TP, dAmplitude, DBL_NAN );
-                } /* end for */
-            } /* end if */
-            break;
-
-        default:
-            ASSERT( false ); 
-            break;
-
-    } /* end switch */
-} // end of DoRainflow
-
-
-template<class T> 
-double CRainflowMatrixT<T>::CalcDamage( double dAmplitude, double dAvrg, double dCounts ) const
+ 
+double CRainflow::CalcDamage( double dAmplitude, double dAvrg, double dCounts ) const
 {
     double dDamage;
     double dLW;
-    AmplTransform AmplTransform;
 
-
-    switch( m_AmplTrans_mode )
-    {
-        case 1:
-            dAmplitude = AmplTransform.Calc( dAmplitude, dAvrg, m_AmplTrans_dM, m_AmplTrans_dR, true /* bZielIstR */ );
-            break;
-
-        case 2:
-            dAmplitude = AmplTransform.Calc( dAmplitude, dAvrg, m_AmplTrans_dM, m_AmplTrans_dAvrg, false /* bZielIstR */ );   
-    }
+    Rainflow::at_transform( dAmplitude, dAvrg, &dAmplitude );
 
     if( dAmplitude > m_SNCurve.SD )
     {
@@ -2143,11 +1296,11 @@ double CRainflowMatrixT<T>::CalcDamage( double dAmplitude, double dAvrg, double 
     dDamage = dCounts / dLW;
     
     return dDamage;
-} // end of CalcDamage
+}
 
 
-template<class T>
-double CRainflowMatrixT<T>::GetBKZ( const VectorStufen& Stufen ) const 
+
+double CRainflow::GetBKZ( const VectorStufen& Stufen ) const 
 {
     double dDamageSum = 0.0;
 
@@ -2155,19 +1308,19 @@ double CRainflowMatrixT<T>::GetBKZ( const VectorStufen& Stufen ) const
     {
         ASSERT( false );
         return -1.0;
-    } // end if
+    }
 
     for( int i = 0; i < (int)Stufen.size(); i++ ) 
     {
         dDamageSum += CalcDamage( Stufen[i].dRange / 2.0, Stufen[i].dAvrg, Stufen[i].dCounts );
-    } // end for
+    }
 
     return dDamageSum;
-} // end of GetBKZ
+}
 
 
-template<class T>
-double CRainflowMatrixT<T>::GetBKZ( const VectorStufenAmpl& Stufen ) const 
+
+double CRainflow::GetBKZ( const VectorStufenAmpl& Stufen ) const 
 {
     double dDamageSum = 0.0;
 
@@ -2175,35 +1328,35 @@ double CRainflowMatrixT<T>::GetBKZ( const VectorStufenAmpl& Stufen ) const
     {
         ASSERT( false );
         return -1.0;
-    } // end if
+    }
 
     for( int i = 0; i < (int)Stufen.size(); i++ ) 
     {
         dDamageSum += CalcDamage( Stufen[i].dAmpl, 0.0 /* dAvrg */, Stufen[i].dCounts );
-    } // end for
+    }
 
     return dDamageSum;
-} // end of GetBKZ
+}
 
 
-template<class T>
-double CRainflowMatrixT<T>::GetBKZ() const 
+
+double CRainflow::GetBKZ() const 
 {
     if( !m_isParametrized ) 
     {
         ASSERT( false );
         return -1.0;
-    } // end if
+    }
 
     VectorStufen Stufen;
     GetStufen( Stufen );
 
     return GetBKZ( Stufen );
-} // end of GetBKZ
+}
 
 
-template<class T>
-double CRainflowMatrixT<T>::GetSumH( const VectorStufenAmpl& Stufen ) const 
+
+double CRainflow::GetSumH( const VectorStufenAmpl& Stufen ) const 
 {
     double dAmount = 0.0;
 
@@ -2211,35 +1364,35 @@ double CRainflowMatrixT<T>::GetSumH( const VectorStufenAmpl& Stufen ) const
     {
         ASSERT( false );
         return -1.0;
-    } // end if
+    }
 
     for( int i = 0; i < (int)Stufen.size(); i++ ) 
     {
         dAmount += Stufen[i].dCounts;
-    } // end for
+    }
 
     return dAmount;
-} // end of GetAmount
+}
 
 
-template<class T>
-double CRainflowMatrixT<T>::GetSumH() const 
+
+double CRainflow::GetSumH() const 
 {
     if( !m_isParametrized ) 
     {
         ASSERT( false );
         return -1.0;
-    } // end if
+    } 
 
     VectorStufenAmpl Stufen;
     GetStufen( Stufen );
 
     return GetSumH( Stufen );
-} // end of GetAmount
+}
 
 
-template<class T>
-double CRainflowMatrixT<T>::GetShapeValue( const VectorStufenAmpl& Stufen, double& dAele ) const 
+
+double CRainflow::GetShapeValue( const VectorStufenAmpl& Stufen, double& dAele ) const 
 {
     double dV       = 0.0;
     double dMaxAmpl = 0;    // Sa,1
@@ -2252,7 +1405,7 @@ double CRainflowMatrixT<T>::GetShapeValue( const VectorStufenAmpl& Stufen, doubl
     {
         ASSERT( false );
         return -1.0;
-    } // end if
+    }
 
     // Maximale Amplitude im Kollektiv suchen
     for( int i = 0; i < (int)Stufen.size(); i++ ) 
@@ -2260,8 +1413,8 @@ double CRainflowMatrixT<T>::GetShapeValue( const VectorStufenAmpl& Stufen, doubl
         if( Stufen[i].dCounts > 0 && Stufen[i].dAmpl > dMaxAmpl )
         {
             dMaxAmpl = Stufen[i].dAmpl;
-        } // end if
-    } // end for
+        }
+    }
 
     // Voelligkeitsgrad berechnen 
     // (Betriebsfestigkeit, Verfahren und Daten zur Bauteilberechnung, Erwin Haibach (2006), Springer Verlag)
@@ -2276,17 +1429,17 @@ double CRainflowMatrixT<T>::GetShapeValue( const VectorStufenAmpl& Stufen, doubl
             // dV += Stufen[i].dCounts / dSumH * pow( Stufen[i].dAmpl / dMaxAmpl, dSNk2 );  // TODO
             dV += Stufen[i].dCounts / dSumH * pow( Stufen[i].dAmpl / dMaxAmpl, dSNk1 );
         }
-    } // end for
+    }
 
     dAele = 1.0 / dV;  // Abstand zwischen Bauteil- und Lebensdauerlinie, Miner-elementar
 
     // Voelligkeitsmass zurueckgeben
     return pow( dV, 1.0 / dSNk1 );  // TODO
-} // end of GetShapeValue
+}
 
 
-template<class T>
-double CRainflowMatrixT<T>::GetShapeValue( const VectorStufenAmpl& Stufen ) const 
+
+double CRainflow::GetShapeValue( const VectorStufenAmpl& Stufen ) const 
 {
     double dAele;
 
@@ -2294,17 +1447,17 @@ double CRainflowMatrixT<T>::GetShapeValue( const VectorStufenAmpl& Stufen ) cons
 }
 
 
-template<class T>
-double CRainflowMatrixT<T>::GetShapeValue() const 
+
+double CRainflow::GetShapeValue() const 
 {
     if( !m_isParametrized ) 
     {
         ASSERT( false );
         return -1.0;
-    } // end if
+    }
 
     VectorStufenAmpl Stufen;
     GetStufen( Stufen );
     
     return GetShapeValue( Stufen );
-} // end of GetShapeValue
+}
