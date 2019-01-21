@@ -9,10 +9,9 @@
 -DRFC_AT_SUPPORT=0
 -xd
 rainflow.c 
-rainflow.h 
+rainflow.h
 config.h 
 config.h.in
 test/rfc_test.c
 test/long_series.c
-test/rfc_wrapper_test.cpp
-test/rfc_wrapper_test2.cpp
+test/rfc_wrapper_simple.cpp

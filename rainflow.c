@@ -171,7 +171,7 @@ static bool                 feed_finalize_tp                (       rfc_ctx_s *,
 static bool                 feed_finalize_hcm               (       rfc_ctx_s *, rfc_flags_e flags );
 #endif /*!RFC_HCM_SUPPORT*/
 static rfc_value_tuple_s *  feed_filter_pt                  (       rfc_ctx_s *, const rfc_value_tuple_s *pt );
-static void                 RFC_cycle_find_4ptm             (       rfc_ctx_s *, rfc_flags_e flags );
+static void                 cycle_find_4ptm                 (       rfc_ctx_s *, rfc_flags_e flags );
 #if RFC_HCM_SUPPORT
 static void                 cycle_find_hcm                  (       rfc_ctx_s *, rfc_flags_e flags );
 #endif /*RFC_HCM_SUPPORT*/
@@ -1513,6 +1513,7 @@ bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
 }
 
 
+#if !RFC_MINIMAL
 /**
  * @brief      Make rainflow matrix symmetrical
  *
@@ -1520,7 +1521,6 @@ bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
  *
  * @return     true on success
  */
-#if !RFC_MINIMAL
 bool RFC_rfm_make_symmetric( void *ctx )
 {
     unsigned       class_count;
@@ -4396,7 +4396,7 @@ void cycle_find( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
             case RFC_COUNTING_METHOD_NONE:
                 break;
             case RFC_COUNTING_METHOD_4PTM:
-                RFC_cycle_find_4ptm( rfc_ctx, flags );
+                cycle_find_4ptm( rfc_ctx, flags );
                 break;
 #if RFC_HCM_SUPPORT
             case RFC_COUNTING_METHOD_HCM:
@@ -4432,7 +4432,7 @@ void cycle_find( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
  * @param      flags    The flags
  */
 static
-void RFC_cycle_find_4ptm( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
+void cycle_find_4ptm( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
 {
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );

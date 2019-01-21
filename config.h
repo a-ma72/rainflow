@@ -4,7 +4,7 @@
 #ifndef RFC_VERSION_MAJOR
   #define RFC_VERSION_MAJOR       "0"
   #define RFC_VERSION_MINOR       "1"
-  #define RFC_USE_INTEGRAL_COUNTS  ON
+  #define RFC_USE_INTEGRAL_COUNTS  OFF
   #define RFC_MINIMAL              OFF
   #define RFC_TP_SUPPORT           ON
   #define RFC_HCM_SUPPORT          ON

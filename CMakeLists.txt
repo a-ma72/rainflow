@@ -58,7 +58,7 @@ target_compile_definitions( ${CMAKE_PROJECT_NAME} PRIVATE MATLAB_MEX_FILE _SCL_S
 target_link_libraries( ${CMAKE_PROJECT_NAME} ${Matlab_LIBRARIES} ${MATH_LIB} )
 
 # Test application, start project for MSVC
-add_executable( rfc_test rainflow.c test/rfc_test.c test/rfc_wrapper_test.cpp test/rfc_wrapper_test2.cpp )
+add_executable( rfc_test rainflow.c test/rfc_test.c test/rfc_wrapper_simple.cpp test/rfc_wrapper_advanced.cpp )
 target_compile_definitions( rfc_test PRIVATE _SCL_SECURE_NO_WARNINGS )
 target_link_libraries( rfc_test ${MATH_LIB} )
 target_sources( rfc_test PUBLIC greatest/greatest.h )

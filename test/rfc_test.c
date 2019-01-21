@@ -1355,19 +1355,22 @@ TEST RFC_at_test( void )
 }
 #endif /*RFC_AT_SUPPORT*/
 
-TEST RFC_CPP_wrapper_easy( void )
+TEST RFC_CPP_wrapper_simple( void )
 {
-    extern bool wrapper_test_easy( void );
-    ASSERT( wrapper_test_easy() );
+    extern bool wrapper_test_simple( void );
+    ASSERT( wrapper_test_simple() );
     PASS();
 }
 
+#if !RFC_MINIMAL
 TEST RFC_CPP_wrapper_advanced( void )
 {
     extern bool wrapper_test_advanced( void );
     ASSERT( wrapper_test_advanced() );
     PASS();
 }
+#endif /*!RFC_MINIMAL*/
+
 
 #if !RFC_MINIMAL
 TEST RFC_wl_math( void )
@@ -1656,8 +1659,10 @@ SUITE( RFC_TEST_SUITE )
     RUN_TEST1( RFC_small_example, 0 );
     RUN_TEST1( RFC_long_series, 0 );
     /* Test C++ Wrapper */
-    RUN_TEST( RFC_CPP_wrapper_easy );
+    RUN_TEST( RFC_CPP_wrapper_simple );
+#if !RFC_MINIMAL
     RUN_TEST( RFC_CPP_wrapper_advanced );
+#endif /*!RFC_MINIMAL*/
 #if !RFC_MINIMAL
     /* Residual methods */
     RUN_TEST( RFC_res_DIN45667 );

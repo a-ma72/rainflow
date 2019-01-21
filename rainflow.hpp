@@ -670,6 +670,11 @@ bool RainflowT<rfc_tp_storage>::at_init( const rfc_double_v &Sa, const rfc_doubl
 template< class rfc_tp_storage >
 bool RainflowT<rfc_tp_storage>::tp_set( size_t pos, rfc_value_tuple_s *tp )
 {
+    if( !tp || m_ctx.tp_locked )
+    {
+        return false;
+    }
+    
     if( pos )
     {
         if( pos > m_tp.size() )

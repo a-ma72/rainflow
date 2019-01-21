@@ -7,11 +7,11 @@
 /* Made extern "C", so that C-Code (rfc_test.c) can access this function (in a C++ module)
    C++ functions are usually "name mangeled", that is averted here! */
 extern "C"
-bool wrapper_test_easy( void )
+bool wrapper_test_simple( void )
 {
     namespace rf = rainflow_C;  /* Using a namespace alias to make it short */
 
-    rf::rfc_ctx ctx = { sizeof(ctx) };
+    rf::rfc_ctx_s ctx = { sizeof(ctx) };
 
     /* Just init and deinit here */
     return
