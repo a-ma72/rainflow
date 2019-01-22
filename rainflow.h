@@ -431,7 +431,7 @@ typedef  bool                       ( *rfc_finalize_fcn_t )      ( rfc_ctx_s *, 
 typedef  rfc_value_tuple_s *        ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, const rfc_value_tuple_s * );
 #if RFC_TP_SUPPORT
 typedef  bool                       ( *rfc_tp_set_fcn_t )        ( rfc_ctx_s *, size_t tp_pos, rfc_value_tuple_s * );
-typedef  bool                       ( *rfc_tp_get_fcn_t )        ( rfc_ctx_s *, size_t tp_pos, const rfc_value_tuple_s ** );
+typedef  bool                       ( *rfc_tp_get_fcn_t )        ( rfc_ctx_s *, size_t tp_pos, rfc_value_tuple_s ** );
 typedef  bool                       ( *rfc_tp_inc_damage_fcn_t ) ( rfc_ctx_s *, size_t tp_pos, double damage );
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT

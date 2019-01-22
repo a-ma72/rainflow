@@ -195,7 +195,7 @@ static void *               mem_alloc                       ( void *ptr, size_t 
 #if RFC_TP_SUPPORT
 /* Methods on turning points history */
 static bool                 tp_set                          (       rfc_ctx_s *, size_t tp_pos, rfc_value_tuple_s *pt );
-static bool                 tp_get                          (       rfc_ctx_s *, size_t tp_pos, const rfc_value_tuple_s **pt );
+static bool                 tp_get                          (       rfc_ctx_s *, size_t tp_pos, rfc_value_tuple_s **pt );
 static bool                 tp_inc_damage                   (       rfc_ctx_s *, size_t tp_pos, double damage );
 static void                 tp_lock                         (       rfc_ctx_s *, bool do_lock );
 static bool                 tp_refeed                       (       rfc_ctx_s *, rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param );
@@ -224,17 +224,12 @@ static rfc_value_t          value_delta                     (       rfc_value_t 
 #define CLASS_UPPER( r, c ) ( (double)(r)->class_width * (1.0 + (c)) + (r)->class_offset )
 #define NUMEL( x )          ( sizeof(x) / sizeof(*(x)) )
 
-#define CTX_CHECK_ARG                                                               \
+#define RFC_CTX_CHECK_AND_ASSIGN                                                    \
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;                                           \
                                                                                     \
     if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )                         \
     {                                                                               \
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );                            \
-    }                                                                               \
-                                                                                    \
-    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )    \
-    {                                                                               \
-        return false;                                                               \
     }                                                                               \
 
 
@@ -271,13 +266,8 @@ static rfc_value_t          value_delta                     (       rfc_value_t 
 bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
                           rfc_value_t hysteresis, rfc_flags_e flags )
 {
-    rfc_ctx_s         *rfc_ctx = (rfc_ctx_s*)ctx;
     rfc_value_tuple_s  nil     = { 0.0 };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
-    {
-        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-    }
+    RFC_CTX_CHECK_AND_ASSIGN
 
     if( rfc_ctx->state != RFC_STATE_INIT0 )
     {
@@ -488,12 +478,7 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
  */
 bool RFC_wl_init_elementary( void *ctx, double sx, double nx, double k )
 {
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
-    {
-        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-    }
+    RFC_CTX_CHECK_AND_ASSIGN
 
     if( rfc_ctx->state != RFC_STATE_INIT )
     {
@@ -683,9 +668,9 @@ bool RFC_wl_init_any( void *ctx, const rfc_wl_param_s* wl_param )
  */
 bool RFC_tp_init( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static )
 {
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+    RFC_CTX_CHECK_AND_ASSIGN
 
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || !tp )
+    if( !tp )
     {
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
@@ -717,12 +702,7 @@ bool RFC_tp_init( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_stati
  */
 bool RFC_tp_init_autoprune( void *ctx, bool autoprune, size_t size, size_t threshold )
 {
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
-    {
-        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-    }
+    RFC_CTX_CHECK_AND_ASSIGN
 
     if( rfc_ctx->state != RFC_STATE_INIT )
     {
@@ -749,12 +729,7 @@ bool RFC_tp_init_autoprune( void *ctx, bool autoprune, size_t size, size_t thres
  */
 bool RFC_tp_prune( void *ctx, size_t limit, rfc_flags_e flags )
 {
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
-    {
-        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-    }
+    RFC_CTX_CHECK_AND_ASSIGN
 
     if( rfc_ctx->tp_cnt > limit )
     {
@@ -905,9 +880,9 @@ bool RFC_tp_prune( void *ctx, size_t limit, rfc_flags_e flags )
  */
 bool RFC_dh_init( void *ctx, rfc_sd_method_e method, double *dh, size_t dh_cap, bool is_static )
 {
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+    RFC_CTX_CHECK_AND_ASSIGN
 
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || rfc_ctx->dh )
+    if( !rfc_ctx->dh )
     {
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
@@ -950,9 +925,9 @@ bool RFC_dh_init( void *ctx, rfc_sd_method_e method, double *dh, size_t dh_cap, 
 bool RFC_at_init( void *ctx, const double *Sa, const double *Sm, unsigned count, 
                              double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric )
 {
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+    RFC_CTX_CHECK_AND_ASSIGN
 
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || M < 0.0 )
+    if( M < 0.0 )
     {
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
@@ -1067,13 +1042,8 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm, unsigned count,
  */
 bool RFC_clear_counts( void *ctx )
 {
-    rfc_ctx_s         *rfc_ctx = (rfc_ctx_s*)ctx;
     rfc_value_tuple_s  nil     = { 0.0 };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
-    {
-        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-    }
+    RFC_CTX_CHECK_AND_ASSIGN
 
     if( rfc_ctx->state < RFC_STATE_INIT )
     {
@@ -1144,13 +1114,8 @@ bool RFC_clear_counts( void *ctx )
  */
 bool RFC_deinit( void *ctx )
 {
-    rfc_ctx_s         *rfc_ctx = (rfc_ctx_s*)ctx;
     rfc_value_tuple_s  nil     = { 0.0 };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
-    {
-        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-    }
+    RFC_CTX_CHECK_AND_ASSIGN
 
     if( rfc_ctx->state < RFC_STATE_INIT )
     {
@@ -1271,14 +1236,9 @@ bool RFC_deinit( void *ctx )
  */
 bool RFC_feed( void *ctx, const rfc_value_t * data, size_t data_count )
 {
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+    RFC_CTX_CHECK_AND_ASSIGN
 
     if( data_count && !data ) return false;
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
-    {
-        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-    }
 
     if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state >= RFC_STATE_FINISHED )
     {
@@ -1320,12 +1280,7 @@ bool RFC_feed( void *ctx, const rfc_value_t * data, size_t data_count )
 bool RFC_cycle_process_counts( void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_flags_e flags )
 {
     rfc_value_tuple_s from = {from_val}, to = {to_val};
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
-    {
-        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-    }
+    RFC_CTX_CHECK_AND_ASSIGN
 
     if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state >= RFC_STATE_FINISHED )
     {
@@ -1354,14 +1309,9 @@ bool RFC_cycle_process_counts( void *ctx, rfc_value_t from_val, rfc_value_t to_v
  */
 bool RFC_feed_scaled( void *ctx, const rfc_value_t * data, size_t data_count, double factor )
 {
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+    RFC_CTX_CHECK_AND_ASSIGN
 
     if( data_count && !data ) return false;
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
-    {
-        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-    }
 
     if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state >= RFC_STATE_FINISHED )
     {
@@ -1400,14 +1350,9 @@ bool RFC_feed_scaled( void *ctx, const rfc_value_t * data, size_t data_count, do
  */
 bool RFC_feed_tuple( void *ctx, rfc_value_tuple_s *data, size_t data_count )
 {
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+    RFC_CTX_CHECK_AND_ASSIGN
 
     if( data_count && !data ) return false;
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
-    {
-        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-    }
 
     if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state >= RFC_STATE_FINISHED )
     {
@@ -1440,14 +1385,9 @@ bool RFC_feed_tuple( void *ctx, rfc_value_tuple_s *data, size_t data_count )
  */
 bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
 {
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
     double damage;
     bool ok;
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
-    {
-        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-    }
+    RFC_CTX_CHECK_AND_ASSIGN
     
     if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state >= RFC_STATE_FINISHED )
     {
@@ -1536,12 +1476,7 @@ bool RFC_rfm_make_symmetric( void *ctx )
     unsigned       from, to;
     rfc_counts_t  *rfm;
 
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
-    {
-        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-    }
+    RFC_CTX_CHECK_AND_ASSIGN
     
     if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state >= RFC_STATE_FINISHED )
     {
@@ -1589,9 +1524,9 @@ bool RFC_rfm_get( const void *ctx, rfc_rfm_item_s **buffer, unsigned *count )
     rfc_counts_t       *rfm_it;
     rfc_rfm_item_s     *item;
 
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+    RFC_CTX_CHECK_AND_ASSIGN
 
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || !buffer || !count )
+    if( !buffer || !count )
     {
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
@@ -1669,9 +1604,9 @@ bool RFC_rfm_set( void *ctx, const rfc_rfm_item_s *buffer, unsigned count, bool 
     const rfc_rfm_item_s    *item;
           rfc_counts_t      *rfm;
 
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+    RFC_CTX_CHECK_AND_ASSIGN
 
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || !buffer )
+    if( !buffer )
     {
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
@@ -1732,12 +1667,7 @@ bool RFC_rfm_peek( const void *ctx, rfc_value_t from_val, rfc_value_t to_val, rf
     unsigned           class_count;
     rfc_counts_t      *rfm;
 
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
-    {
-        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-    }
+    RFC_CTX_CHECK_AND_ASSIGN
     
     if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
     {
@@ -1788,12 +1718,7 @@ bool RFC_rfm_poke( void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_coun
     unsigned           class_count;
     rfc_counts_t      *rfm;
 
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
-    {
-        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-    }
+    RFC_CTX_CHECK_AND_ASSIGN
     
     if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
     {
@@ -1849,12 +1774,7 @@ bool RFC_rfm_sum( const void *ctx, unsigned from_first, unsigned from_last, unsi
     unsigned         class_count;
     rfc_counts_t    *rfm;
 
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
-    {
-        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-    }
+    RFC_CTX_CHECK_AND_ASSIGN
     
     if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
     {
@@ -1915,12 +1835,7 @@ bool RFC_rfm_damage( const void *ctx, unsigned from_first, unsigned from_last, u
     unsigned          class_count;
     rfc_counts_t     *rfm;
 
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || !damage )
-    {
-        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-    }
+    RFC_CTX_CHECK_AND_ASSIGN
     
     if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
     {
@@ -1981,12 +1896,7 @@ bool RFC_rfm_check( const void *ctx )
     unsigned          class_count;
     rfc_counts_t     *rfm;
 
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
-
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
-    {
-        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-    }
+    RFC_CTX_CHECK_AND_ASSIGN
     
     if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
     {
@@ -2032,9 +1942,9 @@ bool RFC_lc_get( const void *ctx, rfc_counts_t *lc, rfc_value_t *level )
     unsigned i;
     unsigned class_count;
 
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+    RFC_CTX_CHECK_AND_ASSIGN
 
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || !lc )
+    if( !lc )
     {
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
@@ -2083,9 +1993,9 @@ bool RFC_lc_from_rfm( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, con
     bool                 up = flags & RFC_FLAGS_COUNT_LC_UP;
     bool                 dn = flags & RFC_FLAGS_COUNT_LC_DN;
 
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+    RFC_CTX_CHECK_AND_ASSIGN
 
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || !lc )
+    if( !lc )
     {
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
@@ -2159,9 +2069,9 @@ bool RFC_lc_from_residue( const void *ctx, rfc_counts_t* lc, rfc_value_t *level,
           bool               dn   = flags & RFC_FLAGS_COUNT_LC_DN;
     const rfc_value_tuple_s *from;
 
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+    RFC_CTX_CHECK_AND_ASSIGN
 
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || !lc )
+    if( !lc )
     {
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
@@ -2242,9 +2152,9 @@ bool RFC_rp_get( const void *ctx, rfc_counts_t *rp, rfc_value_t *class_means )
     unsigned i;
     unsigned class_count;
 
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+    RFC_CTX_CHECK_AND_ASSIGN
 
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || !rp )
+    if( !rp )
     {
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
@@ -2290,9 +2200,9 @@ bool RFC_rp_from_rfm( const void *ctx, rfc_counts_t *rp, rfc_value_t *class_mean
     unsigned    i, j;
     unsigned    class_count;
 
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+    RFC_CTX_CHECK_AND_ASSIGN
 
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || !rp )
+    if( !rp )
     {
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
@@ -2359,9 +2269,9 @@ bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_valu
           double      D;             /* Cumulative damage */
           int         i, j;
 
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+    RFC_CTX_CHECK_AND_ASSIGN
 
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || !damage )
+    if( !damage )
     {
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
@@ -2578,9 +2488,9 @@ bool RFC_damage_from_rfm( const void *ctx, const rfc_counts_t *rfm, double *dama
     unsigned    class_count;
     double      D;
 
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+    RFC_CTX_CHECK_AND_ASSIGN
 
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || !damage )
+    if( !damage )
     {
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
@@ -2820,7 +2730,12 @@ bool RFC_wl_calc_n( const void *ctx, double s0, double n0, double k, double sa, 
  */
 bool RFC_class_param_set( void *ctx, const rfc_class_param_s *class_param )
 {
-    CTX_CHECK_ARG
+    RFC_CTX_CHECK_AND_ASSIGN
+
+    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
+    {
+        return false;
+    }
 
     if( !class_param                          || 
          rfc_ctx->state     != RFC_STATE_INIT || 
@@ -2848,7 +2763,7 @@ bool RFC_class_param_set( void *ctx, const rfc_class_param_s *class_param )
  */
 bool RFC_class_param_get( const void *ctx, rfc_class_param_s *class_param )
 {
-    CTX_CHECK_ARG
+    RFC_CTX_CHECK_AND_ASSIGN
 
     if( !class_param                     ||
          rfc_ctx->state < RFC_STATE_INIT )
@@ -2874,8 +2789,13 @@ bool RFC_class_param_get( const void *ctx, rfc_class_param_s *class_param )
  */
 bool RFC_wl_param_set( void *ctx, const rfc_wl_param_s *wl_param )
 {
-    CTX_CHECK_ARG
+    RFC_CTX_CHECK_AND_ASSIGN
 
+    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
+    {
+        return false;
+    }
+    
     if( !wl_param                        ||
          rfc_ctx->state < RFC_STATE_INIT )
     {
@@ -2906,8 +2826,13 @@ bool RFC_wl_param_set( void *ctx, const rfc_wl_param_s *wl_param )
  */
 bool RFC_wl_param_get( const void *ctx, rfc_wl_param_s *wl_param )
 {
-    CTX_CHECK_ARG
+    RFC_CTX_CHECK_AND_ASSIGN
 
+    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
+    {
+        return false;
+    }
+    
     if( !wl_param                        ||
          rfc_ctx->state < RFC_STATE_INIT )
     {
@@ -2947,9 +2872,9 @@ bool RFC_at_transform( const void *ctx, double Sa, double Sm, double *Sa_transfo
 {
     double Sa_transform = Sa;
 
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+    RFC_CTX_CHECK_AND_ASSIGN
 
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) || !Sa_transformed )
+    if( !Sa_transformed )
     {
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
@@ -5065,7 +4990,7 @@ bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
  * @return     true on success
  */
 static
-bool tp_get( rfc_ctx_s *rfc_ctx, size_t tp_pos, const rfc_value_tuple_s **tp )
+bool tp_get( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s **tp )
 {
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state <= RFC_STATE_FINISHED );

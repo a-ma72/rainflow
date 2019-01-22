@@ -52,7 +52,7 @@ namespace RF = RFC_CPP_NAMESPACE;
 extern "C"
 {
     static bool  tp_set           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp );
-    static bool  tp_get           ( RF::rfc_ctx_s* ctx, size_t tp_pos, const RF::rfc_value_tuple_s **tp );
+    static bool  tp_get           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp );
     static bool  tp_inc_damage    ( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage );
     static void* mem_alloc        ( void *ptr, size_t num, size_t size, RF::rfc_mem_aim_e aim );
 }
@@ -262,7 +262,7 @@ public:
 
     /* Delegates */
     bool    tp_set                  ( size_t tp_pos, rfc_value_tuple_s *tp );
-    bool    tp_get                  ( size_t tp_pos, const rfc_value_tuple_s **tp ) const;
+    bool    tp_get                  ( size_t tp_pos, rfc_value_tuple_s **tp );
     bool    tp_inc_damage           ( size_t tp_pos, double damage );
     static
     void*   mem_alloc               ( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim );
@@ -719,7 +719,7 @@ bool RainflowT<rfc_tp_storage>::tp_set( size_t tp_pos, rfc_value_tuple_s *tp )
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::tp_get( size_t pos, const rfc_value_tuple_s **tp ) const
+bool RainflowT<rfc_tp_storage>::tp_get( size_t pos, rfc_value_tuple_s **tp )
 {
     if( !tp || !pos || pos > m_tp.size() )
     {
@@ -778,7 +778,7 @@ extern "C"
     }
 
     static
-    bool tp_get( RF::rfc_ctx_s* ctx, size_t tp_pos, const RF::rfc_value_tuple_s **tp )
+    bool tp_get( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp )
     {
         return ctx && static_cast<Rainflow*>(ctx->internal.obj)->tp_get( tp_pos, tp );
     }

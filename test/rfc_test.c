@@ -1355,22 +1355,6 @@ TEST RFC_at_test( void )
 }
 #endif /*RFC_AT_SUPPORT*/
 
-TEST RFC_CPP_wrapper_simple( void )
-{
-    extern bool wrapper_test_simple( void );
-    ASSERT( wrapper_test_simple() );
-    PASS();
-}
-
-#if !RFC_MINIMAL
-TEST RFC_CPP_wrapper_advanced( void )
-{
-    extern int wrapper_test_advanced( void );
-    ASSERT( wrapper_test_advanced() );
-    PASS();
-}
-#endif /*!RFC_MINIMAL*/
-
 
 #if !RFC_MINIMAL
 TEST RFC_wl_math( void )
@@ -1658,8 +1642,6 @@ SUITE( RFC_TEST_SUITE )
     RUN_TEST1( RFC_cycle_down, 0 );
     RUN_TEST1( RFC_small_example, 0 );
     RUN_TEST1( RFC_long_series, 0 );
-    /* Test C++ Wrapper */
-    RUN_TEST( RFC_CPP_wrapper_simple );
 #if !RFC_MINIMAL
     /* Residual methods */
     RUN_TEST( RFC_res_DIN45667 );
@@ -1711,8 +1693,11 @@ int main( int argc, char *argv[] )
     RUN_SUITE( RFC_TEST_SUITE );
 #if !RFC_MINIMAL
     {
-        GREATEST_SUITE_EXTERN( RFC_TEST_SUITE_ADVANCED );
-        RUN_SUITE( RFC_TEST_SUITE_ADVANCED );
+        /* Test C++ Wrapper */
+        GREATEST_SUITE_EXTERN( RFC_WRAPPER_SUITE_SIMPLE );
+        GREATEST_SUITE_EXTERN( RFC_WRAPPER_SUITE_ADVANCED );
+        RUN_SUITE( RFC_WRAPPER_SUITE_SIMPLE );
+        RUN_SUITE( RFC_WRAPPER_SUITE_ADVANCED );
     }
 #endif /*!RFC_MINIMAL*/
     GREATEST_MAIN_END();        /* display results */
