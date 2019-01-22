@@ -398,6 +398,10 @@ bool    RFC_wl_calc_sd              ( const void *ctx, double s0, double n0, dou
 bool    RFC_wl_calc_k2              ( const void *ctx, double s0, double n0, double k, double  sx, double nx, double *k2, double  sd, double nd );
 bool    RFC_wl_calc_sa              ( const void *ctx, double s0, double n0, double k, double  n,  double *sa );
 bool    RFC_wl_calc_n               ( const void *ctx, double s0, double n0, double k, double  sa, double *n );
+bool    RFC_wl_param_set            (       void *ctx, const rfc_wl_param_s * );
+bool    RFC_wl_param_get            ( const void *ctx, rfc_wl_param_s * );
+bool    RFC_class_param_set         (       void *ctx, const rfc_class_param_s * );
+bool    RFC_class_param_get         ( const void *ctx, rfc_class_param_s * );
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
 bool    RFC_tp_init                 (       void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
@@ -427,7 +431,7 @@ typedef  bool                       ( *rfc_finalize_fcn_t )      ( rfc_ctx_s *, 
 typedef  rfc_value_tuple_s *        ( *rfc_tp_next_fcn_t )       ( rfc_ctx_s *, const rfc_value_tuple_s * );
 #if RFC_TP_SUPPORT
 typedef  bool                       ( *rfc_tp_set_fcn_t )        ( rfc_ctx_s *, size_t tp_pos, rfc_value_tuple_s * );
-typedef  bool                       ( *rfc_tp_get_fcn_t )        ( rfc_ctx_s *, size_t tp_pos, rfc_value_tuple_s ** );
+typedef  bool                       ( *rfc_tp_get_fcn_t )        ( rfc_ctx_s *, size_t tp_pos, const rfc_value_tuple_s ** );
 typedef  bool                       ( *rfc_tp_inc_damage_fcn_t ) ( rfc_ctx_s *, size_t tp_pos, double damage );
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT

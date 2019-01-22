@@ -68,7 +68,7 @@
  * []  "Zaelverfahren und Lastannahme in der Betriebsfestigkeit";
  *     Michael Koehler, Sven Jenne / Kurt Poetter, Harald Zenner; Springer-Verlag Berlin Heidelberg 2012
  *
- *                                                                                                                                                          *
+ *
  *================================================================================
  * BSD 2-Clause License
  * 
@@ -195,7 +195,7 @@ static void *               mem_alloc                       ( void *ptr, size_t 
 #if RFC_TP_SUPPORT
 /* Methods on turning points history */
 static bool                 tp_set                          (       rfc_ctx_s *, size_t tp_pos, rfc_value_tuple_s *pt );
-static bool                 tp_get                          (       rfc_ctx_s *, size_t tp_pos, rfc_value_tuple_s **pt );
+static bool                 tp_get                          (       rfc_ctx_s *, size_t tp_pos, const rfc_value_tuple_s **pt );
 static bool                 tp_inc_damage                   (       rfc_ctx_s *, size_t tp_pos, double damage );
 static void                 tp_lock                         (       rfc_ctx_s *, bool do_lock );
 static bool                 tp_refeed                       (       rfc_ctx_s *, rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param );
@@ -208,12 +208,6 @@ static bool                 at_R_to_Sm_norm                 (       rfc_ctx_s *,
 static bool                 at_alleviation                  (       rfc_ctx_s *, double Sm_norm, double *alleviation );
 #endif /*RFC_AT_SUPPORT*/
 /* Other */
-#if !RFC_MINIMAL
-static void                 class_param_set                 (       rfc_ctx_s *, const rfc_class_param_s * );
-static void                 class_param_get                 ( const rfc_ctx_s *, rfc_class_param_s * );
-static void                 wl_param_set                    (       rfc_ctx_s *, const rfc_wl_param_s * );
-static void                 wl_param_get                    ( const rfc_ctx_s *, rfc_wl_param_s * );
-#endif /*!RFC_MINIMAL*/
 static bool                 damage_calc_amplitude           (       rfc_ctx_s *, double Sa, double *damage );
 static bool                 damage_calc                     (       rfc_ctx_s *, unsigned class_from, unsigned class_to, double *damage, double *Sa_ret );
 #if RFC_DAMAGE_FAST
@@ -229,6 +223,20 @@ static rfc_value_t          value_delta                     (       rfc_value_t 
 #define CLASS_MEAN( r, c )  ( (double)(r)->class_width * (0.5 + (c)) + (r)->class_offset )
 #define CLASS_UPPER( r, c ) ( (double)(r)->class_width * (1.0 + (c)) + (r)->class_offset )
 #define NUMEL( x )          ( sizeof(x) / sizeof(*(x)) )
+
+#define CTX_CHECK_ARG                                                               \
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;                                           \
+                                                                                    \
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )                         \
+    {                                                                               \
+        return error_raise( rfc_ctx, RFC_ERROR_INVARG );                            \
+    }                                                                               \
+                                                                                    \
+    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )    \
+    {                                                                               \
+        return false;                                                               \
+    }                                                                               \
+
 
 
 #if !RFC_TP_SUPPORT
@@ -406,7 +414,7 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
 #if !RFC_MINIMAL
     /* Make a shadow copy of the Woehler curve parameters */
     rfc_ctx->state = RFC_STATE_INIT;   /* Bypass sanity check for state in wl_init() */
-    wl_param_get( rfc_ctx, &rfc_ctx->internal.wl );
+    RFC_wl_param_get( rfc_ctx, &rfc_ctx->internal.wl );
     rfc_ctx->state = RFC_STATE_INIT0;  /* Reset state */
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
@@ -512,7 +520,7 @@ bool RFC_wl_init_elementary( void *ctx, double sx, double nx, double k )
     rfc_ctx->wl_omission  =  0.0;            /* No omission per default */
 
     /* Make a shadow copy of the Woehler parameters */
-    wl_param_get( rfc_ctx, &rfc_ctx->internal.wl );
+    RFC_wl_param_get( rfc_ctx, &rfc_ctx->internal.wl );
 #endif /*!RFC_MINIMAL*/
 
 #if RFC_DAMAGE_FAST
@@ -558,7 +566,7 @@ bool RFC_wl_init_original( void *ctx, double sd, double nd, double k )
     rfc_ctx->wl_nd = nd;
 
     /* Make a shadow copy of the Woehler parameters */
-    wl_param_get( rfc_ctx, &rfc_ctx->internal.wl );
+    RFC_wl_param_get( rfc_ctx, &rfc_ctx->internal.wl );
 
 #if RFC_DAMAGE_FAST
     if( rfc_ctx->damage_lut )
@@ -603,7 +611,7 @@ bool RFC_wl_init_modified( void *ctx, double sx, double nx, double k, double k2 
     rfc_ctx->wl_q2 =  fabs(k2) - 1;     /* Default value for fatigue strength depression */
 
     /* Make a shadow copy of the Woehler parameters */
-    wl_param_get( rfc_ctx, &rfc_ctx->internal.wl );
+    RFC_wl_param_get( rfc_ctx, &rfc_ctx->internal.wl );
 
 #if RFC_DAMAGE_FAST
     if( rfc_ctx->damage_lut )
@@ -648,7 +656,7 @@ bool RFC_wl_init_any( void *ctx, const rfc_wl_param_s* wl_param )
     rfc_ctx->wl_omission =  wl_param->omission;
 
     /* Make a shadow copy of the Woehler parameters */
-    wl_param_get( rfc_ctx, &rfc_ctx->internal.wl );
+    RFC_wl_param_get( rfc_ctx, &rfc_ctx->internal.wl );
 
 #if RFC_DAMAGE_FAST
     if( rfc_ctx->damage_lut )
@@ -1459,6 +1467,7 @@ bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
         int flags = rfc_ctx->internal.flags;
 
 #if !RFC_MINIMAL
+        /* Level crossing counting is already considered for residue */
         flags &= ~RFC_FLAGS_COUNT_LC;
 #endif /*!RFC_MINIMAL*/
 
@@ -1507,8 +1516,8 @@ bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
     }
 
     rfc_ctx->damage_residue = rfc_ctx->damage - damage;
+    rfc_ctx->state          = ok ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
 
-    rfc_ctx->state = ok ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
     return ok;
 }
 
@@ -2403,7 +2412,7 @@ bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_valu
         }
 
         /* Backup WL parameters */
-        wl_param_get( rfc_ctx, &wl );
+        RFC_wl_param_get( rfc_ctx, &wl );
 
         /* Remove fatigue strength temporarily */
         rfc_ctx->wl_sd = 0.0;
@@ -2463,7 +2472,7 @@ bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_valu
         }
 
         /* Restore WL parameters */
-        wl_param_set( rfc_ctx, &wl );
+        RFC_wl_param_set( rfc_ctx, &wl );
 
         if( !ok ) return false;
 
@@ -2475,7 +2484,7 @@ bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_valu
         rfc_wl_param_s  wl;
         bool ok;
 
-        (void)wl_param_get( rfc_ctx, &wl );
+        (void)RFC_wl_param_get( rfc_ctx, &wl );
 
         rfc_ctx->wl_sd = 0.0;
         rfc_ctx->wl_nd = DBL_MAX;
@@ -2492,7 +2501,7 @@ bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_valu
         ok = damage_from_rp( rfc_ctx, rp, Sa, damage, RFC_RP_DAMAGE_CALC_TYPE_DEFAULT );
 #endif /*RFC_DAMAGE_FAST*/
 
-        (void)wl_param_set( rfc_ctx, &wl );
+        (void)RFC_wl_param_set( rfc_ctx, &wl );
 
         return ok;
     }
@@ -2501,7 +2510,7 @@ bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_valu
         rfc_wl_param_s wl;
         bool ok;
 
-        (void)wl_param_get( rfc_ctx, &wl );
+        (void)RFC_wl_param_get( rfc_ctx, &wl );
 
         rfc_ctx->wl_sd = 0.0;
         rfc_ctx->wl_nd = DBL_MAX;
@@ -2516,7 +2525,7 @@ bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_valu
         ok = damage_from_rp( rfc_ctx, rp, Sa, damage, RFC_RP_DAMAGE_CALC_TYPE_DEFAULT );
 #endif /*RFC_DAMAGE_FAST*/
 
-        (void)wl_param_set( rfc_ctx, &wl );
+        (void)RFC_wl_param_set( rfc_ctx, &wl );
 
         return ok;
     }
@@ -2796,6 +2805,125 @@ bool RFC_wl_calc_n( const void *ctx, double s0, double n0, double k, double sa, 
     }
 
     *n = pow( s0 / sa, k ) * n0;
+
+    return true;
+}
+
+
+/**
+ * @brief      Set class parameter.
+ *
+ * @param      ctx          The rainflow context
+ * @param[in]  class_param  The new class parameter
+ *
+ * @return     true on success
+ */
+bool RFC_class_param_set( void *ctx, const rfc_class_param_s *class_param )
+{
+    CTX_CHECK_ARG
+
+    if( !class_param                          || 
+         rfc_ctx->state     != RFC_STATE_INIT || 
+         class_param->count <= 0              || 
+         class_param->width <= 0.0            )
+    {
+        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
+    }
+
+    rfc_ctx->class_count  = class_param->count;
+    rfc_ctx->class_width  = class_param->width;
+    rfc_ctx->class_offset = class_param->offset;
+
+    return true;
+}
+
+
+/**
+ * @brief      Get class parameter.
+ *
+ * @param      ctx          The rainflow context
+ * @param[out] class_param  The class parameter
+ *
+ * @return     true on success
+ */
+bool RFC_class_param_get( const void *ctx, rfc_class_param_s *class_param )
+{
+    CTX_CHECK_ARG
+
+    if( !class_param                     ||
+         rfc_ctx->state < RFC_STATE_INIT )
+    {
+        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
+    }
+
+    class_param->count  = rfc_ctx->class_count;
+    class_param->width  = rfc_ctx->class_width;
+    class_param->offset = rfc_ctx->class_offset;
+
+    return true;
+}
+
+
+/**
+ * @brief      Set Woehler curve parameters
+ *
+ * @param      ctx       The rainflow context
+ * @param[in]  wl_param  The Woehler curve parameters
+ *
+ * @return     true on success
+ */
+bool RFC_wl_param_set( void *ctx, const rfc_wl_param_s *wl_param )
+{
+    CTX_CHECK_ARG
+
+    if( !wl_param                        ||
+         rfc_ctx->state < RFC_STATE_INIT )
+    {
+        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
+    }
+
+    rfc_ctx->wl_sx          = wl_param->sx;
+    rfc_ctx->wl_nx          = wl_param->nx;
+    rfc_ctx->wl_k           = wl_param->k;
+    rfc_ctx->wl_q           = wl_param->q;
+    rfc_ctx->wl_sd          = wl_param->sd;
+    rfc_ctx->wl_nd          = wl_param->nd;
+    rfc_ctx->wl_k2          = wl_param->k2;
+    rfc_ctx->wl_q2          = wl_param->q2;
+    rfc_ctx->wl_omission    = wl_param->omission;
+
+    return true;
+}
+
+
+/**
+ * @brief      Get Woehler curve parameters
+ *
+ * @param      ctx       The rainflow context
+ * @param[out] wl_param  The Woehler curve parameters
+ *
+ * @return     true on success
+ */
+bool RFC_wl_param_get( const void *ctx, rfc_wl_param_s *wl_param )
+{
+    CTX_CHECK_ARG
+
+    if( !wl_param                        ||
+         rfc_ctx->state < RFC_STATE_INIT )
+    {
+        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
+    }
+
+    wl_param->sx            = rfc_ctx->wl_sx;
+    wl_param->nx            = rfc_ctx->wl_nx;
+    wl_param->k             = rfc_ctx->wl_k;
+    wl_param->q             = rfc_ctx->wl_q;
+    wl_param->sd            = rfc_ctx->wl_sd;
+    wl_param->nd            = rfc_ctx->wl_nd;
+    wl_param->q2            = rfc_ctx->wl_q2;
+    wl_param->k2            = rfc_ctx->wl_k2;
+    wl_param->omission      = rfc_ctx->wl_omission;
+    wl_param->D             = 0.0;
 
     return true;
 }
@@ -4677,8 +4805,8 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
                 double          D_con;                             /* Current damage, Miners' consequent rule */
 
                 /* Backup Woehler curve parameters and use shadowed ones for the impaired part instead */
-                wl_param_get( rfc_ctx, &wl_unimp );
-                wl_param_set( rfc_ctx,  wl_imp );
+                RFC_wl_param_get( rfc_ctx, &wl_unimp );
+                RFC_wl_param_set( rfc_ctx,  wl_imp );
 
 #if RFC_DAMAGE_FAST
                 if( rfc_ctx->damage_lut )
@@ -4730,9 +4858,9 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
                     }
                 }
 
-                wl_param_get( rfc_ctx, wl_imp );
+                RFC_wl_param_get( rfc_ctx, wl_imp );
                 rfc_ctx->internal.wl.D = D_con;
-                wl_param_set( rfc_ctx, &wl_unimp );
+                RFC_wl_param_set( rfc_ctx, &wl_unimp );
             }
 #endif /*!RFC_MINIMAL*/
         }
@@ -4816,11 +4944,18 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
 
 #if RFC_TP_SUPPORT
 /**
- * @brief         Append or alter a turning point in its storage
+ * @brief         Append or alter a turning point in its storage.
  *
- * @param         rfc_ctx  The rainflow context
- * @param[in]     tp_pos   The position, if 0 tp (if new) is appended. If >0 existing point is altered
- * @param[in,out] tp       The turning point
+ *                Attention: Consider tp_locked! tp_cnt and tp_cap have to
+ *                reflect storage state!
+ *
+ * @param         rfc_ctx    The rainflow context
+ * @param[in]     tp_pos     The position. If tp_pos==0 and tp->tp_pos==0, tp
+ *                           will be appended. If tp_pos==0 and tp->tp_pos>0,
+ *                           only the position tp->tp_pos is altered. If
+ *                           tp_pos>0 the existing turning point is overwritten
+ *                           by tp.
+ * @param[in,out] tp         The turning point
  *
  * @return        true on success
  */
@@ -4830,6 +4965,11 @@ bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state <= RFC_STATE_FINISHED );
     assert( tp );
+
+    if( !tp || rfc_ctx->tp_locked )
+    {
+        return false;
+    }
 
 #if RFC_USE_DELEGATES
     /* Check for delegates */
@@ -4846,25 +4986,21 @@ bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
             return true;
         }
 
-        if( !tp || rfc_ctx->tp_locked )
-        {
-            return false;
-        }
-
         /* Check to append or alter */
         if( tp_pos )
         {
-            /* Alter */
+            /* Alter or move existing turning point */
             assert( tp_pos <= rfc_ctx->tp_cnt );
-            tp->tp_pos                = 0;
-            rfc_ctx->tp[ tp_pos - 1 ] = *tp;
-            tp->tp_pos                = tp_pos;
+
+            tp->tp_pos                =  0;        /* No position information for turning points in its storage */
+            rfc_ctx->tp[ tp_pos - 1 ] = *tp;       /* Move or replace turning point */
+            tp->tp_pos                =  tp_pos;   /* Ping back the position (commonly tp lies in residue buffer) */
 
             return true;
         }
         else
         {
-            /* Append */
+            /* Append (tp_pos == 0) */
             if( tp->tp_pos )
             {
                 /* Already an element of tp stack */
@@ -4874,6 +5010,7 @@ bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
             }
             else
             {
+                /* Append tp at the tail */
                 tp_pos = ++rfc_ctx->tp_cnt;
             }
         }
@@ -4928,7 +5065,7 @@ bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
  * @return     true on success
  */
 static
-bool tp_get( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s **tp )
+bool tp_get( rfc_ctx_s *rfc_ctx, size_t tp_pos, const rfc_value_tuple_s **tp )
 {
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state <= RFC_STATE_FINISHED );
@@ -5082,10 +5219,10 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
             }
 #endif /*RFC_AT_SUPPORT*/
         }
-        class_param_set( rfc_ctx, new_class_param );
+        RFC_class_param_set( rfc_ctx, new_class_param );
         damage_lut_init( rfc_ctx );
 #else /*!RFC_DAMAGE_FAST*/
-        class_param_set( rfc_ctx, new_class_param );
+        RFC_class_param_set( rfc_ctx, new_class_param );
 #endif /*RFC_DAMAGE_FAST*/
     }
 
@@ -5468,94 +5605,7 @@ void * mem_alloc( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim )
     }
 }
 
-#if !RFC_MINIMAL
-/**
- * @brief      Set class parameter.
- *
- * @param      rfc_ctx      The rainflow context
- * @param[in]  class_param  The new class parameter
- */
-static
-void class_param_set( rfc_ctx_s *rfc_ctx, const rfc_class_param_s *class_param )
-{
-    assert( rfc_ctx && class_param );
-    assert( rfc_ctx->state == RFC_STATE_INIT );
 
-    assert( class_param->count > 0 );
-    assert( class_param->width > 0.0 );
-
-    rfc_ctx->class_count  = class_param->count;
-    rfc_ctx->class_width  = class_param->width;
-    rfc_ctx->class_offset = class_param->offset;
-}
-
-
-/**
- * @brief      Get class parameter.
- *
- * @param      rfc_ctx      The rainflow context
- * @param[out] class_param  The class parameter
- */
-static
-void class_param_get( const rfc_ctx_s *rfc_ctx, rfc_class_param_s *class_param )
-{
-    assert( rfc_ctx && class_param );
-    assert( rfc_ctx->state >= RFC_STATE_INIT );
-
-    class_param->count  = rfc_ctx->class_count;
-    class_param->width  = rfc_ctx->class_width;
-    class_param->offset = rfc_ctx->class_offset;
-}
-
-
-/**
- * @brief      Set Woehler curve parameters
- *
- * @param      rfc_ctx   The rainflow context
- * @param[in]  wl_param  The Woehler curve parameters
- */
-static
-void wl_param_set( rfc_ctx_s *rfc_ctx, const rfc_wl_param_s *wl_param )
-{
-    assert( rfc_ctx && wl_param );
-    assert( rfc_ctx->state >= RFC_STATE_INIT );
-
-    rfc_ctx->wl_sx          = wl_param->sx;
-    rfc_ctx->wl_nx          = wl_param->nx;
-    rfc_ctx->wl_k           = wl_param->k;
-    rfc_ctx->wl_q           = wl_param->q;
-    rfc_ctx->wl_sd          = wl_param->sd;
-    rfc_ctx->wl_nd          = wl_param->nd;
-    rfc_ctx->wl_k2          = wl_param->k2;
-    rfc_ctx->wl_q2          = wl_param->q2;
-    rfc_ctx->wl_omission    = wl_param->omission;
-}
-
-
-/**
- * @brief      Get Woehler curve parameters
- *
- * @param      rfc_ctx   The rainflow context
- * @param[out] wl_param  The Woehler curve parameters
- */
-static
-void wl_param_get( const rfc_ctx_s *rfc_ctx, rfc_wl_param_s *wl_param )
-{
-    assert( rfc_ctx && wl_param );
-    assert( rfc_ctx->state >= RFC_STATE_INIT );
-
-    wl_param->sx            = rfc_ctx->wl_sx;
-    wl_param->nx            = rfc_ctx->wl_nx;
-    wl_param->k             = rfc_ctx->wl_k;
-    wl_param->q             = rfc_ctx->wl_q;
-    wl_param->sd            = rfc_ctx->wl_sd;
-    wl_param->nd            = rfc_ctx->wl_nd;
-    wl_param->q2            = rfc_ctx->wl_q2;
-    wl_param->k2            = rfc_ctx->wl_k2;
-    wl_param->omission      = rfc_ctx->wl_omission;
-    wl_param->D             = 0.0;
-}
-#endif /*!RFC_MINIMAL*/
 
 
 /*********************************************************************************************************/

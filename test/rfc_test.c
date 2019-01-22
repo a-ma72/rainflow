@@ -1365,7 +1365,7 @@ TEST RFC_CPP_wrapper_simple( void )
 #if !RFC_MINIMAL
 TEST RFC_CPP_wrapper_advanced( void )
 {
-    extern bool wrapper_test_advanced( void );
+    extern int wrapper_test_advanced( void );
     ASSERT( wrapper_test_advanced() );
     PASS();
 }
@@ -1661,9 +1661,6 @@ SUITE( RFC_TEST_SUITE )
     /* Test C++ Wrapper */
     RUN_TEST( RFC_CPP_wrapper_simple );
 #if !RFC_MINIMAL
-    RUN_TEST( RFC_CPP_wrapper_advanced );
-#endif /*!RFC_MINIMAL*/
-#if !RFC_MINIMAL
     /* Residual methods */
     RUN_TEST( RFC_res_DIN45667 );
     RUN_TEST( RFC_res_repeated );
@@ -1686,7 +1683,6 @@ SUITE( RFC_TEST_SUITE )
     RUN_TEST( RFC_at_test );
 #endif /*RFC_AT_SUPPORT*/
 }
-
 
 /* Add definitions that need to be in the test runner's main file. */
 GREATEST_MAIN_DEFS();
@@ -1713,6 +1709,12 @@ int main( int argc, char *argv[] )
 
     GREATEST_MAIN_BEGIN();      /* init & parse command-line args */
     RUN_SUITE( RFC_TEST_SUITE );
+#if !RFC_MINIMAL
+    {
+        GREATEST_SUITE_EXTERN( RFC_TEST_SUITE_ADVANCED );
+        RUN_SUITE( RFC_TEST_SUITE_ADVANCED );
+    }
+#endif /*!RFC_MINIMAL*/
     GREATEST_MAIN_END();        /* display results */
 
     if( ctx.state != RFC_STATE_INIT0 )

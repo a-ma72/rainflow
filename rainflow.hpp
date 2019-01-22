@@ -52,7 +52,7 @@ namespace RF = RFC_CPP_NAMESPACE;
 extern "C"
 {
     static bool  tp_set           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp );
-    static bool  tp_get           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp );
+    static bool  tp_get           ( RF::rfc_ctx_s* ctx, size_t tp_pos, const RF::rfc_value_tuple_s **tp );
     static bool  tp_inc_damage    ( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage );
     static void* mem_alloc        ( void *ptr, size_t num, size_t size, RF::rfc_mem_aim_e aim );
 }
@@ -215,49 +215,54 @@ public:
     bool    finalize                ( rfc_res_method_e residual_method = RFC_RES_IGNORE );
     /* Functions on rainflow matrix */           
     bool    rfm_make_symmetric      ();
-    bool    rfm_get                 ( rfc_rfm_item_s **buffer, unsigned *count );
+    bool    rfm_get                 ( rfc_rfm_item_s **buffer, unsigned *count ) const;
     bool    rfm_set                 ( const rfc_rfm_item_s *buffer, unsigned count, bool add_only );
-    bool    rfm_peek                ( rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t *count );
+    bool    rfm_peek                ( rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t *count ) const;
     bool    rfm_poke                ( rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t count, bool add_only );
-    bool    rfm_sum                 ( unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, rfc_counts_t *count );
-    bool    rfm_damage              ( unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage );
-    bool    rfm_check               ();
-    bool    lc_get                  ( rfc_counts_t *lc, rfc_value_t *level );
-    bool    lc_from_rfm             ( rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags );
-    bool    lc_from_residue         ( rfc_counts_t *lc, rfc_value_t *level, rfc_flags_e flags );
-    bool    rp_get                  ( rfc_counts_t *rp, rfc_value_t *class_means );
-    bool    rp_from_rfm             ( rfc_counts_t *rp, rfc_value_t *class_means, const rfc_counts_t *rfm );
-    bool    damage_from_rp          ( const rfc_counts_t *counts, const rfc_value_t *Sa, double *damage, rfc_rp_damage_method_e rp_calc_type );
-    bool    damage_from_rfm         ( const rfc_counts_t *rfm, double *damage );
-    bool    wl_calc_sx              ( double s0, double n0, double k, double *sx, double nx, double  k2, double  sd, double nd );
-    bool    wl_calc_sd              ( double s0, double n0, double k, double  sx, double nx, double  k2, double *sd, double nd );
-    bool    wl_calc_k2              ( double s0, double n0, double k, double  sx, double nx, double *k2, double  sd, double nd );
-    bool    wl_calc_sa              ( double s0, double n0, double k, double  n,  double *sa );
-    bool    wl_calc_n               ( double s0, double n0, double k, double  sa, double *n );
+    bool    rfm_sum                 ( unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, rfc_counts_t *count ) const;
+    bool    rfm_damage              ( unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage ) const;
+    bool    rfm_check               () const;
+    bool    lc_get                  ( rfc_counts_t *lc, rfc_value_t *level ) const;
+    bool    lc_from_rfm             ( rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags ) const;
+    bool    lc_from_residue         ( rfc_counts_t *lc, rfc_value_t *level, rfc_flags_e flags ) const;
+    bool    rp_get                  ( rfc_counts_t *rp, rfc_value_t *class_means ) const;
+    bool    rp_from_rfm             ( rfc_counts_t *rp, rfc_value_t *class_means, const rfc_counts_t *rfm ) const;
+    bool    damage_from_rp          ( const rfc_counts_t *counts, const rfc_value_t *Sa, double *damage, rfc_rp_damage_method_e rp_calc_type ) const;
+    bool    damage_from_rfm         ( const rfc_counts_t *rfm, double *damage ) const;
+    bool    wl_calc_sx              ( double s0, double n0, double k, double *sx, double nx, double  k2, double  sd, double nd ) const;
+    bool    wl_calc_sd              ( double s0, double n0, double k, double  sx, double nx, double  k2, double *sd, double nd ) const;
+    bool    wl_calc_k2              ( double s0, double n0, double k, double  sx, double nx, double *k2, double  sd, double nd ) const;
+    bool    wl_calc_sa              ( double s0, double n0, double k, double  n,  double *sa ) const;
+    bool    wl_calc_n               ( double s0, double n0, double k, double  sa, double *n ) const;
     bool    tp_init_autoprune       ( bool autoprune, size_t size, size_t threshold );
     bool    tp_prune                ( size_t count, rfc_flags_e flags );
     bool    dh_init                 ( rfc_sd_method_e method, double *dh, size_t dh_cap, bool is_static );
     bool    at_init                 ( const double *Sa, const double *Sm, unsigned count, 
                                       double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
-    bool    at_transform            ( double Sa, double Sm, double *Sa_transformed );
+    bool    at_transform            ( double Sa, double Sm, double *Sa_transformed ) const;
 
     /* C++ specific extensions */
     bool    feed                    ( const std::vector<rfc_value_t> data );
     bool    feed_scaled             ( const std::vector<rfc_value_t> data, double factor );
-    bool    rfm_get                 ( rfc_rfm_item_v &buffer, unsigned *count );
+    bool    rfm_get                 ( rfc_rfm_item_v &buffer, unsigned *count ) const;
     bool    rfm_set                 ( const rfc_rfm_item_v &buffer, bool add_only );
-    bool    lc_get                  ( rfc_counts_v &lc, rfc_value_v &level );
-    bool    lc_from_rfm             ( rfc_counts_v &lc, rfc_value_v &level, const rfc_counts_t *rfm, rfc_flags_e flags );
-    bool    lc_from_residue         ( rfc_counts_v &lc, rfc_value_v &level, rfc_flags_e flags );
-    bool    rp_get                  ( rfc_counts_v &rp, rfc_value_v &class_means );
-    bool    rp_from_rfm             ( rfc_counts_v &rp, rfc_value_v &class_means, const rfc_counts_t *rfm );
-    bool    damage_from_rp          ( const rfc_counts_v &counts, const rfc_value_v &Sa, double *damage, rfc_rp_damage_method_e rp_calc_type );
+    bool    lc_get                  ( rfc_counts_v &lc, rfc_value_v &level ) const;
+    bool    lc_from_rfm             ( rfc_counts_v &lc, rfc_value_v &level, const rfc_counts_t *rfm, rfc_flags_e flags ) const;
+    bool    lc_from_residue         ( rfc_counts_v &lc, rfc_value_v &level, rfc_flags_e flags ) const;
+    bool    rp_get                  ( rfc_counts_v &rp, rfc_value_v &class_means ) const;
+    bool    rp_from_rfm             ( rfc_counts_v &rp, rfc_value_v &class_means, const rfc_counts_t *rfm ) const;
+    bool    damage_from_rp          ( const rfc_counts_v &counts, const rfc_value_v &Sa, double *damage, rfc_rp_damage_method_e rp_calc_type ) const;
     bool    at_init                 ( const rfc_double_v &Sa, const rfc_double_v &Sm, 
                                       double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
+    bool    wl_param_get            ( rfc_wl_param_s &wl_param ) const;
+
+    /* TP storage access */
+    const   rfc_tp_storage&     tp_storage() const { return m_tp; }
+            rfc_tp_storage&     tp_storage()       { return m_tp; }
 
     /* Delegates */
     bool    tp_set                  ( size_t tp_pos, rfc_value_tuple_s *tp );
-    bool    tp_get                  ( size_t tp_pos, rfc_value_tuple_s **tp );
+    bool    tp_get                  ( size_t tp_pos, const rfc_value_tuple_s **tp ) const;
     bool    tp_inc_damage           ( size_t tp_pos, double damage );
     static
     void*   mem_alloc               ( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim );
@@ -377,7 +382,7 @@ bool RainflowT<rfc_tp_storage>::rfm_make_symmetric()
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::rfm_get( rfc_rfm_item_s **buffer, unsigned *count )
+bool RainflowT<rfc_tp_storage>::rfm_get( rfc_rfm_item_s **buffer, unsigned *count ) const
 {
     return RF::RFC_rfm_get( &m_ctx, (RF::rfc_rfm_item_s **)buffer, count );
 }
@@ -391,7 +396,7 @@ bool RainflowT<rfc_tp_storage>::rfm_set( const rfc_rfm_item_s *buffer, unsigned 
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::rfm_peek( rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t *counts )
+bool RainflowT<rfc_tp_storage>::rfm_peek( rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t *counts ) const
 {
     return RF::RFC_rfm_peek( &m_ctx, (RF::rfc_value_t)from_val, (RF::rfc_value_t)to_val, (RF::rfc_counts_t *)counts );
 }
@@ -405,105 +410,105 @@ bool RainflowT<rfc_tp_storage>::rfm_poke( rfc_value_t from_val, rfc_value_t to_v
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::rfm_sum( unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, rfc_counts_t *count )
+bool RainflowT<rfc_tp_storage>::rfm_sum( unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, rfc_counts_t *count ) const
 {
     return RF::RFC_rfm_sum( &m_ctx, from_first, from_last, to_first, to_last, (RF::rfc_counts_t *)count );
 }
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::rfm_damage( unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage )
+bool RainflowT<rfc_tp_storage>::rfm_damage( unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage ) const
 {
     return RF::RFC_rfm_damage( &m_ctx, from_first, from_last, to_first, to_last, damage );
 }
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::rfm_check()
+bool RainflowT<rfc_tp_storage>::rfm_check() const
 {
     return RF::RFC_rfm_check( &m_ctx );
 }
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::lc_get( rfc_counts_t *lc, rfc_value_t *level )
+bool RainflowT<rfc_tp_storage>::lc_get( rfc_counts_t *lc, rfc_value_t *level ) const
 {
     return RF::RFC_lc_get( &m_ctx, (RF::rfc_counts_t *)lc, (RF::rfc_value_t *)level );
 }
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::lc_from_rfm( rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags )
+bool RainflowT<rfc_tp_storage>::lc_from_rfm( rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags ) const
 {
     return RF::RFC_lc_from_rfm( &m_ctx, (RF::rfc_counts_t *)lc, (RF::rfc_value_t *)level, (const RF::rfc_counts_t *)rfm, (RF::rfc_flags_e)flags );
 }
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::lc_from_residue( rfc_counts_t *lc, rfc_value_t *level, rfc_flags_e flags )
+bool RainflowT<rfc_tp_storage>::lc_from_residue( rfc_counts_t *lc, rfc_value_t *level, rfc_flags_e flags ) const
 {
     return RF::RFC_lc_from_residue( &m_ctx, (RF::rfc_counts_t *)lc, (RF::rfc_value_t *)level, (RF::rfc_flags_e) flags );
 }
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::rp_get( rfc_counts_t *rp, rfc_value_t *class_means )
+bool RainflowT<rfc_tp_storage>::rp_get( rfc_counts_t *rp, rfc_value_t *class_means ) const
 {
     return RF::RFC_rp_get( &m_ctx, (RF::rfc_counts_t *)rp, (RF::rfc_value_t *)class_means );
 }
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::rp_from_rfm( rfc_counts_t *rp, rfc_value_t *class_means, const rfc_counts_t *rfm )
+bool RainflowT<rfc_tp_storage>::rp_from_rfm( rfc_counts_t *rp, rfc_value_t *class_means, const rfc_counts_t *rfm ) const
 {
     return RF::RFC_rp_from_rfm( &m_ctx, (RF::rfc_counts_t *)rp, (RF::rfc_value_t *)class_means, (const RF::rfc_counts_t *)rfm );
 }
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::damage_from_rp( const rfc_counts_t *counts, const rfc_value_t *Sa, double *damage, rfc_rp_damage_method_e rp_calc_type )
+bool RainflowT<rfc_tp_storage>::damage_from_rp( const rfc_counts_t *counts, const rfc_value_t *Sa, double *damage, rfc_rp_damage_method_e rp_calc_type ) const
 {
     return RF::RFC_damage_from_rp( &m_ctx, (const RF::rfc_counts_t *)counts, (const RF::rfc_value_t *)Sa, damage, (RF::rfc_rp_damage_method_e)rp_calc_type );
 }
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::damage_from_rfm( const rfc_counts_t *rfm, double *damage )
+bool RainflowT<rfc_tp_storage>::damage_from_rfm( const rfc_counts_t *rfm, double *damage ) const
 {
     return RF::RFC_damage_from_rfm( &m_ctx, (const RF::rfc_counts_t *)rfm, damage );
 }
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::wl_calc_sx( double s0, double n0, double k, double *sx, double nx, double  k2, double  sd, double nd )
+bool RainflowT<rfc_tp_storage>::wl_calc_sx( double s0, double n0, double k, double *sx, double nx, double  k2, double  sd, double nd ) const
 {
     return RF::RFC_wl_calc_sx( &m_ctx, s0, n0, k, sx, nx, k2, sd, nd );
 }
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::wl_calc_sd( double s0, double n0, double k, double  sx, double nx, double  k2, double *sd, double nd )
+bool RainflowT<rfc_tp_storage>::wl_calc_sd( double s0, double n0, double k, double  sx, double nx, double  k2, double *sd, double nd ) const
 {
     return RF::RFC_wl_calc_sd( &m_ctx, s0, n0, k, sx, nx, k2, sd, nd );
 }
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::wl_calc_k2( double s0, double n0, double k, double  sx, double nx, double *k2, double  sd, double nd )
+bool RainflowT<rfc_tp_storage>::wl_calc_k2( double s0, double n0, double k, double  sx, double nx, double *k2, double  sd, double nd ) const
 {
     return RF::RFC_wl_calc_k2( &m_ctx, s0, n0, k, sx, nx, k2, sd, nd );
 }
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::wl_calc_sa( double s0, double n0, double k, double  n,  double *sa )
+bool RainflowT<rfc_tp_storage>::wl_calc_sa( double s0, double n0, double k, double  n,  double *sa ) const
 {
     return RF::RFC_wl_calc_sa( &m_ctx, s0, n0, k, n,  sa );
 }
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::wl_calc_n( double s0, double n0, double k, double  sa, double *n )
+bool RainflowT<rfc_tp_storage>::wl_calc_n( double s0, double n0, double k, double  sa, double *n ) const
 {
     return RF::RFC_wl_calc_n( &m_ctx, s0, n0, k, sa, n );
 }
@@ -539,7 +544,7 @@ bool RainflowT<rfc_tp_storage>::at_init( const double *Sa, const double *Sm, uns
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::at_transform( double Sa, double Sm, double *Sa_transformed )
+bool RainflowT<rfc_tp_storage>::at_transform( double Sa, double Sm, double *Sa_transformed ) const
 {
     return RF::RFC_at_transform( &m_ctx, Sa, Sm, Sa_transformed );
 }
@@ -561,7 +566,7 @@ bool RainflowT<rfc_tp_storage>::feed_scaled( const std::vector<rfc_value_t> data
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::rfm_get( rfc_rfm_item_v &buffer, unsigned *count )
+bool RainflowT<rfc_tp_storage>::rfm_get( rfc_rfm_item_v &buffer, unsigned *count ) const
 {
     rfc_rfm_item_s *buffer_ = NULL;
     unsigned        count_  = 0;
@@ -596,7 +601,7 @@ bool RainflowT<rfc_tp_storage>::rfm_set( const rfc_rfm_item_v &buffer, bool add_
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::lc_get( rfc_counts_v &lc, rfc_value_v &level )
+bool RainflowT<rfc_tp_storage>::lc_get( rfc_counts_v &lc, rfc_value_v &level ) const
 {
     lc.resize( m_ctx.class_count );
     level.resize( m_ctx.class_count );
@@ -606,7 +611,7 @@ bool RainflowT<rfc_tp_storage>::lc_get( rfc_counts_v &lc, rfc_value_v &level )
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::lc_from_rfm( rfc_counts_v &lc, rfc_value_v &level, const rfc_counts_t *rfm, rfc_flags_e flags )
+bool RainflowT<rfc_tp_storage>::lc_from_rfm( rfc_counts_v &lc, rfc_value_v &level, const rfc_counts_t *rfm, rfc_flags_e flags ) const
 {
     lc.resize( m_ctx.class_count );
     level.resize( m_ctx.class_count );
@@ -616,7 +621,7 @@ bool RainflowT<rfc_tp_storage>::lc_from_rfm( rfc_counts_v &lc, rfc_value_v &leve
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::lc_from_residue( rfc_counts_v &lc, rfc_value_v &level, rfc_flags_e flags )
+bool RainflowT<rfc_tp_storage>::lc_from_residue( rfc_counts_v &lc, rfc_value_v &level, rfc_flags_e flags ) const
 {
     lc.resize( m_ctx.class_count );
     level.resize( m_ctx.class_count );
@@ -626,7 +631,7 @@ bool RainflowT<rfc_tp_storage>::lc_from_residue( rfc_counts_v &lc, rfc_value_v &
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::rp_get( rfc_counts_v &rp, rfc_value_v &class_means )
+bool RainflowT<rfc_tp_storage>::rp_get( rfc_counts_v &rp, rfc_value_v &class_means ) const
 {
     rp.resize( m_ctx.class_count );
     class_means.resize( m_ctx.class_count );
@@ -636,7 +641,7 @@ bool RainflowT<rfc_tp_storage>::rp_get( rfc_counts_v &rp, rfc_value_v &class_mea
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::rp_from_rfm( rfc_counts_v &rp, rfc_value_v &class_means, const rfc_counts_t *rfm )
+bool RainflowT<rfc_tp_storage>::rp_from_rfm( rfc_counts_v &rp, rfc_value_v &class_means, const rfc_counts_t *rfm ) const
 {
     rp.resize( m_ctx.class_count );
     class_means.resize( m_ctx.class_count );
@@ -646,7 +651,7 @@ bool RainflowT<rfc_tp_storage>::rp_from_rfm( rfc_counts_v &rp, rfc_value_v &clas
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::damage_from_rp( const rfc_counts_v &counts, const rfc_value_v &Sa, double *damage, rfc_rp_damage_method_e rp_calc_type )
+bool RainflowT<rfc_tp_storage>::damage_from_rp( const rfc_counts_v &counts, const rfc_value_v &Sa, double *damage, rfc_rp_damage_method_e rp_calc_type ) const
 {
     return damage_from_rp( &counts[0], &Sa[0], damage, rp_calc_type );
 }
@@ -654,7 +659,7 @@ bool RainflowT<rfc_tp_storage>::damage_from_rp( const rfc_counts_v &counts, cons
 
 template< class rfc_tp_storage >
 bool RainflowT<rfc_tp_storage>::at_init( const rfc_double_v &Sa, const rfc_double_v &Sm, 
-                                  double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric )
+                                         double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric )
 {
     if( Sa.size() != Sm.size() )
     {
@@ -665,30 +670,48 @@ bool RainflowT<rfc_tp_storage>::at_init( const rfc_double_v &Sa, const rfc_doubl
 }
 
 
+template< class rfc_tp_storage >
+bool RainflowT<rfc_tp_storage>::wl_param_get( rfc_wl_param_s &wl_param ) const
+{
+    return RF::RFC_wl_param_get( &m_ctx, &wl_param );
+}
+
+
+
 
 /* Delegates */
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::tp_set( size_t pos, rfc_value_tuple_s *tp )
+bool RainflowT<rfc_tp_storage>::tp_set( size_t tp_pos, rfc_value_tuple_s *tp )
 {
-    if( !tp || m_ctx.tp_locked )
+    if( tp_pos )
     {
-        return false;
-    }
-    
-    if( pos )
-    {
-        if( pos > m_tp.size() )
+        /* Alter or move existing turning point */
+        if( tp_pos > m_tp.size() )
         {
             return false;
         }
 
-        m_tp[pos-1] = *tp;
-        tp->tp_pos = pos;
+        tp->tp_pos         =  0;        /* No position information for turning points in its storage */
+        m_tp[ tp_pos - 1 ] = *tp;       /* Move or replace turning point */
+        tp->tp_pos         =  tp_pos;   /* Ping back the position (commonly tp lies in residue buffer) */
+
+        return true;
     }
     else
     {
-        m_tp.push_back( *tp );
-        tp->tp_pos = m_tp.size();
+        /* Append (tp_pos == 0) */
+        if( tp->tp_pos )
+        {
+            /* Already an element of tp stack */
+            return tp->tp_pos <= m_tp.size();
+        }
+        else
+        {
+            /* Append tp at the tail */
+            m_tp.push_back( *tp );
+            m_ctx.tp_cnt = tp->tp_pos = m_tp.size();
+            m_ctx.tp_cap = m_tp.capacity();
+        }
     }
 
     return true;
@@ -696,7 +719,7 @@ bool RainflowT<rfc_tp_storage>::tp_set( size_t pos, rfc_value_tuple_s *tp )
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::tp_get( size_t pos, rfc_value_tuple_s **tp )
+bool RainflowT<rfc_tp_storage>::tp_get( size_t pos, const rfc_value_tuple_s **tp ) const
 {
     if( !tp || !pos || pos > m_tp.size() )
     {
@@ -755,7 +778,7 @@ extern "C"
     }
 
     static
-    bool tp_get( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp )
+    bool tp_get( RF::rfc_ctx_s* ctx, size_t tp_pos, const RF::rfc_value_tuple_s **tp )
     {
         return ctx && static_cast<Rainflow*>(ctx->internal.obj)->tp_get( tp_pos, tp );
     }
