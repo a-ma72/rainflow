@@ -27,8 +27,7 @@ TEST wrapper_test_simple( void )
 }
 
 
-/* Made extern "C", so that C-Code (rfc_test.c) can access this function (in a C++ module)
-C++ functions are usually "name mangeled", that is averted here! */
+/* Test suite for rfc_test.c */
 extern "C"
 SUITE( RFC_WRAPPER_SUITE_SIMPLE )
 {

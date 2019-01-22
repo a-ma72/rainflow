@@ -91,22 +91,23 @@ TEST wrapper_test_advanced( void )
     double damage_6_2 = pow( ( (6.0-2.0)/2 / wl_param.sx ), fabs(wl_param.k) ) / wl_param.nx;
     double damage_8_1 = pow( ( (8.0-1.0)/2 / wl_param.sx ), fabs(wl_param.k) ) / wl_param.nx;
 
-    ASSERT( fabs( rf.tp_storage()[0].damage / damage_8_1/2 - 1 )   < 1e-10 );
-    ASSERT( fabs( rf.tp_storage()[1].damage / damage_6_2/2 - 1 )   < 1e-10 );
-    ASSERT( fabs( rf.tp_storage()[2].damage / damage_6_2/2 - 1 )   < 1e-10 );
-    ASSERT( fabs( rf.tp_storage()[3].damage / damage_8_1*1.5 - 1 ) < 1e-10 );
-    ASSERT( fabs( rf.tp_storage()[3].damage / damage_8_1*1.5 - 1 ) < 1e-10 );
-    ASSERT( fabs( rf.tp_storage()[3].damage / damage_6_2*1.5 - 1 ) < 1e-10 );
-    ASSERT( fabs( rf.tp_storage()[3].damage / damage_6_2*1.5 - 1 ) < 1e-10 );
-    ASSERT( fabs( rf.tp_storage()[3].damage / damage_8_1/2 - 1 )   < 1e-10 );
+    GREATEST_FPRINTF( GREATEST_STDOUT, "%g <-> %g = %g\n", rf.tp_storage()[3].damage, damage_8_1, fabs( rf.tp_storage()[3].damage / (damage_8_1) - 1 ) );
+
+    ASSERT( fabs( rf.tp_storage()[0].damage / ( damage_8_1*1/2 ) - 1 )   < 1e-10 );
+    ASSERT( fabs( rf.tp_storage()[1].damage / ( damage_6_2*1/2 ) - 1 )   < 1e-10 );
+    ASSERT( fabs( rf.tp_storage()[2].damage / ( damage_6_2*1/2 ) - 1 )   < 1e-10 );
+    ASSERT( fabs( rf.tp_storage()[3].damage / ( damage_8_1*3/2 ) - 1 )   < 1e-10 );
+    ASSERT( fabs( rf.tp_storage()[4].damage / ( damage_8_1*3/2 ) - 1 )   < 1e-10 );
+    ASSERT( fabs( rf.tp_storage()[5].damage / ( damage_6_2*3/2 ) - 1 )   < 1e-10 );
+    ASSERT( fabs( rf.tp_storage()[6].damage / ( damage_6_2*3/2 ) - 1 )   < 1e-10 );
+    ASSERT( fabs( rf.tp_storage()[7].damage / ( damage_8_1*1/2 ) - 1 )   < 1e-10 );
 
     rf.deinit();
 
     PASS();
 }
 
-/* Made extern "C", so that C-Code (rfc_test.c) can access this function (in a C++ module)
-C++ functions are usually "name mangeled", that is averted here! */
+/* Test suite for rfc_test.c */
 extern "C"
 SUITE( RFC_WRAPPER_SUITE_ADVANCED )
 {
