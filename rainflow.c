@@ -111,6 +111,10 @@
 #include <string.h>  /* memset() */
 #include <float.h>   /* DBL_MAX */
 
+#if _DEBUG
+#include <stdio.h>
+#endif /*_DEBUG*/
+
 
 #if MATLAB_MEX_FILE
 #if !RFC_MINIMAL
@@ -279,6 +283,9 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
     {
 #if !RFC_MINIMAL
         flags                               = RFC_FLAGS_COUNT_ALL            | 
+#if _DEBUG
+                                              RFC_FLAGS_LOG_CLOSED_CYCLES    |
+#endif /*_DEBUG*/
 #if RFC_TP_SUPPORT  
                                               RFC_FLAGS_TPPRUNE_PRESERVE_POS | 
                                               RFC_FLAGS_TPPRUNE_PRESERVE_RES |
@@ -881,11 +888,6 @@ bool RFC_tp_prune( void *ctx, size_t limit, rfc_flags_e flags )
 bool RFC_dh_init( void *ctx, rfc_sd_method_e method, double *dh, size_t dh_cap, bool is_static )
 {
     RFC_CTX_CHECK_AND_ASSIGN
-
-    if( !rfc_ctx->dh )
-    {
-        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-    }
 
     if( rfc_ctx->state != RFC_STATE_INIT )
     {
@@ -2774,6 +2776,58 @@ bool RFC_class_param_get( const void *ctx, rfc_class_param_s *class_param )
     class_param->count  = rfc_ctx->class_count;
     class_param->width  = rfc_ctx->class_width;
     class_param->offset = rfc_ctx->class_offset;
+
+    return true;
+}
+
+
+/**
+ * @brief      Set flags
+ *
+ * @param      ctx        The rainflow context
+ * @param[in]  flags      The flags
+ * @param[in]  debugging  Flag for debugging flags
+ *
+ * @return     true on success
+ */
+bool RFC_set_flags( void *ctx, int flags, bool debugging )
+{
+    RFC_CTX_CHECK_AND_ASSIGN
+
+    if( debugging )
+    {
+        rfc_ctx->internal.debug_flags = (rfc_debug_flags_e)flags;
+    }
+    else
+    {
+        rfc_ctx->internal.flags = (rfc_flags_e)flags;
+    }
+
+    return true;
+}
+
+
+/**
+ * @brief      Get flags
+ *
+ * @param      ctx        The rainflow context
+ * @param[out] flags      Flag for debugging flags
+ * @param[in]  debugging  The debugging
+ *
+ * @return     true on success
+ */
+bool RFC_get_flags( const void *ctx, int *flags, bool debugging )
+{
+    RFC_CTX_CHECK_AND_ASSIGN
+
+    if( debugging )
+    {
+        *flags = (int)rfc_ctx->internal.debug_flags;
+    }
+    else
+    {
+        *flags = (int)rfc_ctx->internal.flags;
+    }
 
     return true;
 }
@@ -4706,6 +4760,15 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
     /* Do several counts, according to "flags" */
     if( class_from != class_to )
     {
+#if _DEBUG
+        if( ( rfc_ctx->internal.debug_flags & RFC_FLAGS_LOG_CLOSED_CYCLES ) &&
+            ( flags & (RFC_FLAGS_COUNT_ALL & ~RFC_FLAGS_COUNT_LC) ) )
+        {
+            fprintf( stdout, "Closed cycle %g@%llu[%llu]->%g@%llu[%llu]\n", 
+                     from->value, from->pos, from->tp_pos,
+                     to->value,   to->pos,   to->tp_pos );
+        }
+#endif /*_DEBUG*/
         /* Cumulate damage */
         if( flags & RFC_FLAGS_COUNT_DAMAGE )
         {

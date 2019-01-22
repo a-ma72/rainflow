@@ -15,7 +15,7 @@ TEST wrapper_test_advanced( void )
 /*
                                              |                                                                                
     8.5 _____________________________________|________________________________________________________________________________
-                    +           +            |       +           +     +           +                                          
+                    +           o            |       +           o     +           o                                          
     7.5 _____________________________________|________________________________________________________________________________
                                              |                                                                                
     6.5 _____________________________________|________________________________________________________________________________
@@ -29,25 +29,26 @@ TEST wrapper_test_advanced( void )
     2.5 _____________________________________|________________________________________________________________________________
                  +           +               |                +                 +                                             
     1.5 _____________________________________|________________________________________________________________________________
-           +           +                     |    +     +           +     +                                                   
+           +           +                     |    +     +           +     +                                                  
     0.5 _____________________________________|________________________________________________________________________________
            1  2  3  4  5  6  7  8            |    1  4  5  6  7  8  1  4  5  6  7  8                                          
 
-    Counts 6-2 (2,3) ; 6-2 (6,7) ; 8-1 (4,5) |    6-2 (6,7) ; 8-1 (4,5) ; 8-1 (8,1) ; 6-2 (6,7) ; 8-1 (4,5)
-    ( => 4x 6-2 ; 4x 8-1 )
+    Counts 6-2 (2,3)                         |    6-2 (6,7) ; 8-1 (4,5) ; 8-1 (8,1) ; 6-2 (6,7) ; 8-1 (4,5)
+    ( => 3x 6-2 ; 3x 8-1 )
 
     TP
     1: 8-1
     2: 6-2
     3: 6-2
-    4: 8-1, 8-1, 8-1
-    5: 8-1, 8-1, 8-1
-    6: 6-2, 6-2, 6-2
-    7: 6-2, 6-2, 6-2
+    4: 8-1, 8-1
+    5: 8-1, 8-1
+    6: 6-2, 6-2
+    7: 6-2, 6-2
     8: 8-1
 */
     Rainflow rf;
     Rainflow::rfc_wl_param_s wl_param;
+    int flags;
 
     double values[] = { 1,6,2,8 };
     std::vector<double> data( values, values + 4 );
@@ -62,6 +63,9 @@ TEST wrapper_test_advanced( void )
 #endif
 
     rf.init( 10, 1, -0.5, 1 );
+    rf.get_flags( &flags, /*debugging*/true );
+    flags |= (int)Rainflow::RFC_FLAGS_LOG_CLOSED_CYCLES;
+    rf.set_flags( flags, /*debugging*/ true );
     rf.feed( values, NUMEL(values) );
     ASSERT( rf.tp_storage().size() == 3 );
     rf.feed( data );
@@ -91,15 +95,13 @@ TEST wrapper_test_advanced( void )
     double damage_6_2 = pow( ( (6.0-2.0)/2 / wl_param.sx ), fabs(wl_param.k) ) / wl_param.nx;
     double damage_8_1 = pow( ( (8.0-1.0)/2 / wl_param.sx ), fabs(wl_param.k) ) / wl_param.nx;
 
-    GREATEST_FPRINTF( GREATEST_STDOUT, "%g <-> %g = %g\n", rf.tp_storage()[3].damage, damage_8_1, fabs( rf.tp_storage()[3].damage / (damage_8_1) - 1 ) );
-
     ASSERT( fabs( rf.tp_storage()[0].damage / ( damage_8_1*1/2 ) - 1 )   < 1e-10 );
     ASSERT( fabs( rf.tp_storage()[1].damage / ( damage_6_2*1/2 ) - 1 )   < 1e-10 );
     ASSERT( fabs( rf.tp_storage()[2].damage / ( damage_6_2*1/2 ) - 1 )   < 1e-10 );
-    ASSERT( fabs( rf.tp_storage()[3].damage / ( damage_8_1*3/2 ) - 1 )   < 1e-10 );
-    ASSERT( fabs( rf.tp_storage()[4].damage / ( damage_8_1*3/2 ) - 1 )   < 1e-10 );
-    ASSERT( fabs( rf.tp_storage()[5].damage / ( damage_6_2*3/2 ) - 1 )   < 1e-10 );
-    ASSERT( fabs( rf.tp_storage()[6].damage / ( damage_6_2*3/2 ) - 1 )   < 1e-10 );
+    ASSERT( fabs( rf.tp_storage()[3].damage / ( damage_8_1*1/1 ) - 1 )   < 1e-10 );
+    ASSERT( fabs( rf.tp_storage()[4].damage / ( damage_8_1*1/1 ) - 1 )   < 1e-10 );
+    ASSERT( fabs( rf.tp_storage()[5].damage / ( damage_6_2*1/1 ) - 1 )   < 1e-10 );
+    ASSERT( fabs( rf.tp_storage()[6].damage / ( damage_6_2*1/1 ) - 1 )   < 1e-10 );
     ASSERT( fabs( rf.tp_storage()[7].damage / ( damage_8_1*1/2 ) - 1 )   < 1e-10 );
 
     rf.deinit();

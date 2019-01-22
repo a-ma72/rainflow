@@ -99,6 +99,13 @@ public:
     };
 
 
+    enum rfc_debug_flags
+    {
+        RFC_FLAGS_LOG_CLOSED_CYCLES             = RF::RFC_FLAGS_LOG_CLOSED_CYCLES,              /**< Log closed cycles */
+    };
+
+
+
     /* See RFC_damage_from_rp() */
     enum rfc_rp_damage_method
     {
@@ -240,6 +247,8 @@ public:
     bool    at_init                 ( const double *Sa, const double *Sm, unsigned count, 
                                       double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
     bool    at_transform            ( double Sa, double Sm, double *Sa_transformed ) const;
+    bool    set_flags               ( int flags, bool debugging = false );
+    bool    get_flags               ( int *flags, bool debugging = false ) const;
 
     /* C++ specific extensions */
     bool    feed                    ( const std::vector<rfc_value_t> data );
@@ -547,6 +556,20 @@ template< class rfc_tp_storage >
 bool RainflowT<rfc_tp_storage>::at_transform( double Sa, double Sm, double *Sa_transformed ) const
 {
     return RF::RFC_at_transform( &m_ctx, Sa, Sm, Sa_transformed );
+}
+
+
+template< class rfc_tp_storage >
+bool RainflowT<rfc_tp_storage>::set_flags( int flags, bool debugging )
+{
+    return RF::RFC_set_flags( &m_ctx, flags, debugging );
+}
+
+
+template< class rfc_tp_storage >
+bool RainflowT<rfc_tp_storage>::get_flags( int *flags, bool debugging ) const
+{
+    return RF::RFC_get_flags( &m_ctx, flags, debugging );
 }
 
 

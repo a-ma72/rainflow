@@ -241,6 +241,12 @@ enum rfc_flags
 };
 
 
+enum rfc_debug_flags
+{
+    RFC_FLAGS_LOG_CLOSED_CYCLES     =  1 << 0,                      /**< Log closed cycles */
+};
+
+
 #if !RFC_MINIMAL
 /* See RFC_damage_from_rp() */
 enum rfc_rp_damage_method
@@ -333,22 +339,23 @@ enum rfc_sd_method
 
 
 /* Typedefs */
-typedef                 RFC_VALUE_TYPE          rfc_value_t;                                                /** Input data value type */
-typedef                 RFC_COUNTS_VALUE_TYPE   rfc_counts_t;                                               /** Type of counting values */
-typedef     struct      rfc_value_tuple         rfc_value_tuple_s;                                          /** Tuple of value and index position */
-typedef     struct      rfc_ctx                 rfc_ctx_s;                                                  /** Forward declaration (rainflow context) */
-typedef     enum        rfc_mem_aim             rfc_mem_aim_e;                                              /** Memory accessing mode */
-typedef     enum        rfc_flags               rfc_flags_e;                                                /** Flags, see RFC_FLAGS... */
-typedef     enum        rfc_state               rfc_state_e;                                                /** Counting state, see RFC_STATE... */
-typedef     enum        rfc_error               rfc_error_e;                                                /** Recent error, see RFC_ERROR... */
-typedef     enum        rfc_res_method          rfc_res_method_e;                                           /** Method when count residue into matrix, see RFC_RES... */
+typedef                 RFC_VALUE_TYPE          rfc_value_t;                /** Input data value type */
+typedef                 RFC_COUNTS_VALUE_TYPE   rfc_counts_t;               /** Type of counting values */
+typedef     struct      rfc_value_tuple         rfc_value_tuple_s;          /** Tuple of value and index position */
+typedef     struct      rfc_ctx                 rfc_ctx_s;                  /** Forward declaration (rainflow context) */
+typedef     enum        rfc_mem_aim             rfc_mem_aim_e;              /** Memory accessing mode */
+typedef     enum        rfc_flags               rfc_flags_e;                /** Flags, see RFC_FLAGS... */
+typedef     enum        rfc_debug_flags         rfc_debug_flags_e;          /** Flags, see RFC_DEBUG_FLAGS... */
+typedef     enum        rfc_state               rfc_state_e;                /** Counting state, see RFC_STATE... */
+typedef     enum        rfc_error               rfc_error_e;                /** Recent error, see RFC_ERROR... */
+typedef     enum        rfc_res_method          rfc_res_method_e;           /** Method when count residue into matrix, see RFC_RES... */
 #if !RFC_MINIMAL
-typedef     enum        rfc_counting_method     rfc_counting_method_e;                                      /** Counting method, see RFC_COUNTING... */
-typedef     enum        rfc_rp_damage_method    rfc_rp_damage_method_e;                                     /** Method when calculating damage from range pair counting, see RFC_RP_DAMAGE_CALC_METHOD... */
-typedef     enum        rfc_sd_method           rfc_sd_method_e;                                            /** Spread damage method, see RFC_SD... */
-typedef     struct      rfc_class_param         rfc_class_param_s;                                          /** Class parameters (width, offset, count) */
-typedef     struct      rfc_wl_param            rfc_wl_param_s;                                             /** Woehler curve parameters (sd, nd, k, k2, omission) */
-typedef     struct      rfc_rfm_item            rfc_rfm_item_s;                                             /** Rainflow matrix element */
+typedef     enum        rfc_counting_method     rfc_counting_method_e;      /** Counting method, see RFC_COUNTING... */
+typedef     enum        rfc_rp_damage_method    rfc_rp_damage_method_e;     /** Method when calculating damage from range pair counting, see RFC_RP_DAMAGE_CALC_METHOD... */
+typedef     enum        rfc_sd_method           rfc_sd_method_e;            /** Spread damage method, see RFC_SD... */
+typedef     struct      rfc_class_param         rfc_class_param_s;          /** Class parameters (width, offset, count) */
+typedef     struct      rfc_wl_param            rfc_wl_param_s;             /** Woehler curve parameters (sd, nd, k, k2, omission) */
+typedef     struct      rfc_rfm_item            rfc_rfm_item_s;             /** Rainflow matrix element */
 #endif /*!RFC_MINIMAL*/
 
 /* Memory allocation functions typedef */
@@ -402,6 +409,8 @@ bool    RFC_wl_param_set            (       void *ctx, const rfc_wl_param_s * );
 bool    RFC_wl_param_get            ( const void *ctx, rfc_wl_param_s * );
 bool    RFC_class_param_set         (       void *ctx, const rfc_class_param_s * );
 bool    RFC_class_param_get         ( const void *ctx, rfc_class_param_s * );
+bool    RFC_set_flags               (       void *ctx, int flags, bool debugging );
+bool    RFC_get_flags               ( const void *ctx, int *flags, bool debugging );
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
 bool    RFC_tp_init                 (       void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
@@ -645,6 +654,7 @@ typedef struct rfc_ctx
     struct internal
     {
         int                             flags;                      /**< Flags (enum rfc_flags) */
+        int                             debug_flags;                /**< Flags for debugging */
         int                             slope;                      /**< Current signal slope */
         rfc_value_tuple_s               extrema[2];                 /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
 #if RFC_GLOBAL_EXTREMA
