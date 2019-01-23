@@ -8,6 +8,7 @@
 -DRFC_DAMAGE_FAST=0
 -DRFC_DH_SUPPORT=0
 -DRFC_AT_SUPPORT=0
+-DRFC_DEBUG_FLAGS=0
 -xd
 rainflow.c 
 rainflow.h 

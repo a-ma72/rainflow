@@ -23,9 +23,14 @@ option( RFC_TP_SUPPORT          "Support turning points" ON )
 option( RFC_DH_SUPPORT          "Support \"spread damage\" over turning points and damage history" OFF )
 option( RFC_AT_SUPPORT          "Support amplitude transformation regarding mean load influence on fatigue strength" OFF )
 option( RFC_DAMAGE_FAST         "Enables fast damage calculation (per look-up table)" ON )
+option( RFC_DEBUG_FLAGS         "Enables flags for detailed " OFF )
 
 
 set( CMAKE_POSITION_INDEPENDENT_CODE ON )
+
+if( CMAKE_BUILD_TYPE MATCHES DEBUG )
+endif()
+
 
 if( MSVC )
     # Turn off misguided "secure CRT" warnings in MSVC.

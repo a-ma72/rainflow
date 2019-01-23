@@ -176,6 +176,9 @@ namespace RFC_CPP_NAMESPACE {
 #ifndef RFC_DAMAGE_FAST
 #define RFC_DAMAGE_FAST ON
 #endif /*RFC_DAMAGE_FAST*/
+#ifndef RFC_DEBUG_FLAGS
+#define RFC_DEBUG_FLAGS OFF
+#endif /*RFC_DEBUG_FLAGS*/
 #endif /*RFC_MINIMAL*/
 
 
@@ -276,15 +279,16 @@ enum rfc_error
     RFC_ERROR_UNEXP                 = -1,                           /**< Unexpected error */
     RFC_ERROR_NOERROR               =  0,                           /**< No error */
     RFC_ERROR_INVARG                =  1,                           /**< Invalid arguments passed */
-    RFC_ERROR_MEMORY                =  2,                           /**< Error on memory allocation */
+    RFC_ERROR_UNSUPPORTED           =  2,                           /**< Unsupported feature */
+    RFC_ERROR_MEMORY                =  3,                           /**< Error on memory allocation */
 #if RFC_TP_SUPPORT
-    RFC_ERROR_TP                    =  3,                           /**< Error while amplitude transformation */
+    RFC_ERROR_TP                    =  4,                           /**< Error while amplitude transformation */
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_AT_SUPPORT
-    RFC_ERROR_AT                    =  4,                           /**< Error while amplitude transformation */
+    RFC_ERROR_AT                    =  5,                           /**< Error while amplitude transformation */
 #endif /*RFC_AT_SUPPORT*/
 #if RFC_DAMAGE_FAST
-    RFC_ERROR_LUT                   =  5,                           /**< Error while accessing look up tables */
+    RFC_ERROR_LUT                   =  6,                           /**< Error while accessing look up tables */
 #endif /*RFC_DAMAGE_FAST*/
 };
 
@@ -409,8 +413,8 @@ bool    RFC_wl_param_set            (       void *ctx, const rfc_wl_param_s * );
 bool    RFC_wl_param_get            ( const void *ctx, rfc_wl_param_s * );
 bool    RFC_class_param_set         (       void *ctx, const rfc_class_param_s * );
 bool    RFC_class_param_get         ( const void *ctx, rfc_class_param_s * );
-bool    RFC_set_flags               (       void *ctx, int flags, bool debugging );
-bool    RFC_get_flags               ( const void *ctx, int *flags, bool debugging );
+bool    RFC_set_flags               (       void *ctx, int flags, int stack );
+bool    RFC_get_flags               ( const void *ctx, int *flags, int stack );
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
 bool    RFC_tp_init                 (       void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
@@ -654,14 +658,16 @@ typedef struct rfc_ctx
     struct internal
     {
         int                             flags;                      /**< Flags (enum rfc_flags) */
+#if RFC_DEBUG_FLAGS
         int                             debug_flags;                /**< Flags for debugging */
+#endif /*RFC_DEBUG_FLAGS*/
         int                             slope;                      /**< Current signal slope */
         rfc_value_tuple_s               extrema[2];                 /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
 #if RFC_GLOBAL_EXTREMA
         bool                            extrema_changed;            /**< True if one extrema has changed */
 #endif /*!RFC_GLOBAL_EXTREMA*/
         size_t                          pos;                        /**< Absolute position in data input stream, base 1 */
-        size_t                          global_offset;              /**< Offset for pos */
+        size_t                          pos_offset;                 /**< Offset for pos */
         rfc_value_tuple_s               residue[3];                 /**< Static residue (if class_count is zero) */
         size_t                          residue_cap;                /**< Capacity of static residue */
         bool                            res_static;                 /**< true, if .residue refers the static residue .internal.residue */

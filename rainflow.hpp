@@ -133,6 +133,7 @@ public:
         RFC_ERROR_UNEXP                         = RF::RFC_ERROR_UNEXP,                          /**< Unexpected error */
         RFC_ERROR_NOERROR                       = RF::RFC_ERROR_NOERROR,                        /**< No error */
         RFC_ERROR_INVARG                        = RF::RFC_ERROR_INVARG,                         /**< Invalid arguments passed */
+        RFC_ERROR_UNSUPPORTED                   = RF::RFC_ERROR_UNSUPPORTED,                    /**< Unsupported feature */
         RFC_ERROR_MEMORY                        = RF::RFC_ERROR_MEMORY,                         /**< Error on memory allocation */
         RFC_ERROR_TP                            = RF::RFC_ERROR_TP,                             /**< Error while amplitude transformation */
         RFC_ERROR_AT                            = RF::RFC_ERROR_AT,                             /**< Error while amplitude transformation */

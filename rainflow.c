@@ -111,7 +111,7 @@
 #include <string.h>  /* memset() */
 #include <float.h>   /* DBL_MAX */
 
-#if _DEBUG
+#if RFC_DEBUG_FLAGS
 #include <stdio.h>
 #endif /*_DEBUG*/
 
@@ -855,7 +855,7 @@ bool RFC_tp_prune( void *ctx, size_t limit, rfc_flags_e flags )
 
         rfc_ctx->tp_cnt                  = dst_i;
         rfc_ctx->internal.pos           -= pos_offset;
-        rfc_ctx->internal.global_offset += pos_offset;
+        rfc_ctx->internal.pos_offset    += pos_offset;
 
 #if RFC_DH_SUPPORT
         /* Shift damage history */
@@ -1076,7 +1076,7 @@ bool RFC_clear_counts( void *ctx )
     rfc_ctx->internal.extrema_changed   = false;
 #endif
     rfc_ctx->internal.pos               = 0;
-    rfc_ctx->internal.global_offset     = 0;
+    rfc_ctx->internal.pos_offset        = 0;
     
     rfc_ctx->damage                     = 0.0;
     rfc_ctx->damage_residue             = 0.0;
@@ -1175,7 +1175,7 @@ bool RFC_deinit( void *ctx )
     rfc_ctx->internal.extrema_changed   = false;
 #endif /*RFC_GLOBAL_EXTREMA*/
     rfc_ctx->internal.pos               = 0;
-    rfc_ctx->internal.global_offset     = 0;
+    rfc_ctx->internal.pos_offset        = 0;
 #if RFC_TP_SUPPORT
     rfc_ctx->internal.margin[0]         = nil;  /* left margin */
     rfc_ctx->internal.margin[1]         = nil;  /* right margin */
@@ -2784,23 +2784,30 @@ bool RFC_class_param_get( const void *ctx, rfc_class_param_s *class_param )
 /**
  * @brief      Set flags
  *
- * @param      ctx        The rainflow context
- * @param[in]  flags      The flags
- * @param[in]  debugging  Flag for debugging flags
+ * @param      ctx    The rainflow context
+ * @param[in]  flags  The flags
+ * @param[in]  stack  ID of flags stack
  *
  * @return     true on success
  */
-bool RFC_set_flags( void *ctx, int flags, bool debugging )
+bool RFC_set_flags( void *ctx, int flags, int stack )
 {
     RFC_CTX_CHECK_AND_ASSIGN
 
-    if( debugging )
+    switch( stack )
     {
-        rfc_ctx->internal.debug_flags = (rfc_debug_flags_e)flags;
-    }
-    else
-    {
-        rfc_ctx->internal.flags = (rfc_flags_e)flags;
+        case 0:
+            rfc_ctx->internal.flags = (rfc_flags_e)flags;
+            break;
+
+#if RFC_DEBUG_FLAGS
+        case 1:
+            rfc_ctx->internal.debug_flags = (rfc_debug_flags_e)flags;
+            break;
+#endif /*RFC_DEBUG_FLAGS*/
+
+        default:
+            return false;
     }
 
     return true;
@@ -2810,23 +2817,30 @@ bool RFC_set_flags( void *ctx, int flags, bool debugging )
 /**
  * @brief      Get flags
  *
- * @param      ctx        The rainflow context
- * @param[out] flags      Flag for debugging flags
- * @param[in]  debugging  The debugging
+ * @param      ctx    The rainflow context
+ * @param[out] flags  Flag for debugging flags
+ * @param[in]  stack  ID of flags stack
  *
  * @return     true on success
  */
-bool RFC_get_flags( const void *ctx, int *flags, bool debugging )
+bool RFC_get_flags( const void *ctx, int *flags, int stack )
 {
     RFC_CTX_CHECK_AND_ASSIGN
 
-    if( debugging )
+    switch( stack )
     {
-        *flags = (int)rfc_ctx->internal.debug_flags;
-    }
-    else
-    {
-        *flags = (int)rfc_ctx->internal.flags;
+        case 0:
+            *flags = (int)rfc_ctx->internal.flags;
+            break;
+
+#if RFC_DEBUG_FLAGS
+        case 1:
+            *flags = (int)rfc_ctx->internal.debug_flags;
+            break;
+#endif /*RFC_DEBUG_FLAGS*/
+
+        default:
+            return false;
     }
 
     return true;
@@ -4760,15 +4774,15 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
     /* Do several counts, according to "flags" */
     if( class_from != class_to )
     {
-#if _DEBUG
-        if( ( rfc_ctx->internal.debug_flags & RFC_FLAGS_LOG_CLOSED_CYCLES ) &&
-            ( flags & (RFC_FLAGS_COUNT_ALL & ~RFC_FLAGS_COUNT_LC) ) )
+#if RFC_DEBUG_FLAGS
+        if( rfc_ctx->internal.debug_flags & RFC_FLAGS_LOG_CLOSED_CYCLES &&
+            flags & (RFC_FLAGS_COUNT_ALL & ~RFC_FLAGS_COUNT_LC) )
         {
-            fprintf( stdout, "Closed cycle %g@%llu[%llu]->%g@%llu[%llu]\n", 
-                     from->value, from->pos, from->tp_pos,
-                     to->value,   to->pos,   to->tp_pos );
+            fprintf( stdout, "Closed cycle %g @ %lu[%lu] --> %g @ %lu[%lu]\n", 
+                     from->value, (long unsigned)from->pos, (long unsigned)from->tp_pos,
+                     to->value,   (long unsigned)to->pos,   (long unsigned)to->tp_pos );
         }
-#endif /*_DEBUG*/
+#endif /*RFC_DEBUG_FLAGS*/
         /* Cumulate damage */
         if( flags & RFC_FLAGS_COUNT_DAMAGE )
         {
@@ -5165,7 +5179,7 @@ void tp_lock( rfc_ctx_s *rfc_ctx, bool do_lock )
 static
 bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param )
 {
-    size_t global_offset,
+    size_t pos_offset,
            i;
 
     assert( rfc_ctx );
@@ -5176,12 +5190,12 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
         return false;
     }
 
-    global_offset = rfc_ctx->internal.global_offset;
+    pos_offset = rfc_ctx->internal.pos_offset;
 
     /* Clear current count data */
     RFC_clear_counts( rfc_ctx );
 
-    rfc_ctx->internal.global_offset = global_offset;
+    rfc_ctx->internal.pos_offset = pos_offset;
 
     /* Class parameters may change, new hysteresis must be greater! */
     if( new_class_param )
@@ -5500,9 +5514,11 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
 
         case RFC_SD_TRANSIENT_23:
             /* \todo */
+            return error_raise( rfc_ctx, RFC_ERROR_UNSUPPORTED );
             break;
         case RFC_SD_TRANSIENT_23c:
             /* \todo */
+            return error_raise( rfc_ctx, RFC_ERROR_UNSUPPORTED );
             break;
 
         default:
