@@ -102,26 +102,7 @@
 /* This version is generated via coan (http://coan2.sourceforge.net/) */
 #endif /*COAN_INVOKED*/
 
-// Notes on mix C and C++ headers:
-// https://developers.redhat.com/blog/2016/02/29/why-cstdlib-is-more-complicated-than-you-might-think/
-// Avoid including C standard headers in a C++ namespace!
-#ifdef __cplusplus
-#include <cstdbool>  /* bool, true, false */
-#include <cstdint>   /* ULLONG_MAX */
-#include <climits>   /* ULLONG_MAX */
-#include <cstddef>   /* size_t, NULL */
-#ifndef RFC_CPP_NAMESPACE
-#define RFC_CPP_NAMESPACE rainflow_C
-#endif /*RFC_CPP_NAMESPACE*/
-namespace RFC_CPP_NAMESPACE {
-#else /*!__cplusplus*/
-#include <stdbool.h> /* bool, true, false */
-#include <stdint.h>  /* ULLONG_MAX */
-#include <limits.h>  /* ULLONG_MAX */
-#include <stddef.h>  /* size_t, NULL */
-#endif /*__cplusplus*/
 #include "config.h"  /* Configuration */
-
 
 #ifndef RFC_VALUE_TYPE
 #define RFC_VALUE_TYPE double
@@ -180,6 +161,34 @@ namespace RFC_CPP_NAMESPACE {
 #define RFC_DEBUG_FLAGS OFF
 #endif /*RFC_DEBUG_FLAGS*/
 #endif /*RFC_MINIMAL*/
+
+
+// Notes on mix C and C++ headers:
+// https://developers.redhat.com/blog/2016/02/29/why-cstdlib-is-more-complicated-than-you-might-think/
+// Avoid including C standard headers in a C++ namespace!
+#ifdef __cplusplus
+#include <cstdbool>  /* bool, true, false */
+#include <cstdint>   /* ULLONG_MAX */
+#include <climits>   /* ULLONG_MAX */
+#include <cstddef>   /* size_t, NULL */
+#if RFC_DEBUG_FLAGS
+#include <cstdio>
+#include <cstdarg>
+#endif /*RFC_DEBUG_FLAGS*/
+#ifndef RFC_CPP_NAMESPACE
+#define RFC_CPP_NAMESPACE rainflow_C
+#endif /*RFC_CPP_NAMESPACE*/
+namespace RFC_CPP_NAMESPACE {
+#else /*!__cplusplus*/
+#include <stdbool.h> /* bool, true, false */
+#include <stdint.h>  /* ULLONG_MAX */
+#include <limits.h>  /* ULLONG_MAX */
+#include <stddef.h>  /* size_t, NULL */
+#if RFC_DEBUG_FLAGS
+#include <stdio.h>
+#include <stdarg.h>
+#endif /*RFC_DEBUG_FLAGS*/
+#endif /*__cplusplus*/
 
 
 /* Memory allocation aim info */
@@ -432,6 +441,10 @@ bool    RFC_at_init                 (       void *ctx, const double *Sa, const d
 bool    RFC_at_transform            ( const void *ctx, double Sa, double Sm, double *Sa_transformed );
 #endif /*RFC_AT_SUPPORT*/
 
+#if RFC_DEBUG_FLAGS
+int     RFC_debug_fprintf           (       void *ctx, FILE *stream, const char *fmt, ... );
+#endif /*RFC_DEBUG_FLAGS*/
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif /*__cplusplus*/
@@ -453,6 +466,9 @@ typedef  void                       ( *rfc_spread_damage_fcn_t ) ( rfc_ctx_s *, 
 #if RFC_AT_SUPPORT
 typedef  bool                       ( *rfc_at_transform_fcn_t )  ( rfc_ctx_s *, double Sa, double Sm, double *Sa_transformed );
 #endif /*RFC_AT_SUPPORT*/
+#if RFC_DEBUG_FLAGS
+typedef  int                        ( *rfc_debug_vfprintf_fcn_t )( rfc_ctx_s *, FILE *stream, const char *fmt, va_list arg );
+#endif /*RFC_DEBUG_FLAGS*/
 #endif /*RFC_USE_DELEGATES*/
 
 
@@ -599,6 +615,9 @@ typedef struct rfc_ctx
 #if RFC_AT_SUPPORT
     rfc_at_transform_fcn_t              at_transform_fcn;           /**< Amplitude transformation to take mean load influence into account */
 #endif /*RFC_AT_SUPPORT*/
+#if RFC_DEBUG_FLAGS
+    rfc_debug_vfprintf_fcn_t            debug_vfprintf_fcn;         /**< Debug vfprintf() function */
+#endif /*RFC_DEBUG_FLAGS*/
 #endif /*RFC_USE_DELEGATES*/
     
     /* Residue */

@@ -1,10 +1,37 @@
 
 /* Using Rainflow C-Library in a C++ context */
 
-#define RFC_TP_STORAGE std::vector<RF::rfc_value_tuple_s>
+
+#define HAVE_NEOLIB 0
+
+#if HAVE_NEOLIB
+#include "neolib/segmented_array.hpp"
+#else /*!HAVE_NEOLIB*/
+#include <vector>
+#endif /*HAVE_NEOLIB*/
+
+#define RFC_CPP_NAMESPACE rainflow_C
+
+namespace RFC_CPP_NAMESPACE
+{
+    typedef struct rfc_value_tuple rfc_value_tuple_s;  /**< Tuple of value and index position */
+#if HAVE_NEOLIB
+    class tp_storage : public neolib::segmented_array<rfc_value_tuple_s>
+    {
+        public:
+            inline size_t capacity() const { return size(); }  /* Rainflow needs a capacity() method */
+    };
+#else /*!HAVE_NEOLIB*/
+    typedef std::vector<rfc_value_tuple_s> tp_storage;  /**< Turning points storage */
+#endif /*HAVE_NEOLIB*/
+}
+
+/* If RFC_TP_STORAGE is defined, rainflow.hpp will define the 
+ * class Rainflow supporting external turning points storage 
+ * with given type */
+#define RFC_TP_STORAGE RFC_CPP_NAMESPACE::tp_storage
 
 #include "../rainflow.hpp"
-//#include "../neolib/segmented_array.hpp"
 #include "../greatest/greatest.h"
 
 #define NUMEL(x) (sizeof(x)/sizeof(*(x)))
@@ -53,23 +80,18 @@ TEST wrapper_test_advanced( void )
     double values[] = { 1,6,2,8 };
     std::vector<double> data( values, values + 4 );
 
-#if 0
-    rf.Parametrize( /*range_min*/ 0.0, /*range_max*/ 10.0,
-                    /*range_fixed_min*/ 0.0, /*range_fixed_max*/ 10.0, /*range*/ DBL_NAN, 
-                    /*class_count*/ 10, /*class_width*/ 1, 
-                    /*dilation*/ 0.0, /*hysteresis*/ 0.5 );
-
-    rf.DoRainflow( data, 4, true );
-#endif
-
     rf.init( 10, 1, -0.5, 1 );
+
     rf.get_flags( &flags, /*debugging*/true );
     flags |= (int)Rainflow::RFC_FLAGS_LOG_CLOSED_CYCLES;
     rf.set_flags( flags, /*debugging*/ true );
+
     rf.feed( values, NUMEL(values) );
     ASSERT( rf.tp_storage().size() == 3 );
+
     rf.feed( data );
     ASSERT( rf.tp_storage().size() == 7 );
+
     rf.finalize( Rainflow::RFC_RES_REPEATED );
     ASSERT( rf.tp_storage().size() == 8 );
 

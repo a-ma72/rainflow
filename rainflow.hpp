@@ -44,6 +44,22 @@
 #include <cmath>
 #include "rainflow.h"
 
+/* Suppose correct configuration */
+static
+char compiler_assert_rfc_config
+[
+  !RFC_MINIMAL              &&
+   RFC_TP_SUPPORT           &&
+   RFC_HCM_SUPPORT          &&
+   RFC_USE_DELEGATES        &&
+   RFC_GLOBAL_EXTREMA       &&
+   RFC_DAMAGE_FAST          &&
+   RFC_DH_SUPPORT           &&
+   RFC_AT_SUPPORT           &&
+   RFC_DEBUG_FLAGS          
+];
+
+
 namespace RF = RFC_CPP_NAMESPACE;
 
 
@@ -789,6 +805,8 @@ void* RainflowT<rfc_tp_storage>::mem_alloc( void *ptr, size_t num, size_t size, 
 
 
 #ifdef RFC_TP_STORAGE
+
+/* Define a Rainflow class with delegates for external turning point storage */
 
 typedef RainflowT<RFC_TP_STORAGE> Rainflow;
 

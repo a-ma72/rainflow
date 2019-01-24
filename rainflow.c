@@ -111,10 +111,6 @@
 #include <string.h>  /* memset() */
 #include <float.h>   /* DBL_MAX */
 
-#if RFC_DEBUG_FLAGS
-#include <stdio.h>
-#endif /*_DEBUG*/
-
 
 #if MATLAB_MEX_FILE
 #if !RFC_MINIMAL
@@ -3076,6 +3072,33 @@ bool RFC_at_transform( const void *ctx, double Sa, double Sm, double *Sa_transfo
 }
 #endif /*RFC_AT_SUPPORT*/
 
+#if RFC_DEBUG_FLAGS
+int RFC_debug_fprintf( void *ctx, FILE *stream, const char *fmt, ... )
+{
+    int result;
+    va_list arg;
+
+    RFC_CTX_CHECK_AND_ASSIGN
+
+    va_start( arg, fmt );
+
+#if RFC_USE_DELEGATES
+    if( rfc_ctx->debug_vfprintf_fcn )
+    {
+        result = rfc_ctx->debug_vfprintf_fcn( rfc_ctx, stream, fmt, arg );
+    }
+    else
+#endif /*RFC_USE_DELEGATES*/
+    {
+        result = vfprintf( stream, fmt, arg );
+    }
+
+    va_end( arg );
+
+    return result;
+}
+#endif /*RFC_DEBUG_FLAGS*/
+
 
 
 
@@ -4778,9 +4801,10 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
         if( rfc_ctx->internal.debug_flags & RFC_FLAGS_LOG_CLOSED_CYCLES &&
             flags & (RFC_FLAGS_COUNT_ALL & ~RFC_FLAGS_COUNT_LC) )
         {
-            fprintf( stdout, "Closed cycle %g @ %lu[%lu] --> %g @ %lu[%lu]\n", 
-                     from->value, (long unsigned)from->pos, (long unsigned)from->tp_pos,
-                     to->value,   (long unsigned)to->pos,   (long unsigned)to->tp_pos );
+            RFC_debug_fprintf( rfc_ctx, stdout, 
+                               "Closed cycle %g @ %lu[%lu] --> %g @ %lu[%lu]\n", 
+                               from->value, (long unsigned)from->pos, (long unsigned)from->tp_pos,
+                               to->value,   (long unsigned)to->pos,   (long unsigned)to->tp_pos );
         }
 #endif /*RFC_DEBUG_FLAGS*/
         /* Cumulate damage */
@@ -5622,6 +5646,33 @@ void * mem_alloc( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim )
 
 
 #if MATLAB_MEX_FILE
+
+#if RFC_DEBUG_FLAGS
+static
+int rfc_vfprintf_fcn( void *ctx, FILE* stream, const char *fmt, va_list arg )
+{
+    int length;
+
+    /* Get the buffer size needed */
+    length = vsnprintf( NULL, 0, fmt, arg );  
+    if( length > 0 )
+    {
+        char *buffer = malloc( ++length );
+
+        if( buffer )
+        {
+            buffer[length-1] = 0;
+            vsnprintf( buffer, length, fmt, arg );
+            mexPrintf( "%s", buffer );
+
+            free( buffer );
+        }
+    }
+
+    return length;
+}
+#endif /*RFC_DEBUG_FLAGS*/
+
 /**
  * MATLAB wrapper for the rainflow algorithm
  */
@@ -5705,6 +5756,11 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         ok = RFC_init( &rfc_ctx, 
                        class_count, (rfc_value_t)class_width, (rfc_value_t)class_offset, 
                        (rfc_value_t)hysteresis, RFC_FLAGS_DEFAULT );
+#if RFC_DEBUG_FLAGS
+        rfc_ctx.debug_vfprintf_fcn = rfc_vfprintf_fcn;
+        RFC_set_flags( &rfc_ctx, RFC_FLAGS_LOG_CLOSED_CYCLES, 1 );
+#endif /*RFC_DEBUG_FLAGS*/
+
 #if RFC_TP_SUPPORT
         if( ok )
         {
