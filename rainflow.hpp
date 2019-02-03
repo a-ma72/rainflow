@@ -224,77 +224,123 @@ public:
     typedef     void *   ( *rfc_mem_alloc_fcn_t )   ( void *, size_t num, size_t size, rfc_mem_aim_e aim );     /** Memory allocation functor */
 
     /* Core function wrapper */
-    bool    init                    ( unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
-                                      rfc_value_t hysteresis, rfc_flags_e flags = RFC_FLAGS_DEFAULT );
-    bool    wl_init_elementary      ( double sx, double nx, double k );
-    bool    wl_init_original        ( double sd, double nd, double k );
-    bool    wl_init_modified        ( double sx, double nx, double k, double k2 );
-    bool    wl_init_any             ( const rfc_wl_param_s* );
-    bool    clear_counts            ();
-    bool    deinit                  ();
-    bool    feed                    ( const rfc_value_t* data, size_t count );
-    bool    cycle_process_counts    ( rfc_value_t from_val, rfc_value_t to_val, rfc_flags_e flags );
-    bool    feed_scaled             ( const rfc_value_t* data, size_t count, double factor );
-    bool    feed_tuple              ( rfc_value_tuple_s *data, size_t count );
-    bool    finalize                ( rfc_res_method_e residual_method = RFC_RES_IGNORE );
+    bool            init                    ( unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
+                                              rfc_value_t hysteresis, rfc_flags_e flags = RFC_FLAGS_DEFAULT );
+    bool            wl_init_elementary      ( double sx, double nx, double k );
+    bool            wl_init_original        ( double sd, double nd, double k );
+    bool            wl_init_modified        ( double sx, double nx, double k, double k2 );
+    bool            wl_init_any             ( const rfc_wl_param_s* );
+    bool            clear_counts            ();
+    bool            deinit                  ();
+    bool            feed                    ( const rfc_value_t* data, size_t count );
+    bool            cycle_process_counts    ( rfc_value_t from_val, rfc_value_t to_val, rfc_flags_e flags );
+    bool            feed_scaled             ( const rfc_value_t* data, size_t count, double factor );
+    bool            feed_tuple              ( rfc_value_tuple_s *data, size_t count );
+    bool            finalize                ( rfc_res_method_e residual_method = RFC_RES_IGNORE );
     /* Functions on rainflow matrix */           
-    bool    rfm_make_symmetric      ();
-    bool    rfm_get                 ( rfc_rfm_item_s **buffer, unsigned *count ) const;
-    bool    rfm_set                 ( const rfc_rfm_item_s *buffer, unsigned count, bool add_only );
-    bool    rfm_peek                ( rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t *count ) const;
-    bool    rfm_poke                ( rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t count, bool add_only );
-    bool    rfm_sum                 ( unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, rfc_counts_t *count ) const;
-    bool    rfm_damage              ( unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage ) const;
-    bool    rfm_check               () const;
-    bool    lc_get                  ( rfc_counts_t *lc, rfc_value_t *level ) const;
-    bool    lc_from_rfm             ( rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags ) const;
-    bool    lc_from_residue         ( rfc_counts_t *lc, rfc_value_t *level, rfc_flags_e flags ) const;
-    bool    rp_get                  ( rfc_counts_t *rp, rfc_value_t *class_means ) const;
-    bool    rp_from_rfm             ( rfc_counts_t *rp, rfc_value_t *class_means, const rfc_counts_t *rfm ) const;
-    bool    damage_from_rp          ( const rfc_counts_t *counts, const rfc_value_t *Sa, double *damage, rfc_rp_damage_method_e rp_calc_type ) const;
-    bool    damage_from_rfm         ( const rfc_counts_t *rfm, double *damage ) const;
-    bool    wl_calc_sx              ( double s0, double n0, double k, double *sx, double nx, double  k2, double  sd, double nd ) const;
-    bool    wl_calc_sd              ( double s0, double n0, double k, double  sx, double nx, double  k2, double *sd, double nd ) const;
-    bool    wl_calc_k2              ( double s0, double n0, double k, double  sx, double nx, double *k2, double  sd, double nd ) const;
-    bool    wl_calc_sa              ( double s0, double n0, double k, double  n,  double *sa ) const;
-    bool    wl_calc_n               ( double s0, double n0, double k, double  sa, double *n ) const;
-    bool    tp_init_autoprune       ( bool autoprune, size_t size, size_t threshold );
-    bool    tp_prune                ( size_t count, rfc_flags_e flags );
-    bool    dh_init                 ( rfc_sd_method_e method, double *dh, size_t dh_cap, bool is_static );
-    bool    at_init                 ( const double *Sa, const double *Sm, unsigned count, 
-                                      double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
-    bool    at_transform            ( double Sa, double Sm, double *Sa_transformed ) const;
-    bool    set_flags               ( int flags, bool debugging = false );
-    bool    get_flags               ( int *flags, bool debugging = false ) const;
+    bool            rfm_make_symmetric      ();
+    bool            rfm_get                 ( rfc_rfm_item_s **buffer, unsigned *count ) const;
+    bool            rfm_set                 ( const rfc_rfm_item_s *buffer, unsigned count, bool add_only );
+    bool            rfm_peek                ( rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t *count ) const;
+    bool            rfm_poke                ( rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t count, bool add_only );
+    bool            rfm_sum                 ( unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, rfc_counts_t *count ) const;
+    bool            rfm_damage              ( unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage ) const;
+    bool            rfm_check               () const;
+    bool            lc_get                  ( rfc_counts_t *lc, rfc_value_t *level ) const;
+    bool            lc_from_rfm             ( rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags ) const;
+    bool            lc_from_residue         ( rfc_counts_t *lc, rfc_value_t *level, rfc_flags_e flags ) const;
+    bool            rp_get                  ( rfc_counts_t *rp, rfc_value_t *class_means ) const;
+    bool            rp_from_rfm             ( rfc_counts_t *rp, rfc_value_t *class_means, const rfc_counts_t *rfm ) const;
+    bool            damage_from_rp          ( const rfc_counts_t *counts, const rfc_value_t *Sa, double *damage, rfc_rp_damage_method_e rp_calc_type ) const;
+    bool            damage_from_rfm         ( const rfc_counts_t *rfm, double *damage ) const;
+    bool            wl_calc_sx              ( double s0, double n0, double k, double *sx, double nx, double  k2, double  sd, double nd ) const;
+    bool            wl_calc_sd              ( double s0, double n0, double k, double  sx, double nx, double  k2, double *sd, double nd ) const;
+    bool            wl_calc_k2              ( double s0, double n0, double k, double  sx, double nx, double *k2, double  sd, double nd ) const;
+    bool            wl_calc_sa              ( double s0, double n0, double k, double  n,  double *sa ) const;
+    bool            wl_calc_n               ( double s0, double n0, double k, double  sa, double *n ) const;
+    bool            tp_init_autoprune       ( bool autoprune, size_t size, size_t threshold );
+    bool            tp_prune                ( size_t count, rfc_flags_e flags );
+    bool            dh_init                 ( rfc_sd_method_e method, double *dh, size_t dh_cap, bool is_static );
+    bool            at_init                 ( const double *Sa, const double *Sm, unsigned count, 
+                                              double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
+    bool            at_transform            ( double Sa, double Sm, double *Sa_transformed ) const;
+    bool            set_flags               ( int flags, bool debugging = false );
+    bool            get_flags               ( int *flags, bool debugging = false ) const;
 
     /* C++ specific extensions */
-    bool    feed                    ( const std::vector<rfc_value_t> data );
-    bool    feed_scaled             ( const std::vector<rfc_value_t> data, double factor );
-    bool    rfm_get                 ( rfc_rfm_item_v &buffer, unsigned *count ) const;
-    bool    rfm_set                 ( const rfc_rfm_item_v &buffer, bool add_only );
-    bool    lc_get                  ( rfc_counts_v &lc, rfc_value_v &level ) const;
-    bool    lc_from_rfm             ( rfc_counts_v &lc, rfc_value_v &level, const rfc_counts_t *rfm, rfc_flags_e flags ) const;
-    bool    lc_from_residue         ( rfc_counts_v &lc, rfc_value_v &level, rfc_flags_e flags ) const;
-    bool    rp_get                  ( rfc_counts_v &rp, rfc_value_v &class_means ) const;
-    bool    rp_from_rfm             ( rfc_counts_v &rp, rfc_value_v &class_means, const rfc_counts_t *rfm ) const;
-    bool    damage_from_rp          ( const rfc_counts_v &counts, const rfc_value_v &Sa, double *damage, rfc_rp_damage_method_e rp_calc_type ) const;
-    bool    at_init                 ( const rfc_double_v &Sa, const rfc_double_v &Sm, 
-                                      double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
-    bool    wl_param_get            ( rfc_wl_param_s &wl_param ) const;
+    bool            feed                    ( const std::vector<rfc_value_t> data );
+    bool            feed_scaled             ( const std::vector<rfc_value_t> data, double factor );
+    bool            rfm_get                 ( rfc_rfm_item_v &buffer, unsigned *count ) const;
+    bool            rfm_set                 ( const rfc_rfm_item_v &buffer, bool add_only );
+    bool            lc_get                  ( rfc_counts_v &lc, rfc_value_v &level ) const;
+    bool            lc_from_rfm             ( rfc_counts_v &lc, rfc_value_v &level, const rfc_counts_t *rfm, rfc_flags_e flags ) const;
+    bool            lc_from_residue         ( rfc_counts_v &lc, rfc_value_v &level, rfc_flags_e flags ) const;
+    bool            rp_get                  ( rfc_counts_v &rp, rfc_value_v &class_means ) const;
+    bool            rp_from_rfm             ( rfc_counts_v &rp, rfc_value_v &class_means, const rfc_counts_t *rfm ) const;
+    bool            damage_from_rp          ( const rfc_counts_v &counts, const rfc_value_v &Sa, double *damage, rfc_rp_damage_method_e rp_calc_type ) const;
+    bool            at_init                 ( const rfc_double_v &Sa, const rfc_double_v &Sm, 
+                                              double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
+    bool            wl_param_get            ( rfc_wl_param_s &wl_param ) const;
 
     /* TP storage access */
-    const   rfc_tp_storage&     tp_storage() const { return m_tp; }
-            rfc_tp_storage&     tp_storage()       { return m_tp; }
+    const
+    rfc_tp_storage& tp_storage              () const { return m_tp; }
+    rfc_tp_storage& tp_storage              ()       { return m_tp; }
 
     /* Delegates */
-    bool    tp_set                  ( size_t tp_pos, rfc_value_tuple_s *tp );
-    bool    tp_get                  ( size_t tp_pos, rfc_value_tuple_s **tp );
-    bool    tp_inc_damage           ( size_t tp_pos, double damage );
+    bool            tp_set                  ( size_t tp_pos, rfc_value_tuple_s *tp );
+    bool            tp_get                  ( size_t tp_pos, rfc_value_tuple_s **tp );
+    bool            tp_inc_damage           ( size_t tp_pos, double damage );
+
+    
+    /* dtor */     ~RainflowT               () { deinit(); }
+    /* ctor */      RainflowT               ()                                                   // Std ctor
+    { 
+        RF::rfc_ctx_s nil = { sizeof( RF::rfc_ctx_s ) };
+
+        m_ctx = nil;
+    } 
+    /* ctor */      RainflowT               ( RF::rfc_ctx_s&& other ) { assign_ctx( other ); }   // Move ctor
+    RainflowT&      operator=               ( RF::rfc_ctx_s&& other ) { assign_ctx( other ); }   // Move assignment
+
+    /* ctx access */
+    const
+    RF::rfc_ctx_s&  get_ctx                 () const { return m_ctx; }
+    void            assign_ctx              ( RF::rfc_ctx_s& ctx )
+    { 
+        if( ctx.internal.obj != this ) 
+        { 
+            RF::rfc_ctx_s nil = { sizeof( RF::rfc_ctx_s ) };
+
+            (void)deinit(); 
+            m_ctx = ctx;
+            m_ctx.internal.obj = this;  // Take ownership and custody
+            ctx = nil; 
+        } 
+    }
+    void            assign_ctx              ( RF::rfc_ctx_s&& ctx )  // Move assignment
+    { 
+        if( ctx.internal.obj != this ) 
+        { 
+            (void)deinit(); 
+            m_ctx = ctx;
+            m_ctx.internal.obj = this;  // Take ownership and custody
+        } 
+    }
+
+    /* Memory allocator */
     static
-    void*   mem_alloc               ( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim );
+    void*           mem_alloc               ( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim );
+
 private:
-    RF::rfc_ctx_s                   m_ctx;
-    rfc_tp_storage                  m_tp;
+    void            assign_ctx              ( const RF::rfc_ctx_s& );   // Inhibit assign on const ctx
+                    RainflowT               ( const RF::rfc_ctx_s& );   // Inhibit copy ctor on const ctx
+                    RainflowT               ( const RainflowT& );       // Inhibit copy ctor on (non-)const RainflowT
+    RainflowT&      operator=               ( const rfc_ctx_s& );       // Inhibit copy assignment on const ctx
+    RainflowT&      operator=               ( const RainflowT& );       // Inhibit copy assignment on (non-)const RainflowT
+
+    RF::rfc_ctx_s   m_ctx;
+    rfc_tp_storage  m_tp;
 };
 
 
@@ -361,7 +407,15 @@ bool RainflowT<rfc_tp_storage>::clear_counts()
 template< class rfc_tp_storage >
 bool RainflowT<rfc_tp_storage>::deinit()
 {
-    return RF::RFC_deinit( &m_ctx );
+    if( m_ctx.internal.obj != this )
+    {
+        // Don't have ownership
+        return false;
+    }
+    else
+    {
+        return RF::RFC_deinit( &m_ctx );
+    }
 }
 
 

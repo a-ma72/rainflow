@@ -2347,9 +2347,11 @@ bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_valu
 
             /**
              *  The following lines of code doesn't reflect the original formula as in [6] chapter 3.2.9, formula 3.2-65.
-             *  This realisation resolves his approach to use partial damages instead of particular cycles from the histogram.
-             *  This solution benefits from inserting an abstraction layer, which permits to use any representation of 
-             *  a Woehler curve with a given fatigue strength limit.
+             *  This realization resolves his approach to use partial damages instead of particular cycles from the histogram.
+             *  This procedure benefits from inserting an abstraction layer, which permits to use any representation of 
+             *  a Woehler curve with a given fatigue strength limit providing a damage per cycle representation. 
+             *  Note that the Miner Consequent approach, in contrast to Original/Elementary/Modified, is unsuitable when using 
+             *  an inappropriate Woehler curve, to estimate so called "pseudo damages".
              */
 
             /* Weighted damage */
