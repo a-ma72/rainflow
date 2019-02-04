@@ -9,8 +9,8 @@
 
 
 cmake_minimum_required( VERSION 3.6 )
-set( CMAKE_CONFIGURATION_TYPES Release Debug )
 project( Rainflow )
+set( CMAKE_CONFIGURATION_TYPES Release Debug )
 set( RFC_VERSION_MAJOR "0" )
 set( RFC_VERSION_MINOR "1" )
 
@@ -56,11 +56,11 @@ endif()
 
 # set up matlab libraries
 include_directories( ${Matlab_INCLUDE_DIRS} )
-configure_file( ${CMAKE_SOURCE_DIR}/config.h.in ${CMAKE_SOURCE_DIR}/config.h )
+configure_file( config.h.in config.h )
 
-matlab_add_mex( NAME ${CMAKE_PROJECT_NAME} SRC rainflow.c OUTPUT_NAME rfc )
-target_compile_definitions( ${CMAKE_PROJECT_NAME} PRIVATE MATLAB_MEX_FILE _SCL_SECURE_NO_WARNINGS )
-target_link_libraries( ${CMAKE_PROJECT_NAME} ${Matlab_LIBRARIES} ${MATH_LIB} )
+matlab_add_mex( NAME ${PROJECT_NAME} SRC rainflow.c OUTPUT_NAME rfc )
+target_compile_definitions( ${PROJECT_NAME} PRIVATE MATLAB_MEX_FILE _SCL_SECURE_NO_WARNINGS )
+target_link_libraries( ${PROJECT_NAME} ${Matlab_LIBRARIES} ${MATH_LIB} )
 
 # Test application, start project for MSVC
 add_executable( rfc_test rainflow.c test/rfc_test.c test/rfc_wrapper_simple.cpp test/rfc_wrapper_advanced.cpp )
@@ -71,7 +71,7 @@ set_target_properties( rfc_test PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED
 set_property( DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT rfc_test )
 
 # install to /bin by default
-install( TARGETS ${CMAKE_PROJECT_NAME} rfc_test RUNTIME DESTINATION bin LIBRARY DESTINATION bin )
+install( TARGETS ${PROJECT_NAME} rfc_test RUNTIME DESTINATION bin LIBRARY DESTINATION bin )
 install( FILES test/long_series.csv test/long_series.c matlab/validate.m DESTINATION bin )
 
 
