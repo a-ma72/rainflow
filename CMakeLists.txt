@@ -62,6 +62,9 @@ matlab_add_mex( NAME ${PROJECT_NAME} SRC rainflow.c OUTPUT_NAME rfc )
 target_compile_definitions( ${PROJECT_NAME} PRIVATE MATLAB_MEX_FILE _SCL_SECURE_NO_WARNINGS )
 target_link_libraries( ${PROJECT_NAME} ${Matlab_LIBRARIES} ${MATH_LIB} )
 
+add_library( rfc STATIC rainflow.c )
+target_link_libraries( ${PROJECT_NAME} ${MATH_LIB} )
+
 # Test application, start project for MSVC
 add_executable( rfc_test rainflow.c test/rfc_test.c test/rfc_wrapper_simple.cpp test/rfc_wrapper_advanced.cpp )
 target_compile_definitions( rfc_test PRIVATE _SCL_SECURE_NO_WARNINGS )

@@ -467,7 +467,7 @@ typedef  void                       ( *rfc_spread_damage_fcn_t ) ( rfc_ctx_s *, 
 typedef  bool                       ( *rfc_at_transform_fcn_t )  ( rfc_ctx_s *, double Sa, double Sm, double *Sa_transformed );
 #endif /*RFC_AT_SUPPORT*/
 #if RFC_DEBUG_FLAGS
-typedef  int                        ( *rfc_debug_vfprintf_fcn_t )( rfc_ctx_s *, FILE *stream, const char *fmt, va_list arg );
+typedef  int                        ( *rfc_debug_vfprintf_fcn_t )( void *, FILE *stream, const char *fmt, va_list arg );
 #endif /*RFC_DEBUG_FLAGS*/
 #endif /*RFC_USE_DELEGATES*/
 
