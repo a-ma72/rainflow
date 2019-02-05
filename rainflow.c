@@ -975,48 +975,58 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm, unsigned count,
 
         double Sa_R_Inf, Sa_R_0, Sa_R_0p5;
 
-        assert( !Sa && !Sm && !count );
+        assert( !Sa && !Sm );
 
-        Sa_R_Inf = 1.0 / ( 1.0 - M );                      /* y = -x && y = Sa(R=-1) - Mx                  */
-        Sa_R_0   = 1.0 / ( 1.0 + M );                      /* y =  x && y = Sa(R=-1) - Mx                  */
-        Sa_R_0p5 = Sa_R_0 * ( 1.0 + M/3 ) / ( 1.0 + M );   /* Backtrace Sa(R=0) to Sa(R=-1) with M/3, then */
-                                                           /* 3y = x && y = Sa(R=-1) - (M/3)x              */
-        if( symmetric )
+        if( M > 0.0 )
         {
-            /* Build symmetrical reference curve */
-            /* Symmetric around R=-1 (Sm=0) */
+            Sa_R_Inf = 1.0 / ( 1.0 - M );                      /* y = -x && y = Sa(R=-1) - Mx                  */
+            Sa_R_0   = 1.0 / ( 1.0 + M );                      /* y =  x && y = Sa(R=-1) - Mx                  */
+            Sa_R_0p5 = Sa_R_0 * ( 1.0 + M/3 ) / ( 1.0 + M );   /* Backtrace Sa(R=0) to Sa(R=-1) with M/3, then */
+                                                               /* 3y = x && y = Sa(R=-1) - (M/3)x              */
+            if( symmetric )
+            {
+                /* Build symmetrical reference curve */
+                /* Symmetric around R=-1 (Sm=0) */
 
-            double *Sa_ = rfc_ctx->internal.at_haigh.Sa;
-            double *Sm_ = rfc_ctx->internal.at_haigh.Sm;
+                double *Sa_ = rfc_ctx->internal.at_haigh.Sa;
+                double *Sm_ = rfc_ctx->internal.at_haigh.Sm;
 
-            assert( NUMEL( rfc_ctx->internal.at_haigh.Sa ) >= 5 );
-            
-            rfc_ctx->internal.at_haigh.count = 5;
+                assert( NUMEL( rfc_ctx->internal.at_haigh.Sa ) >= 5 );
+                
+                rfc_ctx->internal.at_haigh.count = 5;
 
-            Sa_[0] = Sa_R_0p5; Sm_[0] = -Sa_R_0p5 * 3.0;
-            Sa_[1] = Sa_R_0;   Sm_[1] = -Sa_R_0;
-            Sa_[2] = 1.0;      Sm_[2] =  0.0;
-            Sa_[3] = Sa_[1];   Sm_[3] = -Sm_[1];
-            Sa_[4] = Sa_[0];   Sm_[4] = -Sm_[0];
+                Sa_[0] = Sa_R_0p5; Sm_[0] = -Sa_R_0p5 * 3.0;
+                Sa_[1] = Sa_R_0;   Sm_[1] = -Sa_R_0;
+                Sa_[2] = 1.0;      Sm_[2] =  0.0;
+                Sa_[3] = Sa_[1];   Sm_[3] = -Sm_[1];
+                Sa_[4] = Sa_[0];   Sm_[4] = -Sm_[0];
+            }
+            else
+            {
+                /* Build non-symmetric reference curve */
+                double *Sa_ = rfc_ctx->internal.at_haigh.Sa;
+                double *Sm_ = rfc_ctx->internal.at_haigh.Sm;
+
+                assert( NUMEL( rfc_ctx->internal.at_haigh.Sa ) >= 3 );
+                
+                rfc_ctx->internal.at_haigh.count = 3;
+
+                Sa_[0] = Sa_R_Inf; Sm_[0] = -Sa_R_Inf;
+                Sa_[1] = Sa_R_0;   Sm_[1] =  Sa_R_0;
+                Sa_[2] = Sa_R_0p5; Sm_[2] =  Sa_R_0p5 * 3.0;
+            }
+
+            rfc_ctx->at.Sa       = rfc_ctx->internal.at_haigh.Sa;
+            rfc_ctx->at.Sm       = rfc_ctx->internal.at_haigh.Sm;
+            rfc_ctx->at.count    = rfc_ctx->internal.at_haigh.count;
         }
         else
         {
-            /* Build non-symmetric reference curve */
-            double *Sa_ = rfc_ctx->internal.at_haigh.Sa;
-            double *Sm_ = rfc_ctx->internal.at_haigh.Sm;
-
-            assert( NUMEL( rfc_ctx->internal.at_haigh.Sa ) >= 3 );
-            
-            rfc_ctx->internal.at_haigh.count = 3;
-
-            Sa_[0] = Sa_R_Inf; Sm_[0] = -Sa_R_Inf;
-            Sa_[1] = Sa_R_0;   Sm_[1] =  Sa_R_0;
-            Sa_[2] = Sa_R_0p5; Sm_[2] =  Sa_R_0p5 * 3.0;
+            rfc_ctx->at.Sa       = NULL;
+            rfc_ctx->at.Sm       = NULL;
+            rfc_ctx->at.count    = 0;
         }
 
-        rfc_ctx->at.Sa       = rfc_ctx->internal.at_haigh.Sa;
-        rfc_ctx->at.Sm       = rfc_ctx->internal.at_haigh.Sm;
-        rfc_ctx->at.count    = rfc_ctx->internal.at_haigh.count;
         rfc_ctx->at.M        = M;
         rfc_ctx->at.Sm_rig   = Sm_rig;
         rfc_ctx->at.R_rig    = R_rig;
@@ -1655,7 +1665,7 @@ bool RFC_rfm_set( void *ctx, const rfc_rfm_item_s *buffer, unsigned count, bool 
  * @param      ctx       The rainflow context
  * @param      from_val  The cycles start value
  * @param      to_val    The cycles target value
- * @param[out] counts    The corresponding value from the matrix element
+ * @param[out] counts    The corresponding value from the matrix element (not cycles!)
  *
  * @return     true on success
  */
@@ -1705,7 +1715,7 @@ bool RFC_rfm_peek( const void *ctx, rfc_value_t from_val, rfc_value_t to_val, rf
  * @param      ctx       The rainflow context
  * @param      from_val  The cycles start value
  * @param      to_val    The cycles target value
- * @param      counts    The count value for the matrix element
+ * @param      counts    The count value for the matrix element (not cycles!)
  * @param      add_only  Value is added if set to true
  *
  * @return     true on success
@@ -2141,11 +2151,11 @@ bool RFC_lc_from_residue( const void *ctx, rfc_counts_t* lc, rfc_value_t *level,
  *
  * @param      ctx          The rainflow context
  * @param[out] rp           The histogram (counts)
- * @param[out] class_means  The class means
+ * @param[out] Sa           The amplitudes
  *
  * @return     true on success
  */
-bool RFC_rp_get( const void *ctx, rfc_counts_t *rp, rfc_value_t *class_means )
+bool RFC_rp_get( const void *ctx, rfc_counts_t *rp, rfc_value_t *Sa )
 {
     unsigned i;
     unsigned class_count;
@@ -2173,9 +2183,9 @@ bool RFC_rp_get( const void *ctx, rfc_counts_t *rp, rfc_value_t *class_means )
     {
         rp[i] = rfc_ctx->rp[i];
 
-        if( class_means )
+        if( Sa )
         {
-            class_means[i] = CLASS_MEAN( rfc_ctx, i );
+            Sa[i] = rfc_ctx->class_width * i / 2;
         }
     }
 
@@ -2187,13 +2197,13 @@ bool RFC_rp_get( const void *ctx, rfc_counts_t *rp, rfc_value_t *class_means )
  * @brief      Generate range pair histogram from rainflow matrix
  *
  * @param      ctx          The rainflow context
- * @param[out] rp           The buffer for range pair counts
- * @param[out] class_means  The buffer for class means, may be NULL
+ * @param[out] rp           The buffer for range pair counts (not cycles!)
+ * @param[out] Sa           The buffer for amplitudes, may be NULL
  * @param[in]  rfm          The rfm
  *
  * @return     true on success
  */
-bool RFC_rp_from_rfm( const void *ctx, rfc_counts_t *rp, rfc_value_t *class_means, const rfc_counts_t *rfm )
+bool RFC_rp_from_rfm( const void *ctx, rfc_counts_t *rp, rfc_value_t *Sa, const rfc_counts_t *rfm )
 {
     unsigned    i, j;
     unsigned    class_count;
@@ -2226,9 +2236,9 @@ bool RFC_rp_from_rfm( const void *ctx, rfc_counts_t *rp, rfc_value_t *class_mean
     {
         rfc_counts_t sum = (rfc_counts_t)0;
 
-        if( class_means )
+        if( Sa )
         {
-            class_means[i] = CLASS_MEAN( rfc_ctx, i );
+            Sa[i] = rfc_ctx->class_width * i / 2;
         }
 
         for( j = i; j < class_count; j++ ) 
@@ -2408,7 +2418,7 @@ bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_valu
             rfc_ctx->damage_lut_inapt--;
         }
 #else /*!RFC_DAMAGE_FAST*/
-        ok = damage_from_rp( rfc_ctx, rp, Sa, damage, RFC_RP_DAMAGE_CALC_TYPE_DEFAULT );
+        ok = RFC_damage_from_rp( rfc_ctx, rp, Sa, damage, RFC_RP_DAMAGE_CALC_TYPE_DEFAULT );
 #endif /*RFC_DAMAGE_FAST*/
 
         (void)RFC_wl_param_set( rfc_ctx, &wl );
@@ -2432,7 +2442,7 @@ bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_valu
             rfc_ctx->damage_lut_inapt--;
         }
 #else /*!RFC_DAMAGE_FAST*/
-        ok = damage_from_rp( rfc_ctx, rp, Sa, damage, RFC_RP_DAMAGE_CALC_TYPE_DEFAULT );
+        ok = RFC_damage_from_rp( rfc_ctx, rp, Sa, damage, RFC_RP_DAMAGE_CALC_TYPE_DEFAULT );
 #endif /*RFC_DAMAGE_FAST*/
 
         (void)RFC_wl_param_set( rfc_ctx, &wl );

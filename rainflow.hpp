@@ -277,14 +277,17 @@ public:
     bool            lc_from_residue         ( rfc_counts_v &lc, rfc_value_v &level, rfc_flags_e flags ) const;
     bool            rp_get                  ( rfc_counts_v &rp, rfc_value_v &class_means ) const;
     bool            rp_from_rfm             ( rfc_counts_v &rp, rfc_value_v &class_means, const rfc_counts_t *rfm ) const;
-    bool            damage_from_rp          ( const rfc_counts_v &counts, const rfc_value_v &Sa, double *damage, rfc_rp_damage_method_e rp_calc_type ) const;
+    bool            damage_from_rp          ( const rfc_counts_v &counts, const rfc_value_v &Sa, double &damage, rfc_rp_damage_method_e rp_calc_type ) const;
     bool            at_init                 ( const rfc_double_v &Sa, const rfc_double_v &Sm, 
                                               double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
+    bool            at_init                 ( double M, double Sm_rig, double R_rig, bool R_pinned );
+    bool            at_transform            ( double Sa, double Sm, double &Sa_transformed ) const;
     bool            wl_param_get            ( rfc_wl_param_s &wl_param ) const;
 
     /* TP storage access */
-    const
+    inline const
     rfc_tp_storage& tp_storage              () const { return m_tp; }
+    inline
     rfc_tp_storage& tp_storage              ()       { return m_tp; }
 
     /* Delegates */
@@ -339,6 +342,7 @@ private:
     RainflowT&      operator=               ( const rfc_ctx_s& );       // Inhibit copy assignment on const ctx
     RainflowT&      operator=               ( const RainflowT& );       // Inhibit copy assignment on (non-)const RainflowT
 
+protected:
     RF::rfc_ctx_s   m_ctx;
     rfc_tp_storage  m_tp;
 };
@@ -532,16 +536,16 @@ bool RainflowT<rfc_tp_storage>::lc_from_residue( rfc_counts_t *lc, rfc_value_t *
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::rp_get( rfc_counts_t *rp, rfc_value_t *class_means ) const
+bool RainflowT<rfc_tp_storage>::rp_get( rfc_counts_t *rp, rfc_value_t *ranges ) const
 {
-    return RF::RFC_rp_get( &m_ctx, (RF::rfc_counts_t *)rp, (RF::rfc_value_t *)class_means );
+    return RF::RFC_rp_get( &m_ctx, (RF::rfc_counts_t *)rp, (RF::rfc_value_t *)ranges );
 }
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::rp_from_rfm( rfc_counts_t *rp, rfc_value_t *class_means, const rfc_counts_t *rfm ) const
+bool RainflowT<rfc_tp_storage>::rp_from_rfm( rfc_counts_t *rp, rfc_value_t *ranges, const rfc_counts_t *rfm ) const
 {
-    return RF::RFC_rp_from_rfm( &m_ctx, (RF::rfc_counts_t *)rp, (RF::rfc_value_t *)class_means, (const RF::rfc_counts_t *)rfm );
+    return RF::RFC_rp_from_rfm( &m_ctx, (RF::rfc_counts_t *)rp, (RF::rfc_value_t *)ranges, (const RF::rfc_counts_t *)rfm );
 }
 
 
@@ -745,9 +749,9 @@ bool RainflowT<rfc_tp_storage>::rp_from_rfm( rfc_counts_v &rp, rfc_value_v &clas
 
 
 template< class rfc_tp_storage >
-bool RainflowT<rfc_tp_storage>::damage_from_rp( const rfc_counts_v &counts, const rfc_value_v &Sa, double *damage, rfc_rp_damage_method_e rp_calc_type ) const
+bool RainflowT<rfc_tp_storage>::damage_from_rp( const rfc_counts_v &counts, const rfc_value_v &Sa, double &damage, rfc_rp_damage_method_e rp_calc_type ) const
 {
-    return damage_from_rp( &counts[0], &Sa[0], damage, rp_calc_type );
+    return damage_from_rp( &counts[0], &Sa[0], &damage, rp_calc_type );
 }
 
 
@@ -761,6 +765,20 @@ bool RainflowT<rfc_tp_storage>::at_init( const rfc_double_v &Sa, const rfc_doubl
     }
 
     return at_init( &Sa[0], &Sm[0], (unsigned)Sa.size(), M, Sm_rig, R_rig, R_pinned, symmetric );
+}
+
+
+template< class rfc_tp_storage >
+bool RainflowT<rfc_tp_storage>::at_init( double M, double Sm_rig, double R_rig, bool R_pinned )
+{
+    return at_init( /*Sa*/ NULL, /*Sm*/ NULL, /*count*/ 0, M, Sm_rig, R_rig, R_pinned, /*symmetric*/ false );
+}
+
+
+template< class rfc_tp_storage >
+bool RainflowT<rfc_tp_storage>::at_transform( double Sa, double Sm, double &Sa_transformed ) const
+{
+    return RF::RFC_at_transform( &m_ctx, Sa, Sm, &Sa_transformed );
 }
 
 

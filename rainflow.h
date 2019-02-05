@@ -98,6 +98,9 @@
  *================================================================================
  */
 
+#ifndef RAINFLOW_H
+#define RAINFLOW_H
+
 #if COAN_INVOKED
 /* This version is generated via coan (http://coan2.sourceforge.net/) */
 #endif /*COAN_INVOKED*/
@@ -409,8 +412,8 @@ bool    RFC_rfm_check               ( const void *ctx );
 bool    RFC_lc_get                  ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level );
 bool    RFC_lc_from_rfm             ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags );
 bool    RFC_lc_from_residue         ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, rfc_flags_e flags );
-bool    RFC_rp_get                  ( const void *ctx, rfc_counts_t *rp, rfc_value_t *class_means );
-bool    RFC_rp_from_rfm             ( const void *ctx, rfc_counts_t *rp, rfc_value_t *class_means, const rfc_counts_t *rfm );
+bool    RFC_rp_get                  ( const void *ctx, rfc_counts_t *rp, rfc_value_t *Sa );
+bool    RFC_rp_from_rfm             ( const void *ctx, rfc_counts_t *rp, rfc_value_t *Sa, const rfc_counts_t *rfm );
 bool    RFC_damage_from_rp          ( const void *ctx, const rfc_counts_t *counts, const rfc_value_t *Sa, double *damage, rfc_rp_damage_method_e rp_calc_type );
 bool    RFC_damage_from_rfm         ( const void *ctx, const rfc_counts_t *rfm, double *damage );
 bool    RFC_wl_calc_sx              ( const void *ctx, double s0, double n0, double k, double *sx, double nx, double  k2, double  sd, double nd );
@@ -729,3 +732,5 @@ typedef struct rfc_ctx
 #ifdef __cplusplus
 }  // namespace RFC_CPP_NAMESPACE
 #endif /*__cplusplus*/
+
+#endif /*RAINFLOW_H*/
