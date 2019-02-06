@@ -111,12 +111,13 @@ void export_tp( const char *filename, rfc_value_tuple_s* data, size_t count )
 #endif /*RFC_TP_SUPPORT*/
 
 
-double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
+rfc_counts_t rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 {
-    rfc_counts_t counts;
+    rfc_counts_t counts = 0;
 
-    counts = rfc_ctx->rfm[ rfc_ctx->class_count * (from-1) + (to-1) ];
-    return (double)counts / rfc_ctx->full_inc;
+    (void) RFC_rfm_peek( rfc_ctx, from, to, &counts );
+
+    return counts;
 }
 
 
@@ -167,6 +168,47 @@ double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
     }                                                                                          \
     else FAIL();
 
+
+
+#if !RFC_MINIMAL
+TEST RFC_lc_test( rfc_ctx_s *ctx )
+{
+    rfc_counts_t *lc    = NULL, *lc_from_rfm    = NULL, *lc_from_res    = NULL;
+    rfc_value_t  *level = NULL, *level_from_rfm = NULL, *level_from_res = NULL;
+
+    lc             = (rfc_counts_t*)calloc( ctx->class_count, sizeof( rfc_counts_t ) );
+    lc_from_rfm    = (rfc_counts_t*)calloc( ctx->class_count, sizeof( rfc_counts_t ) );
+    lc_from_res    = (rfc_counts_t*)calloc( ctx->class_count, sizeof( rfc_counts_t ) );
+    level          = (rfc_value_t*) calloc( ctx->class_count, sizeof( rfc_value_t ) );
+    level_from_rfm = (rfc_value_t*) calloc( ctx->class_count, sizeof( rfc_value_t ) );
+    level_from_res = (rfc_value_t*) calloc( ctx->class_count, sizeof( rfc_value_t ) );
+
+    if( lc && lc_from_rfm && level && level_from_rfm )
+    {
+        if( RFC_lc_get( ctx, lc, level ) &&
+            RFC_lc_from_rfm( ctx, lc_from_rfm, level_from_rfm, /*rfm*/ NULL, RFC_FLAGS_COUNT_LC ) &&
+            RFC_lc_from_residue( ctx, lc_from_res, level_from_res, RFC_FLAGS_COUNT_LC ) )
+        {
+            for( unsigned i = 0; i < ctx->class_count; i++ )
+            {
+                lc_from_rfm[i] += lc_from_res[i];
+            }
+            ASSERT_MEM_EQ( lc, lc_from_rfm,       ctx->class_count * sizeof( rfc_counts_t ) );
+            ASSERT_MEM_EQ( level, level_from_rfm, ctx->class_count * sizeof( rfc_value_t ) );
+            ASSERT_MEM_EQ( level, level_from_res, ctx->class_count * sizeof( rfc_value_t ) );
+        }
+    }
+
+    free( lc );
+    free( lc_from_rfm );
+    free( lc_from_res );
+    free( level );
+    free( level_from_rfm );
+    free( level_from_res );
+
+    PASS();
+}
+#endif /*!RFC_MINIMAL*/
 
 
 TEST RFC_tp_prune_test( int ccnt )
@@ -464,7 +506,7 @@ TEST RFC_cycle_up( int ccnt )
         if( class_count )
         {
             ASSERT_EQ( sum, 1.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 3, 2 ), 1.0 );
+            ASSERT_EQ( rfm_peek( &ctx, 3, 2 ), 1 * ctx.full_inc );
             ASSERT_EQ( ctx.residue_cnt, 2 );
             ASSERT_EQ( ctx.residue[0].value, 1.0 );
             ASSERT_EQ( ctx.residue[1].value, 4.0 );
@@ -472,9 +514,14 @@ TEST RFC_cycle_up( int ccnt )
             ASSERT_EQ( ctx.residue[0].pos, 1 );
             ASSERT_EQ( ctx.residue[1].pos, 4 );
 
-            ASSERT_EQ( ctx.lc[0], 2 );
-            ASSERT_EQ( ctx.lc[1], 6 );
-            ASSERT_EQ( ctx.lc[2], 2 );
+#if !RFC_MINIMAL
+            ASSERT_EQ( ctx.lc[0], 1 * ctx.full_inc );
+            ASSERT_EQ( ctx.lc[1], 3 * ctx.full_inc );
+            ASSERT_EQ( ctx.lc[2], 1 * ctx.full_inc );
+
+            /* Check lc count */
+            RUN_TEST1( RFC_lc_test, &ctx );
+#endif /*!RFC_MINIMAL*/
         }
 #if RFC_TP_SUPPORT
         if( class_count )
@@ -536,13 +583,22 @@ TEST RFC_cycle_down( int ccnt )
         if( class_count )
         {
             ASSERT_EQ( sum, 1.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 2, 3 ), 1.0 );
+            ASSERT_EQ( rfm_peek( &ctx, 2, 3 ), 1 * ctx.full_inc );
             ASSERT_EQ( ctx.residue_cnt, 2 );
             ASSERT_EQ( ctx.residue[0].value, 4.0 );
             ASSERT_EQ( ctx.residue[1].value, 1.0 );
             ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
             ASSERT_EQ( ctx.residue[0].pos, 1 );
             ASSERT_EQ( ctx.residue[1].pos, 4 );
+
+#if !RFC_MINIMAL
+            ASSERT_EQ( ctx.lc[0], 1 * ctx.full_inc );
+            ASSERT_EQ( ctx.lc[1], 3 * ctx.full_inc );
+            ASSERT_EQ( ctx.lc[2], 1 * ctx.full_inc );
+
+            /* Check lc count */
+            RUN_TEST1( RFC_lc_test, &ctx );
+#endif /*!RFC_MINIMAL*/
         }
 #if RFC_TP_SUPPORT
         if( class_count )
@@ -604,17 +660,21 @@ TEST RFC_small_example( int ccnt )
         if( class_count )
         {
             ASSERT_EQ( sum, 7.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 5, 3 ), 2.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 6, 3 ), 1.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 1, 4 ), 1.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 2, 4 ), 1.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 1, 6 ), 2.0 );
+            ASSERT_EQ( rfm_peek( &ctx, 5, 3 ), 2 * ctx.full_inc );
+            ASSERT_EQ( rfm_peek( &ctx, 6, 3 ), 1 * ctx.full_inc );
+            ASSERT_EQ( rfm_peek( &ctx, 1, 4 ), 1 * ctx.full_inc );
+            ASSERT_EQ( rfm_peek( &ctx, 2, 4 ), 1 * ctx.full_inc );
+            ASSERT_EQ( rfm_peek( &ctx, 1, 6 ), 2 * ctx.full_inc );
             ASSERT_EQ( ctx.residue_cnt, 5 );
             ASSERT_EQ( ctx.residue[0].value, 2.0 );
             ASSERT_EQ( ctx.residue[1].value, 6.0 );
             ASSERT_EQ( ctx.residue[2].value, 1.0 );
             ASSERT_EQ( ctx.residue[3].value, 5.0 );
             ASSERT_EQ( ctx.residue[4].value, 2.0 );
+#if !RFC_MINIMAL
+            /* Check lc count */
+            RUN_TEST1( RFC_lc_test, &ctx );
+#endif /*!RFC_MINIMAL*/
         }
         ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
     } while(0);
@@ -848,8 +908,6 @@ TEST RFC_long_series( int ccnt )
         {
             RFC_VALUE_TYPE sum = 0.0;
             double damage = 0.0;
-            rfc_counts_t *lc_counts = NULL, *lc_counts_from_rfm = NULL;
-            rfc_value_t  *level     = NULL, *level_from_rfm     = NULL;
 
             for( i = 0; i < class_count * class_count; i++ )
             {
@@ -868,26 +926,10 @@ TEST RFC_long_series( int ccnt )
             ASSERT( RFC_damage_from_rfm( &ctx, NULL /*rfm*/, &damage ) );
             GREATEST_ASSERT_IN_RANGE( damage, 4.8703e-16, 0.00005e-16 );
 
+#if !RFC_MINIMAL
             /* Check lc count */
-            lc_counts          = (rfc_counts_t*)calloc( ctx.class_count, sizeof( rfc_counts_t ) );
-            lc_counts_from_rfm = (rfc_counts_t*)calloc( ctx.class_count, sizeof( rfc_counts_t ) );
-            level              = (rfc_value_t*) calloc( ctx.class_count, sizeof( rfc_value_t ) );
-            level_from_rfm     = (rfc_value_t*) calloc( ctx.class_count, sizeof( rfc_value_t ) );
-
-            if( lc_counts && lc_counts_from_rfm && level && level_from_rfm )
-            {
-                if( RFC_lc_get( &ctx, lc_counts, level ) &&
-                    RFC_lc_from_rfm( &ctx, lc_counts_from_rfm, level_from_rfm, /*rfm*/ NULL, RFC_FLAGS_COUNT_LC ) )
-                {
-                    ASSERT_MEM_EQ( lc_counts, lc_counts_from_rfm, ctx.class_count * sizeof( rfc_counts_t ) );
-                    ASSERT_MEM_EQ( level, level_from_rfm, ctx.class_count * sizeof( rfc_value_t ) );
-                }
-            }
-
-            free( lc_counts );
-            free( lc_counts_from_rfm );
-            free( level );
-            free( level_from_rfm );
+            RUN_TEST1( RFC_lc_test, &ctx );
+#endif /*!RFC_MINIMAL*/
 
 #endif /*!RFC_MINIMAL*/
             /* Check residue */

@@ -2034,19 +2034,27 @@ bool RFC_lc_from_rfm( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, con
             level[i] = CLASS_UPPER( rfc_ctx, i );
         }
         
-        for( from = 0; from < i; from++ )
+        for( from = 0; from <= i; from++ )
         {
             for( to = i + 1; to < class_count; to++ )
             {
+                /* One closed cycle has always a rising and a falling slope */
+                 
                 if( up )
                 {
                     /* Count rising slopes */
                     assert( sum < RFC_COUNTS_LIMIT - rfm[ from * class_count + to ] );
                     sum += rfm[ from * class_count + to ];
+
+                    assert( sum < RFC_COUNTS_LIMIT - rfm[ from * class_count + to ] );
+                    sum += rfm[ to * class_count + from ];
                 }
                 if( dn )
                 {
                     /* Count falling slopes */
+                    assert( sum < RFC_COUNTS_LIMIT - rfm[ from * class_count + to ] );
+                    sum += rfm[ from * class_count + to ];
+
                     assert( sum < RFC_COUNTS_LIMIT - rfm[ from * class_count + to ] );
                     sum += rfm[ to * class_count + from ];
                 }
@@ -4757,7 +4765,16 @@ void cycle_process_lc( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
     if( n > 1 && (flags & RFC_FLAGS_COUNT_LC) )
     {
         /* Do the level crossing counting */
-        cycle_process_counts( rfc_ctx, &rfc_ctx->residue[n-2], &rfc_ctx->residue[n-1], NULL, flags & (RFC_FLAGS_COUNT_LC | RFC_FLAGS_ENFORCE_MARGIN) );
+        bool rising = rfc_ctx->residue[n-1].value > rfc_ctx->residue[n-2].value;
+
+        if( rising )
+        {
+            cycle_process_counts( rfc_ctx, &rfc_ctx->residue[n-2], &rfc_ctx->residue[n-1], NULL, flags & (RFC_FLAGS_COUNT_LC_UP | RFC_FLAGS_ENFORCE_MARGIN) );
+        }
+        else
+        {
+            cycle_process_counts( rfc_ctx, &rfc_ctx->residue[n-2], &rfc_ctx->residue[n-1], NULL, flags & (RFC_FLAGS_COUNT_LC_DN | RFC_FLAGS_ENFORCE_MARGIN) );
+        }
     }
 }
 #endif /*!RFC_MINIMAL*/
@@ -4943,23 +4960,22 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
              * Counts class upper bound crossings
              * Class upper bound value = (idx+1) * class_width + class_offset
              */
-            
-            if( class_from < class_to && ( flags & RFC_FLAGS_COUNT_LC_UP ) )
+            unsigned idx;
+            unsigned idx_from = ( class_from < class_to ) ? class_from : class_to;
+            unsigned idx_to   = ( class_from > class_to ) ? class_from : class_to;
+
+            for( idx = idx_from; idx < idx_to; idx++ )
             {
-                /* Count rising slopes */
-                unsigned idx;
-                for( idx = class_from; idx < class_to; idx++ )
+                if( flags & RFC_FLAGS_COUNT_LC_UP )
                 {
+                    /* Count rising slopes */
                     assert( rfc_ctx->lc[idx] <= RFC_COUNTS_LIMIT );
                     rfc_ctx->lc[idx] += rfc_ctx->full_inc;
                 }
-            }
-            else if( class_to < class_from && ( flags & RFC_FLAGS_COUNT_LC_DN ) )
-            {
-                /* Count falling slopes */
-                unsigned idx;
-                for( idx = class_to; idx < class_from; idx++ )
+
+                if( flags & RFC_FLAGS_COUNT_LC_DN )
                 {
+                    /* Count falling slopes */
                     assert( rfc_ctx->lc[idx] <= RFC_COUNTS_LIMIT );
                     rfc_ctx->lc[idx] += rfc_ctx->full_inc;
                 }
@@ -5511,7 +5527,7 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
                             return false;
                         }
                         /* Current cycle weight */
-                        D *= rfc_ctx->curr_inc / rfc_ctx->full_inc;
+                        D *= (double)rfc_ctx->curr_inc / rfc_ctx->full_inc;
                         /* Di = 1/( ND*(Sa/SD*weight)^k ) = 1/( ND*(Sa/SD)^k ) * 1/weight^k */
                         D_new = D * pow( weight, -fabs(rfc_ctx->wl_k) );
                         break;
@@ -5522,7 +5538,7 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
                             return false;
                         }
                         /* Current cycle weight */
-                        D *= rfc_ctx->curr_inc / rfc_ctx->full_inc;
+                        D *= (double)rfc_ctx->curr_inc / rfc_ctx->full_inc;
                         /* Di = 1/( ND*(Sa/SD)^k ) * weight */
                         D_new = D * weight;
                         break;
