@@ -72,7 +72,7 @@
  *================================================================================
  * BSD 2-Clause License
  * 
- * Copyright (c) 2018, Andras Martin
+ * Copyright (c) 2019, Andras Martin
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -1987,12 +1987,14 @@ bool RFC_lc_get( const void *ctx, rfc_counts_t *lc, rfc_value_t *level )
  * @brief      Create level crossing histogram from rainflow matrix
  *
  * @param      ctx     The rainflow context
- * @param[out] lc     The buffer for LC histogram (counts)
- * @param[out] level  The buffer for LC upper class borders
+ * @param[out] lc      The buffer for LC histogram (counts)
+ * @param[out] level   The buffer for LC upper class borders
  * @param[in]  rfm     The rainflow matrix, max be NULL
  * @param      flags   The flags
  *
  * @return     true on success
+ * @note       Returned lc contains probably half_inc counts, when finalized with RFC_RES_HALFCYCLES!
+ *             (In contrast .lc doesn't!)
  */
 bool RFC_lc_from_rfm( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags )
 {
@@ -3223,14 +3225,11 @@ bool feed_once( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt, rfc_flags_e fla
 #if !RFC_MINIMAL
         /* New turning point, do LC count */
         cycle_process_lc( rfc_ctx, flags & (RFC_FLAGS_COUNT_LC | RFC_FLAGS_ENFORCE_MARGIN) );
+        flags &= ~RFC_FLAGS_COUNT_LC;
 #endif /*!RFC_MINIMAL*/
 
         if( rfc_ctx->class_count )
         {
-#if !RFC_MINIMAL
-            flags &= ~RFC_FLAGS_COUNT_LC;
-#endif /*!RFC_MINIMAL*/
-
             /* Check for closed cycles and count. Modifies residue! */
             cycle_find( rfc_ctx, flags );
         }
@@ -4952,7 +4951,7 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
                 for( idx = class_from; idx < class_to; idx++ )
                 {
                     assert( rfc_ctx->lc[idx] <= RFC_COUNTS_LIMIT );
-                    rfc_ctx->lc[idx] += rfc_ctx->curr_inc;
+                    rfc_ctx->lc[idx] += rfc_ctx->full_inc;
                 }
             }
             else if( class_to < class_from && ( flags & RFC_FLAGS_COUNT_LC_DN ) )
@@ -4962,7 +4961,7 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
                 for( idx = class_to; idx < class_from; idx++ )
                 {
                     assert( rfc_ctx->lc[idx] <= RFC_COUNTS_LIMIT );
-                    rfc_ctx->lc[idx] += rfc_ctx->curr_inc;
+                    rfc_ctx->lc[idx] += rfc_ctx->full_inc;
                 }
             }
         }

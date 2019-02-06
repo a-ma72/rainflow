@@ -1,16 +1,19 @@
 /*
- *   |     .-.
- *   |    /   \         .-.
- *   |   /     \       /   \       .-.     .-.     _   _
- *   +--/-------\-----/-----\-----/---\---/---\---/-\-/-\/\/---
- *   | /         \   /       \   /     '-'     '-'
- *   |/           '-'         '-'
  *
+ *   |                     .-.
+ *   |                    /   \
+ *   |     .-.===========/     \         .-.
+ *   |    /   \         /       \       /   \
+ *   |   /     \       /         \     /     \         .-.
+ *   +--/-------\-----/-----------\---/-------\-------/---\
+ *   | /         \   /             '-'=========\     /     \   /
+ *   |/           '-'                           \   /       '-'
+ *   |                                           '-'
  *          ____  ___    _____   __________    ____ _       __
  *         / __ \/   |  /  _/ | / / ____/ /   / __ \ |     / /
- *        / /_/ / /| |  / //  |/ / /_  / /   / / / / | /| / / 
- *       / _, _/ ___ |_/ // /|  / __/ / /___/ /_/ /| |/ |/ /  
- *      /_/ |_/_/  |_/___/_/ |_/_/   /_____/\____/ |__/|__/   
+ *        / /_/ / /| |  / //  |/ / /_  / /   / / / / | /| / /
+ *       / _, _/ ___ |_/ // /|  / __/ / /___/ /_/ /| |/ |/ /
+ *      /_/ |_/_/  |_/___/_/ |_/_/   /_____/\____/ |__/|__/
  *
  *    Rainflow Counting Algorithm (4-point-method), C99 compliant
  *    Test suite
@@ -18,7 +21,7 @@
  *================================================================================
  * BSD 2-Clause License
  * 
- * Copyright (c) 2018, Andras Martin
+ * Copyright (c) 2019, Andras Martin
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -468,6 +471,10 @@ TEST RFC_cycle_up( int ccnt )
             ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
             ASSERT_EQ( ctx.residue[0].pos, 1 );
             ASSERT_EQ( ctx.residue[1].pos, 4 );
+
+            ASSERT_EQ( ctx.lc[0], 2 );
+            ASSERT_EQ( ctx.lc[1], 6 );
+            ASSERT_EQ( ctx.lc[2], 2 );
         }
 #if RFC_TP_SUPPORT
         if( class_count )

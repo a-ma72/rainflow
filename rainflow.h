@@ -72,7 +72,7 @@
  *================================================================================
  * BSD 2-Clause License
  * 
- * Copyright (c) 2018, Andras Martin
+ * Copyright (c) 2019, Andras Martin
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -632,7 +632,7 @@ typedef struct rfc_ctx
     rfc_counts_t                       *rfm;                        /**< Rainflow matrix, always class_count^2 elements (row-major, row=from, to=col). */
 #if !RFC_MINIMAL
     rfc_counts_t                       *rp;                         /**< Range pair counts, always class_count elements */
-    rfc_counts_t                       *lc;                         /**< Level crossing counts, always class_count elements */
+    rfc_counts_t                       *lc;                         /**< Level crossing counts, always class_count elements. Every per .flags selected slope increments by .full_inc! */
 #endif /*!RFC_MINIMAL*/
 
 #if RFC_TP_SUPPORT
