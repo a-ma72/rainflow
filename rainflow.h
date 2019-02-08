@@ -402,6 +402,7 @@ bool    RFC_finalize                (       void *ctx, rfc_res_method_e residual
 #if !RFC_MINIMAL
 /* Functions on rainflow matrix */
 bool    RFC_rfm_make_symmetric      (       void *ctx );
+bool    RFC_rfm_non_zeros           ( const void *ctx, unsigned *count );
 bool    RFC_rfm_get                 ( const void *ctx, rfc_rfm_item_s **buffer, unsigned *count );
 bool    RFC_rfm_set                 (       void *ctx, const rfc_rfm_item_s *buffer, unsigned count, bool add_only );
 bool    RFC_rfm_peek                ( const void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t *counts );

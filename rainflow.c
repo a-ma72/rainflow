@@ -1516,14 +1516,62 @@ bool RFC_rfm_make_symmetric( void *ctx )
 
 
 /**
- * @brief      Get the rainflow matrix as sparse elements
+ * @brief      Returns the number of non zero entries in rainflow matrix
  *
- * @param      ctx     The rainflow context
- * @param[out] buffer  The elements buffer (may be NULL)
- * @param[out] count   The number of elements in buffer
+ * @param[in]  ctx   The rainflow context
  *
  * @return     true on success
  */
+bool RFC_rfm_non_zeros( const void *ctx, unsigned *count )
+{
+    unsigned            class_count;
+    unsigned            from, to;
+    rfc_counts_t       *rfm_it;
+
+    RFC_CTX_CHECK_AND_ASSIGN
+
+    if( !count )
+    {
+        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
+    }
+    
+    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
+    {
+        return false;
+    }
+
+    class_count = rfc_ctx->class_count;
+
+    rfm_it = rfc_ctx->rfm;
+
+    if( !rfm_it || !class_count )
+    {
+        return false;
+    }
+
+    *count     = 0;
+    for( from = 0; from < class_count; from++ )
+    {
+        for( to = 0; to < class_count; to++, rfm_it )
+        {
+            if( *rfm_it ) *count++;
+        }
+    }
+
+    return true;
+}
+
+
+/**
+ * @brief      Get the rainflow matrix as sparse elements
+ *
+ * @param      ctx     The rainflow context
+ * @param[out] buffer  The elements buffer, if NULL memory will be allocated
+ * @param[out] count   The number of elements in buffer
+ *
+ * @return     true on success
+ * @note       The counts are natively returned, regardless of .full_inc!
+*/
 bool RFC_rfm_get( const void *ctx, rfc_rfm_item_s **buffer, unsigned *count )
 {
     unsigned            class_count;
@@ -1539,7 +1587,7 @@ bool RFC_rfm_get( const void *ctx, rfc_rfm_item_s **buffer, unsigned *count )
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
     
-    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state >= RFC_STATE_FINISHED )
+    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
     {
         return false;
     }
@@ -1558,9 +1606,12 @@ bool RFC_rfm_get( const void *ctx, rfc_rfm_item_s **buffer, unsigned *count )
     *count     = 0;
     for( from = 0; from < class_count; from++ )
     {
-        for( to = 0; to < class_count; to++, rfm_it )
+        for( to = 0; to < class_count; to++, rfm_it++ )
         {
-            if( *rfm_it ) *count++;
+            if( *rfm_it )
+            {
+                (*count)++;
+            }
         }
     }
 
@@ -1605,6 +1656,7 @@ bool RFC_rfm_get( const void *ctx, rfc_rfm_item_s **buffer, unsigned *count )
  * @param      add_only  Counts are added if set to true
  *
  * @return     true on success
+ * @note       The counts are natively added, regardless of .full_inc!
  */
 bool RFC_rfm_set( void *ctx, const rfc_rfm_item_s *buffer, unsigned count, bool add_only )
 {
@@ -1619,7 +1671,7 @@ bool RFC_rfm_set( void *ctx, const rfc_rfm_item_s *buffer, unsigned count, bool 
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
     
-    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state >= RFC_STATE_FINISHED )
+    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
     {
         return false;
     }
@@ -1665,7 +1717,7 @@ bool RFC_rfm_set( void *ctx, const rfc_rfm_item_s *buffer, unsigned count, bool 
  * @param      ctx       The rainflow context
  * @param      from_val  The cycles start value
  * @param      to_val    The cycles target value
- * @param[out] counts    The corresponding value from the matrix element (not cycles!)
+ * @param[out] counts    The corresponding count from the matrix element (not cycles!), regardless of .full_inc!
  *
  * @return     true on success
  */
@@ -1715,7 +1767,7 @@ bool RFC_rfm_peek( const void *ctx, rfc_value_t from_val, rfc_value_t to_val, rf
  * @param      ctx       The rainflow context
  * @param      from_val  The cycles start value
  * @param      to_val    The cycles target value
- * @param      counts    The count value for the matrix element (not cycles!)
+ * @param      counts    The count value for the matrix element (not cycles!), regardless of .full_inc!
  * @param      add_only  Value is added if set to true
  *
  * @return     true on success
@@ -1775,6 +1827,7 @@ bool RFC_rfm_poke( void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_coun
  * @param      count       The sum of the matrix region
  *
  * @return     true on success
+ * @note       The sum is natively built, regardless of .full_inc!
  */
 bool RFC_rfm_sum( const void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, rfc_counts_t *count )
 {
@@ -1940,8 +1993,8 @@ bool RFC_rfm_check( const void *ctx )
  * @brief      Get level crossing histogram
  *
  * @param      ctx    The rainflow context
- * @param[out] lc     The buffer for LC histogram (counts)
- * @param[out] level  The buffer for LC upper class borders
+ * @param[out] lc     The buffer for LC histogram (counts), .full_inc represents one "count"!
+ * @param[out] level  The buffer for LC upper class borders (dropped if NULL)
  *
  * @return     true on success
  */
@@ -1987,14 +2040,13 @@ bool RFC_lc_get( const void *ctx, rfc_counts_t *lc, rfc_value_t *level )
  * @brief      Create level crossing histogram from rainflow matrix
  *
  * @param      ctx     The rainflow context
- * @param[out] lc      The buffer for LC histogram (counts)
- * @param[out] level   The buffer for LC upper class borders
- * @param[in]  rfm     The rainflow matrix, max be NULL
+ * @param[out] lc      The buffer for LC histogram (counts), .full_inc represents one "count"
+ * @param[out] level   The buffer for LC upper class borders (dropped if NULL)
+ * @param[in]  rfm     The input rainflow matrix, max be NULL
  * @param      flags   The flags
  *
  * @return     true on success
- * @note       Returned lc contains probably half_inc counts, when finalized with RFC_RES_HALFCYCLES!
- *             (In contrast .lc doesn't!)
+ * @note       Returned lc usually differs from .lc, when counting is finalized with any flag other than RFC_RES_NONE!
  */
 bool RFC_lc_from_rfm( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags )
 {
@@ -2073,8 +2125,8 @@ bool RFC_lc_from_rfm( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, con
  * histogram buffer.
  *
  * @param      ctx    The rainflow context
- * @param[out] lc     The buffer for LC histogram (counts)
- * @param[out] level  The buffer for LC upper class borders
+ * @param[out] lc     The buffer for LC histogram (counts), .full_inc represents one "count"!
+ * @param[out] level  The buffer for LC upper class borders (dropped if NULL)
  * @param      flags  The flags
  *
  * @return     true on success
@@ -2160,8 +2212,8 @@ bool RFC_lc_from_residue( const void *ctx, rfc_counts_t* lc, rfc_value_t *level,
  * @brief      Get range pair histogram
  *
  * @param      ctx          The rainflow context
- * @param[out] rp           The histogram (counts)
- * @param[out] Sa           The amplitudes
+ * @param[out] rp           The histogram (counts), .full_inc represent one "cycle"!
+ * @param[out] Sa           The amplitudes (dropped if NULL)
  *
  * @return     true on success
  */
@@ -2195,7 +2247,7 @@ bool RFC_rp_get( const void *ctx, rfc_counts_t *rp, rfc_value_t *Sa )
 
         if( Sa )
         {
-            Sa[i] = rfc_ctx->class_width * i / 2;
+            Sa[i] = rfc_ctx->class_width * i / 2;  /* range / 2 */
         }
     }
 
@@ -2207,9 +2259,9 @@ bool RFC_rp_get( const void *ctx, rfc_counts_t *rp, rfc_value_t *Sa )
  * @brief      Generate range pair histogram from rainflow matrix
  *
  * @param      ctx          The rainflow context
- * @param[out] rp           The buffer for range pair counts (not cycles!)
- * @param[out] Sa           The buffer for amplitudes, may be NULL
- * @param[in]  rfm          The rfm
+ * @param[out] rp           The buffer for range pair counts (not cycles!), .full_inc represents one "cycle"!
+ * @param[out] Sa           The buffer for amplitudes (dropped if NULL)
+ * @param[in]  rfm          The input rainflow matrix (may be NULL)
  *
  * @return     true on success
  */
@@ -2248,7 +2300,7 @@ bool RFC_rp_from_rfm( const void *ctx, rfc_counts_t *rp, rfc_value_t *Sa, const 
 
         if( Sa )
         {
-            Sa[i] = rfc_ctx->class_width * i / 2;
+            Sa[i] = rfc_ctx->class_width * i / 2;  /* range / 2 */
         }
 
         for( j = i; j < class_count; j++ ) 
@@ -2497,7 +2549,7 @@ bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_valu
  * @brief      Calculate the damage from rainflow matrix
  *
  * @param      ctx     The rainflow context
- * @param[in]  rfm     The rainflow matrix, max be NULL (Mind that full_inc describes 1 cycle!)
+ * @param[in]  rfm     The input rainflow matrix (may be NULL), .full_inc represents one "cycle"!
  * @param[out] damage  The buffer for cumulated damage
  *
  * @return     true on success
@@ -3850,13 +3902,30 @@ bool finalize_res_repeated( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
                 *to++ = *from++;
             }
 
+            rfc_ctx->internal.flags = flags;
+            /* Feed again with the copy, no new turning points are generated, since residue[].tp_pos */
+
 #if RFC_TP_SUPPORT
-            residue[cnt-1].tp_pos = rfc_ctx->tp_cnt + 1;
+            do
+            {
+                size_t tp_cnt = rfc_ctx->tp_cnt;
+
+                ok = RFC_feed_tuple( rfc_ctx, residue, cnt - 1 );
+
+                if( ok )
+                {
+                    if( rfc_ctx->tp_cnt > tp_cnt )
+                    {
+                        /* Interim turning point became a turning point */
+                        residue[cnt-1].tp_pos = tp_cnt + 1;
+                    }
+                    ok = RFC_feed_tuple( rfc_ctx, residue + cnt - 1, 1 );
+                }
+            } while(0);
+#else /*!RFC_TP_SUPPORT*/
+            ok = RFC_feed_tuple( rfc_ctx, residue, cnt );
 #endif /*RFC_TP_SUPPORT*/
 
-            rfc_ctx->internal.flags = flags;
-            /* Feed again with the copy, no new turning points are generated, since residue[].tp_pos > 0 (except interim tp) */
-            ok = RFC_feed_tuple( rfc_ctx, residue, cnt );
             rfc_ctx->internal.flags = old_flags;
 
             /* Free temporary residue */
