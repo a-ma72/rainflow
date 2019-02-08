@@ -433,6 +433,7 @@ bool    RFC_get_flags               ( const void *ctx, int *flags, int stack );
 bool    RFC_tp_init                 (       void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
 bool    RFC_tp_init_autoprune       (       void *ctx, bool autoprune, size_t size, size_t threshold );
 bool    RFC_tp_prune                (       void *ctx, size_t count, rfc_flags_e flags );
+bool    RFC_tp_clear                (       void *ctx );
 #endif /*RFC_TP_SUPPORT*/
 
 #if RFC_DH_SUPPORT
@@ -477,7 +478,7 @@ typedef  int                        ( *rfc_debug_vfprintf_fcn_t )( void *, FILE 
 
 
 /* Value info struct */
-typedef struct rfc_value_tuple
+struct rfc_value_tuple
 {
     rfc_value_t                         value;                      /**< Value. Don't change order, value field must be first! */
     unsigned                            cls;                        /**< Class number, base 0 */
@@ -488,15 +489,15 @@ typedef struct rfc_value_tuple
     double                              damage;                     /**< Damage accumulated to this turning point */
 #endif /*RFC_DH_SUPPORT*/    
 #endif /*RFC_TP_SUPPORT*/
-} rfc_value_tuple_s;
+};
 
 #if !RFC_MINIMAL
-typedef struct rfc_class_param
+struct rfc_class_param
 {
     unsigned                            count;                      /**< Class count */
     rfc_value_t                         width;                      /**< Class width */
     rfc_value_t                         offset;                     /**< Lower bound of first class */
-} rfc_class_param_s;
+};
 
 /**
  *   Woehler models
@@ -532,7 +533,7 @@ typedef struct rfc_class_param
  *   ( ln(s0)*|k| + ln(n0) - ln(sx)*(|k|-|k2|) - ln(nd) ) / |k2|                 = ln(sd)
  *  |( ( ln(s0) - ln(sx) )*|k| + ln(n0)        - ln(nd) ) / ( ln(sd) - ln(sx) )| = |k2|
  */
-typedef struct rfc_wl_param
+struct rfc_wl_param
 {
     double                              sd;                         /**< Fatigue strength amplitude (Miner original) */
     double                              nd;                         /**< Cycles according to wl_sd */
@@ -544,21 +545,21 @@ typedef struct rfc_wl_param
     double                              q;                          /**< Parameter q based on k for "Miner consequent" approach, always positive */
     double                              q2;                         /**< Parameter q based on k2 for "Miner consequent" approach, always positive */
     double                              D;                          /**< If D > 0, parameters define Woehler curve for impaired part */
-} rfc_wl_param_s;
+};
 
-typedef struct rfc_rfm_item
+struct rfc_rfm_item
 {
     unsigned                            from;                       /**< Start class, base 0 */
     unsigned                            to;                         /**< Ending class, base 0 */
     rfc_counts_t                        counts;                     /**< Counts */
-} rfc_rfm_item_s;
+};
 #endif /*!RFC_MINIMAL*/
 
 
 /**
  * Rainflow context (ctx)
  */
-typedef struct rfc_ctx
+struct rfc_ctx
 {
     size_t                              version;                    /**< Version number as sizeof(struct rfctx..), must be 1st field! */
 
@@ -728,7 +729,7 @@ typedef struct rfc_ctx
 #endif /*RFC_USE_DELEGATES*/
     }
                                         internal;
-} rfc_ctx_s;
+};
 
 #ifdef __cplusplus
 }  // namespace RFC_CPP_NAMESPACE

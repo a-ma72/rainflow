@@ -243,9 +243,10 @@ TEST RFC_lc_test( rfc_ctx_s *ctx, bool cond )
             RFC_lc_from_rfm( ctx, lc_from_rfm, level_from_rfm, /*rfm*/ NULL, RFC_FLAGS_COUNT_LC ) &&
             RFC_lc_from_residue( ctx, lc_from_res, level_from_res, RFC_FLAGS_COUNT_LC ) )
         {
-            for( unsigned i = 0; i < ctx->class_count; i++ )
+            unsigned u;
+            for( u = 0; u < ctx->class_count; u++ )
             {
-                lc_from_rfm[i] += lc_from_res[i];
+                lc_from_rfm[u] += lc_from_res[u];
             }
 
             if( cond )
@@ -257,9 +258,10 @@ TEST RFC_lc_test( rfc_ctx_s *ctx, bool cond )
             else
             {
                 bool equal = true;
-                for( unsigned i = 0; i < ctx->class_count; i++ )
+                unsigned u;
+                for( u = 0; u < ctx->class_count; u++ )
                 {
-                    if( lc_from_rfm[i] == lc[i] || level[i] != level_from_rfm[i] )
+                    if( lc_from_rfm[u] == lc[u] || level[u] != level_from_rfm[u] )
                     {
                         equal = false;
                         break;

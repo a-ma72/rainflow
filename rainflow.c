@@ -866,6 +866,36 @@ bool RFC_tp_prune( void *ctx, size_t limit, rfc_flags_e flags )
     
     return true;
 }
+
+
+/**
+ * @brief      Clear turning point storage
+ *
+ * @param      ctx   The rainflow context
+ *
+ * @return     true on success
+ */
+bool RFC_tp_clear( void *ctx )
+{
+    size_t i;
+
+    RFC_CTX_CHECK_AND_ASSIGN
+
+    if( rfc_ctx->state < RFC_STATE_INIT )
+    {
+        return false;
+    }
+
+    rfc_ctx->tp_cnt = 0;
+
+    for( i = 0; i < rfc_ctx->residue_cnt; i++ )
+    {
+        rfc_ctx->residue[i].tp_pos = 0;
+    }
+
+    return true;
+}
+
 #endif /*RFC_TP_SUPPORT*/
 
 
