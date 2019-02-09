@@ -4703,21 +4703,21 @@ void cycle_find_4ptm( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
     {
         size_t idx = rfc_ctx->residue_cnt - 4;
 
-        rfc_value_t A = rfc_ctx->residue[idx+0].value;
-        rfc_value_t B = rfc_ctx->residue[idx+1].value;
-        rfc_value_t C = rfc_ctx->residue[idx+2].value;
-        rfc_value_t D = rfc_ctx->residue[idx+3].value;
+        unsigned A = rfc_ctx->residue[idx+0].cls;
+        unsigned B = rfc_ctx->residue[idx+1].cls;
+        unsigned C = rfc_ctx->residue[idx+2].cls;
+        unsigned D = rfc_ctx->residue[idx+3].cls;
 
         if( B > C )
         {
-            rfc_value_t temp = B;
+            unsigned temp = B;
             B = C;
             C = temp;
         }
 
         if( A > D )
         {
-            rfc_value_t temp = A;
+            unsigned temp = A;
             A = D;
             D = temp;
         }
@@ -4757,6 +4757,7 @@ static
 void cycle_find_hcm( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
 {
     int IZ, IR;
+    double eps = rfc_ctx->class_width / 100;
 
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
@@ -4785,7 +4786,7 @@ label_2:
             I = &rfc_ctx->internal.hcm.stack[IZ-1];
             J = &rfc_ctx->internal.hcm.stack[IZ];
 
-            if( (K->value - J->value) * (J->value - I->value) >= 0 )
+            if( (double)(K->value - J->value) * (double)(J->value - I->value) + eps >= 0.0 )
             {
                 /* Is no turning point */
                 /* This should only may happen, when RFC_FLAGS_ENFORCE_MARGIN is set, 
@@ -4798,7 +4799,7 @@ label_2:
             else
             {
                 /* Is a turning point */
-                if( fabs( (double)K->value - (double)J->value ) >= fabs( (double)J->value - (double)I->value) )
+                if( fabs( (double)K->value - (double)J->value ) + eps >= fabs( (double)J->value - (double)I->value ) )
                 {
                     /* Cycle range is greater or equal to previous, register closed cycle */
                     cycle_process_counts( rfc_ctx, I, J, NULL, flags );
@@ -4812,14 +4813,14 @@ label_2:
         {
             J = &rfc_ctx->internal.hcm.stack[IZ];
 
-            if( ( (double)K->value - (double)J->value ) * (double)J->value >= 0.0 )
+            if( ( (double)K->value - (double)J->value ) * (double)J->value + eps >= 0.0 )
             {
                 /* Is no turning point */
                 IZ--;
                 /* Test further closed cycles */
                 goto label_2;
             }
-            else if( fabs( (double)K->value ) > fabs( (double)J->value ) )
+            else if( fabs( (double)K->value ) + eps > fabs( (double)J->value ) )
             {
                 /* Is turning point and range is less than previous */
                 IR++;
