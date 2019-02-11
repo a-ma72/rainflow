@@ -4,13 +4,13 @@
 
 #define HAVE_NEOLIB 0
 
+#include "../rainflow.h"
+
 #if HAVE_NEOLIB
-#include <3d_party/neolib/include/neolib/segmented_array.hpp"
+#include <3d_party/neolib/include/neolib/segmented_array.hpp>
 #else /*!HAVE_NEOLIB*/
 #include <vector>
 #endif /*HAVE_NEOLIB*/
-
-#define RFC_CPP_NAMESPACE rainflow_C
 
 namespace RFC_CPP_NAMESPACE
 {

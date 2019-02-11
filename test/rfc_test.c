@@ -1011,7 +1011,7 @@ TEST RFC_long_series( int ccnt )
             ASSERT_EQ_FMT( ctx.residue[0].value,   0.54, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[1].value,   2.37, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[2].value,  -0.45, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[3].value,  17.45, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[3].value,  17.04, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[4].value, -50.90, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[5].value, 114.14, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[6].value, -24.85, "%.2f" );
