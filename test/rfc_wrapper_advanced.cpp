@@ -5,7 +5,7 @@
 #define HAVE_NEOLIB 0
 
 #if HAVE_NEOLIB
-#include "neolib/segmented_array.hpp"
+#include <3d_party/neolib/include/neolib/segmented_array.hpp"
 #else /*!HAVE_NEOLIB*/
 #include <vector>
 #endif /*HAVE_NEOLIB*/
