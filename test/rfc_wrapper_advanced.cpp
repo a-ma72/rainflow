@@ -1,17 +1,21 @@
 
 /* Using Rainflow C-Library in a C++ context */
 
-
+// "Cross-platform C++ Utility Library" [https://github.com/i42output/neolib]
 #define HAVE_NEOLIB 0
 
 #include "../rainflow.h"
+#include "../greatest/greatest.h"
+
+#define NUMEL(x) (sizeof(x)/sizeof(*(x)))
 
 #if HAVE_NEOLIB
-#include <3d_party/neolib/include/neolib/segmented_array.hpp>
+#include "../../neolib/include/neolib/segmented_array.hpp"
 #else /*!HAVE_NEOLIB*/
 #include <vector>
 #endif /*HAVE_NEOLIB*/
 
+// Declare user defined turning points storage (tp_storage)
 namespace RFC_CPP_NAMESPACE
 {
     typedef struct rfc_value_tuple rfc_value_tuple_s;  /**< Tuple of value and index position */
@@ -26,15 +30,14 @@ namespace RFC_CPP_NAMESPACE
 #endif /*HAVE_NEOLIB*/
 }
 
+
 /* If RFC_TP_STORAGE is defined, rainflow.hpp will define the 
  * class Rainflow supporting external turning points storage 
  * with given type */
 #define RFC_TP_STORAGE RFC_CPP_NAMESPACE::tp_storage
-
 #include "../rainflow.hpp"
-#include "../greatest/greatest.h"
 
-#define NUMEL(x) (sizeof(x)/sizeof(*(x)))
+
 
 
 TEST wrapper_test_advanced( void )
