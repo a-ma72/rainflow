@@ -307,9 +307,6 @@ public:
     bool            at_init                 ( double M, double Sm_rig, double R_rig, bool R_pinned );
     bool            at_transform            ( double Sa, double Sm, double &Sa_transformed ) const;
     bool            wl_param_get            ( rfc_wl_param_s &wl_param ) const;
-    bool            cls_number              ( rfc_value_t value, unsigned &class_number ) const;
-    bool            cls_upper               ( unsigned class_number, rfc_value_t &class_upper_value ) const;
-    bool            cls_mean                ( unsigned class_number, rfc_value_t &class_mean_value ) const;
 
     /* TP storage access */
     inline const
@@ -844,27 +841,6 @@ template< class T >
 bool RainflowT<T>::wl_param_get( rfc_wl_param_s &wl_param ) const
 {
     return RF::RFC_wl_param_get( &m_ctx, &wl_param );
-}
-
-
-template< class T >
-bool RainflowT<T>::cls_number( rfc_value_t value, unsigned &class_number ) const
-{
-    return RF::RFC_class_number( &m_ctx, value, &class_number );
-}
-
-
-template< class T >
-bool RainflowT<T>::cls_upper( unsigned class_number, rfc_value_t &class_upper_value ) const
-{
-    return RF::cls_upper( &m_ctx, class_number, &class_upper_value );
-}
-
-
-template< class T >
-bool RainflowT<T>::cls_mean( unsigned class_number, rfc_value_t &class_mean_value ) const
-{
-    return RF::cls_mean( &m_ctx, class_number, &class_mean_value );
 }
 
 
