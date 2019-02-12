@@ -62,16 +62,24 @@ char compiler_assert_rfc_config
 
 namespace RF = RFC_CPP_NAMESPACE;
 
-
-
-/* C delegates */
-extern "C"
+/* Support external turning point storage */
+#ifdef RFC_TP_STORAGE
+namespace RFC_CPP_NAMESPACE
 {
-    static bool  tp_set           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp );
-    static bool  tp_get           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp );
-    static bool  tp_inc_damage    ( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage );
-    static void* mem_alloc        ( void *ptr, size_t num, size_t size, RF::rfc_mem_aim_e aim );
+    /* C delegates */
+    extern "C"
+    {
+        static bool  tp_set           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp );
+        static bool  tp_get           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp );
+        static bool  tp_inc_damage    ( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage );
+        static void* mem_alloc        ( void *ptr, size_t num, size_t size, RF::rfc_mem_aim_e aim );
+    }
 }
+
+    template< class T > class RainflowT;
+    typedef RainflowT<RFC_TP_STORAGE> Rainflow;
+#endif /*RFC_TP_STORAGE*/
+
 
 
 template< class T = std::vector<RF::rfc_value_tuple_s> >
@@ -255,7 +263,6 @@ public:
     bool            lc_from_residue         ( rfc_counts_t *lc, rfc_value_t *level, rfc_flags_e flags ) const;
     bool            rp_get                  ( rfc_counts_t *rp, rfc_value_t *Sa ) const;
     bool            rp_from_rfm             ( rfc_counts_t *rp, rfc_value_t *Sa, const rfc_counts_t *rfm ) const;
-    /* Functions on damage */
     bool            damage_from_rp          ( const rfc_counts_t *counts, const rfc_value_t *Sa, double *damage, rfc_rp_damage_method_e rp_calc_type ) const;
     bool            damage_from_rfm         ( const rfc_counts_t *rfm, double *damage ) const;
     /* Woehler curve */
@@ -276,11 +283,13 @@ public:
     /* Flags */
     bool            set_flags               ( int flags, bool debugging = false );
     bool            get_flags               ( int *flags, bool debugging = false ) const;
-    /* Increment for countings */
     inline
     rfc_counts_t    full_inc                () const { return m_ctx.full_inc; }
     inline
     rfc_counts_t    half_inc                () const { return m_ctx.half_inc; }
+    bool            cls_number              ( rfc_value_t value, unsigned *class_number ) const;
+    bool            cls_upper               ( unsigned class_number, rfc_value_t *class_upper ) const;
+    bool            cls_mean                ( unsigned class_number, rfc_value_t *class_mean ) const;
 
     /* more C++ specific extensions */
     bool            feed                    ( const std::vector<rfc_value_t> data );
@@ -381,16 +390,18 @@ bool RainflowT<T>::init( unsigned class_count, rfc_value_t class_width, rfc_valu
 
     m_ctx = ctx;
 
-    m_ctx.mem_alloc = ::mem_alloc;
+    m_ctx.mem_alloc = RF::mem_alloc;
 
     ok = RF::RFC_init( &m_ctx, class_count, class_width, class_offset, hysteresis, (RF::rfc_flags_e)flags );
 
     if( ok )
     {
         m_ctx.internal.obj          = this;
-        m_ctx.tp_set_fcn            = ::tp_set;
-        m_ctx.tp_get_fcn            = ::tp_get;
-        m_ctx.tp_inc_damage_fcn     = ::tp_inc_damage;
+#ifdef RFC_TP_STORAGE
+        m_ctx.tp_set_fcn            = RF::tp_set;
+        m_ctx.tp_get_fcn            = RF::tp_get;
+        m_ctx.tp_inc_damage_fcn     = RF::tp_inc_damage;
+#endif /*RFC_TP_STORAGE*/
     }
 
     return ok;
@@ -679,6 +690,27 @@ bool RainflowT<T>::get_flags( int *flags, bool debugging ) const
 }
 
 
+template< class T >
+bool RainflowT<T>::cls_number( rfc_value_t value, unsigned *class_number ) const
+{
+    return RF::RFC_class_number( &m_ctx, value, class_number );
+}
+
+
+template< class T >
+bool RainflowT<T>::cls_upper( unsigned class_number, rfc_value_t *class_upper ) const
+{
+    return RF::RFC_class_upper( &m_ctx, class_number, class_upper );
+}
+
+
+template< class T >
+bool RainflowT<T>::cls_mean( unsigned class_number, rfc_value_t *class_mean ) const
+{
+    return RF::RFC_class_mean( &m_ctx, class_number, class_mean );
+}
+
+
 /* CPP specific extensions */
 template< class T >
 bool RainflowT<T>::feed( const std::vector<rfc_value_t> data )
@@ -921,39 +953,36 @@ void* RainflowT<T>::mem_alloc( void *ptr, size_t num, size_t size, rfc_mem_aim_e
 }
 
 
-#ifdef RFC_TP_STORAGE
 
-/* Define a Rainflow class with delegates for external turning point storage */
-
-typedef RainflowT<RFC_TP_STORAGE> Rainflow;
-
-/* C delegates */
-extern "C"
+namespace RFC_CPP_NAMESPACE
 {
-    static
-    bool tp_set( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp )
-    {
-        return ctx && static_cast<Rainflow*>(ctx->internal.obj)->tp_set( tp_pos, tp );
-    }
+    /* Define a Rainflow class with delegates for external turning point storage */
 
-    static
-    bool tp_get( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp )
+    /* C delegates */
+    extern "C"
     {
-        return ctx && static_cast<Rainflow*>(ctx->internal.obj)->tp_get( tp_pos, tp );
-    }
+        static
+        bool tp_set( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp )
+        {
+            return ctx && static_cast<Rainflow*>(ctx->internal.obj)->tp_set( tp_pos, tp );
+        }
 
-    static 
-    bool tp_inc_damage( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage )
-    {
-        return ctx && static_cast<Rainflow*>(ctx->internal.obj)->tp_inc_damage( tp_pos, damage );
-    }
+        static
+        bool tp_get( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp )
+        {
+            return ctx && static_cast<Rainflow*>(ctx->internal.obj)->tp_get( tp_pos, tp );
+        }
 
-    static
-    void * mem_alloc( void *ptr, size_t num, size_t size, RF::rfc_mem_aim_e aim )
-    {
-        return Rainflow::mem_alloc( ptr, num, size, (Rainflow::rfc_mem_aim_e)aim );
+        static 
+        bool tp_inc_damage( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage )
+        {
+            return ctx && static_cast<Rainflow*>(ctx->internal.obj)->tp_inc_damage( tp_pos, damage );
+        }
+
+        static
+        void * mem_alloc( void *ptr, size_t num, size_t size, RF::rfc_mem_aim_e aim )
+        {
+            return Rainflow::mem_alloc( ptr, num, size, (Rainflow::rfc_mem_aim_e)aim );
+        }
     }
 }
-
-
-#endif /*RFC_TP_STORAGE*/

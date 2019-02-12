@@ -2882,11 +2882,11 @@ bool RFC_class_param_get( const void *ctx, rfc_class_param_s *class_param )
 
 
 /**
- * @brief      Get the class number for one value
+ * @brief      Get class number from value
  *
- * @param[in]  ctx     The rainflow context
- * @param[in]  value   The value
- * @param      number  The class number (base 0)
+ * @param[in]  ctx           The rainflow context
+ * @param[in]  value         The value
+ * @param      class_number  The class number
  *
  * @return     true on success
  */
@@ -2907,52 +2907,52 @@ bool RFC_class_number( const void *ctx, rfc_value_t value, unsigned *class_numbe
 
 
 /**
- * @brief      Get the class upper value for one class
+ * @brief      Get class mean from class number
  *
- * @param[in]  ctx                The rainflow context
- * @param[in]  class_number       The class number (base 0)
- * @param      class_upper_value  The class upper value
+ * @param[in]  ctx           The rainflow context
+ * @param[in]  class_number  The class number
+ * @param      class_mean    The class mean
  *
  * @return     true on success
  */
-bool RFC_class_upper( const void *ctx, unsigned class_number, rfc_value_t *class_upper_value )
+bool RFC_class_mean( const void *ctx, unsigned class_number, rfc_value_t *class_mean )
 {
     RFC_CTX_CHECK_AND_ASSIGN
 
-    if( !class_upper_value               ||
+    if( !class_mean                      ||
          rfc_ctx->state < RFC_STATE_INIT )
     {
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
 
-    *class_upper_value = CLASS_UPPER( rfc_ctx, class_number );
+    *class_mean = CLASS_MEAN( rfc_ctx, class_number );
 
     return true;
 }
 
 
 /**
- * @brief      Get class mean value for one class
+ * @brief      Get class upper value from class nummer
  *
- * @param[in]  ctx               The rainflow context
- * @param[in]  class_number      The class number
- * @param      class_mean_value  The class mean value
+ * @param[in]  ctx           The rainflow context
+ * @param[in]  class_number  The class number
+ * @param      class_upper   The class upper
  *
  * @return     true on success
  */
-bool RFC_class_mean( const void *ctx, unsigned class_number, rfc_value_t *class_mean_value )
+bool RFC_class_upper( const void *ctx, unsigned class_number, rfc_value_t *class_upper )
 {
     RFC_CTX_CHECK_AND_ASSIGN
 
-    if( !class_mean_value                ||
+    if( !class_upper                     ||
          rfc_ctx->state < RFC_STATE_INIT )
     {
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
 
-    *class_mean_value = CLASS_MEAN( rfc_ctx, class_number );
+    *class_upper = CLASS_UPPER( rfc_ctx, class_number );
 
-    return true;
+    return false;
 }
 
 

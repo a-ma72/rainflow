@@ -60,6 +60,14 @@
 #define ROUND(x) ((x)>=0?(long)((x)+0.5):(long)((x)-0.5))
 #define NUMEL(x) (sizeof(x)/sizeof((x)[0]))
 
+static
+struct buffer
+{
+    void *ptr;
+    struct buffer *next;
+} buffers = {0};
+
+
 typedef struct mem_chunk
 {
     size_t             size, 
@@ -68,7 +76,7 @@ typedef struct mem_chunk
     RFC_VALUE_TYPE     data[1];
 } mem_chunk;
 
-      rfc_ctx_s   ctx              = { sizeof(ctx) };
+      rfc_ctx_s   ctx              = { sizeof(ctx) };   /* module shared rainflow context */
       mem_chunk  *mem_chain        = NULL;
 const char       *long_series_file = NULL;
 
@@ -86,6 +94,45 @@ mem_chunk* new_chunk( size_t size )
     }
 
     return chunk;
+}
+
+static 
+struct buffer* add_buffer( void* ptr )
+{
+    struct buffer *new_buffer = (struct buffer*)calloc( 1, sizeof( struct buffer ) );
+    struct buffer *buffer_ptr = &buffers;
+
+    while( buffer_ptr->next )
+    {
+        buffer_ptr = buffer_ptr->next;
+    }
+
+    new_buffer->ptr  = ptr;
+    buffer_ptr->next = new_buffer;
+
+    return buffer_ptr;
+}
+
+static
+void strip_buffer( struct buffer* buffer )
+{
+    struct buffer* buffer_next;
+
+    if( !buffer ) buffer = &buffers;
+
+    buffer_next  = buffer->next;
+    buffer->next = NULL;
+
+    while( buffer_next )
+    {
+        buffer = buffer_next;
+        buffer_next = buffer->next;
+        if( buffer->ptr )
+        {
+            free( buffer->ptr );
+        }
+        free( buffer );
+    }
 }
 
 
@@ -171,7 +218,7 @@ rfc_counts_t rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 
 
 #if !RFC_MINIMAL
-TEST RFC_lc_test( rfc_ctx_s *ctx )
+TEST RFC_lc_test( rfc_ctx_s *ctx, bool cond )
 {
     rfc_counts_t *lc    = NULL, *lc_from_rfm    = NULL, *lc_from_res    = NULL;
     rfc_value_t  *level = NULL, *level_from_rfm = NULL, *level_from_res = NULL;
@@ -183,28 +230,51 @@ TEST RFC_lc_test( rfc_ctx_s *ctx )
     level_from_rfm = (rfc_value_t*) calloc( ctx->class_count, sizeof( rfc_value_t ) );
     level_from_res = (rfc_value_t*) calloc( ctx->class_count, sizeof( rfc_value_t ) );
 
+    add_buffer( lc );
+    add_buffer( lc_from_rfm );
+    add_buffer( lc_from_res );
+    add_buffer( level );
+    add_buffer( level_from_rfm );
+    add_buffer( level_from_res );
+
     if( lc && lc_from_rfm && level && level_from_rfm )
     {
         if( RFC_lc_get( ctx, lc, level ) &&
             RFC_lc_from_rfm( ctx, lc_from_rfm, level_from_rfm, /*rfm*/ NULL, RFC_FLAGS_COUNT_LC ) &&
             RFC_lc_from_residue( ctx, lc_from_res, level_from_res, RFC_FLAGS_COUNT_LC ) )
         {
-            for( unsigned i = 0; i < ctx->class_count; i++ )
+            unsigned u;
+            for( u = 0; u < ctx->class_count; u++ )
             {
-                lc_from_rfm[i] += lc_from_res[i];
+                lc_from_rfm[u] += lc_from_res[u];
             }
-            ASSERT_MEM_EQ( lc, lc_from_rfm,       ctx->class_count * sizeof( rfc_counts_t ) );
-            ASSERT_MEM_EQ( level, level_from_rfm, ctx->class_count * sizeof( rfc_value_t ) );
-            ASSERT_MEM_EQ( level, level_from_res, ctx->class_count * sizeof( rfc_value_t ) );
+
+            if( cond )
+            {
+                ASSERT_MEM_EQ( lc, lc_from_rfm,       ctx->class_count * sizeof( rfc_counts_t ) );
+                ASSERT_MEM_EQ( level, level_from_rfm, ctx->class_count * sizeof( rfc_value_t ) );
+                ASSERT_MEM_EQ( level, level_from_res, ctx->class_count * sizeof( rfc_value_t ) );
+            }
+            else
+            {
+                bool equal = true;
+                unsigned u;
+                for( u = 0; u < ctx->class_count; u++ )
+                {
+                    if( lc_from_rfm[u] == lc[u] || level[u] != level_from_rfm[u] )
+                    {
+                        equal = false;
+                        break;
+                    }
+                }
+
+                if( equal )
+                {
+                    FAIL();
+                }
+            }
         }
     }
-
-    free( lc );
-    free( lc_from_rfm );
-    free( lc_from_res );
-    free( level );
-    free( level_from_rfm );
-    free( level_from_res );
 
     PASS();
 }
@@ -520,7 +590,8 @@ TEST RFC_cycle_up( int ccnt )
             ASSERT_EQ( ctx.lc[2], 1 * ctx.full_inc );
 
             /* Check lc count */
-            RUN_TEST1( RFC_lc_test, &ctx );
+            CHECK_CALL( RFC_lc_test( &ctx, true ) );
+            strip_buffer( NULL );
 #endif /*!RFC_MINIMAL*/
         }
 #if RFC_TP_SUPPORT
@@ -597,7 +668,8 @@ TEST RFC_cycle_down( int ccnt )
             ASSERT_EQ( ctx.lc[2], 1 * ctx.full_inc );
 
             /* Check lc count */
-            RUN_TEST1( RFC_lc_test, &ctx );
+            CHECK_CALL( RFC_lc_test( &ctx, true ) );
+            strip_buffer( NULL );
 #endif /*!RFC_MINIMAL*/
         }
 #if RFC_TP_SUPPORT
@@ -673,7 +745,8 @@ TEST RFC_small_example( int ccnt )
             ASSERT_EQ( ctx.residue[4].value, 2.0 );
 #if !RFC_MINIMAL
             /* Check lc count */
-            RUN_TEST1( RFC_lc_test, &ctx );
+            CHECK_CALL( RFC_lc_test( &ctx, true ) );
+            strip_buffer( NULL );
 #endif /*!RFC_MINIMAL*/
         }
         ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
@@ -928,7 +1001,8 @@ TEST RFC_long_series( int ccnt )
 
 #if !RFC_MINIMAL
             /* Check lc count */
-            RUN_TEST1( RFC_lc_test, &ctx );
+            CHECK_CALL( RFC_lc_test( &ctx, true ) );
+            strip_buffer( NULL );
 #endif /*!RFC_MINIMAL*/
 
 #endif /*!RFC_MINIMAL*/
@@ -937,7 +1011,7 @@ TEST RFC_long_series( int ccnt )
             ASSERT_EQ_FMT( ctx.residue[0].value,   0.54, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[1].value,   2.37, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[2].value,  -0.45, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[3].value,  17.45, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[3].value,  17.04, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[4].value, -50.90, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[5].value, 114.14, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[6].value, -24.85, "%.2f" );
@@ -1016,6 +1090,10 @@ TEST RFC_res_DIN45667( void )
     ASSERT( ctx.rp[7] == 0 );
     ASSERT( ctx.rp[8] == 0 );
     ASSERT( ctx.rp[9] == 0 );
+#if !RFC_MINIMAL
+    CHECK_CALL( RFC_lc_test( &ctx, false ) );
+    strip_buffer( NULL );
+#endif /*!RFC_MINIMAL*/
     ASSERT( RFC_deinit( &ctx ) );
 
     PASS();
@@ -1089,6 +1167,10 @@ TEST RFC_res_repeated( void )
     ASSERT( RFC_finalize( &ctx, RFC_RES_REPEATED ) );
     ASSERT( ctx.state == RFC_STATE_FINISHED );
     ASSERT( ctx.residue_cnt == 0 );
+#if !RFC_MINIMAL
+    CHECK_CALL( RFC_lc_test( &ctx, false ) );
+    strip_buffer( NULL );
+#endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
     ASSERT( ctx.tp_cnt == 4 );
     ASSERT( ctx.tp[0].tp_pos == 0 );
@@ -1154,6 +1236,10 @@ TEST RFC_res_fullcycles( void )
     ASSERT( ctx.state == RFC_STATE_BUSY_INTERIM );
     ASSERT( ctx.residue_cnt == 3 );
     ASSERT( ctx.damage == 0.0 );
+#if !RFC_MINIMAL
+    CHECK_CALL( RFC_lc_test( &ctx, false ) );
+    strip_buffer( NULL );
+#endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
     ASSERT( ctx.tp_cnt == 3 );
     ASSERT( ctx.tp[0].tp_pos == 0 );
@@ -1238,6 +1324,10 @@ TEST RFC_res_halfcycles( void )
     ASSERT( ctx.state == RFC_STATE_BUSY_INTERIM );
     ASSERT( ctx.residue_cnt == 3 );
     ASSERT( ctx.damage == 0.0 );
+#if !RFC_MINIMAL
+    CHECK_CALL( RFC_lc_test( &ctx, false ) );
+    strip_buffer( NULL );
+#endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
     ASSERT( ctx.tp_cnt == 3 );
     ASSERT( ctx.tp[0].tp_pos == 0 );
@@ -1786,4 +1876,6 @@ int main( int argc, char *argv[] )
         free( mem_chain );
         mem_chain = next;
     }
+
+    strip_buffer( NULL );
 }
