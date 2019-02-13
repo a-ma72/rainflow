@@ -673,7 +673,7 @@ bool RFC_tp_init( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_stati
 {
     RFC_CTX_CHECK_AND_ASSIGN
 
-    if( !tp )
+    if( !tp || rfc_ctx->tp )
     {
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
