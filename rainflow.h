@@ -236,7 +236,7 @@ enum rfc_flags
     RFC_FLAGS_COUNT_LC              =  RFC_FLAGS_COUNT_LC_UP        /**< Count into level crossing (all slopes) */
                                     |  RFC_FLAGS_COUNT_LC_DN,
     RFC_FLAGS_COUNT_MK              =  1 << 6,                      /**< Live damage counter (Miner consequent) */
-    RFC_FLAGS_ENFORCE_MARGIN        =  1  << 7,                     /**< Enforce first and last data point are turning points */
+    RFC_FLAGS_ENFORCE_MARGIN        =  1 << 7,                      /**< Enforce first and last data point are turning points */
 #endif /*!RFC_MINIMAL*/
     RFC_FLAGS_COUNT_ALL             =  RFC_FLAGS_COUNT_RFM          /**< Count all */
                                     |  RFC_FLAGS_COUNT_DAMAGE
