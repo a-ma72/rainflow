@@ -208,14 +208,17 @@ enum rfc_mem_aim
 #if RFC_DAMAGE_FAST
     RFC_MEM_AIM_DLUT                =  6,                           /**< Error on accessing memory for damage look-up table */
 #endif
+#if RFC_AT_SUPPORT
+    RFC_MEM_AIM_ALUT                =  7,                           /**< Error on accessing memory for amplitude look-up table */
+#endif
 #if RFC_HCM_SUPPORT
-    RFC_MEM_AIM_HCM                 =  7,                           /**< Error on accessing memory for HCM algorithm */
+    RFC_MEM_AIM_HCM                 =  8,                           /**< Error on accessing memory for HCM algorithm */
 #endif
 #if RFC_DH_SUPPORT
-    RFC_MEM_AIM_DH                  =  8,                           /**< Error on accessing memory for damage history */
+    RFC_MEM_AIM_DH                  =  9,                           /**< Error on accessing memory for damage history */
 #endif
 #if !RFC_MINIMAL
-    RFC_MEM_AIM_RFM_ELEMENTS        =  9,                           /**< Error on accessing memory for rf matrix elements */
+    RFC_MEM_AIM_RFM_ELEMENTS        = 10,                           /**< Error on accessing memory for rf matrix elements */
 #endif /*!RFC_MINIMAL*/
 };
 

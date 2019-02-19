@@ -459,7 +459,7 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
         rfc_ctx->damage_lut_inapt           = 1;
 #if RFC_AT_SUPPORT
         rfc_ctx->amplitude_lut              = (double*)rfc_ctx->mem_alloc( rfc_ctx->amplitude_lut, class_count * class_count, 
-                                                                           sizeof(double), RFC_MEM_AIM_DLUT );
+                                                                           sizeof(double), RFC_MEM_AIM_ALUT );
 #endif /*RFC_AT_SUPPORT*/
         damage_lut_init( rfc_ctx );
     }
@@ -1168,7 +1168,7 @@ bool RFC_deinit( void *ctx )
 #if RFC_DAMAGE_FAST
     if( rfc_ctx->damage_lut )           rfc_ctx->mem_alloc( rfc_ctx->damage_lut,    0, 0, RFC_MEM_AIM_DLUT );
 #if RFC_AT_SUPPORT
-    if( rfc_ctx->amplitude_lut )        rfc_ctx->mem_alloc( rfc_ctx->amplitude_lut, 0, 0, RFC_MEM_AIM_DLUT );
+    if( rfc_ctx->amplitude_lut )        rfc_ctx->mem_alloc( rfc_ctx->amplitude_lut, 0, 0, RFC_MEM_AIM_ALUT );
 #endif /*RFC_AT_SUPPORT*/
 #endif /*RFC_DAMAGE_FAST*/
 #if !RFC_MINIMAL
@@ -1380,7 +1380,7 @@ bool RFC_feed_scaled( void *ctx, const rfc_value_t * data, size_t data_count, do
 
 
 /**
- * @brief         Feed counting algorithm with data tuples.
+ * @brief         Feed counting algorithm with data tuples (tp_pos is kept maintaining). 
  *
  * @param         ctx         The rainflow context
  * @param[in,out] data        The data tuples
@@ -5446,20 +5446,35 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
         assert( new_hysteresis >= rfc_ctx->hysteresis );
         rfc_ctx->hysteresis     = new_hysteresis;
 #if RFC_DAMAGE_FAST
-        rfc_ctx->damage_lut_inapt = 1;
         if( rfc_ctx->class_count != new_class_param->count )
         {
+            double *new_damage_lut;
             size_t num = rfc_ctx->class_count * rfc_ctx->class_count;
-            if( !rfc_ctx->mem_alloc( rfc_ctx->damage_lut, num, sizeof(rfc_counts_t), RFC_MEM_AIM_DLUT ) )
+
+            new_damage_lut = (double*)rfc_ctx->mem_alloc( rfc_ctx->damage_lut, num, sizeof(double), RFC_MEM_AIM_DLUT );
+
+            if( !new_damage_lut )
             {
                 return error_raise( rfc_ctx, RFC_ERROR_MEMORY );
+            }
+            else
+            {
+                rfc_ctx->damage_lut = new_damage_lut;
             }
 #if RFC_AT_SUPPORT
             if( rfc_ctx->amplitude_lut )
             {
-                if( !rfc_ctx->mem_alloc( rfc_ctx->amplitude_lut, num, sizeof(rfc_counts_t), RFC_MEM_AIM_DLUT ) )
+                double *new_amplitude_lut;
+
+                new_amplitude_lut = (double*)rfc_ctx->mem_alloc( rfc_ctx->amplitude_lut, num, sizeof(double), RFC_MEM_AIM_ALUT );
+
+                if( !new_amplitude_lut )
                 {
                     return error_raise( rfc_ctx, RFC_ERROR_MEMORY );
+                }
+                else
+                {
+                    rfc_ctx->amplitude_lut = new_amplitude_lut;
                 }
             }
 #endif /*RFC_AT_SUPPORT*/
