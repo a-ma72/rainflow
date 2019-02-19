@@ -920,6 +920,8 @@ bool RFC_dh_init( void *ctx, rfc_sd_method_e method, double *dh, size_t dh_cap, 
         return false;
     }
 
+    assert( !rfc_ctx->dh );
+
     rfc_ctx->spread_damage_method = method;
     rfc_ctx->dh                   = dh;
     rfc_ctx->dh_cap               = dh_cap;
@@ -1516,7 +1518,7 @@ bool RFC_rfm_make_symmetric( void *ctx )
 
     RFC_CTX_CHECK_AND_ASSIGN
     
-    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state >= RFC_STATE_FINISHED )
+    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
     {
         return false;
     }
@@ -4441,7 +4443,6 @@ void damage_lut_init( rfc_ctx_s *rfc_ctx )
     double    Sa;
 
     assert( rfc_ctx );
-    assert( rfc_ctx->damage_lut );
     assert( rfc_ctx->state == RFC_STATE_INIT );
 
     if( rfc_ctx->damage_lut )
@@ -5010,6 +5011,22 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
                                to->value,   (long unsigned)to->pos,   (long unsigned)to->tp_pos );
         }
 #endif /*RFC_DEBUG_FLAGS*/
+
+        /* Turning point pairing */
+        from->adj_pos = to->pos;
+        to->adj_pos = from->pos;
+        from->avrg = to->avrg = (rfc_value_t)fabs( (double)from->value + to->value );
+
+        if( from->tp_pos )
+        {
+            tp_set( rfc_ctx, from->tp_pos, from );
+        }
+
+        if( to->tp_pos )
+        {
+            tp_set( rfc_ctx, to->tp_pos, to );
+        }
+
         /* Cumulate damage */
         if( flags & RFC_FLAGS_COUNT_DAMAGE )
         {
