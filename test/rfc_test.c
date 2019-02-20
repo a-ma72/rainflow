@@ -1,16 +1,19 @@
 /*
- *   |     .-.
- *   |    /   \         .-.
- *   |   /     \       /   \       .-.     .-.     _   _
- *   +--/-------\-----/-----\-----/---\---/---\---/-\-/-\/\/---
- *   | /         \   /       \   /     '-'     '-'
- *   |/           '-'         '-'
  *
+ *   |                     .-.
+ *   |                    /   \
+ *   |     .-.===========/     \         .-.
+ *   |    /   \         /       \       /   \
+ *   |   /     \       /         \     /     \         .-.
+ *   +--/-------\-----/-----------\---/-------\-------/---\
+ *   | /         \   /             '-'=========\     /     \   /
+ *   |/           '-'                           \   /       '-'
+ *   |                                           '-'
  *          ____  ___    _____   __________    ____ _       __
  *         / __ \/   |  /  _/ | / / ____/ /   / __ \ |     / /
- *        / /_/ / /| |  / //  |/ / /_  / /   / / / / | /| / / 
- *       / _, _/ ___ |_/ // /|  / __/ / /___/ /_/ /| |/ |/ /  
- *      /_/ |_/_/  |_/___/_/ |_/_/   /_____/\____/ |__/|__/   
+ *        / /_/ / /| |  / //  |/ / /_  / /   / / / / | /| / /
+ *       / _, _/ ___ |_/ // /|  / __/ / /___/ /_/ /| |/ |/ /
+ *      /_/ |_/_/  |_/___/_/ |_/_/   /_____/\____/ |__/|__/
  *
  *    Rainflow Counting Algorithm (4-point-method), C99 compliant
  *    Test suite
@@ -18,7 +21,7 @@
  *================================================================================
  * BSD 2-Clause License
  * 
- * Copyright (c) 2018, Andras Martin
+ * Copyright (c) 2019, Andras Martin
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -53,9 +56,16 @@
 #include <math.h>
 #include <float.h>
 
-
 #define ROUND(x) ((x)>=0?(long)((x)+0.5):(long)((x)-0.5))
 #define NUMEL(x) (sizeof(x)/sizeof((x)[0]))
+
+static
+struct buffer
+{
+    void *ptr;
+    struct buffer *next;
+} buffers = {0};
+
 
 typedef struct mem_chunk
 {
@@ -85,13 +95,54 @@ mem_chunk* new_chunk( size_t size )
     return chunk;
 }
 
-
-double rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
+static 
+struct buffer* add_buffer( void* ptr )
 {
-    RFC_counts_type counts;
+    struct buffer *new_buffer = (struct buffer*)calloc( 1, sizeof( struct buffer ) );
+    struct buffer *buffer_ptr = &buffers;
 
-    counts = rfc_ctx->rfm[ rfc_ctx->class_count * (from-1) + (to-1) ];
-    return (double)counts / rfc_ctx->full_inc;
+    while( buffer_ptr->next )
+    {
+        buffer_ptr = buffer_ptr->next;
+    }
+
+    new_buffer->ptr  = ptr;
+    buffer_ptr->next = new_buffer;
+
+    return buffer_ptr;
+}
+
+static
+void strip_buffer( struct buffer* buffer )
+{
+    struct buffer* buffer_next;
+
+    if( !buffer ) buffer = &buffers;
+
+    buffer_next  = buffer->next;
+    buffer->next = NULL;
+
+    while( buffer_next )
+    {
+        buffer = buffer_next;
+        buffer_next = buffer->next;
+        if( buffer->ptr )
+        {
+            free( buffer->ptr );
+        }
+        free( buffer );
+    }
+}
+
+
+
+
+rfc_counts_t rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
+{
+    from = (int)( ( (double)from - rfc_ctx->class_offset ) / rfc_ctx->class_width );
+    to   = (int)( ( (double)to   - rfc_ctx->class_offset ) / rfc_ctx->class_width );
+    
+    return rfc_ctx->rfm[ from * rfc_ctx->class_count + to ];
 }
 
 
@@ -162,7 +213,7 @@ TEST RFC_cycle_up( int ccnt )
         if( class_count )
         {
             ASSERT_EQ( sum, 1.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 3, 2 ), 1.0 );
+            ASSERT_EQ( rfm_peek( &ctx, 3, 2 ), 1 * ctx.full_inc );
             ASSERT_EQ( ctx.residue_cnt, 2 );
             ASSERT_EQ( ctx.residue[0].value, 1.0 );
             ASSERT_EQ( ctx.residue[1].value, 4.0 );
@@ -208,7 +259,7 @@ TEST RFC_cycle_down( int ccnt )
         if( class_count )
         {
             ASSERT_EQ( sum, 1.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 2, 3 ), 1.0 );
+            ASSERT_EQ( rfm_peek( &ctx, 2, 3 ), 1 * ctx.full_inc );
             ASSERT_EQ( ctx.residue_cnt, 2 );
             ASSERT_EQ( ctx.residue[0].value, 4.0 );
             ASSERT_EQ( ctx.residue[1].value, 1.0 );
@@ -254,11 +305,11 @@ TEST RFC_small_example( int ccnt )
         if( class_count )
         {
             ASSERT_EQ( sum, 7.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 5, 3 ), 2.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 6, 3 ), 1.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 1, 4 ), 1.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 2, 4 ), 1.0 );
-            ASSERT_EQ( rfm_peek( &ctx, 1, 6 ), 2.0 );
+            ASSERT_EQ( rfm_peek( &ctx, 5, 3 ), 2 * ctx.full_inc );
+            ASSERT_EQ( rfm_peek( &ctx, 6, 3 ), 1 * ctx.full_inc );
+            ASSERT_EQ( rfm_peek( &ctx, 1, 4 ), 1 * ctx.full_inc );
+            ASSERT_EQ( rfm_peek( &ctx, 2, 4 ), 1 * ctx.full_inc );
+            ASSERT_EQ( rfm_peek( &ctx, 1, 6 ), 2 * ctx.full_inc );
             ASSERT_EQ( ctx.residue_cnt, 5 );
             ASSERT_EQ( ctx.residue[0].value, 2.0 );
             ASSERT_EQ( ctx.residue[1].value, 6.0 );
@@ -510,16 +561,16 @@ TEST RFC_long_series( int ccnt )
             ASSERT_EQ_FMT( ctx.residue[0].value,   0.54, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[1].value,   2.37, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[2].value,  -0.45, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[3].value,  17.45, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[3].value,  17.04, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[4].value, -50.90, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[5].value, 114.14, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[6].value, -24.85, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[7].value,  31.00, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[8].value,  -0.65, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[9].value,  16.59, "%.2f" );
-
         } while(0);
     }
+
     ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
 
     if( ctx.state != RFC_STATE_INIT0 )
@@ -539,12 +590,9 @@ TEST RFC_long_series( int ccnt )
 
 
 
-TEST RFC_CPP_wrapper( void )
-{
-    extern bool wrapper_test( void );
-    ASSERT( wrapper_test() );
-    PASS();
-}
+
+
+
 
 
 /* local suite (greatest) */
@@ -561,8 +609,6 @@ SUITE( RFC_TEST_SUITE )
     RUN_TEST1( RFC_cycle_down, 0 );
     RUN_TEST1( RFC_small_example, 0 );
     RUN_TEST1( RFC_long_series, 0 );
-    /* Test C++ Wrapper */
-    RUN_TEST( RFC_CPP_wrapper );
 }
 
 
@@ -591,6 +637,10 @@ int main( int argc, char *argv[] )
 
     GREATEST_MAIN_BEGIN();      /* init & parse command-line args */
     RUN_SUITE( RFC_TEST_SUITE );
+
+    /* Test C++ Wrapper */
+    GREATEST_SUITE_EXTERN( RFC_WRAPPER_SUITE_SIMPLE );
+    RUN_SUITE( RFC_WRAPPER_SUITE_SIMPLE );
     GREATEST_MAIN_END();        /* display results */
 
     if( ctx.state != RFC_STATE_INIT0 )
@@ -604,4 +654,6 @@ int main( int argc, char *argv[] )
         free( mem_chain );
         mem_chain = next;
     }
+
+    strip_buffer( NULL );
 }

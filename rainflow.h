@@ -1,16 +1,19 @@
 /*
- *   |     .-.
- *   |    /   \         .-.
- *   |   /     \       /   \       .-.     .-.     _   _
- *   +--/-------\-----/-----\-----/---\---/---\---/-\-/-\/\/---
- *   | /         \   /       \   /     '-'     '-'
- *   |/           '-'         '-'
  *
+ *   |                     .-.
+ *   |                    /   \
+ *   |     .-.===========/     \         .-.
+ *   |    /   \         /       \       /   \
+ *   |   /     \       /         \     /     \         .-.
+ *   +--/-------\-----/-----------\---/-------\-------/---\
+ *   | /         \   /             '-'=========\     /     \   /
+ *   |/           '-'                           \   /       '-'
+ *   |                                           '-'
  *          ____  ___    _____   __________    ____ _       __
  *         / __ \/   |  /  _/ | / / ____/ /   / __ \ |     / /
- *        / /_/ / /| |  / //  |/ / /_  / /   / / / / | /| / / 
- *       / _, _/ ___ |_/ // /|  / __/ / /___/ /_/ /| |/ |/ /  
- *      /_/ |_/_/  |_/___/_/ |_/_/   /_____/\____/ |__/|__/   
+ *        / /_/ / /| |  / //  |/ / /_  / /   / / / / | /| / /
+ *       / _, _/ ___ |_/ // /|  / __/ / /___/ /_/ /| |/ |/ /
+ *      /_/ |_/_/  |_/___/_/ |_/_/   /_____/\____/ |__/|__/
  *
  *    Rainflow Counting Algorithm (4-point-method), C99 compliant
  * 
@@ -69,7 +72,7 @@
  *================================================================================
  * BSD 2-Clause License
  * 
- * Copyright (c) 2018, Andras Martin
+ * Copyright (c) 2019, Andras Martin
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -95,15 +98,12 @@
  *================================================================================
  */
 
+#ifndef RAINFLOW_H
+#define RAINFLOW_H
+
 /* This version is generated via coan (http://coan2.sourceforge.net/) */
 
-
-#include <stdbool.h> /* bool, true, false */
-#include <stdint.h>  /* ULLONG_MAX */
-#include <limits.h>  /* ULLONG_MAX */
-#include <stddef.h>  /* size_t, NULL */
 #include "config.h"  /* Configuration */
-
 
 #ifndef RFC_VALUE_TYPE
 #define RFC_VALUE_TYPE double
@@ -122,105 +122,160 @@
 #endif /*RFC_USE_INTEGRAL_COUNTS*/
 
 
+
+// Notes on mix C and C++ headers:
+// https://developers.redhat.com/blog/2016/02/29/why-cstdlib-is-more-complicated-than-you-might-think/
+// Avoid including C standard headers in a C++ namespace!
+#ifdef __cplusplus
+#include <cstdbool>  /* bool, true, false */
+#include <cstdint>   /* ULLONG_MAX */
+#include <climits>   /* ULLONG_MAX */
+#include <cstddef>   /* size_t, NULL */
+#ifndef RFC_CPP_NAMESPACE
+#define RFC_CPP_NAMESPACE rainflow_C
+#endif /*RFC_CPP_NAMESPACE*/
+namespace RFC_CPP_NAMESPACE {
+#else /*!__cplusplus*/
+#include <stdbool.h> /* bool, true, false */
+#include <stdint.h>  /* ULLONG_MAX */
+#include <limits.h>  /* ULLONG_MAX */
+#include <stddef.h>  /* size_t, NULL */
+#endif /*__cplusplus*/
+
+
 /* Memory allocation aim info */
-enum
+enum rfc_mem_aim
 {
-    RFC_MEM_AIM_TEMP                =  0,
-    RFC_MEM_AIM_RESIDUE             =  1,
-    RFC_MEM_AIM_MATRIX              =  2,
-    RFC_MEM_AIM_RP                  =  3,
-    RFC_MEM_AIM_LC                  =  4,
+    RFC_MEM_AIM_TEMP                =  0,                           /**< Error on accessing memory for temporary storage */
+    RFC_MEM_AIM_RESIDUE             =  1,                           /**< Error on accessing memory for residue */
+    RFC_MEM_AIM_MATRIX              =  2,                           /**< Error on accessing memory for rf matrix */
+    RFC_MEM_AIM_RP                  =  3,                           /**< Error on accessing memory for range pair counting */
+    RFC_MEM_AIM_LC                  =  4,                           /**< Error on accessing memory for level crossing */
 };
 
 
 /* Flags */
-enum
+enum rfc_flags
 {
     RFC_FLAGS_DEFAULT               = -1,
-    RFC_FLAGS_COUNT_RFM             = 1 << 0,                       /**< Count into rainflow matrix */
-    RFC_FLAGS_COUNT_DAMAGE          = 1 << 1,                       /**< Count pseudo damage */
-    RFC_FLAGS_COUNT_ALL             = RFC_FLAGS_COUNT_RFM           /**< Count all */
-                                    | RFC_FLAGS_COUNT_DAMAGE
+    RFC_FLAGS_COUNT_RFM             =  1 << 0,                      /**< Count into rainflow matrix */
+    RFC_FLAGS_COUNT_DAMAGE          =  1 << 1,                      /**< Count damage */
+    RFC_FLAGS_COUNT_ALL             =  RFC_FLAGS_COUNT_RFM          /**< Count all */
+                                    |  RFC_FLAGS_COUNT_DAMAGE
 };
 
-    
-/* Memory allocation functions typedef */
-typedef void * ( *rfc_mem_alloc_fcn_t )( void *, size_t num, size_t size, int aim );
+
+enum rfc_debug_flags
+{
+    RFC_FLAGS_LOG_CLOSED_CYCLES     =  1 << 0,                      /**< Log closed cycles */
+};
+
+
+
+
+enum rfc_state
+{
+    RFC_STATE_INIT0,                                                /**< Initialized with zeros */
+    RFC_STATE_INIT,                                                 /**< Initialized, memory allocated */
+    RFC_STATE_BUSY,                                                 /**< In counting state */
+    RFC_STATE_BUSY_INTERIM,                                         /**< In counting state, having still one interim turning point (not included) */
+    RFC_STATE_FINALIZE,                                             /**< Finalizing */
+    RFC_STATE_FINISHED,                                             /**< Counting finished, memory still allocated */
+    RFC_STATE_ERROR,                                                /**< An error occurred */
+};
+
+
+enum rfc_error
+{
+    RFC_ERROR_UNEXP                 = -1,                           /**< Unexpected error */
+    RFC_ERROR_NOERROR               =  0,                           /**< No error */
+    RFC_ERROR_INVARG                =  1,                           /**< Invalid arguments passed */
+    RFC_ERROR_UNSUPPORTED           =  2,                           /**< Unsupported feature */
+    RFC_ERROR_MEMORY                =  3,                           /**< Error on memory allocation */
+};
+
+
+enum rfc_res_method
+{
+    /* Don't change order! */
+    RFC_RES_NONE                    = 0,                            /**< No residual method */
+    RFC_RES_IGNORE                  = 1,                            /**< Ignore residue (same as RFC_RES_NONE) */
+    RFC_RES_COUNT                                                   /**< Number of options */
+};
+
 
 /* Typedefs */
-typedef RFC_VALUE_TYPE          RFC_value_type;      /** Input data value type */
-typedef RFC_COUNTS_VALUE_TYPE   RFC_counts_type;     /** Type of counting values */
-typedef struct rfc_ctx          rfc_ctx_s;           /** Forward declaration (rainflow context) */
-typedef struct rfc_value_tuple  rfc_value_tuple_s;   /** Tuple of value and index position */
+typedef                 RFC_VALUE_TYPE          rfc_value_t;                /** Input data value type */
+typedef                 RFC_COUNTS_VALUE_TYPE   rfc_counts_t;               /** Type of counting values */
+typedef     struct      rfc_value_tuple         rfc_value_tuple_s;          /** Tuple of value and index position */
+typedef     struct      rfc_ctx                 rfc_ctx_s;                  /** Forward declaration (rainflow context) */
+typedef     enum        rfc_mem_aim             rfc_mem_aim_e;              /** Memory accessing mode */
+typedef     enum        rfc_flags               rfc_flags_e;                /** Flags, see RFC_FLAGS... */
+typedef     enum        rfc_debug_flags         rfc_debug_flags_e;          /** Flags, see RFC_DEBUG_FLAGS... */
+typedef     enum        rfc_state               rfc_state_e;                /** Counting state, see RFC_STATE... */
+typedef     enum        rfc_error               rfc_error_e;                /** Recent error, see RFC_ERROR... */
+typedef     enum        rfc_res_method          rfc_res_method_e;           /** Method when count residue into matrix, see RFC_RES... */
 
+/* Memory allocation functions typedef */
+typedef     void *   ( *rfc_mem_alloc_fcn_t )   ( void *, size_t num, size_t size, rfc_mem_aim_e aim );     /** Memory allocation functor */
+
+#ifdef __cplusplus
+extern "C" {
+#endif /*__cplusplus*/
 
 /* Core functions */
-bool    RFC_init                ( void *ctx, unsigned class_count, RFC_value_type class_width, RFC_value_type class_offset, 
-                                             RFC_value_type hysteresis, int flags );
-bool    RFC_wl_init_elementary  ( void *ctx, double sx, double nx, double k );
-bool    RFC_deinit              ( void *ctx );
-bool    RFC_feed                ( void *ctx, const RFC_value_type* data, size_t count );
-bool    RFC_finalize            ( void *ctx, int residual_method );
+bool    RFC_init                    (       void *ctx, unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
+                                                       rfc_value_t hysteresis, rfc_flags_e flags );
+bool    RFC_wl_init_elementary      (       void *ctx, double sx, double nx, double k );
+bool    RFC_deinit                  (       void *ctx );
+bool    RFC_feed                    (       void *ctx, const rfc_value_t* data, size_t count );
+bool    RFC_finalize                (       void *ctx, rfc_res_method_e residual_method );
+
+
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif /*__cplusplus*/
+
 
 
 /* Value info struct */
-typedef struct rfc_value_tuple
+struct rfc_value_tuple
 {
-    RFC_value_type                      value;                      /**< Value. Don't change order, value field must be first! */
+    rfc_value_t                         value;                      /**< Value. Don't change order, value field must be first! */
     unsigned                            cls;                        /**< Class number, base 0 */
     size_t                              pos;                        /**< Absolute position in input data stream, base 1 */
-} rfc_value_tuple_s;
+};
+
 
 
 /**
  * Rainflow context (ctx)
  */
-typedef struct rfc_ctx
+struct rfc_ctx
 {
     size_t                              version;                    /**< Version number as sizeof(struct rfctx..), must be 1st field! */
 
-    enum
-    {
-        RFC_STATE_INIT0,                                            /**< Initialized with zeros */
-        RFC_STATE_INIT,                                             /**< Initialized, memory allocated */
-        RFC_STATE_BUSY,                                             /**< In counting state */
-        RFC_STATE_BUSY_INTERIM,                                     /**< In counting state, having still one interim turning point (not included) */
-        RFC_STATE_FINALIZE,                                         /**< Finalizing */
-        RFC_STATE_FINISHED,                                         /**< Counting finished, memory still allocated */
-        RFC_STATE_ERROR,                                            /**< An error occured */
-    }                                   state;                      /**< Current counting state */
+    /* State and error information */
+    rfc_state_e                         state;                      /**< Current counting state */
+    rfc_error_e                         error;                      /**< Error code */
 
-    enum
-    {
-        RFC_ERROR_UNEXP                 = -1,                       /**< Unexpected error */
-        RFC_ERROR_NOERROR               =  0,                       /**< No error */
-        RFC_ERROR_INVARG                =  1,                       /**< Invalid arguments passed */
-        RFC_ERROR_MEMORY                =  2,                       /**< Error on memory allocation */
-    }                                   error;                      /**< Error code */
-
-
-    enum 
-    {
-        /* Don't change order! */
-        RFC_RES_NONE                    = 0,                        /**< No residual method */
-        RFC_RES_IGNORE,                                             /**< Ignore residue (same as RFC_RES_NONE) */
-        RFC_RES_COUNT                                               /**< Number of options */
-    }
-                                        residual_method;
+    /* Methods */
+    rfc_res_method_e                    residual_method;            /**< Used on finalizing */
 
     /* Memory allocation functions */
     rfc_mem_alloc_fcn_t                 mem_alloc;                  /**< Allocate initialized memory */
 
     /* Counter increments */
-    RFC_counts_type                     full_inc;                   /**< Increment for a full cycle */
-    RFC_counts_type                     half_inc;                   /**< Increment for a half cycle, used by some residual algorithms */
-    RFC_counts_type                     curr_inc;                   /**< Current increment, used by counting algorithms */
+    rfc_counts_t                        full_inc;                   /**< Increment for a full cycle */
+    rfc_counts_t                        half_inc;                   /**< Increment for a half cycle, used by some residual algorithms */
+    rfc_counts_t                        curr_inc;                   /**< Current increment, used by counting algorithms */
 
     /* Rainflow class parameters */
     unsigned                            class_count;                /**< Class count */
-    RFC_value_type                      class_width;                /**< Class width */
-    RFC_value_type                      class_offset;               /**< Lower bound of first class */
-    RFC_value_type                      hysteresis;                 /**< Hysteresis filtering, slope must exceed hysteresis to be counted! */
+    rfc_value_t                         class_width;                /**< Class width */
+    rfc_value_t                         class_offset;               /**< Lower bound of first class */
+    rfc_value_t                         hysteresis;                 /**< Hysteresis filtering, slope must exceed hysteresis to be counted! */
 
     /* Woehler curve */
     double                              wl_sx;                      /**< Sa of any point on the Woehler curve */
@@ -234,22 +289,30 @@ typedef struct rfc_ctx
     size_t                              residue_cnt;                /**< Number of value tuples in buffer */
 
     /* Non-sparse storages (optional, may be NULL) */
-    RFC_counts_type                    *rfm;                        /**< Rainflow matrix, always class_count^2 elements (row-major, row=from, to=col). */
+    rfc_counts_t                       *rfm;                        /**< Rainflow matrix, always class_count^2 elements (row-major, row=from, to=col). */
 
     /* Damage */
-    double                              damage;                     /**< Cumulated pseudo damage */
+    double                              damage;                     /**< Cumulated damage */
+    double                              damage_residue;             /**< Partial damage in .damage influenced by taking residue into account (after finalizing) */
+
 
     /* Internal usage */
     struct internal
     {
-        int                             flags;                      /**< Flags */
+        int                             flags;                      /**< Flags (enum rfc_flags) */
         int                             slope;                      /**< Current signal slope */
         rfc_value_tuple_s               extrema[2];                 /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
         size_t                          pos;                        /**< Absolute position in data input stream, base 1 */
-        size_t                          global_offset;              /**< Offset for pos */
+        size_t                          pos_offset;                 /**< Offset for pos */
         rfc_value_tuple_s               residue[3];                 /**< Static residue (if class_count is zero) */
         size_t                          residue_cap;                /**< Capacity of static residue */
-        bool                            res_static;                 /**< true, if static residue is in use */
+        bool                            res_static;                 /**< true, if .residue refers the static residue .internal.residue */
     }
                                         internal;
-} rfc_ctx_s;
+};
+
+#ifdef __cplusplus
+}  // namespace RFC_CPP_NAMESPACE
+#endif /*__cplusplus*/
+
+#endif /*RAINFLOW_H*/
