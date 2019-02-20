@@ -3579,7 +3579,10 @@ bool feed_finalize( rfc_ctx_s *rfc_ctx )
 #endif /*!RFC_MINIMAL*/
 
             /* Check once more if a new cycle is closed now */
+            /* feed_finalize_tp(...) has locked the tp storage, but we may need to alter .pos and .adj_pos */
+            tp_lock( rfc_ctx, false );
             cycle_find( rfc_ctx, flags );
+            tp_lock( rfc_ctx, true );
         }
 
 #if RFC_HCM_SUPPORT
@@ -3643,7 +3646,7 @@ bool feed_finalize_tp( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *tp_interim, rfc_fl
         if( !tp_set( rfc_ctx, 0, tp_interim ) ) return false;
     }
 
-    /* Lock turning points queue */
+    /* Lock turning points storage */
     tp_lock( rfc_ctx, true );
     return true;
 }
@@ -5012,19 +5015,46 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
         }
 #endif /*RFC_DEBUG_FLAGS*/
 
-        /* Turning point pairing */
-        from->adj_pos = to->pos;
-        to->adj_pos = from->pos;
-        from->avrg = to->avrg = (rfc_value_t)fabs( (double)from->value + to->value );
-
-        if( from->tp_pos )
+        if( flags & RFC_FLAGS_COUNT_DAMAGE )
         {
-            tp_set( rfc_ctx, from->tp_pos, from );
-        }
+            /* Pairing turning points, if a closed cycle is counted */
+            if( from->tp_pos )
+            {
+#if RFC_DH_SUPPORT
+                rfc_value_tuple_s from_cpy;
 
-        if( to->tp_pos )
-        {
-            tp_set( rfc_ctx, to->tp_pos, to );
+                from->adj_pos   = to->pos;
+                from->avrg      = (rfc_value_t)fabs( (double)from->value + to->value );
+                /* Don't alter damage values in tp storage! */
+                from_cpy        = *from;
+                from_cpy.damage = -1;
+                tp_set( rfc_ctx, from->tp_pos, &from_cpy );
+                *from           = from_cpy;
+#else /*!RFC_DH_SUPPORT*/
+                from->adj_pos   = to->pos;
+                from->avrg      = (rfc_value_t)fabs( (double)from->value + to->value );
+                tp_set( rfc_ctx, from->tp_pos, from );
+#endif /*RFC_DH_SUPPORT*/
+            }
+
+            if( to->tp_pos )
+            {
+#if RFC_DH_SUPPORT
+                rfc_value_tuple_s to_cpy;
+
+                to->adj_pos   = from->pos;
+                to->avrg      = (rfc_value_t)fabs( (double)from->value + to->value );
+                /* Don't alter damage values in tp storage! */
+                to_cpy        = *to;
+                to_cpy.damage = -1;
+                tp_set( rfc_ctx, to->tp_pos, &to_cpy );
+                *to           = to_cpy;
+#else /*!RFC_DH_SUPPORT*/
+                to->adj_pos   = from->pos;
+                to->avrg      = (rfc_value_t)fabs( (double)from->value + to->value );
+                tp_set( rfc_ctx, to->tp_pos, &to_cpy );
+#endif /*RFC_DH_SUPPORT*/
+            }
         }
 
         /* Cumulate damage */
@@ -5199,7 +5229,7 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
  *                           will be appended. If tp_pos==0 and tp->tp_pos>0,
  *                           only the position tp->tp_pos is altered. If
  *                           tp_pos>0 the existing turning point is overwritten
- *                           by tp.
+ *                           by tp (.damage will not be overwritten, if tp->damage<0)
  * @param[in,out] tp         The turning point
  *
  * @return        true on success
@@ -5237,9 +5267,17 @@ bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
             /* Alter or move existing turning point */
             assert( tp_pos <= rfc_ctx->tp_cnt );
 
-            tp->tp_pos                =  0;        /* No position information for turning points in its storage */
-            rfc_ctx->tp[ tp_pos - 1 ] = *tp;       /* Move or replace turning point */
-            tp->tp_pos                =  tp_pos;   /* Ping back the position (commonly tp lies in residue buffer) */
+#if RFC_DH_SUPPORT
+            if( tp->damage < 0.0 )
+            {
+                /* Don't alter damage value of target point, if tp->damage < 0 */
+                tp->damage = rfc_ctx->tp[ tp_pos - 1 ].damage;
+            }
+#endif /*RFC_DH_SUPPORT*/
+
+            tp->tp_pos                =  0;                                  /* No position information for turning points in its storage */
+            rfc_ctx->tp[ tp_pos - 1 ] = *tp;                                 /* Move or replace turning point */
+            tp->tp_pos                =  tp_pos;                             /* Ping back the position (commonly tp lies in residue buffer) */
 
             return true;
         }
@@ -5354,6 +5392,7 @@ bool tp_get( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s **tp )
  * @param[in]  damage   The damage
  *
  * @return     true on success
+ * @note       Also allowed on a locked tp storage!
  */
 static
 bool tp_inc_damage( rfc_ctx_s *rfc_ctx, size_t tp_pos, double damage )
@@ -5390,7 +5429,7 @@ bool tp_inc_damage( rfc_ctx_s *rfc_ctx, size_t tp_pos, double damage )
 
 
 /**
- * @brief      Lock turning points queue
+ * @brief      (Dis-)Lock turning points storage, to control insertion and removal
  *
  * @param      rfc_ctx  The rainflow context
  * @param      do_lock  Turning point storage will be locked, if true
@@ -5428,16 +5467,15 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
+    /* Handle interim turning point and margins */
     if( !feed_finalize( rfc_ctx ) )
     {
         return false;
     }
 
+    /* Clear data for current countings, but protect pos_offset */
     pos_offset = rfc_ctx->internal.pos_offset;
-
-    /* Clear current count data */
     RFC_clear_counts( rfc_ctx );
-
     rfc_ctx->internal.pos_offset = pos_offset;
 
     /* Class parameters may change, new hysteresis must be greater! */
@@ -5566,6 +5604,7 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
  * @param         flags    The flags
  *
  * @return        true on success
+ * @note          Also allowed on a locked tp storage!
  */
 static 
 bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, 

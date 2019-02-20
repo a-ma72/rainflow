@@ -490,7 +490,7 @@ struct rfc_value_tuple
     unsigned                            cls;                        /**< Class number, base 0 */
     size_t                              pos;                        /**< Absolute position in input data stream, base 1 */
 #if RFC_TP_SUPPORT
-    size_t                              adj_pos;                    /**< Absolute position in input data stream of adjacent turning point, base 1. */
+    size_t                              adj_pos;                    /**< Absolute position in input data stream of adjacent turning point, base 1. Valid only, if RFC_FLAGS_COUNT_DAMAGE is set! */
     size_t                              tp_pos;                     /**< Position in tp storage, base 1. Only used in residue, in tp storage always 0! */
     rfc_value_t                         avrg;                       /**< Average value of two paired turning points */
 #if RFC_DH_SUPPORT

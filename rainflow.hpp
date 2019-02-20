@@ -856,6 +856,13 @@ bool RainflowT<T>::tp_set( size_t tp_pos, rfc_value_tuple_s *tp )
             return false;
         }
 
+#if RFC_DH_SUPPORT
+        if( tp->damage < 0.0 )
+        {
+            tp->damage = m_tp[ tp_pos - 1 ].damage;
+        }
+#endif /*RFC_DH_SUPPORT*/
+
         tp->tp_pos         =  0;        /* No position information for turning points in its storage */
         m_tp[ tp_pos - 1 ] = *tp;       /* Move or replace turning point */
         tp->tp_pos         =  tp_pos;   /* Ping back the position (commonly tp lies in residue buffer) */
