@@ -160,11 +160,18 @@ void export_tp( const char *filename, rfc_value_tuple_s* data, size_t count )
 
 rfc_counts_t rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 {
+#if !RFC_MINIMAL
     rfc_counts_t counts = 0;
 
     (void) RFC_rfm_peek( rfc_ctx, from, to, &counts );
 
     return counts;
+#else /*!RFC_MINIMAL*/
+    from = (int)( ( (double)from - rfc_ctx->class_offset ) / rfc_ctx->class_width );
+    to   = (int)( ( (double)to   - rfc_ctx->class_offset ) / rfc_ctx->class_width );
+    
+    return rfc_ctx->rfm[ from * rfc_ctx->class_count + to ];
+#endif /*!RFC_MINIMAL*/
 }
 
 

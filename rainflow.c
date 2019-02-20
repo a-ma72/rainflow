@@ -3579,10 +3579,14 @@ bool feed_finalize( rfc_ctx_s *rfc_ctx )
 #endif /*!RFC_MINIMAL*/
 
             /* Check once more if a new cycle is closed now */
+#if RFC_TP_SUPPORT
             /* feed_finalize_tp(...) has locked the tp storage, but we may need to alter .pos and .adj_pos */
             tp_lock( rfc_ctx, false );
             cycle_find( rfc_ctx, flags );
             tp_lock( rfc_ctx, true );
+#else /*!RFC_TP_SUPPORT*/
+            cycle_find( rfc_ctx, flags );
+#endif /*RFC_TP_SUPPORT*/
         }
 
 #if RFC_HCM_SUPPORT
@@ -5015,6 +5019,7 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
         }
 #endif /*RFC_DEBUG_FLAGS*/
 
+#if RFC_TP_SUPPORT
         if( flags & RFC_FLAGS_COUNT_DAMAGE )
         {
             /* Pairing turning points, if a closed cycle is counted */
@@ -5056,6 +5061,7 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
 #endif /*RFC_DH_SUPPORT*/
             }
         }
+#endif /*RFC_TP_SUPPORT*/
 
         /* Cumulate damage */
         if( flags & RFC_FLAGS_COUNT_DAMAGE )

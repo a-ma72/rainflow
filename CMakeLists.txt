@@ -16,7 +16,7 @@ set( RFC_VERSION_MINOR "1" )
 
 # options valid, if project compiled as standalone only
 if( CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR )
-	message( STATUS "Build ${PROJECT_NAME} as main project")
+    message( STATUS "Build ${PROJECT_NAME} as main project")
     option( RFC_MINIMAL             "(Disable all other flags)" OFF )
     option( RFC_USE_INTEGRAL_COUNTS "Use integral (non-floating) data type for counts" OFF )
     option( RFC_USE_DELEGATES       "Use delegates (functors)" OFF )
@@ -28,7 +28,7 @@ if( CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR )
     option( RFC_DAMAGE_FAST         "Enables fast damage calculation (per look-up table)" ON )
     option( RFC_DEBUG_FLAGS         "Enables flags for detailed " OFF )
 else()
-	message( STATUS "Build ${PROJECT_NAME} as subsequent project")
+    message( STATUS "Build ${PROJECT_NAME} as subsequent project")
 endif()
 
 set( CMAKE_POSITION_INDEPENDENT_CODE ON )
