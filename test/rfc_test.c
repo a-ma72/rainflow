@@ -75,7 +75,7 @@ typedef struct mem_chunk
     RFC_VALUE_TYPE     data[1];
 } mem_chunk;
 
-      rfc_ctx_s   ctx              = { sizeof(ctx) };
+      rfc_ctx_s   ctx              = { sizeof(ctx) };   /* module shared rainflow context */
       mem_chunk  *mem_chain        = NULL;
 const char       *long_series_file = NULL;
 
