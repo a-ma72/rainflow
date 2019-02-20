@@ -61,7 +61,7 @@ endif()
 
 # set up matlab libraries
 include_directories( ${Matlab_INCLUDE_DIRS} )
-configure_file( config.h.in config.h )
+configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/config.h )
 
 matlab_add_mex( NAME ${PROJECT_NAME} SRC rainflow.c OUTPUT_NAME rfc )
 target_compile_definitions( ${PROJECT_NAME} PRIVATE MATLAB_MEX_FILE _SCL_SECURE_NO_WARNINGS )

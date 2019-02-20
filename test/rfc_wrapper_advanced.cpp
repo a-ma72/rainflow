@@ -1,6 +1,17 @@
 
 /* Using Rainflow C-Library in a C++ context */
 
+#if   !RFC_MINIMAL              &&  \
+       RFC_TP_SUPPORT           &&  \
+       RFC_HCM_SUPPORT          &&  \
+       RFC_USE_DELEGATES        &&  \
+       RFC_GLOBAL_EXTREMA       &&  \
+       RFC_DAMAGE_FAST          &&  \
+       RFC_DH_SUPPORT           &&  \
+       RFC_AT_SUPPORT           &&  \
+       RFC_DEBUG_FLAGS          
+
+
 // "Cross-platform C++ Utility Library" [https://github.com/i42output/neolib]
 #define HAVE_NEOLIB 0
 
@@ -140,3 +151,18 @@ SUITE( RFC_WRAPPER_SUITE_ADVANCED )
 {
     RUN_TEST( wrapper_test_advanced );
 }
+
+#else
+#include "../greatest/greatest.h"
+
+TEST wrapper_test_advanced( void )
+{
+    PASS();
+}
+
+extern "C"
+SUITE( RFC_WRAPPER_SUITE_ADVANCED )
+{
+    RUN_TEST( wrapper_test_advanced );
+}
+#endif

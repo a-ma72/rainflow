@@ -2512,7 +2512,7 @@ bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_valu
             rfc_ctx->damage_lut_inapt--;
         }
 #else /*!RFC_DAMAGE_FAST*/
-        ok = RFC_damage_from_rp( rfc_ctx, rp, Sa, damage, RFC_RP_DAMAGE_CALC_TYPE_DEFAULT );
+        ok = RFC_damage_from_rp( rfc_ctx, rp, Sa, damage, RFC_RP_DAMAGE_CALC_METHOD_DEFAULT );
 #endif /*RFC_DAMAGE_FAST*/
 
         (void)RFC_wl_param_set( rfc_ctx, &wl );
@@ -2536,7 +2536,7 @@ bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_valu
             rfc_ctx->damage_lut_inapt--;
         }
 #else /*!RFC_DAMAGE_FAST*/
-        ok = RFC_damage_from_rp( rfc_ctx, rp, Sa, damage, RFC_RP_DAMAGE_CALC_TYPE_DEFAULT );
+        ok = RFC_damage_from_rp( rfc_ctx, rp, Sa, damage, RFC_RP_DAMAGE_CALC_METHOD_DEFAULT );
 #endif /*RFC_DAMAGE_FAST*/
 
         (void)RFC_wl_param_set( rfc_ctx, &wl );

@@ -175,53 +175,6 @@ rfc_counts_t rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 }
 
 
-#if RFC_TP_SUPPORT
-#define INIT_ARRAY(...) __VA_ARGS__
-#define SIMPLE_RFC_0(CCNT,TP,TP_N,OFFS) \
-    if( RFC_init( &ctx, CCNT /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
-                        1 /* hysteresis */, RFC_FLAGS_DEFAULT ) &&                             \
-        RFC_tp_init( &ctx, TP /* *tp */, TP_N /* tp_cap */, true /* is_static */ ) )           \
-    {                                                                                          \
-        RFC_VALUE_TYPE data[] = {0};                                                           \
-        ASSERT( RFC_feed( &ctx, data, 0 ) );                                                   \
-        ASSERT( RFC_finalize( &ctx, RFC_RES_NONE /* residual_method */ ) );                    \
-    }                                                                                          \
-    else FAIL();
-
-#define INIT_ARRAY(...) __VA_ARGS__
-#define SIMPLE_RFC(CCNT,TP,TP_N,OFFS,X) \
-    if( RFC_init( &ctx, CCNT /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
-                        1 /* hysteresis */, RFC_FLAGS_DEFAULT ) &&                             \
-        RFC_tp_init( &ctx, TP /* *tp */, TP_N /* tp_cap */, true /* is_static */ ) )           \
-    {                                                                                          \
-        RFC_VALUE_TYPE data[] = {INIT_ARRAY X};                                                \
-        ASSERT( RFC_feed( &ctx, data, NUMEL(data) ) );                                         \
-        ASSERT( RFC_finalize( &ctx, RFC_RES_NONE /* residual_method */ ) );                    \
-    }                                                                                          \
-    else FAIL();
-
-#define SIMPLE_RFC_MARGIN_0(CCNT,TP,TP_N,OFFS) \
-    if( RFC_init( &ctx, CCNT /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
-                        1 /* hysteresis */, RFC_FLAGS_COUNT_ALL|RFC_FLAGS_ENFORCE_MARGIN ) &&  \
-        RFC_tp_init( &ctx, TP /* *tp */, TP_N /* tp_cap */, true /* is_static */ ) )           \
-    {                                                                                          \
-        RFC_VALUE_TYPE data[] = {0};                                                           \
-        ASSERT( RFC_feed( &ctx, data, 0 ) );                                                   \
-        ASSERT( RFC_finalize( &ctx, RFC_RES_NONE /* residual_method */ ) );                    \
-    }                                                                                          \
-    else FAIL();
-
-#define SIMPLE_RFC_MARGIN(CCNT,TP,TP_N,OFFS,X) \
-    if( RFC_init( &ctx, CCNT /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
-                        1 /* hysteresis */, RFC_FLAGS_COUNT_ALL|RFC_FLAGS_ENFORCE_MARGIN ) &&  \
-        RFC_tp_init( &ctx, TP /* *tp */, TP_N /* tp_cap */, true /* is_static */ ) )           \
-    {                                                                                          \
-        RFC_VALUE_TYPE data[] = {INIT_ARRAY X};                                                \
-        ASSERT( RFC_feed( &ctx, data, NUMEL(data) ) );                                         \
-        ASSERT( RFC_finalize( &ctx, RFC_RES_NONE /* residual_method */ ) );                    \
-    }                                                                                          \
-    else FAIL();
-
 
 
 #if !RFC_MINIMAL
@@ -286,6 +239,56 @@ TEST RFC_lc_test( rfc_ctx_s *ctx, bool cond )
     PASS();
 }
 #endif /*!RFC_MINIMAL*/
+
+
+#if RFC_TP_SUPPORT
+#define INIT_ARRAY(...) __VA_ARGS__
+#define SIMPLE_RFC_0(CCNT,TP,TP_N,OFFS) \
+    if( RFC_init( &ctx, CCNT /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
+                        1 /* hysteresis */, RFC_FLAGS_DEFAULT ) &&                             \
+        RFC_tp_init( &ctx, TP /* *tp */, TP_N /* tp_cap */, true /* is_static */ ) )           \
+    {                                                                                          \
+        RFC_VALUE_TYPE data[] = {0};                                                           \
+        ASSERT( RFC_feed( &ctx, data, 0 ) );                                                   \
+        ASSERT( RFC_finalize( &ctx, RFC_RES_NONE /* residual_method */ ) );                    \
+    }                                                                                          \
+    else FAIL();
+
+#define INIT_ARRAY(...) __VA_ARGS__
+#define SIMPLE_RFC(CCNT,TP,TP_N,OFFS,X) \
+    if( RFC_init( &ctx, CCNT /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
+                        1 /* hysteresis */, RFC_FLAGS_DEFAULT ) &&                             \
+        RFC_tp_init( &ctx, TP /* *tp */, TP_N /* tp_cap */, true /* is_static */ ) )           \
+    {                                                                                          \
+        RFC_VALUE_TYPE data[] = {INIT_ARRAY X};                                                \
+        ASSERT( RFC_feed( &ctx, data, NUMEL(data) ) );                                         \
+        ASSERT( RFC_finalize( &ctx, RFC_RES_NONE /* residual_method */ ) );                    \
+    }                                                                                          \
+    else FAIL();
+
+#define SIMPLE_RFC_MARGIN_0(CCNT,TP,TP_N,OFFS) \
+    if( RFC_init( &ctx, CCNT /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
+                        1 /* hysteresis */, RFC_FLAGS_COUNT_ALL|RFC_FLAGS_ENFORCE_MARGIN ) &&  \
+        RFC_tp_init( &ctx, TP /* *tp */, TP_N /* tp_cap */, true /* is_static */ ) )           \
+    {                                                                                          \
+        RFC_VALUE_TYPE data[] = {0};                                                           \
+        ASSERT( RFC_feed( &ctx, data, 0 ) );                                                   \
+        ASSERT( RFC_finalize( &ctx, RFC_RES_NONE /* residual_method */ ) );                    \
+    }                                                                                          \
+    else FAIL();
+
+#define SIMPLE_RFC_MARGIN(CCNT,TP,TP_N,OFFS,X) \
+    if( RFC_init( &ctx, CCNT /* class_count */, 1 /* class_width */, OFFS /* class_offset */,  \
+                        1 /* hysteresis */, RFC_FLAGS_COUNT_ALL|RFC_FLAGS_ENFORCE_MARGIN ) &&  \
+        RFC_tp_init( &ctx, TP /* *tp */, TP_N /* tp_cap */, true /* is_static */ ) )           \
+    {                                                                                          \
+        RFC_VALUE_TYPE data[] = {INIT_ARRAY X};                                                \
+        ASSERT( RFC_feed( &ctx, data, NUMEL(data) ) );                                         \
+        ASSERT( RFC_finalize( &ctx, RFC_RES_NONE /* residual_method */ ) );                    \
+    }                                                                                          \
+    else FAIL();
+
+
 
 
 TEST RFC_tp_prune_test( int ccnt )
