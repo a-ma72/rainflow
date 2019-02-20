@@ -1859,12 +1859,13 @@ int main( int argc, char *argv[] )
 
     GREATEST_MAIN_BEGIN();      /* init & parse command-line args */
     RUN_SUITE( RFC_TEST_SUITE );
+
+    /* Test C++ Wrapper */
+    GREATEST_SUITE_EXTERN( RFC_WRAPPER_SUITE_SIMPLE );
+    RUN_SUITE( RFC_WRAPPER_SUITE_SIMPLE );
 #if !RFC_MINIMAL
     {
-        /* Test C++ Wrapper */
-        GREATEST_SUITE_EXTERN( RFC_WRAPPER_SUITE_SIMPLE );
         GREATEST_SUITE_EXTERN( RFC_WRAPPER_SUITE_ADVANCED );
-        RUN_SUITE( RFC_WRAPPER_SUITE_SIMPLE );
         RUN_SUITE( RFC_WRAPPER_SUITE_ADVANCED );
     }
 #endif /*!RFC_MINIMAL*/
