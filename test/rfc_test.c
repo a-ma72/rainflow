@@ -1187,7 +1187,7 @@ TEST RFC_res_repeated( void )
     ASSERT( ctx.tp[1].tp_pos == 0 );
     ASSERT( ctx.tp[2].tp_pos == 0 );
     ASSERT( ctx.tp[3].tp_pos == 0 );
-    printf( "%ld, %ld\n", ctx.tp[2].pos, ctx.tp[2].adj_pos );
+    printf( "%lu, %lu\n", (unsigned long)ctx.tp[2].pos, (unsigned long)ctx.tp[2].adj_pos );
     ASSERT( ctx.tp[0].pos == 1 && ctx.tp[0].adj_pos == 4 );
     ASSERT( ctx.tp[1].pos == 2 && ctx.tp[1].adj_pos == 3 );
     ASSERT( ctx.tp[2].pos == 3 && ctx.tp[2].adj_pos == 2 );

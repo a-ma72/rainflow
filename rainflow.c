@@ -5057,7 +5057,7 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
 #else /*!RFC_DH_SUPPORT*/
                 to->adj_pos   = from->pos;
                 to->avrg      = (rfc_value_t)fabs( (double)from->value + to->value );
-                tp_set( rfc_ctx, to->tp_pos, &to_cpy );
+                tp_set( rfc_ctx, to->tp_pos, to );
 #endif /*RFC_DH_SUPPORT*/
             }
         }
