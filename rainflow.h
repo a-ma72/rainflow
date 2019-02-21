@@ -709,7 +709,7 @@ struct rfc_ctx
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
         rfc_value_tuple_s               margin[2];                  /**< First and last data point */
-        int                             margin_stage;               /**< 0: Init, 1: Left margin set, 2: 1st turning point safe */
+        int                             margin_stage;               /**< 0: Init, 1: Left margin set, 2: 1st turning point is safe */
         bool                            tp_static;                  /**< true, if tp is statically allocated */
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT

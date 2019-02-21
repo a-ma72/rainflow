@@ -38,7 +38,13 @@ for VALUE_TYPE = {'float', 'double'}
                     fprintf( fid, '%s\n', 'if %errorlevel% neq 0 exit /b %errorlevel%' );
                     fprintf( fid, '%s\n', '.\Release\rfc_test.exe || exit /b 1' );
                     fclose( fid );
-                    status = system( '..\build\generate.bat', '-echo' );
+                    i = 0;
+                    status = 1;
+                    while status ~= 0
+                      status = system( '..\build\generate.bat', '-echo' );
+                      i = i + 1;
+                      if i > 10, break, end
+                    end
                     if status ~= 0, return, end
                   end
                 end

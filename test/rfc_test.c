@@ -418,14 +418,6 @@ TEST RFC_tp_refeed_test( int ccnt )
 
     class_count = 0;
 
-    if( class_count )
-    {
-        ASSERT( class_width > 0.0 );
-        ASSERT( class_count > 1 );
-        ASSERT( x_min >= class_offset );
-        ASSERT( x_max <  class_offset + class_width * class_count );
-    }
-
     ASSERT( tp = ctx.mem_alloc( tp, 1, sizeof( rfc_value_tuple_s ), RFC_MEM_AIM_TP ) );
 
     ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
@@ -434,7 +426,7 @@ TEST RFC_tp_refeed_test( int ccnt )
     x_min = x_max = data[0];
     class_count = 100;
 
-    for( i = 0; i < data_len; i++ )
+    for( i = 0; i < data_len; )
     {
         size_t j;
         size_t chunk_len = min( 100, data_len - i );
@@ -455,7 +447,8 @@ TEST RFC_tp_refeed_test( int ccnt )
 
             if( class_width < 0.0 )
             {
-                class_width = ( x_max - x_min ) / ( class_count - 1 );
+                class_width  = ( x_max - x_min ) / ( class_count - 1 );
+                class_offset = x_min - class_width / 2;
             }
 
             if( class_width < 0.0 )
@@ -481,7 +474,34 @@ TEST RFC_tp_refeed_test( int ccnt )
     }
     ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
 
-    ASSERT( ctx.mem_alloc( tp, 0, 0, RFC_MEM_AIM_TP ) );
+    do
+    {
+        rfc_ctx_s          ctx2 = {sizeof(rfc_ctx_s)};
+        rfc_value_tuple_s *tp2  = NULL;
+
+        ASSERT( RFC_init( &ctx2, ctx.class_count, ctx.class_width, ctx.class_offset, ctx.hysteresis, RFC_FLAGS_DEFAULT ) );
+        tp2 = (rfc_value_tuple_s*)ctx2.mem_alloc( NULL, /*num*/ 1, sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TP );
+        ASSERT( RFC_tp_init( &ctx2, tp2, /*tp_cap*/ 1, /*is_static*/ false ) );
+        ASSERT( RFC_feed( &ctx2, data, data_len ) );
+        ASSERT( RFC_finalize( &ctx2, RFC_RES_NONE ) );
+
+        ASSERT_IN_RANGE( fabs( ctx.damage / ctx2.damage ), 1.0, 1e-10 );
+        ASSERT_EQ( ctx.tp_cnt, ctx2.tp_cnt );
+        for( i = 0; i < ctx.tp_cnt; i++ )
+        {
+            printf( "%lu\n", (unsigned long)i );
+            ASSERT_IN_RANGE( ctx.tp[i].value,   ctx2.tp[i].value,  1e-10 );
+            ASSERT_EQ(       ctx.tp[i].cls,     ctx2.tp[i].cls );
+            ASSERT_EQ(       ctx.tp[i].pos,     ctx2.tp[i].pos );
+            //ASSERT_EQ(       ctx.tp[i].adj_pos, ctx2.tp[i].adj_pos );
+            //ASSERT_IN_RANGE( ctx.tp[i].avrg,    ctx2.tp[i].avrg,   1e-10 );
+            ASSERT_IN_RANGE( ctx.tp[i].damage,  ctx2.tp[i].damage, 1e-10 );
+        }
+        ASSERT_MEM_EQ( ctx.tp, ctx2.tp, ctx.tp_cnt * sizeof( rfc_value_tuple_s ) );
+        ASSERT( RFC_deinit( &ctx2 ) );
+    } while(0);
+
+    ASSERT( RFC_deinit( &ctx ) );
 
     PASS();
 }
@@ -978,7 +998,7 @@ TEST RFC_long_series( int ccnt )
         GREATEST_FPRINTF( GREATEST_STDOUT, "\n" );
 
         class_count = 100;
-        printf( "Class count (%d): ", class_count );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "Class count (%d): ", class_count );
         if( fgets( buf, sizeof(buf), stdin ) != NULL )
         {
             if( ( 1 == sscanf( buf, "%lf %n", &value, &len ) ) && ( strlen(buf) == len ) && ( value > 0.0 ) )
@@ -988,7 +1008,7 @@ TEST RFC_long_series( int ccnt )
         }
 
         hysteresis = class_width = (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
-        printf( "Class width (%g): ", class_width );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "Class width (%g): ", class_width );
         if( fgets( buf, sizeof(buf), stdin ) != NULL )
         {
             if( ( 1 == sscanf( buf, "%lf %n", &value, &len ) ) && ( strlen(buf) == len ) && ( value > 0.0 ) )
@@ -998,7 +1018,7 @@ TEST RFC_long_series( int ccnt )
         }
 
         class_offset  =  x_min - class_width / 2;
-        printf( "Class offset (%g): ", class_offset );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "Class offset (%g): ", class_offset );
         if( fgets( buf, sizeof(buf), stdin ) != NULL )
         {
             if( ( 1 == sscanf( buf, "%lf %n", &value, &len ) ) && ( strlen(buf) == len ) )
@@ -1006,7 +1026,7 @@ TEST RFC_long_series( int ccnt )
                 class_offset = value;
             }
         }
-        printf( "\n" );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "\n" );
     }
 
     GREATEST_FPRINTF( GREATEST_STDOUT, "\nTest long series:" );
@@ -1288,7 +1308,6 @@ TEST RFC_res_repeated( void )
     ASSERT( ctx.tp[1].tp_pos == 0 );
     ASSERT( ctx.tp[2].tp_pos == 0 );
     ASSERT( ctx.tp[3].tp_pos == 0 );
-    printf( "%lu, %lu\n", (unsigned long)ctx.tp[2].pos, (unsigned long)ctx.tp[2].adj_pos );
     ASSERT( ctx.tp[0].pos == 1 && ctx.tp[0].adj_pos == 4 );
     ASSERT( ctx.tp[1].pos == 2 && ctx.tp[1].adj_pos == 3 );
     ASSERT( ctx.tp[2].pos == 3 && ctx.tp[2].adj_pos == 2 );
