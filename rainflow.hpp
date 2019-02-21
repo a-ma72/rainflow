@@ -55,8 +55,7 @@ char compiler_assert_rfc_config
    RFC_GLOBAL_EXTREMA       &&
    RFC_DAMAGE_FAST          &&
    RFC_DH_SUPPORT           &&
-   RFC_AT_SUPPORT           &&
-   RFC_DEBUG_FLAGS          
+   RFC_AT_SUPPORT
 ];
 
 

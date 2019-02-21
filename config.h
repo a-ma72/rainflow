@@ -13,5 +13,5 @@
   #define RFC_DAMAGE_FAST          ON
   #define RFC_DH_SUPPORT           ON
   #define RFC_AT_SUPPORT           ON
-  #define RFC_DEBUG_FLAGS          ON
+  #define RFC_DEBUG_FLAGS          OFF
 #endif /*RFC_VERSION_MAJOR*/
