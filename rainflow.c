@@ -211,7 +211,7 @@ static bool                 at_alleviation                  (       rfc_ctx_s *,
 static bool                 damage_calc_amplitude           (       rfc_ctx_s *, double Sa, double *damage );
 static bool                 damage_calc                     (       rfc_ctx_s *, unsigned class_from, unsigned class_to, double *damage, double *Sa_ret );
 #if RFC_DAMAGE_FAST
-static void                 damage_lut_init                 (       rfc_ctx_s * );
+static bool                 damage_lut_init                 (       rfc_ctx_s * );
 static bool                 damage_calc_fast                (       rfc_ctx_s *, unsigned class_from, unsigned class_to, double *damage, double *Sa_ret );
 #endif /*RFC_DAMAGE_FAST*/
 static bool                 error_raise                     (       rfc_ctx_s *, rfc_error_e );
@@ -461,7 +461,7 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
         rfc_ctx->amplitude_lut              = (double*)rfc_ctx->mem_alloc( rfc_ctx->amplitude_lut, class_count * class_count, 
                                                                            sizeof(double), RFC_MEM_AIM_ALUT );
 #endif /*RFC_AT_SUPPORT*/
-        damage_lut_init( rfc_ctx );
+        return damage_lut_init( rfc_ctx );
     }
 #endif /*RFC_DAMAGE_FAST*/
 
@@ -514,7 +514,7 @@ bool RFC_wl_init_elementary( void *ctx, double sx, double nx, double k )
 #if RFC_DAMAGE_FAST
     if( rfc_ctx->damage_lut )
     {
-        damage_lut_init( rfc_ctx );
+        return damage_lut_init( rfc_ctx );
     }
 #endif /*RFC_DAMAGE_FAST*/
 
@@ -559,7 +559,7 @@ bool RFC_wl_init_original( void *ctx, double sd, double nd, double k )
 #if RFC_DAMAGE_FAST
     if( rfc_ctx->damage_lut )
     {
-        damage_lut_init( rfc_ctx );
+        return damage_lut_init( rfc_ctx );
     }
 #endif /*RFC_DAMAGE_FAST*/
 
@@ -604,7 +604,7 @@ bool RFC_wl_init_modified( void *ctx, double sx, double nx, double k, double k2 
 #if RFC_DAMAGE_FAST
     if( rfc_ctx->damage_lut )
     {
-        damage_lut_init( rfc_ctx );
+        return damage_lut_init( rfc_ctx );
     }
 #endif /*RFC_DAMAGE_FAST*/
 
@@ -649,7 +649,7 @@ bool RFC_wl_init_any( void *ctx, const rfc_wl_param_s* wl_param )
 #if RFC_DAMAGE_FAST
     if( rfc_ctx->damage_lut )
     {
-        damage_lut_init( rfc_ctx );
+        return damage_lut_init( rfc_ctx );
     }
 #endif /*RFC_DAMAGE_FAST*/
 
@@ -869,6 +869,28 @@ bool RFC_tp_prune( void *ctx, size_t limit, rfc_flags_e flags )
 
 
 /**
+ * @brief      Restart counting with given points from turning points history
+ *
+ * @param      ctx              The rainflow context
+ * @param      new_hysteresis   The new hysteresis
+ * @param[in]  new_class_param  The new class parameters
+ *
+ * @return     true on success
+ */
+bool RFC_tp_refeed( void *ctx, rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param )
+{
+    RFC_CTX_CHECK_AND_ASSIGN
+
+    if( rfc_ctx->state < RFC_STATE_INIT )
+    {
+        return false;
+    }
+
+    return tp_refeed( rfc_ctx, new_hysteresis, new_class_param );
+}
+
+
+/**
  * @brief      Clear turning point storage
  *
  * @param      ctx   The rainflow context
@@ -1066,10 +1088,10 @@ bool RFC_at_init( void *ctx, const double *Sa, const double *Sm, unsigned count,
     }
 
 #if RFC_DAMAGE_FAST
-    damage_lut_init( rfc_ctx );
-#endif /*RFC_DAMAGE_FAST*/
-
+    return damage_lut_init( rfc_ctx );
+#else /*!RFC_DAMAGE_FAST*/
     return true;
+#endif /*RFC_DAMAGE_FAST*/
 }
 #endif /*RFC_AT_SUPPORT*/
 
@@ -4440,9 +4462,11 @@ bool damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_to, do
  *             implementation the midrange doesn't matter!
  *
  * @param      rfc_ctx  The rainflow context
+ *
+ * @returns    true on success
  */
 static 
-void damage_lut_init( rfc_ctx_s *rfc_ctx )
+bool damage_lut_init( rfc_ctx_s *rfc_ctx )
 {
     double   *lut;
     unsigned  from, 
@@ -4465,7 +4489,7 @@ void damage_lut_init( rfc_ctx_s *rfc_ctx )
 
                 if( !damage_calc( rfc_ctx, from, to, &D, &Sa ) )
                 {
-                    return;
+                    return false;
                 }
                 lut[from * rfc_ctx->class_count + to] = D;
 #if RFC_AT_SUPPORT
@@ -4480,6 +4504,8 @@ void damage_lut_init( rfc_ctx_s *rfc_ctx )
         rfc_ctx->damage_lut       = lut;
         rfc_ctx->damage_lut_inapt = 0;
     }
+
+    return true;
 }
 
 
@@ -5493,7 +5519,20 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
         if( rfc_ctx->class_count != new_class_param->count )
         {
             double *new_damage_lut;
-            size_t num = rfc_ctx->class_count * rfc_ctx->class_count;
+            size_t num = new_class_param->count * new_class_param->count;
+            rfc_value_t *new_residue;
+            size_t new_resiude_cap = new_class_param->count * 2;
+
+            new_residue = (double*)rfc_ctx->mem_alloc( rfc_ctx->residue, new_resiude_cap, sizeof(double), RFC_MEM_AIM_RESIDUE );
+
+            if( !new_residue )
+            {
+                return error_raise( rfc_ctx, RFC_ERROR_MEMORY );
+            }
+
+            rfc_ctx->residue     = new_residue;
+            rfc_ctx->residue_cap = new_resiude_cap;
+            rfc_ctx->residue_cnt = 0;
 
             new_damage_lut = (double*)rfc_ctx->mem_alloc( rfc_ctx->damage_lut, num, sizeof(double), RFC_MEM_AIM_DLUT );
 
@@ -5523,10 +5562,11 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
             }
 #endif /*RFC_AT_SUPPORT*/
         }
-        RFC_class_param_set( rfc_ctx, new_class_param );
-        damage_lut_init( rfc_ctx );
+        rfc_ctx->state == RFC_STATE_INIT;
+        return RFC_class_param_set( rfc_ctx, new_class_param ) &&
+               damage_lut_init( rfc_ctx );
 #else /*!RFC_DAMAGE_FAST*/
-        RFC_class_param_set( rfc_ctx, new_class_param );
+        return RFC_class_param_set( rfc_ctx, new_class_param );
 #endif /*RFC_DAMAGE_FAST*/
     }
 

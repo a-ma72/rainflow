@@ -386,6 +386,107 @@ TEST RFC_tp_prune_test( int ccnt )
 }
 
 
+TEST RFC_tp_refeed_test( int ccnt )
+{
+    RFC_VALUE_TYPE      data[10000];
+    size_t              data_len            =  NUMEL( data );
+    RFC_VALUE_TYPE      x_max;
+    RFC_VALUE_TYPE      x_min;
+    unsigned            class_count         = ccnt ? 100 : 0;
+    RFC_VALUE_TYPE      class_width;
+    RFC_VALUE_TYPE      class_offset;
+    RFC_VALUE_TYPE      hysteresis;
+    rfc_value_tuple_s  *tp                  = NULL;
+    size_t              i;
+
+#include "long_series.c"
+
+    for( i = 0; i < data_len; i++ )
+    {
+        double value = data_export[i];
+        data[i] = value;
+    }
+
+#if 0
+    class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
+    class_offset    =  x_min - class_width / 2;
+    hysteresis      =  class_width;
+#endif
+    class_width  = 0;
+    class_offset = 0;
+    hysteresis   = 0;
+
+    class_count = 0;
+
+    if( class_count )
+    {
+        ASSERT( class_width > 0.0 );
+        ASSERT( class_count > 1 );
+        ASSERT( x_min >= class_offset );
+        ASSERT( x_max <  class_offset + class_width * class_count );
+    }
+
+    ASSERT( tp = ctx.mem_alloc( tp, 1, sizeof( rfc_value_tuple_s ), RFC_MEM_AIM_TP ) );
+
+    ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
+    ASSERT( RFC_tp_init( &ctx, tp, /*tp_cnt*/ 1, /* is_static */ false ) );
+
+    x_min = x_max = data[0];
+    class_count = 100;
+
+    for( i = 0; i < data_len; i++ )
+    {
+        size_t j;
+        size_t chunk_len = min( 100, data_len - i );
+
+        for( j = i; j < i + chunk_len; j++ )
+        {
+            if( data[j] > x_max )
+            {
+                x_max = data[j];
+                class_width = -1;
+            }
+
+            if( data[j] < x_min )
+            {
+                x_min = data[j];
+                class_width = -1;
+            }
+
+            if( class_width < 0.0 )
+            {
+                class_width = ( x_max - x_min ) / ( class_count - 1 );
+            }
+
+            if( class_width < 0.0 )
+            {
+                class_width = 0.0;
+            }
+        }
+
+        if( class_width > ctx.class_width )
+        {
+            rfc_class_param_s class_param;
+
+            class_param.count  = class_count;
+            class_param.width  = class_width;
+            class_param.offset = class_offset;
+
+            RFC_tp_refeed( &ctx, /*new_hysteresis*/ class_width, &class_param );
+        }
+
+        ASSERT( RFC_feed( &ctx, data + i, /* count */ chunk_len ) );
+
+        i += chunk_len;
+    }
+    ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
+
+    ASSERT( ctx.mem_alloc( tp, 0, 0, RFC_MEM_AIM_TP ) );
+
+    PASS();
+}
+
+
 TEST RFC_test_turning_points( int ccnt )
 {
     //rfc_ctx_s         ctx = {sizeof(ctx)};
@@ -1835,8 +1936,11 @@ SUITE( RFC_TEST_SUITE )
     /* Test turning points */
     RUN_TEST1( RFC_test_turning_points, 1 );
     RUN_TEST1( RFC_tp_prune_test, 1 );
+    RUN_TEST1( RFC_tp_refeed_test, 1 );
     RUN_TEST1( RFC_test_turning_points, 0 );
     RUN_TEST1( RFC_tp_prune_test, 0 );
+    RUN_TEST1( RFC_tp_refeed_test, 0 );
+
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_AT_SUPPORT
     /* Test amplitude transformation */

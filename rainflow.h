@@ -439,6 +439,7 @@ bool    RFC_get_flags               ( const void *ctx, int *flags, int stack );
 bool    RFC_tp_init                 (       void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
 bool    RFC_tp_init_autoprune       (       void *ctx, bool autoprune, size_t size, size_t threshold );
 bool    RFC_tp_prune                (       void *ctx, size_t count, rfc_flags_e flags );
+bool    RFC_tp_refeed               (       void *ctx, rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param );
 bool    RFC_tp_clear                (       void *ctx );
 #endif /*RFC_TP_SUPPORT*/
 
