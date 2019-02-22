@@ -413,6 +413,7 @@ bool    RFC_rfm_poke                (       void *ctx, rfc_value_t from_val, rfc
 bool    RFC_rfm_sum                 ( const void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, rfc_counts_t *count );
 bool    RFC_rfm_damage              ( const void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage );
 bool    RFC_rfm_check               ( const void *ctx );
+bool    RFC_rfm_refeed              (       void *ctx, rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param );
 bool    RFC_lc_get                  ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level );
 bool    RFC_lc_from_rfm             ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags );
 bool    RFC_lc_from_residue         ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, rfc_flags_e flags );
