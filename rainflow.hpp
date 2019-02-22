@@ -256,7 +256,8 @@ public:
     bool            rfm_sum                 ( unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, rfc_counts_t *count ) const;
     bool            rfm_damage              ( unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage ) const;
     bool            rfm_check               () const;
-    /* Functions on histograms */           
+    bool            rfm_refeed              ( rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param );
+/* Functions on histograms */           
     bool            lc_get                  ( rfc_counts_t *lc, rfc_value_t *level ) const;
     bool            lc_from_rfm             ( rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags ) const;
     bool            lc_from_residue         ( rfc_counts_t *lc, rfc_value_t *level, rfc_flags_e flags ) const;
@@ -546,6 +547,13 @@ bool RainflowT<T>::rfm_damage( unsigned from_first, unsigned from_last, unsigned
 
 
 template< class T >
+bool RainflowT<T>::rfm_refeed( rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param )
+{
+    return RF::RFC_rfm_refeed( &m_ctx, new_hysteresis, new_class_param );
+}
+
+
+template< class T >
 bool RainflowT<T>::rfm_check() const
 {
     return RF::RFC_rfm_check( &m_ctx );
@@ -647,6 +655,13 @@ template< class T >
 bool RainflowT<T>::tp_prune( size_t count, rfc_flags_e flags )
 {
     return RF::RFC_tp_prune( &m_ctx, count, (RF::rfc_flags_e) flags );
+}
+
+
+template< class T >
+bool Rainflow<T>::tp_refeed( rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param )
+{
+    return RF::RFC_tp_refeed( &m_ctx, new_hysteresis, new_class_param );
 }
 
 

@@ -51,7 +51,7 @@ for loop = 2^10-1:-1:0
     i = 0;
     status = 1;
     while status ~= 0
-      status = system( '../build/generate.bat', '-echo' );
+      status = system( '..\build\generate.bat', '-echo' );
       i = i + 1;
       if i > 10, break, end
     end
