@@ -2123,9 +2123,14 @@ bool RFC_rfm_refeed( void *ctx, rfc_value_t new_hysteresis, const rfc_class_para
         return false;
     }
 
+#if RFC_DAMAGE_FAST
     if(  new_class_param && 
-        !RFC_class_param_set( rfc_ctx, new_class_param ) &&
+        !RFC_class_param_set( rfc_ctx, new_class_param ) ||
         !damage_lut_init( rfc_ctx ) )
+#else /*!RFC_DAMAGE_FAST*/
+    if(  new_class_param && 
+        !RFC_class_param_set( rfc_ctx, new_class_param ) )
+#endif /*RFC_DAMAGE_FAST*/
     {
         return false;
     }
@@ -2983,7 +2988,9 @@ bool RFC_class_param_set( void *ctx, const rfc_class_param_s *class_param )
     rfc_ctx->class_width  = class_param->width;
     rfc_ctx->class_offset = class_param->offset;
 
+#if RFC_DAMAGE_FAST
     rfc_ctx->damage_lut_inapt++;
+#endif /*RFC_DAMAGE_FAST*/
 
     return true;
 }
@@ -4611,8 +4618,8 @@ bool damage_lut_init( rfc_ctx_s *rfc_ctx )
             }
         }
 
-        rfc_ctx->damage_lut       = lut;
-        rfc_ctx->damage_lut_inapt = 0;
+        rfc_ctx->damage_lut          = lut;
+        rfc_ctx->damage_lut_inapt    = 0;
     }
 
     return true;
@@ -5641,8 +5648,12 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
         assert( new_hysteresis >= rfc_ctx->hysteresis );
         rfc_ctx->hysteresis     = new_hysteresis;
 
+#if RFC_DAMAGE_FAST
         if( !RFC_class_param_set( rfc_ctx, new_class_param ) ||
             !damage_lut_init( rfc_ctx ) )
+#else /*!RFC_DAMAGE_FAST*/
+        if( !RFC_class_param_set( rfc_ctx, new_class_param ) )
+#endif /*RFC_DAMAGE_FAST*/
         {
             return false;
         }

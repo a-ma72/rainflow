@@ -371,7 +371,9 @@ typedef     enum        rfc_res_method          rfc_res_method_e;           /** 
 #if !RFC_MINIMAL
 typedef     enum        rfc_counting_method     rfc_counting_method_e;      /** Counting method, see RFC_COUNTING... */
 typedef     enum        rfc_rp_damage_method    rfc_rp_damage_method_e;     /** Method when calculating damage from range pair counting, see RFC_RP_DAMAGE_CALC_METHOD... */
+#if RFC_DH_SUPPORT
 typedef     enum        rfc_sd_method           rfc_sd_method_e;            /** Spread damage method, see RFC_SD... */
+#endif /*RFC_DH_SUPPORT*/
 typedef     struct      rfc_class_param         rfc_class_param_s;          /** Class parameters (width, offset, count) */
 typedef     struct      rfc_wl_param            rfc_wl_param_s;             /** Woehler curve parameters (sd, nd, k, k2, omission) */
 typedef     struct      rfc_rfm_item            rfc_rfm_item_s;             /** Rainflow matrix element */
@@ -668,7 +670,7 @@ struct rfc_ctx
     double                             *damage_lut;                 /**< Damage look-up table */
     int                                 damage_lut_inapt;           /**< Greater 0, if values in damage_lut aren't proper to Woehler curve parameters */
 #if RFC_AT_SUPPORT
-    double                             *amplitude_lut;              /**< Amplitude look-up table */
+    double                             *amplitude_lut;              /**< Amplitude look-up table, only valid if damage_lut_inapt = 0 */
 #endif /*RFC_AT_SUPPORT*/
 #endif /*RFC_DAMAGE_FAST*/
     double                              damage;                     /**< Cumulated damage */

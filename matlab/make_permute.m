@@ -1,4 +1,3 @@
-assert( ispc )
 addpath( '.' );
 
 clear all
@@ -9,13 +8,13 @@ loop = 1;
 mkdir( '../build' );
 cd( '..' );
 projdir = cd( 'build' );
-VS_Toolset = 'Visual Studio 14 2015 Win64';
-VS_CommonTools = '%VS140COMNTOOLS%VsDevCmd.bat';
 
-loop = uint32(0);
+if ispc
+  VS_Toolset = 'Visual Studio 14 2015 Win64';
+  VS_CommonTools = '%VS140COMNTOOLS%VsDevCmd.bat';
+end
 
-%for loop = 2^10-1:-1:0
-for loop = 364:-1:66
+for loop = 2^10-1:-1:0
   VALUE_TYPE              = bitconf( loop, 1, 'float', 'double' );
   RFC_USE_INTEGRAL_COUNTS = bitconf( loop, 2 );
   RFC_MINIMAL             = bitconf( loop, 3 );
@@ -34,25 +33,49 @@ for loop = 364:-1:66
   defs(3,:) = deal( {'='} );
   defs(4,:) = sprintfc( '%d', cellfun( @eval, defs(2,:) ) );
   defs(5,:) = deal( {' '} );
-  fid = fopen( '../build/generate.bat', 'wt' );
-  fprintf( fid, '%s\n', 'cd %~dp0' );
-  fprintf( fid, '@call "%s"\n', VS_CommonTools );
-  fprintf( fid, '%s\n', sprintf( '"%s\\cmake.exe" -DCMAKE_BUILD_TYPE=Debug -G"%s" %s %s %s" ', ...
-                                 getenv('cmake_root'), VS_Toolset, ...
-                                 ['-DRFC_VALUE_TYPE=',VALUE_TYPE], ...
-                                 [defs{:}], ...
-                                 projdir ) );
-  fprintf( fid, '%s\n', 'if %errorlevel% neq 0 exit /b %errorlevel%' );
-  fprintf( fid, '%s\n', 'devenv rainflow.sln /build Release' );
-  fprintf( fid, '%s\n', 'if %errorlevel% neq 0 exit /b %errorlevel%' );
-  fprintf( fid, '%s\n', '.\Release\rfc_test.exe || exit /b 1' );
-  fclose( fid );
-  i = 0;
-  status = 1;
-  while status ~= 0
-    status = system( '..\build\generate.bat', '-echo' );
-    i = i + 1;
-    if i > 10, break, end
+  
+  if ispc
+    fid = fopen( '../build/generate.bat', 'wt' );
+    fprintf( fid, '%s\n', 'cd %~dp0' );
+    fprintf( fid, '@call "%s"\n', VS_CommonTools );
+    fprintf( fid, '%s\n', sprintf( '"%s\\cmake.exe" -DCMAKE_BUILD_TYPE=Debug -G"%s" %s %s %s ', ...
+                                   getenv('cmake_root'), VS_Toolset, ...
+                                   ['-DRFC_VALUE_TYPE=',VALUE_TYPE], ...
+                                   [defs{:}], ...
+                                   projdir ) );
+    fprintf( fid, '%s\n', 'if %errorlevel% neq 0 exit /b %errorlevel%' );
+    fprintf( fid, '%s\n', 'devenv rainflow.sln /build Release' );
+    fprintf( fid, '%s\n', 'if %errorlevel% neq 0 exit /b %errorlevel%' );
+    fprintf( fid, '%s\n', '.\Release\rfc_test.exe || exit /b 1' );
+    fclose( fid );
+    i = 0;
+    status = 1;
+    while status ~= 0
+      status = system( '../build/generate.bat', '-echo' );
+      i = i + 1;
+      if i > 10, break, end
+    end
+    if status ~= 0, return, end
+  else
+    fid = fopen( '../build/generate.sh', 'wt' );
+    fprintf( fid, '%s\n', '#!/bin/bash' );
+    fprintf( fid, '%s\n', 'set -e' );
+    fprintf( fid, '%s\n', sprintf( 'cmake -DCMAKE_BUILD_TYPE=Debug -G"%s" %s %s %s ', ...
+                                   'Unix Makefiles', ...
+                                   ['-DRFC_VALUE_TYPE=',VALUE_TYPE], ...
+                                   [defs{:}], ...
+                                   projdir ) );
+    fprintf( fid, '%s\n', 'make' );
+    fprintf( fid, '%s\n', './rfc_test' );
+    fclose( fid );
+    system( 'chmod +x generate.sh' );
+    i = 0;
+    status = 1;
+    while status ~= 0
+      status = system( '../build/generate.sh', '-echo' );
+      i = i + 1;
+      if i > 10, break, end
+    end
+    if status ~= 0, return, end
   end
-  if status ~= 0, return, end
 end

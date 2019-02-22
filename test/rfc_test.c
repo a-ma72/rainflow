@@ -423,7 +423,7 @@ TEST RFC_tp_refeed_test( int ccnt )
     for( i = 0; i < data_len; )
     {
         size_t j;
-        size_t chunk_len = min( chunk_maxlen, data_len - i );
+        size_t chunk_len = ( chunk_maxlen < data_len - i ) ? chunk_maxlen : ( data_len - i );
 
         for( j = i; j < i + chunk_len; j++ )
         {
