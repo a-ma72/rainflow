@@ -2123,7 +2123,9 @@ bool RFC_rfm_refeed( void *ctx, rfc_value_t new_hysteresis, const rfc_class_para
         return false;
     }
 
-    if( new_class_param && !RFC_class_param_set( rfc_ctx, new_class_param ) )
+    if(  new_class_param && 
+        !RFC_class_param_set( rfc_ctx, new_class_param ) &&
+        !damage_lut_init( rfc_ctx ) )
     {
         return false;
     }
@@ -2957,6 +2959,8 @@ bool RFC_wl_calc_n( const void *ctx, double s0, double n0, double k, double sa, 
  * @param[in]  class_param  The new class parameter
  *
  * @return     true on success
+ * 
+ * @note       Changing class parameters invalidate look-up tables!
  */
 bool RFC_class_param_set( void *ctx, const rfc_class_param_s *class_param )
 {
@@ -2978,6 +2982,8 @@ bool RFC_class_param_set( void *ctx, const rfc_class_param_s *class_param )
     rfc_ctx->class_count  = class_param->count;
     rfc_ctx->class_width  = class_param->width;
     rfc_ctx->class_offset = class_param->offset;
+
+    rfc_ctx->damage_lut_inapt++;
 
     return true;
 }
@@ -5608,11 +5614,6 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
-    if( new_class_param && !new_class_param->count )
-    {
-        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-    }
-
     /* Handle interim turning point and margins */
     if( !feed_finalize( rfc_ctx ) )
     {
@@ -5640,74 +5641,11 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
         assert( new_hysteresis >= rfc_ctx->hysteresis );
         rfc_ctx->hysteresis     = new_hysteresis;
 
-        if( rfc_ctx->class_count != new_class_param->count )
-        {
-            rfc_value_tuple_s *new_residue;
-            size_t             new_resiude_cap = new_class_param->count * 2;
-
-            new_residue = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( NULL, new_resiude_cap, sizeof(rfc_value_tuple_s), RFC_MEM_AIM_RESIDUE );
-
-            if( !new_residue )
-            {
-                return error_raise( rfc_ctx, RFC_ERROR_MEMORY );
-            }
-
-            if( rfc_ctx->residue && !rfc_ctx->internal.res_static )
-            {
-                rfc_ctx->mem_alloc( rfc_ctx->residue, 0, 0, RFC_MEM_AIM_RESIDUE );
-            }
-
-            rfc_ctx->residue     = new_residue;
-            rfc_ctx->residue_cap = new_resiude_cap;
-            rfc_ctx->residue_cnt = 0;
-        }
-
-#if RFC_DAMAGE_FAST
-        if( rfc_ctx->class_count != new_class_param->count )
-        {
-            double *new_damage_lut;
-            size_t  num = new_class_param->count * new_class_param->count;
-
-            new_damage_lut = (double*)rfc_ctx->mem_alloc( rfc_ctx->damage_lut, num, sizeof(double), RFC_MEM_AIM_DLUT );
-
-            if( !new_damage_lut )
-            {
-                return error_raise( rfc_ctx, RFC_ERROR_MEMORY );
-            }
-            else
-            {
-                rfc_ctx->damage_lut = new_damage_lut;
-            }
-#if RFC_AT_SUPPORT
-            if( rfc_ctx->amplitude_lut )
-            {
-                double *new_amplitude_lut;
-
-                new_amplitude_lut = (double*)rfc_ctx->mem_alloc( rfc_ctx->amplitude_lut, num, sizeof(double), RFC_MEM_AIM_ALUT );
-
-                if( !new_amplitude_lut )
-                {
-                    return error_raise( rfc_ctx, RFC_ERROR_MEMORY );
-                }
-                else
-                {
-                    rfc_ctx->amplitude_lut = new_amplitude_lut;
-                }
-            }
-#endif /*RFC_AT_SUPPORT*/
-        }
-
         if( !RFC_class_param_set( rfc_ctx, new_class_param ) ||
             !damage_lut_init( rfc_ctx ) )
         {
             return false;
         }
-#else /*!RFC_DAMAGE_FAST*/
-        if( !RFC_class_param_set( rfc_ctx, new_class_param ) )
-        {
-            return false;
-        }
-#endif /*RFC_DAMAGE_FAST*/
     }
 
 #if RFC_USE_DELEGATES
