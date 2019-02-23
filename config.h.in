@@ -1,0 +1,8 @@
+#define ON  1
+#define OFF 0
+
+#ifndef RFC_VERSION_MAJOR
+  #define RFC_VERSION_MAJOR       "${RFC_VERSION_MAJOR}"
+  #define RFC_VERSION_MINOR       "${RFC_VERSION_MINOR}"
+  #define RFC_USE_INTEGRAL_COUNTS  ${RFC_USE_INTEGRAL_COUNTS}
+#endif /*RFC_VERSION_MAJOR*/
