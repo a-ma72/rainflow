@@ -109,36 +109,36 @@ TEST wrapper_test_advanced( void )
     rf.finalize( Rainflow::RFC_RES_REPEATED );
     ASSERT( rf.tp_storage().size() == 8 );
 
-    ASSERT( rf.tp_storage()[0].tp_pos == 0 );
-    ASSERT( rf.tp_storage()[1].tp_pos == 0 );
-    ASSERT( rf.tp_storage()[2].tp_pos == 0 );
-    ASSERT( rf.tp_storage()[3].tp_pos == 0 );
-    ASSERT( rf.tp_storage()[4].tp_pos == 0 );
-    ASSERT( rf.tp_storage()[5].tp_pos == 0 );
-    ASSERT( rf.tp_storage()[6].tp_pos == 0 );
-    ASSERT( rf.tp_storage()[7].tp_pos == 0 );
+    ASSERT_EQ( rf.tp_storage()[0].tp_pos, 0 );
+    ASSERT_EQ( rf.tp_storage()[1].tp_pos, 0 );
+    ASSERT_EQ( rf.tp_storage()[2].tp_pos, 0 );
+    ASSERT_EQ( rf.tp_storage()[3].tp_pos, 0 );
+    ASSERT_EQ( rf.tp_storage()[4].tp_pos, 0 );
+    ASSERT_EQ( rf.tp_storage()[5].tp_pos, 0 );
+    ASSERT_EQ( rf.tp_storage()[6].tp_pos, 0 );
+    ASSERT_EQ( rf.tp_storage()[7].tp_pos, 0 );
 
-    ASSERT( rf.tp_storage()[0].value == 1 );
-    ASSERT( rf.tp_storage()[1].value == 6 );
-    ASSERT( rf.tp_storage()[2].value == 2 );
-    ASSERT( rf.tp_storage()[3].value == 8 );
-    ASSERT( rf.tp_storage()[4].value == 1 );
-    ASSERT( rf.tp_storage()[5].value == 6 );
-    ASSERT( rf.tp_storage()[6].value == 2 );
-    ASSERT( rf.tp_storage()[7].value == 8 );
+    ASSERT_EQ( rf.tp_storage()[0].value, 1 );
+    ASSERT_EQ( rf.tp_storage()[1].value, 6 );
+    ASSERT_EQ( rf.tp_storage()[2].value, 2 );
+    ASSERT_EQ( rf.tp_storage()[3].value, 8 );
+    ASSERT_EQ( rf.tp_storage()[4].value, 1 );
+    ASSERT_EQ( rf.tp_storage()[5].value, 6 );
+    ASSERT_EQ( rf.tp_storage()[6].value, 2 );
+    ASSERT_EQ( rf.tp_storage()[7].value, 8 );
 
     rf.wl_param_get( wl_param );
     double damage_6_2 = pow( ( (6.0-2.0)/2 / wl_param.sx ), fabs(wl_param.k) ) / wl_param.nx;
     double damage_8_1 = pow( ( (8.0-1.0)/2 / wl_param.sx ), fabs(wl_param.k) ) / wl_param.nx;
 
-    ASSERT( fabs( rf.tp_storage()[0].damage / ( damage_8_1*1/2 ) - 1 )   < 1e-10 );
-    ASSERT( fabs( rf.tp_storage()[1].damage / ( damage_6_2*1/2 ) - 1 )   < 1e-10 );
-    ASSERT( fabs( rf.tp_storage()[2].damage / ( damage_6_2*1/2 ) - 1 )   < 1e-10 );
-    ASSERT( fabs( rf.tp_storage()[3].damage / ( damage_8_1*1/1 ) - 1 )   < 1e-10 );
-    ASSERT( fabs( rf.tp_storage()[4].damage / ( damage_8_1*1/1 ) - 1 )   < 1e-10 );
-    ASSERT( fabs( rf.tp_storage()[5].damage / ( damage_6_2*1/1 ) - 1 )   < 1e-10 );
-    ASSERT( fabs( rf.tp_storage()[6].damage / ( damage_6_2*1/1 ) - 1 )   < 1e-10 );
-    ASSERT( fabs( rf.tp_storage()[7].damage / ( damage_8_1*1/2 ) - 1 )   < 1e-10 );
+    ASSERT_IN_RANGE( rf.tp_storage()[0].damage / ( damage_8_1*1/2 ), 1.0, 1e-10 );
+    ASSERT_IN_RANGE( rf.tp_storage()[1].damage / ( damage_6_2*1/2 ), 1.0, 1e-10 );
+    ASSERT_IN_RANGE( rf.tp_storage()[2].damage / ( damage_6_2*1/2 ), 1.0, 1e-10 );
+    ASSERT_IN_RANGE( rf.tp_storage()[3].damage / ( damage_8_1*1/1 ), 1.0, 1e-10 );
+    ASSERT_IN_RANGE( rf.tp_storage()[4].damage / ( damage_8_1*1/1 ), 1.0, 1e-10 );
+    ASSERT_IN_RANGE( rf.tp_storage()[5].damage / ( damage_6_2*1/1 ), 1.0, 1e-10 );
+    ASSERT_IN_RANGE( rf.tp_storage()[6].damage / ( damage_6_2*1/1 ), 1.0, 1e-10 );
+    ASSERT_IN_RANGE( rf.tp_storage()[7].damage / ( damage_8_1*1/2 ), 1.0, 1e-10 );
 
     rf.deinit();
 
