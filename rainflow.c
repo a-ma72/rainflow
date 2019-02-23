@@ -68,7 +68,7 @@
  * []  "Zaelverfahren und Lastannahme in der Betriebsfestigkeit";
  *     Michael Koehler, Sven Jenne / Kurt Poetter, Harald Zenner; Springer-Verlag Berlin Heidelberg 2012
  *
- *                                                                                                                                                          *
+ *
  *================================================================================
  * BSD 2-Clause License
  * 
@@ -155,8 +155,6 @@ static rfc_value_t          value_delta                     (       rfc_value_t 
     {                                                                               \
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );                            \
     }                                                                               \
-
-
 
 /**
  * @brief      Initialization (rainflow context).
@@ -435,15 +433,6 @@ bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
 
 
 
-
-
-
-
-
-
-
-
-
 /*** Implementation static functions ***/
 
 
@@ -479,7 +468,6 @@ bool feed_once( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt, rfc_flags_e fla
     {
         if( rfc_ctx->class_count )
         {
-
             /* Check for closed cycles and count. Modifies residue! */
             cycle_find( rfc_ctx, flags );
         }

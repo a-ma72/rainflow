@@ -68,7 +68,7 @@
  * []  "Zaelverfahren und Lastannahme in der Betriebsfestigkeit";
  *     Michael Koehler, Sven Jenne / Kurt Poetter, Harald Zenner; Springer-Verlag Berlin Heidelberg 2012
  *
- *                                                                                                                                                          *
+ *
  *================================================================================
  * BSD 2-Clause License
  * 
@@ -171,8 +171,6 @@ enum rfc_debug_flags
 };
 
 
-
-
 enum rfc_state
 {
     RFC_STATE_INIT0,                                                /**< Initialized with zeros */
@@ -232,11 +230,9 @@ bool    RFC_feed                    (       void *ctx, const rfc_value_t* data, 
 bool    RFC_finalize                (       void *ctx, rfc_res_method_e residual_method );
 
 
-
 #ifdef __cplusplus
 }  // extern "C"
 #endif /*__cplusplus*/
-
 
 
 /* Value info struct */
@@ -246,7 +242,6 @@ struct rfc_value_tuple
     unsigned                            cls;                        /**< Class number, base 0 */
     size_t                              pos;                        /**< Absolute position in input data stream, base 1 */
 };
-
 
 
 /**
@@ -282,7 +277,6 @@ struct rfc_ctx
     double                              wl_nx;                      /**< Cycles for Sa on the Woehler curve */
     double                              wl_k;                       /**< Woehler slope, always negative */
 
-    
     /* Residue */
     rfc_value_tuple_s                  *residue;                    /**< Buffer for residue */
     size_t                              residue_cap;                /**< Buffer capacity in number of elements (max. 2*class_count) */
@@ -294,7 +288,6 @@ struct rfc_ctx
     /* Damage */
     double                              damage;                     /**< Cumulated damage */
     double                              damage_residue;             /**< Partial damage in .damage influenced by taking residue into account (after finalizing) */
-
 
     /* Internal usage */
     struct internal

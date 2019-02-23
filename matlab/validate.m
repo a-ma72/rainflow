@@ -117,7 +117,7 @@ function validate
   assert( strcmp( sprintf( '%.4e', pd ), '4.8703e-16' ) )
   assert( sum( sum(rm) ) == 601 );
   assert( length(re) == 10 );
-  test = re ./ [0.538;2.372;-0.448;17.0373;-50.901;114.136;-24.851;31.002;-0.646;16.594];
+  test = re ./ [0.538;2.372;-0.448;17.445;-50.901;114.136;-24.851;31.002;-0.646;16.594];
   test = abs( test - 1 );
   assert( all( test < 1e-3 ))
 

@@ -435,7 +435,7 @@ TEST RFC_long_series( int ccnt )
         GREATEST_FPRINTF( GREATEST_STDOUT, "\n" );
 
         class_count = 100;
-        printf( "Class count (%d): ", class_count );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "Class count (%d): ", class_count );
         if( fgets( buf, sizeof(buf), stdin ) != NULL )
         {
             if( ( 1 == sscanf( buf, "%lf %n", &value, &len ) ) && ( strlen(buf) == len ) && ( value > 0.0 ) )
@@ -445,7 +445,7 @@ TEST RFC_long_series( int ccnt )
         }
 
         hysteresis = class_width = (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
-        printf( "Class width (%g): ", class_width );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "Class width (%g): ", class_width );
         if( fgets( buf, sizeof(buf), stdin ) != NULL )
         {
             if( ( 1 == sscanf( buf, "%lf %n", &value, &len ) ) && ( strlen(buf) == len ) && ( value > 0.0 ) )
@@ -455,7 +455,7 @@ TEST RFC_long_series( int ccnt )
         }
 
         class_offset  =  x_min - class_width / 2;
-        printf( "Class offset (%g): ", class_offset );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "Class offset (%g): ", class_offset );
         if( fgets( buf, sizeof(buf), stdin ) != NULL )
         {
             if( ( 1 == sscanf( buf, "%lf %n", &value, &len ) ) && ( strlen(buf) == len ) )
@@ -463,7 +463,7 @@ TEST RFC_long_series( int ccnt )
                 class_offset = value;
             }
         }
-        printf( "\n" );
+        GREATEST_FPRINTF( GREATEST_STDOUT, "\n" );
     }
 
     GREATEST_FPRINTF( GREATEST_STDOUT, "\nTest long series:" );
