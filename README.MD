@@ -35,7 +35,7 @@ predefined functions.
     Using _COAN_ [[http://coan2.sourceforge.net/]] for example, you can tidy up the code from unwanted features. (The minimal version of this package is created using _COAN_ with option `RFC_MINMAL`set.)  
     b) C++ wrapper _rainflow.hpp_ encapsulates functions from rainflow.h in a namespace and offers a template class _Rainflow_ for object oriented access and inheritance.
     This class also offers container class based turning point storage.  
- 2. Streamable: You may count you data at once, as data packages or sample-wise.  
+ 2. Streamable: You're able to count your data at once, as data packages or sample-wise.  
  3. Class width fit to your needs. Dynamically increase class width, when needed. (Needs turning point storage.)  
  4. Optional HCM counting method (Clormann/Seeger).
  5. Woehler curve with up to two slopes, fatigue limit and omission.  
@@ -51,6 +51,8 @@ predefined functions.
      - ASTM method (halfcycle, fullcycle)  
      - Second run  
      - HCM  
+ 14. Delegates.  
+
 
 ---
 ### References:

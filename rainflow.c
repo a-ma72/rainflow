@@ -1363,6 +1363,7 @@ bool RFC_feed( void *ctx, const rfc_value_t * data, size_t data_count )
 }
 
 
+#if !RFC_MINIMAL
 /**
  * @brief      Do countings for a given cycle
  *
@@ -1373,7 +1374,6 @@ bool RFC_feed( void *ctx, const rfc_value_t * data, size_t data_count )
  *
  * @return     true on success
  */
-#if !RFC_MINIMAL
 bool RFC_cycle_process_counts( void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_flags_e flags )
 {
     rfc_value_tuple_s from = {from_val}, to = {to_val};

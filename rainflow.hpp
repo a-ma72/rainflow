@@ -15,7 +15,7 @@
  *       / _, _/ ___ |_/ // /|  / __/ / /___/ /_/ /| |/ |/ /
  *      /_/ |_/_/  |_/___/_/ |_/_/   /_____/\____/ |__/|__/
  *
- *    RainflowT Counting Algorithm (4-point-method), C99 compliant
+ *    Rainflow Counting Algorithm (4-point-method), C99 compliant
 
 
 

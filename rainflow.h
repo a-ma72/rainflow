@@ -68,7 +68,7 @@
  * []  "Zaelverfahren und Lastannahme in der Betriebsfestigkeit";
  *     Michael Koehler, Sven Jenne / Kurt Poetter, Harald Zenner; Springer-Verlag Berlin Heidelberg 2012
  *
- *                                                                                                                                                          *
+ *
  *================================================================================
  * BSD 2-Clause License
  * 
