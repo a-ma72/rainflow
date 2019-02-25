@@ -1330,7 +1330,7 @@ TEST RFC_res_repeated( void )
         ASSERT( RFC_tp_init( &ctx, tp, NUMEL(tp), /*is_static*/ true ) );
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT
-        ASSERT( RFC_dh_init( &ctx, RFC_SD_FULL_P2, /*dh*/ NULL, /*dh_cap*/ 0, /*is_static*/ true ) );
+        ASSERT( RFC_dh_init( &ctx, RFC_SD_FULL_P2, /*stream*/ NULL, /*dh*/ NULL, /*dh_cap*/ 0, /*is_static*/ true ) );
 #endif /*RFC_DH_SUPPORT*/        
         ASSERT( RFC_feed( &ctx, data, NUMEL(data) ) );
     }
@@ -1421,7 +1421,7 @@ TEST RFC_res_fullcycles( void )
         ASSERT( RFC_tp_init( &ctx, tp, NUMEL(tp), /*is_static*/ true ) );
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT
-        ASSERT( RFC_dh_init( &ctx, RFC_SD_HALF_23, /*dh*/ NULL, /*dh_cap*/ 0, /*is_static*/ true ) );
+        ASSERT( RFC_dh_init( &ctx, RFC_SD_HALF_23, /*stream*/ NULL, /*dh*/ NULL, /*dh_cap*/ 0, /*is_static*/ true ) );
 #endif /*RFC_DH_SUPPORT*/        
         ASSERT( RFC_feed( &ctx, data, NUMEL(data) ) );
     }
@@ -1509,7 +1509,7 @@ TEST RFC_res_halfcycles( void )
         ASSERT( RFC_tp_init( &ctx, tp, NUMEL(tp), /*is_static*/ true ) );
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT
-        ASSERT( RFC_dh_init( &ctx, RFC_SD_HALF_23, /*dh*/ NULL, /*dh_cap*/ 0, /*is_static*/ true ) );
+        ASSERT( RFC_dh_init( &ctx, RFC_SD_HALF_23, /*stream*/ NULL, /*dh*/ NULL, /*dh_cap*/ 0, /*is_static*/ true ) );
 #endif /*RFC_DH_SUPPORT*/        
         ASSERT( RFC_feed( &ctx, data, NUMEL(data) ) );
     }

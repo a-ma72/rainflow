@@ -937,13 +937,14 @@ bool RFC_tp_clear( void *ctx )
  *
  * @param      ctx        The rainflow context
  * @param[in]  method     The mode, how to spread (RFC_SD_...)
+ * @param[in]  stream     The input stream (only for transient calculation, otherwise NULL)
  * @param      dh         The storage buffer
  * @param      dh_cap     The capacity of dh
  * @param      is_static  true, if dh is static and should not be freed
  *
  * @return     true on success
  */
-bool RFC_dh_init( void *ctx, rfc_sd_method_e method, double *dh, size_t dh_cap, bool is_static )
+bool RFC_dh_init( void *ctx, rfc_sd_method_e method, const rfc_value_t *stream, double *dh, size_t dh_cap, bool is_static )
 {
     RFC_CTX_CHECK_AND_ASSIGN
 
@@ -969,7 +970,16 @@ bool RFC_dh_init( void *ctx, rfc_sd_method_e method, double *dh, size_t dh_cap, 
         }
     }
 
+    if( method == RFC_SD_TRANSIENT_23 || method == RFC_SD_TRANSIENT_23c )
+    {
+        if( !stream )
+        {
+            return error_raise( rfc_ctx, RFC_ERROR_INVARG );
+        }
+    }
+
     rfc_ctx->spread_damage_method = method;
+    rfc_ctx->stream               = (const rfc_value_t*)stream;
     rfc_ctx->dh                   = dh;
     rfc_ctx->dh_cap               = dh_cap;
     rfc_ctx->dh_cnt               = 0;
@@ -5947,13 +5957,63 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
                 }
             }
 #endif /*RFC_TP_SUPPORT*/
+            break;
         }
-        break;
 
         case RFC_SD_TRANSIENT_23:
-            /* \todo */
-            return error_raise( rfc_ctx, RFC_ERROR_UNSUPPORTED );
+        {
+            size_t          pos = from->pos;
+            unsigned        class = from->cls, 
+                            class_new;
+            double          damage = 0.0,
+                            damage_new = 0.0;
+            const
+            rfc_value_t    *stream = rfc_ctx->stream;
+            double         *dh = rfc_ctx->dh;
+
+            if( !stream || !dh || !pos )
+            {
+                return error_raise( rfc_ctx, RFC_ERROR_INVARG );
+            }
+
+            stream += from->pos - 1;
+            dh     += from->pos - 1;
+
+            do
+            {
+                if( pos > rfc_ctx->internal.pos )
+                {
+                    pos -= rfc_ctx->internal.pos;
+                    dh  -= rfc_ctx->internal.pos;
+                }
+
+                if( pos > rfc_ctx->dh_cap )
+                {
+                    return error_raise( rfc_ctx, RFC_ERROR_DH );
+                }
+
+                class_new = QUANTIZE( rfc_ctx, *stream++ );
+
+                if( ( class_new > class ^ to->cls > from->cls ) == 0 )
+                {
+                    if( !damage_calc( rfc_ctx, from->cls, class_new, &damage_new, /*Sa*/ NULL ) )
+                    {
+                        return error_raise( rfc_ctx, RFC_ERROR_DH );
+                    }
+
+                    *dh   += damage_new - damage;
+                    damage = damage_new;
+                    class  = class_new;
+                }
+
+                if( pos++ == to->pos ) break;
+
+                dh++;
+            } while( 1 );
+
             break;
+        }
+
         case RFC_SD_TRANSIENT_23c:
             /* \todo */
             return error_raise( rfc_ctx, RFC_ERROR_UNSUPPORTED );
@@ -6188,12 +6248,9 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 
         if( !ok )
         {
-            mexErrMsgTxt( "Error during initialization!" );
+            RFC_deinit( &rfc_ctx );
+            mexErrMsgTxt( "Error during initialization (tp)!" );
         }
-
-#if RFC_DH_SUPPORT
-        rfc_ctx.spread_damage_method = spread_damage;
-#endif /*RFC_DH_SUPPORT*/
 
         /* Cast values from double type to rfc_value_t */ 
         if( sizeof( rfc_value_t ) != sizeof(double) && data_len )  /* maybe unsafe! */
@@ -6204,7 +6261,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
             if( !buffer )
             {
                 RFC_deinit( &rfc_ctx );
-                mexErrMsgTxt( "Error during initialization!" );
+                mexErrMsgTxt( "Error during initialization (memory)!" );
             }
 
             for( i = 0; i < data_len; i++ )
@@ -6213,6 +6270,19 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
             }
         }
         else buffer = (rfc_value_t*)data;
+
+#if RFC_DH_SUPPORT
+        if( spread_damage >= RFC_SD_TRANSIENT_23 )
+        {
+            rfc_ctx.dh_cap = 1;
+            rfc_ctx.dh = (double*)rfc_ctx.mem_alloc( NULL, 1, sizeof( double ), RFC_MEM_AIM_DH );
+        }
+        
+        if( !RFC_dh_init( &rfc_ctx, spread_damage, /*stream*/ buffer, rfc_ctx.dh, rfc_ctx.dh_cap, /*is_static*/ false ) )
+        {
+            ok = false;
+        }
+#endif /*RFC_DH_SUPPORT*/
 
         /* Rainflow counting */
 
@@ -6233,8 +6303,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         /* Free temporary buffer (cast) */
         if( (void*)buffer != (void*)data )
         {
-            mem_alloc( buffer, 0, 0, RFC_MEM_AIM_TEMP );
-            buffer = NULL;
+            buffer = mem_alloc( buffer, 0, 0, RFC_MEM_AIM_TEMP );
         }
 
         if( !ok )
@@ -6395,6 +6464,26 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                 }
             }
 #endif /*RFC_TP_SUPPORT*/
+#if RFC_DH_SUPPORT
+            /* Turning points */
+            if( nlhs > 6 && rfc_ctx.dh )
+            {
+                mxArray *dh  = mxCreateDoubleMatrix( rfc_ctx.internal.pos, 1, mxREAL );
+                double  *dh_ptr = dh ? mxGetPr(dh) : NULL;
+
+                if( dh_ptr )
+                {
+                    size_t i;
+
+                    for( i = 0; i < rfc_ctx.internal.pos; i++ )
+                    {
+                        *dh_ptr++ = rfc_ctx.dh[i];
+                    }
+                }
+
+                plhs[6] = dh;
+            }
+#endif /*RFC_DH_SUPPORT*/
 #endif /*!RFC_MINIMAL*/
         }
 
