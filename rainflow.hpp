@@ -274,6 +274,7 @@ public:
     /* Turning points */
     bool            tp_init_autoprune       ( bool autoprune, size_t size, size_t threshold );
     bool            tp_prune                ( size_t count, rfc_flags_e flags );
+    bool            tp_refeed               ( rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param );
     /* Damage history */
     bool            dh_init                 ( rfc_sd_method_e method, double *dh, size_t dh_cap, bool is_static );
     /* Amplitude transformation*/
@@ -659,7 +660,7 @@ bool RainflowT<T>::tp_prune( size_t count, rfc_flags_e flags )
 
 
 template< class T >
-bool Rainflow<T>::tp_refeed( rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param )
+bool RainflowT<T>::tp_refeed( rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param )
 {
     return RF::RFC_tp_refeed( &m_ctx, new_hysteresis, new_class_param );
 }
@@ -826,7 +827,7 @@ bool RainflowT<T>::damage_from_rp( const rfc_counts_v &counts, const rfc_value_v
 
 template< class T >
 bool RainflowT<T>::at_init( const rfc_double_v &Sa, const rfc_double_v &Sm, 
-                                         double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric )
+                            double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric )
 {
     if( Sa.size() != Sm.size() )
     {
