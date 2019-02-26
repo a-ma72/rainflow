@@ -8,9 +8,20 @@
 # cmake -G "Visual Studio 14 2015 Win64" ..
 
 
-cmake_minimum_required( VERSION 3.6 )
-project( Rainflow )
-set( CMAKE_CONFIGURATION_TYPES Release Debug )
+cmake_minimum_required( VERSION 3.12 )
+set( CMAKE_VERBOSE_MAKEFILE OFF )
+set( CMAKE_BUILD_PARALLEL_LEVEL 12 )
+
+# Build type and compiler selection
+if( NOT CMAKE_CONFIGURATION_TYPES )
+    get_property( HAVE_MULTI_CONFIG_GENERATOR GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG )
+    # Set default configuration types for multi-config generators
+    if( HAVE_MULTI_CONFIG_GENERATOR )
+        set( CMAKE_CONFIGURATION_TYPES "Release;Debug" )
+    endif()
+endif()
+
+project( rainflow )
 set( RFC_VERSION_MAJOR "0" )
 set( RFC_VERSION_MINOR "1" )
 

@@ -116,10 +116,10 @@ function validate
   hysteresis        = class_width;
   enforce_margin    = 0;
   use_hcm           = 0;
-  residual_method   = 0;  % 0=RFC_RES_NONE
-  spread_damage     = 0;  % 0=RFC_SD_HALF_23
+  residual_method   = 0;  % 0=RFC_RES_NONE, 6=RFC_RES_REPEATED
+  spread_damage     = 1;  % 0=RFC_SD_HALF_23, 1=RFC_SD_RAMP_AMPLITUDE_23
   
-  [pd,re,rm,rp,lc,tp] = ...
+  [pd,re,rm,rp,lc,tp,dh] = ...
     rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
                 residual_method, enforce_margin, use_hcm, spread_damage );
               
@@ -129,9 +129,23 @@ function validate
 
   close all
   figure
-  plotyy( tp(:,1), tp(:,2), tp(:,1), cumsum( tp(:,3) ) );
+  [ax, h1, h2] = plotyy( tp(:,1), tp(:,2), tp(:,1), cumsum( tp(:,3) ) );
+  set( h1, 'DisplayName', 'time series' );
+  set( h2, 'DisplayName', 'cumulative damage (based on TP)' );
+  
   grid
   
+  spread_damage = 7;  % 7=RFC_SD_TRANSIENT_23
+  
+  [pd,re,rm,rp,lc,tp,dh] = ...
+    rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
+                residual_method, enforce_margin, use_hcm, spread_damage );
+              
+  assert( abs( sum( dh ) / pd - 1 ) < 1e-10 );
+  hold( ax(2), 'all' );
+  plot( ax(2), 1:length(dh), cumsum(dh), 'k-.', 'DisplayName', 'cumulative damage (based on time series)' )
+  legend( 'show' )
+
   figure
   plot( re );
   title( 'Residuum' );
@@ -150,7 +164,7 @@ function validate
   assert( strcmp( sprintf( '%.4e', pd ), '4.8703e-16' ) )
   assert( sum( sum(rm) ) == 601 );
   assert( length(re) == 10 );
-  test = re ./ [0.538;2.372;-0.448;17.445;-50.901;114.136;-24.851;31.002;-0.646;16.594];
+  test = re ./ [0.538;2.372;-0.448;17.0373;-50.901;114.136;-24.851;31.002;-0.646;16.594];
   test = abs( test - 1 );
   assert( all( test < 1e-3 ))
 
@@ -166,9 +180,10 @@ function validate
   %% Long series, turning points only
   y = rfc( 'turningpoints', x, class_width, enforce_margin );
   figure
-  plot( x, 'k-' );
+  plot( x, 'k-', 'DisplayName', 'time series' );
   hold all
-  plot( y(2,:), y(1,:), 'r--' );
+  plot( y(2,:), y(1,:), 'r--', 'DisplayName', 'turning points' );
+  legend( 'show' );
 end
 
 function rounded_data = export_series( filename, data, class_count )

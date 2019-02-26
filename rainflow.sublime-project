@@ -1,0 +1,39 @@
+{
+	"folders":
+	[
+		{
+			"path": "."
+		}
+	],
+	"settings":
+	{
+		"cmake":
+		{
+			"build_folder": "${project_path}/build",
+			"command_line_overrides":
+			{
+				"CMAKE_BUILD_TYPE": "Release"
+			},
+			"filter_targets":
+			[
+				"clean",
+				"rainflow",
+				"rfc_test"
+			],
+			"windows":
+			{
+				"configurations":
+				[
+					"Debug",
+					"Release"
+				],
+				"generator": "Visual Studio",
+				"target_architecture": "amd64",
+				"visual_studio_versions":
+				[
+					14
+				]
+			}
+		}
+	}
+}

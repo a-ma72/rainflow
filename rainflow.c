@@ -116,13 +116,14 @@
 #if !RFC_MINIMAL
 #define RFC_MEX_USAGE \
 "\nUsage:\n"\
-"[pd,re,rm,rp,lc,tp] = rfc( 'rfc', data, class_count, class_width, class_offset, hysteresis, residual_method, enfore_margin, use_hcm )\n"\
+"[pd,re,rm,rp,lc,tp,dh] = rfc( 'rfc', data, class_count, class_width, class_offset, hysteresis, residual_method, enfore_margin, use_hcm )\n"\
 "    pd = Pseudo damage\n"\
 "    re = Residue\n"\
 "    rm = Rainflow matrix (from/to)\n"\
 "    rp = Range pair counts\n"\
 "    lc = Level crossings\n"\
 "    tp = Turning points\n"\
+"    dh = Damage history\n"\
 "\n"\
 "[Sa] = rfc( 'amptransform', Sa, Sm, M, target, R_pinned )\n"\
 "             Sa = Amplitude\n"\
@@ -744,6 +745,11 @@ bool RFC_tp_prune( void *ctx, size_t limit, rfc_flags_e flags )
 {
     RFC_CTX_CHECK_AND_ASSIGN
 
+    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
+    {
+        return false;
+    }
+
     if( rfc_ctx->tp_cnt > limit )
     {
         rfc_value_tuple_s   *src_beg_it,    /* Source (begin) (tp) */
@@ -891,7 +897,7 @@ bool RFC_tp_refeed( void *ctx, rfc_value_t new_hysteresis, const rfc_class_param
 {
     RFC_CTX_CHECK_AND_ASSIGN
 
-    if( rfc_ctx->state < RFC_STATE_INIT )
+    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state >= RFC_STATE_FINISHED )
     {
         return false;
     }
@@ -953,7 +959,7 @@ bool RFC_dh_init( void *ctx, rfc_sd_method_e method, const rfc_value_t *stream, 
         return false;
     }
 
-    if( !dh && !is_static )
+    if( !dh && dh_cap && !is_static )
     {
         dh = (double*)rfc_ctx->mem_alloc( NULL, dh_cap, sizeof(double), RFC_MEM_AIM_DH );
 
@@ -962,17 +968,15 @@ bool RFC_dh_init( void *ctx, rfc_sd_method_e method, const rfc_value_t *stream, 
             return error_raise( rfc_ctx, RFC_ERROR_MEMORY );
         }
     }
-    else
+
+    if( rfc_ctx->dh && dh )
     {
-        if( rfc_ctx->dh )
-        {
-            return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-        }
+        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
 
     if( method == RFC_SD_TRANSIENT_23 || method == RFC_SD_TRANSIENT_23c )
     {
-        if( !stream )
+        if( dh && !stream )
         {
             return error_raise( rfc_ctx, RFC_ERROR_INVARG );
         }
@@ -5902,7 +5906,7 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
                 size_t             tp_pos_0,        /* Turning point position, base 0 */
                                    pos_0;           /* Input stream position, base 0 */
                 double             weight;
-                double             D, D_new;
+                double             D_new;
 
                 tp_pos_0 = i % rfc_ctx->tp_cnt;
 
@@ -5912,32 +5916,34 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
                 }
 
                 pos_0    = tp->pos - 1;
-                pos_0   += ( start >= pos_0 ) ? rfc_ctx->internal.pos : 0;
+                pos_0   += ( i >= rfc_ctx->tp_cnt ) ? rfc_ctx->internal.pos : 0;
                 weight   = (double)( pos_0 - start ) / width;
+
+                assert( weight <= 1.0 );
 
                 switch( rfc_ctx->spread_damage_method )
                 {
                     case RFC_SD_RAMP_AMPLITUDE_23:
                     case RFC_SD_RAMP_AMPLITUDE_24:
-                        if( !damage_calc( rfc_ctx, from_cls, to_cls, &D, NULL /*Sa_ret*/ ) )
+                        if( !damage_calc( rfc_ctx, from_cls, to_cls, &D_new, NULL /*Sa_ret*/ ) )
                         {
                             return false;
                         }
                         /* Current cycle weight */
-                        D *= (double)rfc_ctx->curr_inc / rfc_ctx->full_inc;
+                        D_new *= (double)rfc_ctx->curr_inc / rfc_ctx->full_inc;
                         /* Di = 1/( ND*(Sa/SD*weight)^k ) = 1/( ND*(Sa/SD)^k ) * 1/weight^k */
-                        D_new = D * pow( weight, -fabs(rfc_ctx->wl_k) );
+                        D_new = weight > 0.0 ? ( D_new * pow( weight, fabs(rfc_ctx->wl_k) ) ) : 0.0;
                         break;
                     case RFC_SD_RAMP_DAMAGE_23:
                     case RFC_SD_RAMP_DAMAGE_24:
-                        if( !damage_calc( rfc_ctx, from_cls, to_cls, &D, NULL /*Sa_ret*/ ) )
+                        if( !damage_calc( rfc_ctx, from_cls, to_cls, &D_new, NULL /*Sa_ret*/ ) )
                         {
                             return false;
                         }
                         /* Current cycle weight */
-                        D *= (double)rfc_ctx->curr_inc / rfc_ctx->full_inc;
+                        D_new *= (double)rfc_ctx->curr_inc / rfc_ctx->full_inc;
                         /* Di = 1/( ND*(Sa/SD)^k ) * weight */
-                        D_new = D * weight;
+                        D_new = D_new * weight;
                         break;
                 }
 
@@ -5994,16 +6000,17 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
 
                 class_new = QUANTIZE( rfc_ctx, *stream++ );
 
-                if( ( class_new > class ^ to->cls > from->cls ) == 0 )
+                if( ( (class_new > class) ^ (to->cls > from->cls) ) == 0 )
                 {
                     if( !damage_calc( rfc_ctx, from->cls, class_new, &damage_new, /*Sa*/ NULL ) )
                     {
                         return error_raise( rfc_ctx, RFC_ERROR_DH );
                     }
 
-                    *dh   += damage_new - damage;
-                    damage = damage_new;
-                    class  = class_new;
+                    damage_new *= (double)rfc_ctx->curr_inc / rfc_ctx->full_inc;
+                    *dh        += damage_new - damage;
+                    damage      = damage_new;
+                    class       = class_new;
                 }
 
                 if( pos++ == to->pos ) break;
@@ -6238,11 +6245,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 #if RFC_TP_SUPPORT
         if( ok )
         {
-            rfc_ctx.tp_cap = 128;
-            rfc_ctx.tp     = (rfc_value_tuple_s*)mem_alloc( NULL, rfc_ctx.tp_cap, 
-                                                            sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TP );
-
-            ok = RFC_tp_init( &rfc_ctx, rfc_ctx.tp, rfc_ctx.tp_cap, /* is_static */ true );
+            ok = RFC_tp_init( &rfc_ctx, /*tp*/ NULL, /*tp_cap*/ 128, /* is_static */ false );
         }
 #endif /*RFC_TP_SUPPORT*/
 
@@ -6274,14 +6277,19 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 #if RFC_DH_SUPPORT
         if( spread_damage >= RFC_SD_TRANSIENT_23 )
         {
-            rfc_ctx.dh_cap = 1;
-            rfc_ctx.dh = (double*)rfc_ctx.mem_alloc( NULL, 1, sizeof( double ), RFC_MEM_AIM_DH );
+            if( !RFC_dh_init( &rfc_ctx, spread_damage, /*stream*/ buffer, /*dh*/ NULL, /*dh_cap*/ 1, /*is_static*/ false ) )
+            {
+                ok = false;
+            }
+        }
+        else
+        {
+            if( !RFC_dh_init( &rfc_ctx, spread_damage, /*stream*/ buffer, /*dh*/ NULL, /*dh_cap*/ 0, /*is_static*/ false ) )
+            {
+                ok = false;
+            }
         }
         
-        if( !RFC_dh_init( &rfc_ctx, spread_damage, /*stream*/ buffer, rfc_ctx.dh, rfc_ctx.dh_cap, /*is_static*/ false ) )
-        {
-            ok = false;
-        }
 #endif /*RFC_DH_SUPPORT*/
 
         /* Rainflow counting */
@@ -6466,22 +6474,29 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT
             /* Turning points */
-            if( nlhs > 6 && rfc_ctx.dh )
+            if( nlhs > 6 )
             {
-                mxArray *dh  = mxCreateDoubleMatrix( rfc_ctx.internal.pos, 1, mxREAL );
-                double  *dh_ptr = dh ? mxGetPr(dh) : NULL;
-
-                if( dh_ptr )
+                if( rfc_ctx.dh )
                 {
-                    size_t i;
+                    mxArray *dh  = mxCreateDoubleMatrix( rfc_ctx.internal.pos, 1, mxREAL );
+                    double  *dh_ptr = dh ? mxGetPr(dh) : NULL;
 
-                    for( i = 0; i < rfc_ctx.internal.pos; i++ )
+                    if( dh_ptr )
                     {
-                        *dh_ptr++ = rfc_ctx.dh[i];
-                    }
-                }
+                        size_t i;
 
-                plhs[6] = dh;
+                        for( i = 0; i < rfc_ctx.internal.pos; i++ )
+                        {
+                            *dh_ptr++ = rfc_ctx.dh[i];
+                        }
+                    }
+
+                    plhs[6] = dh;
+                }
+                else
+                {
+                    plhs[6] = mxCreateDoubleMatrix( 0, 0, mxREAL );
+                }
             }
 #endif /*RFC_DH_SUPPORT*/
 #endif /*!RFC_MINIMAL*/
