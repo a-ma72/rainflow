@@ -1,4 +1,13 @@
 function validate
+
+  if exist( 'rfc', 'file' ) ~= 3
+    if ispc
+      addpath( '../build/Debug' );
+    else
+      addpath( '../build' );
+    end
+  end
+  
   %% Empty series
   name              = 'empty';
   class_count       = 100;
@@ -123,6 +132,8 @@ function validate
     rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
                 residual_method, enforce_margin, use_hcm, spread_damage );
               
+  % With residuum:    pd == 3.8810e-13
+  % Without residuum: pd == 4.8703e-16
   assert( abs( sum( tp(:,3) ) / pd - 1 ) < 1e-10 );
 
   save( name, 'rm', 're' );
@@ -135,7 +146,7 @@ function validate
   
   grid
   
-  spread_damage = 7;  % 7=RFC_SD_TRANSIENT_23
+  spread_damage = 8;  % 7=RFC_SD_TRANSIENT_23, 8=RFC_SD_TRANSIENT_23c
   
   [pd,re,rm,rp,lc,tp,dh] = ...
     rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...

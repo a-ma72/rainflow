@@ -295,6 +295,10 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
     }
     rfc_ctx->internal.flags                 = flags;
 
+#if _DEBUG
+    rfc_ctx->internal.finalizing            = false;
+#endif /*_DEBUG*/
+
     /* Counter increments */
     rfc_ctx->full_inc                       = RFC_FULL_CYCLE_INCREMENT;
     rfc_ctx->half_inc                       = RFC_HALF_CYCLE_INCREMENT;
@@ -1209,6 +1213,10 @@ bool RFC_clear_counts( void *ctx )
     } while(0);
 #endif /*!RFC_MINIMAL*/
 
+#if _DEBUG
+    rfc_ctx->internal.finalizing        = false;
+#endif /*_DEBUG*/
+
     rfc_ctx->state = RFC_STATE_INIT;
 
     return true;
@@ -1505,6 +1513,10 @@ bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
         return false;
     }
 
+#if _DEBUG
+    rfc_ctx->internal.finalizing = true;
+#endif
+
     damage = rfc_ctx->damage;
 
 #if RFC_USE_DELEGATES
@@ -1568,6 +1580,10 @@ bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
 
     rfc_ctx->damage_residue = rfc_ctx->damage - damage;
     rfc_ctx->state          = ok ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
+
+#if _DEBUG
+    rfc_ctx->internal.finalizing = false;
+#endif
 
     return ok;
 }
@@ -5859,6 +5875,7 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
                     width, 
                     tp_start, tp_end;   /* Base 0 */
             int     from_cls, to_cls;   /* Base 0 */
+            double  D_cycle;
 
             /* Care about possible wrapping, caused by RFC_RES_REPEATED:
                 0         1
@@ -5877,6 +5894,14 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
 
             from_cls = from->cls;
             to_cls   = to->cls;
+
+            if( !damage_calc( rfc_ctx, from_cls, to_cls, &D_cycle, NULL /*Sa_ret*/ ) )
+            {
+                return false;
+            }
+
+            /* Current cycle weight */
+            D_cycle *= (double)rfc_ctx->curr_inc / rfc_ctx->full_inc;
 
             /* Spread over P2 to P3 or over P2 to P4 */
             if( rfc_ctx->spread_damage_method == RFC_SD_RAMP_AMPLITUDE_24 ||
@@ -5925,25 +5950,13 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
                 {
                     case RFC_SD_RAMP_AMPLITUDE_23:
                     case RFC_SD_RAMP_AMPLITUDE_24:
-                        if( !damage_calc( rfc_ctx, from_cls, to_cls, &D_new, NULL /*Sa_ret*/ ) )
-                        {
-                            return false;
-                        }
-                        /* Current cycle weight */
-                        D_new *= (double)rfc_ctx->curr_inc / rfc_ctx->full_inc;
                         /* Di = 1/( ND*(Sa/SD*weight)^k ) = 1/( ND*(Sa/SD)^k ) * 1/weight^k */
-                        D_new = weight > 0.0 ? ( D_new * pow( weight, fabs(rfc_ctx->wl_k) ) ) : 0.0;
+                        D_new = weight > 0.0 ? ( D_cycle * pow( weight, fabs(rfc_ctx->wl_k) ) ) : 0.0;
                         break;
                     case RFC_SD_RAMP_DAMAGE_23:
                     case RFC_SD_RAMP_DAMAGE_24:
-                        if( !damage_calc( rfc_ctx, from_cls, to_cls, &D_new, NULL /*Sa_ret*/ ) )
-                        {
-                            return false;
-                        }
-                        /* Current cycle weight */
-                        D_new *= (double)rfc_ctx->curr_inc / rfc_ctx->full_inc;
                         /* Di = 1/( ND*(Sa/SD)^k ) * weight */
-                        D_new = D_new * weight;
+                        D_new = D_cycle * weight;
                         break;
                 }
 
@@ -5968,14 +5981,11 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
 
         case RFC_SD_TRANSIENT_23:
         {
-            size_t          pos = from->pos;
-            unsigned        class = from->cls, 
-                            class_new;
-            double          damage = 0.0,
-                            damage_new = 0.0;
             const
             rfc_value_t    *stream = rfc_ctx->stream;
             double         *dh = rfc_ctx->dh;
+            size_t          pos = from->pos;
+            unsigned        class_now = from->cls;
 
             if( !stream || !dh || !pos )
             {
@@ -5987,6 +5997,9 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
 
             do
             {
+                unsigned class_new;
+                double   D_new;
+
                 if( pos > rfc_ctx->internal.pos )
                 {
                     pos -= rfc_ctx->internal.pos;
@@ -6000,31 +6013,155 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
 
                 class_new = QUANTIZE( rfc_ctx, *stream++ );
 
-                if( ( (class_new > class) ^ (to->cls > from->cls) ) == 0 )
+                if( class_new != class_now )
                 {
-                    if( !damage_calc( rfc_ctx, from->cls, class_new, &damage_new, /*Sa*/ NULL ) )
+                    if( ( (class_new > class_now) ^ (to->cls > from->cls) ) == 0 )
                     {
-                        return error_raise( rfc_ctx, RFC_ERROR_DH );
-                    }
+                        if( !damage_calc( rfc_ctx, from->cls, class_new, &D_new, /*Sa*/ NULL ) )
+                        {
+                            return error_raise( rfc_ctx, RFC_ERROR_DH );
+                        }
 
-                    damage_new *= (double)rfc_ctx->curr_inc / rfc_ctx->full_inc;
-                    *dh        += damage_new - damage;
-                    damage      = damage_new;
-                    class       = class_new;
+                        D_new *= (double)rfc_ctx->curr_inc / rfc_ctx->full_inc;
+
+                        if( D_new > D )
+                        {
+                            *dh += D_new - D;
+                             D   = D_new;
+                        }
+
+                        class_now = class_new;
+                    }
                 }
 
-                if( pos++ == to->pos ) break;
-
-                dh++;
-            } while( 1 );
+            } while( dh++, pos++ != to->pos );
 
             break;
         }
 
         case RFC_SD_TRANSIENT_23c:
-            /* \todo */
-            return error_raise( rfc_ctx, RFC_ERROR_UNSUPPORTED );
+        {
+            const
+            rfc_value_t    *stream = rfc_ctx->stream;
+            double         *dh = rfc_ctx->dh;
+            size_t          pos = from->pos;
+            size_t          pos_end = to->pos;
+            unsigned        class_now = from->cls,
+                            class_min,
+                            class_max;
+            double          D_weight = next ? 0.5 : 1.0;
+            int             second_half = 0;
+
+            if( !stream || !dh || !pos )
+            {
+                return error_raise( rfc_ctx, RFC_ERROR_INVARG );
+            }
+
+            if( from->cls < to->cls )
+            {
+                class_min = from->cls;
+                class_max = to->cls;
+            }
+            else
+            {
+                class_min = to->cls;
+                class_max = from->cls;
+            }
+
+            stream += from->pos - 1;
+            dh     += from->pos - 1;
+
+            do
+            {
+                unsigned class_new;
+                double   D_new = 0.0;
+
+                if( next )
+                {
+                    assert( next->cls != to->cls );
+                    assert( next->pos != to->pos );
+                    assert( abs( (int)from->cls - (int)to->cls ) <= abs( (int)to->cls - (int)next->cls ) );
+                }
+
+                if( pos > rfc_ctx->internal.pos )
+                {
+                    pos    -= rfc_ctx->internal.pos;
+                    dh     -= rfc_ctx->internal.pos;
+                    stream -= rfc_ctx->internal.pos;
+                }
+
+                if( pos > rfc_ctx->dh_cap )
+                {
+                    return error_raise( rfc_ctx, RFC_ERROR_DH );
+                }
+
+                class_new = QUANTIZE( rfc_ctx, *stream++ );
+
+                if( class_new < class_min )
+                {
+                    class_new = class_min;
+                }
+                else if( class_new > class_max )
+                {
+                    class_new = class_max;
+                }
+
+                if( class_new != class_now )
+                {
+                    if( !second_half )
+                    {
+                        /* Slope direction */
+                        if( ( (class_new > class_now) ^ (to->cls > from->cls) ) == 0 )
+                        {
+                            if( !damage_calc( rfc_ctx, from->cls, class_new, &D_new, /*Sa*/ NULL ) )
+                            {
+                                return error_raise( rfc_ctx, RFC_ERROR_DH );
+                            }
+
+                            D_new     *= (double)rfc_ctx->curr_inc / rfc_ctx->full_inc;
+                            D_new     *= D_weight;
+                            class_now  = class_new;
+                        }
+                    }
+                    else
+                    {
+                        /* Opposite direction */
+                        if( ( (class_new > class_now) ^ (to->cls > from->cls) ) != 0 )
+                        {
+                            if( !damage_calc( rfc_ctx, to->cls, class_new, &D_new, /*Sa*/ NULL ) )
+                            {
+                                return error_raise( rfc_ctx, RFC_ERROR_DH );
+                            }
+
+                            D_new     *= (double)rfc_ctx->curr_inc / rfc_ctx->full_inc;
+                            D_new     *= D_weight;
+                            class_now  = class_new;
+                        }
+                    }
+
+                    if( D_new > D )
+                    {
+                        *dh += D_new - D;
+                         D   = D_new;
+                    }
+                }
+
+                if( pos == to->pos )
+                {
+                    if( next )
+                    {
+                        pos_end = next->pos;
+                    }
+                    second_half = 1;
+                    D = 0.0;
+                }
+                
+            } while( dh++, pos++ != pos_end );
+
+            // assert( fabs( D1 / D - 1 ) < 1e-10 );
+
             break;
+        }
 
         default:
             assert( false );
@@ -6224,7 +6361,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 
 
 #if RFC_DH_SUPPORT
-        mxAssert( spread_damage >= RFC_SD_NONE && spread_damage <= RFC_SD_COUNT,
+        mxAssert( spread_damage >= RFC_SD_NONE && spread_damage < RFC_SD_COUNT,
                   "Invalid spread damage method!" );
 #else /*!RFC_DH_SUPPORT*/
         if( spread_damage != 0 )

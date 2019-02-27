@@ -597,7 +597,7 @@ struct rfc_ctx
     /* Counter increments */
     rfc_counts_t                        full_inc;                   /**< Increment for a full cycle */
     rfc_counts_t                        half_inc;                   /**< Increment for a half cycle, used by some residual algorithms */
-    rfc_counts_t                        curr_inc;                   /**< Current increment, used by counting algorithms */
+    rfc_counts_t                        curr_inc;                   /**< Current increment, used by counting algorithms (changed by finalize_res_weight_cycles() only) */
 
     /* Rainflow class parameters */
     unsigned                            class_count;                /**< Class count */
@@ -698,6 +698,9 @@ struct rfc_ctx
     struct internal
     {
         int                             flags;                      /**< Flags (enum rfc_flags) */
+#if _DEBUG
+#endif /*_DEBUG*/
+        bool                            finalizing;                 /**< true, when finalizing */
 #if RFC_DEBUG_FLAGS
         int                             debug_flags;                /**< Flags for debugging */
 #endif /*RFC_DEBUG_FLAGS*/
