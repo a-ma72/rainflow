@@ -72,7 +72,7 @@ endif()
 # Math library
 find_library( LIBM_LIBRARY NAMES m )
 if( NOT LIBM_LIBRARY )
-    unset( LIBM_LIBRARY )
+    set( LIBM_LIBRARY "" )
 endif()
 
 set( MATLAB_FIND_DEBUG 1 )
