@@ -37,7 +37,7 @@ predefined functions.
     This class also offers container class based turning point storage.  
  2. Streamable: You're able to count your data at once, as data packages or sample-wise.  
  3. Class width fit to your needs. Dynamically increase class width, when needed. (Needs turning point storage.)  
- 4. Optional HCM counting method (Clormann/Seeger).
+ 4. Four point counting method, optionally HCM counting method (Clormann/Seeger).
  5. Woehler curve with up to two slopes, fatigue limit and omission.  
  6. Miners rule for damage accumulation (elementary, original, modified and consequent).  
  7. In-time damage indicator (Miners' consequent rule).  
@@ -45,13 +45,14 @@ predefined functions.
  9. Turning points with hysteresis filtering. Turning points involved in a closed hysteresis are marked as pairs, with its partial assigned damage. (Compact history)  
  10. Look-up tables for damage calculation and amplitude transformation.  
  11. Amplitude transformation (Haigh diagram) according to FKM (symmetrical, unsymmetrical or user defined).  
- 12. Damage history (uncompressed), TBD  
+ 12. Damage history (uncompressed)  
  13. Various methods on residual data:  
      - According to DIN 45667  
      - ASTM method (halfcycle, fullcycle)  
      - Second run  
      - HCM  
- 14. Delegates.  
+ 14. Various function pointers to implement user defined behavior.
+ 15. Conversions supporting RFM->LC, RFM->RP, RFM->Damage and RP->Damage (original, elementar, modifiziert, konsequent).  
 
 
 ---
