@@ -276,7 +276,7 @@ public:
     bool            tp_prune                ( size_t count, rfc_flags_e flags );
     bool            tp_refeed               ( rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param );
     /* Damage history */
-    bool            dh_init                 ( rfc_sd_method_e method, rfc_value_t *stream, double *dh, size_t dh_cap, bool is_static );
+    bool            dh_init                 ( rfc_sd_method_e method, const rfc_value_t *stream, double *dh, size_t dh_cap, bool is_static );
     /* Amplitude transformation*/
     bool            at_init                 ( const double *Sa, const double *Sm, unsigned count, 
                                               double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
