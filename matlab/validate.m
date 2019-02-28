@@ -154,7 +154,8 @@ function validate
               
   assert( abs( sum( dh ) / pd - 1 ) < 1e-10 );
   hold( ax(2), 'all' );
-  plot( ax(2), 1:length(dh), cumsum(dh), 'k-.', 'DisplayName', 'cumulative damage (based on time series)' )
+  plot( ax(2), 1:length(dh), cumsum(dh), 'k--', 'DisplayName', 'cumulative damage (based on time series)' )
+  plot( ax(2), tp(:,1), cumsum(tp(:,3)), 'g-.', 'DisplayName', 'mapped on turning points' );
   legend( 'show' )
 
   figure

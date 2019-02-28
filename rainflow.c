@@ -186,7 +186,7 @@ static bool                 finalize_res_ignore             (       rfc_ctx_s *,
 static bool                 finalize_res_discard            (       rfc_ctx_s *, rfc_flags_e flags );
 static bool                 finalize_res_weight_cycles      (       rfc_ctx_s *, rfc_counts_t weight, rfc_flags_e flags );
 static bool                 finalize_res_clormann_seeger    (       rfc_ctx_s *, rfc_flags_e flags );
-static bool                 RFC_finalize_res_rp_DIN45667    (       rfc_ctx_s *, rfc_flags_e flags );
+static bool                 finalize_res_rp_DIN45667        (       rfc_ctx_s *, rfc_flags_e flags );
 static bool                 finalize_res_repeated           (       rfc_ctx_s *, rfc_flags_e flags );
 static bool                 residue_exchange                (       rfc_ctx_s *, rfc_value_tuple_s **residue, size_t *residue_cap, size_t *residue_cnt, bool restore );
 #endif /*!RFC_MINIMAL*/
@@ -203,6 +203,7 @@ static bool                 tp_refeed                       (       rfc_ctx_s *,
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT
 static bool                 spread_damage                   (       rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, rfc_flags_e flags );
+static bool                 spread_damage_map_tp            (       rfc_ctx_s * );
 #endif /*RFC_DH_SUPPORT*/
 #if RFC_AT_SUPPORT
 static bool                 at_R_to_Sm_norm                 (       rfc_ctx_s *, double R, double *Sm_norm );
@@ -1558,7 +1559,7 @@ bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
                 ok = finalize_res_repeated( rfc_ctx, flags );
                 break;
             case RFC_RES_RP_DIN45667:
-                ok = RFC_finalize_res_rp_DIN45667( rfc_ctx, flags );
+                ok = finalize_res_rp_DIN45667( rfc_ctx, flags );
                 break;
 #endif /*!RFC_MINIMAL*/
             default:
@@ -1584,6 +1585,13 @@ bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
 #if _DEBUG
     rfc_ctx->internal.finalizing = false;
 #endif
+
+#if RFC_DH_SUPPORT
+    if( ok )
+    {
+        ok = spread_damage_map_tp( rfc_ctx );
+    }
+#endif /*RFC_DH_SUPPORT*/
 
     return ok;
 }
@@ -4038,7 +4046,7 @@ bool finalize_res_clormann_seeger( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
  * @return     true on success
  */
 static
-bool RFC_finalize_res_rp_DIN45667( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
+bool finalize_res_rp_DIN45667( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
 {
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
@@ -6158,8 +6166,6 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
                 
             } while( dh++, pos++ != pos_end );
 
-            // assert( fabs( D1 / D - 1 ) < 1e-10 );
-
             break;
         }
 
@@ -6167,6 +6173,53 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
             assert( false );
             break;
     }
+
+    return true;
+}
+
+
+/**
+ * @brief      Map damage from transient spreading methods to turning points information
+ *
+ * @param      rfc_ctx  The rainflow context
+ *
+ * @return     true on success
+ */
+static
+bool spread_damage_map_tp( rfc_ctx_s *rfc_ctx )
+{
+#if RFC_TP_SUPPORT
+    if( rfc_ctx->spread_damage_method == RFC_SD_TRANSIENT_23c &&
+        rfc_ctx->tp )
+    {
+        const
+        double            *dh_ptr = rfc_ctx->dh;
+        rfc_value_tuple_s *tp_ptr = rfc_ctx->tp;
+        size_t             i, i_tp;
+        double             D_new = 0.0,
+                           D_cum = 0.0;
+
+        D_cum = 0.0;
+        i_tp  = 0;
+
+        for( i = 0; i < rfc_ctx->internal.pos; i++, dh_ptr++ )
+        {
+            D_new += *dh_ptr;
+
+            if( i_tp < rfc_ctx->tp_cnt && i + 1 == tp_ptr->pos )
+            {
+                tp_ptr++->damage = D_new - D_cum;
+                D_cum = D_new;
+                i_tp++;
+            }
+        }
+
+        if( D_new > D_cum && rfc_ctx->tp_cnt > 0 )
+        {
+            rfc_ctx->tp[ rfc_ctx->tp_cnt - 1 ].damage += D_new - D_cum;
+        }
+    }
+#endif /*RFC_TP_SUPPORT*/
 
     return true;
 }

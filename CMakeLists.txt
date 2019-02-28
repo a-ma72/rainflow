@@ -1,3 +1,6 @@
+# CMakeLists for rainflow
+# 2019, Andreas Martin
+
 # First set Matlab_ROOT_DIR environment variable to your installed matlab path,
 # such as 'export Matlab_ROOT_DIR=/usr/local/MATLAB/R2017b'!
 # (GNUC: gcc for C file, g++ for CXX files)
@@ -12,6 +15,13 @@ cmake_minimum_required( VERSION 3.12 )
 set( CMAKE_VERBOSE_MAKEFILE OFF )
 set( CMAKE_BUILD_PARALLEL_LEVEL 12 )
 
+# Project name and version
+project( rainflow )
+set( RFC_VERSION_MAJOR "0" )
+set( RFC_VERSION_MINOR "2" )
+
+
+
 # Build type and compiler selection
 if( NOT CMAKE_CONFIGURATION_TYPES )
     get_property( HAVE_MULTI_CONFIG_GENERATOR GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG )
@@ -21,11 +31,14 @@ if( NOT CMAKE_CONFIGURATION_TYPES )
     endif()
 endif()
 
-project( rainflow )
-set( RFC_VERSION_MAJOR "0" )
-set( RFC_VERSION_MINOR "1" )
+# C++11
+set( CMAKE_CXX_STANDARD 11 )
+set( CMAKE_CXX_STANDARD_REQUIRED ON )
+set( CMAKE_CXX_EXTENSIONS ON )
+set( CMAKE_POSITION_INDEPENDENT_CODE ON )
 
-# options valid, if project compiled as standalone only
+
+# Options valid, if project compiled as standalone only
 if( CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR )
     message( STATUS "Build ${PROJECT_NAME} as main project")
     option( RFC_MINIMAL             "(Disable all other flags)" OFF )
@@ -42,12 +55,12 @@ else()
     message( STATUS "Build ${PROJECT_NAME} as subsequent project")
 endif()
 
-set( CMAKE_POSITION_INDEPENDENT_CODE ON )
 
 if( CMAKE_BUILD_TYPE MATCHES DEBUG )
 endif()
 
 
+# Compiler dependencies
 if( MSVC )
     # Turn off misguided "secure CRT" warnings in MSVC.
     # Microsoft wants people to use the MS-specific <function>_s
@@ -56,8 +69,10 @@ if( MSVC )
     add_definitions( -D_CRT_SECURE_NO_WARNINGS )
 endif()
 
-if( UNIX )
-    set( MATH_LIB m )
+# Math library
+find_library( LIBM_LIBRARY NAMES m )
+if( NOT LIBM_LIBRARY )
+    unset( LIBM_LIBRARY )
 endif()
 
 set( MATLAB_FIND_DEBUG 1 )
@@ -70,23 +85,34 @@ else()
     message( FATAL_ERROR "MATLAB not found...nothing will be built." )
 endif()
 
+if( UNIX )
+    if( $ENV{USER} STREQUAL "emartna" )
+        # These switches could not be set (redhat 6.10, gcc 4.4.7)
+        set( CMAKE_CXX_FLAGS -std=gnu++0x )
+        set( CMAKE_C_FLAGS -fPIC )
+    endif()
+endif()
+
 # set up matlab libraries
 include_directories( ${Matlab_INCLUDE_DIRS} )
+
+# Configuration file
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/config.h )
 
+# MEX function (MATLAB)
 matlab_add_mex( NAME ${PROJECT_NAME} SRC rainflow.c OUTPUT_NAME rfc )
 target_compile_definitions( ${PROJECT_NAME} PRIVATE MATLAB_MEX_FILE _SCL_SECURE_NO_WARNINGS )
-target_link_libraries( ${PROJECT_NAME} ${Matlab_LIBRARIES} ${MATH_LIB} )
+target_link_libraries( ${PROJECT_NAME} ${Matlab_LIBRARIES} ${LIBM_LIBRARY} )
 
+# Static rainflow library
 add_library( rfc STATIC rainflow.c )
-target_link_libraries( ${PROJECT_NAME} ${MATH_LIB} )
+target_link_libraries( rfc ${LIBM_LIBRARY} )
 
 # Test application, start project for MSVC
 add_executable( rfc_test rainflow.c test/rfc_test.c test/rfc_wrapper_simple.cpp test/rfc_wrapper_advanced.cpp )
 target_compile_definitions( rfc_test PRIVATE _SCL_SECURE_NO_WARNINGS )
-target_link_libraries( rfc_test ${MATH_LIB} )
+target_link_libraries( rfc_test ${LIBM_LIBRARY} )
 target_sources( rfc_test PUBLIC greatest/greatest.h )
-set_target_properties( rfc_test PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS YES )
 set_property( DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT rfc_test )
 
 # install to /bin by default
