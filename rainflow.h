@@ -262,6 +262,9 @@ enum rfc_flags
 enum rfc_debug_flags
 {
     RFC_FLAGS_LOG_CLOSED_CYCLES     =  1 << 0,                      /**< Log closed cycles */
+    RFC_FLAGS_LOG_READ_TP           =  1 << 1,                      /**< Read from tp storage */
+    RFC_FLAGS_LOG_WRITE_TP          =  1 << 2,                      /**< Write to tp storage */
+    RFC_FLAGS_LOG_TP_REFEED         =  1 << 3,                      /**< Trace tp storage while tp_refeed */
 };
 
 

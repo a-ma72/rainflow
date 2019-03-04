@@ -340,6 +340,7 @@ public:
     /* ctx access */
     const
     RF::rfc_ctx_s&  get_ctx                 () const { return m_ctx; }
+    RF::rfc_ctx_s&  get_ctx                 () { return m_ctx; }
     void            assign_ctx              ( RF::rfc_ctx_s& ctx )
     { 
         if( ctx.internal.obj != this ) 
@@ -866,14 +867,16 @@ bool RainflowT<T>::tp_set( size_t tp_pos, rfc_value_tuple_s *tp )
     if( tp_pos )
     {
         /* Alter or move existing turning point */
-        if( tp_pos > m_tp.size() )
+        if( tp_pos > m_ctx.tp_cnt )
         {
+            /* Writing behind tp_cnt is not ok */
             return false;
         }
 
 #if RFC_DH_SUPPORT
         if( tp->damage < 0.0 )
         {
+            /* Negative tp->damage instructs to maintain turning points damage */
             tp->damage = m_tp[ tp_pos - 1 ].damage;
         }
 #endif /*RFC_DH_SUPPORT*/
@@ -882,6 +885,15 @@ bool RainflowT<T>::tp_set( size_t tp_pos, rfc_value_tuple_s *tp )
         m_tp[ tp_pos - 1 ] = *tp;       /* Move or replace turning point */
         tp->tp_pos         =  tp_pos;   /* Ping back the position (commonly tp lies in residue buffer) */
 
+#if RFC_DEBUG_FLAGS
+        if( m_ctx.internal.debug_flags & RF::RFC_FLAGS_LOG_WRITE_TP )
+        {
+            RFC_debug_fprintf( &m_ctx, stdout, 
+                               "Alter tp #%lu (%g[%lu] @ %lu)\n", 
+                               tp_pos, tp->value, tp->cls, tp->pos );
+        }
+#endif /*RFC_DEBUG_FLAGS*/
+
         return true;
     }
     else
@@ -889,15 +901,34 @@ bool RainflowT<T>::tp_set( size_t tp_pos, rfc_value_tuple_s *tp )
         /* Append (tp_pos == 0) */
         if( tp->tp_pos )
         {
+#if RFC_DEBUG_FLAGS
+            if( m_ctx.internal.debug_flags & RF::RFC_FLAGS_LOG_WRITE_TP )
+            {
+                RFC_debug_fprintf( &m_ctx, stdout, 
+                                   "Alter (unchanged) tp #%lu (%g[%lu] @ %lu)\n", 
+                                   tp->pos, tp->value, tp->cls, tp->pos );
+            }
+#endif /*RFC_DEBUG_FLAGS*/
+
             /* Already an element of tp stack */
-            return tp->tp_pos <= m_tp.size();
+            return tp->tp_pos <= m_ctx.tp_cnt;
         }
         else
         {
             /* Append tp at the tail */
+            tp->tp_pos = 0;
             m_tp.push_back( *tp );
-            m_ctx.tp_cnt = tp->tp_pos = m_tp.size();
+            tp->tp_pos = ++m_ctx.tp_cnt;
             m_ctx.tp_cap = m_tp.capacity();
+
+#if RFC_DEBUG_FLAGS
+            if( m_ctx.internal.debug_flags & RF::RFC_FLAGS_LOG_WRITE_TP )
+            {
+                RFC_debug_fprintf( &m_ctx, stdout, 
+                                   "Append tp #%lu (%g[%lu] @ %lu)\n", 
+                                   tp->tp_pos, tp->value, tp->cls, tp->pos );
+            }
+#endif /*RFC_DEBUG_FLAGS*/
         }
     }
 
@@ -908,10 +939,20 @@ bool RainflowT<T>::tp_set( size_t tp_pos, rfc_value_tuple_s *tp )
 template< class T >
 bool RainflowT<T>::tp_get( size_t pos, rfc_value_tuple_s **tp )
 {
-    if( !tp || !pos || pos > m_tp.size() )
+    /* Reading behind tp_cnt is ok */
+    if( !tp || !pos || pos > m_ctx.tp_cap )
     {
         return false;
     }
+
+#if RFC_DEBUG_FLAGS
+    if( m_ctx.internal.debug_flags & RF::RFC_FLAGS_LOG_READ_TP )
+    {
+        RFC_debug_fprintf( &m_ctx, stdout, 
+                           "Read tp #%lu (%g[%lu] @ %lu)\n", 
+                           pos, m_tp[pos-1].value, m_tp[pos-1].cls, m_tp[pos-1].pos );
+    }
+#endif /*RFC_DEBUG_FLAGS*/
 
     *tp = &m_tp[pos-1];
 

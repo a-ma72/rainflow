@@ -220,10 +220,10 @@ static bool                 error_raise                     (       rfc_ctx_s *,
 static rfc_value_t          value_delta                     (       rfc_value_t from_val, rfc_value_t to, int *sign_ptr );
 
 
-#define QUANTIZE( r, v )    ( (unsigned)( ((v) - (r)->class_offset) / (r)->class_width ) )
-#define AMPLITUDE( r, i )   ( (double)(r)->class_width * (i) / 2 )
-#define CLASS_MEAN( r, c )  ( (double)(r)->class_width * (0.5 + (c)) + (r)->class_offset )
-#define CLASS_UPPER( r, c ) ( (double)(r)->class_width * (1.0 + (c)) + (r)->class_offset )
+#define QUANTIZE( r, v )    ( (r)->class_count ? (unsigned)( ((v) - (r)->class_offset) / (r)->class_width ) : 0 )
+#define AMPLITUDE( r, i )   ( (r)->class_count ? ( (double)(r)->class_width * (i) / 2 ) : 0.0 )
+#define CLASS_MEAN( r, c )  ( (r)->class_count ? ( (double)(r)->class_width * (0.5 + (c)) + (r)->class_offset ) : 0.0 )
+#define CLASS_UPPER( r, c ) ( (r)->class_count ? ( (double)(r)->class_width * (1.0 + (c)) + (r)->class_offset ) : 0.0 )
 #define NUMEL( x )          ( sizeof(x) / sizeof(*(x)) )
 
 #define RFC_CTX_CHECK_AND_ASSIGN                                                    \
@@ -311,6 +311,11 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
         {
             return error_raise( rfc_ctx, RFC_ERROR_INVARG );
         }
+    }
+    else
+    {
+        class_width  = 1.0;
+        class_offset = 0.0;
     }
 
     /* Rainflow class parameters */
@@ -754,6 +759,13 @@ bool RFC_tp_prune( void *ctx, size_t limit, rfc_flags_e flags )
     {
         return false;
     }
+
+#if RFC_DH_SUPPORT
+    if( rfc_ctx->dh )
+    {
+        return error_raise( rfc_ctx, RFC_ERROR_UNSUPPORTED );
+    }
+#endif /*RFC_DH_SUPPORT*/
 
     if( rfc_ctx->tp_cnt > limit )
     {
@@ -5437,7 +5449,7 @@ bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
     /* Check for delegates */
     if( rfc_ctx->tp_set_fcn )
     {
-        /* Add turning point */
+        /* Delegate */
         return rfc_ctx->tp_set_fcn( rfc_ctx, tp_pos, tp );
     }
     else
@@ -5451,7 +5463,8 @@ bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
         /* Check to append or alter */
         if( tp_pos )
         {
-            /* Alter or move existing turning point */
+            /* Alter or move existing turning point.
+               Writing behind tp_cnt is not ok       */
             assert( tp_pos <= rfc_ctx->tp_cnt );
 
 #if RFC_DH_SUPPORT
@@ -5462,10 +5475,18 @@ bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
             }
 #endif /*RFC_DH_SUPPORT*/
 
-            tp->tp_pos                =  0;                                  /* No position information for turning points in its storage */
+            tp->tp_pos                =  0;                                  /* Omit position information for turning points in its storage */
             rfc_ctx->tp[ tp_pos - 1 ] = *tp;                                 /* Move or replace turning point */
             tp->tp_pos                =  tp_pos;                             /* Ping back the position (commonly tp lies in residue buffer) */
 
+#if RFC_DEBUG_FLAGS
+            if( rfc_ctx->internal.debug_flags & RFC_FLAGS_LOG_WRITE_TP )
+            {
+                RFC_debug_fprintf( rfc_ctx, stdout, 
+                                   "Alter tp #%lu (%g[%lu] @ %lu)\n", 
+                                   tp_pos, tp->value, tp->cls, tp->pos );
+            }
+#endif /*RFC_DEBUG_FLAGS*/
             return true;
         }
         else
@@ -5474,8 +5495,16 @@ bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
             if( tp->tp_pos )
             {
                 /* Already an element of tp stack */
-                assert( tp->tp_pos <= rfc_ctx->tp_cnt );
+                assert( tp->tp_pos <= rfc_ctx->tp_cap );
 
+#if RFC_DEBUG_FLAGS
+                if( rfc_ctx->internal.debug_flags & RFC_FLAGS_LOG_WRITE_TP )
+                {
+                    RFC_debug_fprintf( rfc_ctx, stdout, 
+                                       "Try to appen, but already exists: tp #%lu (%g[%lu] @ %lu)\n", 
+                                       tp_pos, tp->value, tp->cls, tp->pos );
+                }
+#endif /*RFC_DEBUG_FLAGS*/
                 return true;
             }
             else
@@ -5515,6 +5544,15 @@ bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
         rfc_ctx->tp[ tp_pos - 1 ] = *tp;      /* Make a copy of tp in .tp, tp->tp_pos remains unaltered */
         tp->tp_pos                =  tp_pos;  /* Ping back turning point position index in tp, base 1 */
 
+#if RFC_DEBUG_FLAGS
+        if( rfc_ctx->internal.debug_flags & RFC_FLAGS_LOG_WRITE_TP )
+        {
+            RFC_debug_fprintf( rfc_ctx, stdout, 
+                               "Append tp #%lu (%g[%lu] @ %lu)\n", 
+                               tp_pos, tp->value, tp->cls, tp->pos );
+        }
+#endif /*RFC_DEBUG_FLAGS*/
+
         if( rfc_ctx->internal.flags & RFC_FLAGS_TPAUTOPRUNE && rfc_ctx->tp_cnt > rfc_ctx->tp_prune_threshold )
         {
             return RFC_tp_prune( rfc_ctx, rfc_ctx->tp_prune_size, RFC_FLAGS_TPPRUNE_PRESERVE_POS );
@@ -5540,7 +5578,7 @@ bool tp_get( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s **tp )
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state <= RFC_STATE_FINISHED );
 
-    if( !tp_pos || tp_pos > rfc_ctx->tp_cnt )
+    if( !tp_pos || tp_pos > rfc_ctx->tp_cap )
     {
         return false;
     }
@@ -5549,7 +5587,7 @@ bool tp_get( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s **tp )
     /* Check for delegates */
     if( rfc_ctx->tp_get_fcn )
     {
-        /* Add turning point */
+        /* Delegate */
         return rfc_ctx->tp_get_fcn( rfc_ctx, tp_pos, tp );
     }
     else
@@ -5562,8 +5600,19 @@ bool tp_get( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s **tp )
 
         if( tp )
         {
-            assert( tp_pos <= rfc_ctx->tp_cnt );
+            /* Reading behind tp_cnt is ok */
+            assert( tp_pos <= rfc_ctx->tp_cap );
+
             *tp = &rfc_ctx->tp[ tp_pos - 1 ];
+
+#if RFC_DEBUG_FLAGS
+            if( rfc_ctx->internal.debug_flags & RFC_FLAGS_LOG_READ_TP )
+            {
+                RFC_debug_fprintf( rfc_ctx, stdout, 
+                                   "Read tp #%lu (%g[%lu] @ %lu)\n", 
+                                   tp_pos, (*tp)->value, (*tp)->cls, (*tp)->pos );
+            }
+#endif /*RFC_DEBUG_FLAGS*/
         }
     }
 
@@ -5601,7 +5650,7 @@ bool tp_inc_damage( rfc_ctx_s *rfc_ctx, size_t tp_pos, double damage )
     {
         if( rfc_ctx->tp && tp_pos )
         {
-            if( !tp_pos || tp_pos > rfc_ctx->tp_cnt )
+            if( !tp_pos || tp_pos > rfc_ctx->tp_cap )
             {
                 return error_raise( rfc_ctx, RFC_ERROR_TP );
             }
@@ -5644,6 +5693,8 @@ void tp_lock( rfc_ctx_s *rfc_ctx, bool do_lock )
  * @param[in]  new_class_param  The new class parameters
  *
  * @return     true on success
+ * 
+ * @note       new_hysteresis must be greater than rfc_ctx->hysteresis!
  */
 static
 bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param )
@@ -5659,10 +5710,38 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
-    /* Handle interim turning point and margins */
-    if( !feed_finalize( rfc_ctx ) )
+    if( new_hysteresis < rfc_ctx->hysteresis )
     {
-        return false;
+        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
+    }
+
+    if( rfc_ctx->state < RFC_STATE_BUSY_INTERIM || new_hysteresis == rfc_ctx->hysteresis )
+    {
+        /* Less than 2 turning points in stack */
+        return true;
+    }
+    else
+    {
+        /* At least 2 turning points in stack */
+        assert( rfc_ctx->state == RFC_STATE_BUSY_INTERIM );
+
+        rfc_value_tuple_s *tp_interim = &rfc_ctx->residue[rfc_ctx->residue_cnt];
+        rfc_ctx->residue_cnt++;
+
+        rfc_ctx->state = RFC_STATE_BUSY;
+
+#if RFC_DEBUG_FLAGS
+        if( rfc_ctx->internal.debug_flags & RFC_FLAGS_LOG_TP_REFEED )
+        {
+            RFC_debug_fprintf( rfc_ctx, stdout, "Finalize tp storage...\n" );
+        }
+#endif /*RFC_DEBUG_FLAGS*/
+
+        /* Finalize turning point storage */
+        if( !feed_finalize_tp( rfc_ctx, tp_interim, /*flags*/ 0 ) )
+        {
+            return false;
+        }
     }
 
     /* Clear data for current countings, but protect pos_offset */
@@ -5675,7 +5754,6 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
     RFC_clear_counts( rfc_ctx );   // state is RFC_STATE_INIT now and tp storage is unlocked
     rfc_ctx->internal.pos        = pos;
     rfc_ctx->internal.pos_offset = pos_offset;
-    rfc_ctx->tp_cnt              = tp_cnt;
 #if RFC_DH_SUPPORT
     rfc_ctx->dh_cnt              = dh_cnt;
 #endif /*RFC_DH_SUPPORT*/
@@ -5701,7 +5779,6 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
     if( rfc_ctx->tp_get_fcn )
     {
         rfc_value_tuple_s *tp, *tp_ext;
-        size_t             tp_cnt = rfc_ctx->tp_cnt;
         int                n      = 0;
         const int          n_max  = 500;
         bool               ok     = true;  
@@ -5713,7 +5790,6 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
             return error_raise( rfc_ctx, RFC_ERROR_MEMORY );
         }
 
-        rfc_ctx->tp_cnt = 0;
         i = 1;
         while( tp_cnt && ok )
         {
@@ -5739,12 +5815,33 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
                 }
             }
 
-            RFC_feed_tuple( rfc_ctx, tp, n_cnt );
+            ok = RFC_feed_tuple( rfc_ctx, tp, n_cnt );
 
             tp_cnt -= n_cnt;
         }
 
         mem_alloc( tp, 0, 0, RFC_MEM_AIM_TP );
+
+#if RFC_DEBUG_FLAGS
+        if( rfc_ctx->internal.debug_flags & RFC_FLAGS_LOG_TP_REFEED )
+        {
+            int flags = rfc_ctx->internal.debug_flags;
+
+            RFC_debug_fprintf( rfc_ctx, stdout,
+                               "Content of tp storage:\n" );
+
+            RFC_set_flags( rfc_ctx, RFC_FLAGS_LOG_READ_TP, /*debugging*/ true );
+            
+            for( i = 1; i <= rfc_ctx->tp_cnt; i++ )
+            {
+                rfc_value_tuple_s *tp;
+
+                tp_get( rfc_ctx, i, &tp );
+            }
+
+            RFC_set_flags( rfc_ctx, flags, /*debugging*/ true );
+        }
+#endif /*RFC_DEBUG_FLAGS*/
 
         return ok;
     }
