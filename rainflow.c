@@ -710,6 +710,8 @@ bool RFC_tp_init( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_stati
     
     rfc_ctx->internal.tp_static = is_static;
 
+    RFC_debug_fprintf( rfc_ctx, stdout, "Enforce: %d\n", rfc_ctx->internal.flags & RFC_FLAGS_ENFORCE_MARGIN );
+
     return true;
 }
 
@@ -1253,6 +1255,8 @@ bool RFC_deinit( void *ctx )
     {
         return false;
     }
+
+    return true;
 
     if( !rfc_ctx->internal.res_static &&
         rfc_ctx->residue )              rfc_ctx->mem_alloc( rfc_ctx->residue,       0, 0, RFC_MEM_AIM_RESIDUE );
@@ -5757,13 +5761,11 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
 #if RFC_DH_SUPPORT
     rfc_ctx->dh_cnt              = dh_cnt;
 #endif /*RFC_DH_SUPPORT*/
+    rfc_ctx->hysteresis          = new_hysteresis;
 
     /* Class parameters may change, new hysteresis must be greater! */
     if( new_class_param )
     {
-        assert( new_hysteresis >= rfc_ctx->hysteresis );
-        rfc_ctx->hysteresis     = new_hysteresis;
-
 #if RFC_DAMAGE_FAST
         if( !RFC_class_param_set( rfc_ctx, new_class_param ) ||
             !damage_lut_init( rfc_ctx ) )
@@ -5783,7 +5785,7 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
         const int          n_max  = 500;
         bool               ok     = true;  
 
-        tp = mem_alloc( NULL, n_max, sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TP );
+        tp = rfc_ctx->mem_alloc( NULL, n_max, sizeof(rfc_value_tuple_s), RFC_MEM_AIM_TP );
 
         if( !tp )
         {
@@ -5820,7 +5822,7 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
             tp_cnt -= n_cnt;
         }
 
-        mem_alloc( tp, 0, 0, RFC_MEM_AIM_TP );
+        rfc_ctx->mem_alloc( tp, 0, 0, RFC_MEM_AIM_TP );
 
 #if RFC_DEBUG_FLAGS
         if( rfc_ctx->internal.debug_flags & RFC_FLAGS_LOG_TP_REFEED )

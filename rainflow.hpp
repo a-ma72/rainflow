@@ -384,12 +384,7 @@ template< class T >
 bool RainflowT<T>::init( unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
                          rfc_value_t hysteresis, rfc_flags_e flags )
 {
-    RF::rfc_ctx_s ctx = { sizeof( RF::rfc_ctx_s ) };
     bool ok;
-
-    m_ctx = ctx;
-
-    m_ctx.mem_alloc = RF::mem_alloc;
 
     ok = RF::RFC_init( &m_ctx, class_count, class_width, class_offset, hysteresis, (RF::rfc_flags_e)flags );
 
@@ -915,10 +910,21 @@ bool RainflowT<T>::tp_set( size_t tp_pos, rfc_value_tuple_s *tp )
         }
         else
         {
+            size_t tp_pos = ++m_ctx.tp_cnt;
+
             /* Append tp at the tail */
             tp->tp_pos = 0;
-            m_tp.push_back( *tp );
-            tp->tp_pos = ++m_ctx.tp_cnt;
+            
+            if( tp_pos > m_tp.size() )
+            {
+                m_tp.push_back( *tp );
+            }
+            else
+            {
+                m_tp[tp_pos-1] = *tp;
+            }
+
+            tp->tp_pos = tp_pos;
             m_ctx.tp_cap = m_tp.capacity();
 
 #if RFC_DEBUG_FLAGS
