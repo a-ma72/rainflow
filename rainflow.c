@@ -710,8 +710,6 @@ bool RFC_tp_init( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_stati
     
     rfc_ctx->internal.tp_static = is_static;
 
-    RFC_debug_fprintf( rfc_ctx, stdout, "Enforce: %d\n", rfc_ctx->internal.flags & RFC_FLAGS_ENFORCE_MARGIN );
-
     return true;
 }
 

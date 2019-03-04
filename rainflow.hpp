@@ -44,6 +44,18 @@
 #include <cmath>
 #include "rainflow.h"
 
+#ifndef CALLOC
+#define CALLOC calloc
+#endif
+
+#ifndef REALLOC
+#define REALLOC realloc
+#endif
+
+#ifndef FREE
+#define FREE free
+#endif
+
 /* Suppose correct configuration */
 static
 char compiler_assert_rfc_config
@@ -333,6 +345,7 @@ public:
         RF::rfc_ctx_s nil = { sizeof( RF::rfc_ctx_s ) };
 
         m_ctx = nil;
+        m_ctx.mem_alloc = RF::mem_alloc;
     } 
     /* ctor */      RainflowT               ( RF::rfc_ctx_s&& other ) { assign_ctx( other ); }   // Move ctor
     RainflowT&      operator=               ( RF::rfc_ctx_s&& other ) { assign_ctx( other ); }   // Move assignment
@@ -651,14 +664,26 @@ bool RainflowT<T>::tp_init_autoprune( bool autoprune, size_t size, size_t thresh
 template< class T >
 bool RainflowT<T>::tp_prune( size_t count, rfc_flags_e flags )
 {
-    return RF::RFC_tp_prune( &m_ctx, count, (RF::rfc_flags_e) flags );
+    bool ok;
+    
+    ok = RF::RFC_tp_prune( &m_ctx, count, (RF::rfc_flags_e) flags );
+
+    m_tp.resize( m_ctx.tp_cnt );
+
+    return ok;
 }
 
 
 template< class T >
 bool RainflowT<T>::tp_refeed( rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param )
 {
-    return RF::RFC_tp_refeed( &m_ctx, new_hysteresis, new_class_param );
+    bool ok;
+
+    ok = RF::RFC_tp_refeed( &m_ctx, new_hysteresis, new_class_param );
+
+    m_tp.resize( m_ctx.tp_cnt );
+
+    return ok;
 }
 
 
@@ -987,13 +1012,13 @@ void* RainflowT<T>::mem_alloc( void *ptr, size_t num, size_t size, rfc_mem_aim_e
     {
         if( ptr )
         {
-            free( ptr );
+            FREE( ptr );
         }
         return NULL;
     }
     else
     {
-        return ptr ? realloc( ptr, num * size ) : calloc( num, size );
+        return ptr ? REALLOC( ptr, num * size ) : CALLOC( num, size );
     }
 }
 
