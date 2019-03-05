@@ -710,8 +710,6 @@ bool RFC_tp_init( void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_stati
     
     rfc_ctx->internal.tp_static = is_static;
 
-    RFC_debug_fprintf( rfc_ctx, stdout, "Enforce: %d\n", rfc_ctx->internal.flags & RFC_FLAGS_ENFORCE_MARGIN );
-
     return true;
 }
 
@@ -962,14 +960,13 @@ bool RFC_tp_clear( void *ctx )
  *
  * @param      ctx        The rainflow context
  * @param[in]  method     The mode, how to spread (RFC_SD_...)
- * @param[in]  stream     The input stream (only for transient calculation, otherwise NULL)
  * @param      dh         The storage buffer
  * @param      dh_cap     The capacity of dh
  * @param      is_static  true, if dh is static and should not be freed
  *
  * @return     true on success
  */
-bool RFC_dh_init( void *ctx, rfc_sd_method_e method, const rfc_value_t *stream, double *dh, size_t dh_cap, bool is_static )
+bool RFC_dh_init( void *ctx, rfc_sd_method_e method, double *dh, size_t dh_cap, bool is_static )
 {
     RFC_CTX_CHECK_AND_ASSIGN
 
@@ -993,16 +990,8 @@ bool RFC_dh_init( void *ctx, rfc_sd_method_e method, const rfc_value_t *stream, 
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
 
-    if( method == RFC_SD_TRANSIENT_23 || method == RFC_SD_TRANSIENT_23c )
-    {
-        if( dh && !stream )
-        {
-            return error_raise( rfc_ctx, RFC_ERROR_INVARG );
-        }
-    }
-
     rfc_ctx->spread_damage_method = method;
-    rfc_ctx->stream               = (const rfc_value_t*)stream;
+    rfc_ctx->dh_istream           = (const rfc_value_t*)NULL;
     rfc_ctx->dh                   = dh;
     rfc_ctx->dh_cap               = dh_cap;
     rfc_ctx->dh_cnt               = 0;
@@ -1256,8 +1245,6 @@ bool RFC_deinit( void *ctx )
         return false;
     }
 
-    return true;
-
     if( !rfc_ctx->internal.res_static &&
         rfc_ctx->residue )              rfc_ctx->mem_alloc( rfc_ctx->residue,       0, 0, RFC_MEM_AIM_RESIDUE );
     if( rfc_ctx->rfm )                  rfc_ctx->mem_alloc( rfc_ctx->rfm,           0, 0, RFC_MEM_AIM_MATRIX );
@@ -1374,11 +1361,24 @@ bool RFC_feed( void *ctx, const rfc_value_t * data, size_t data_count )
 {
     RFC_CTX_CHECK_AND_ASSIGN
 
-    if( data_count && !data ) return false;
+    if( !data ) return !data_count;
 
     if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state >= RFC_STATE_FINISHED )
     {
         return false;
+    }
+
+    if( rfc_ctx->dh )
+    {
+        if( !rfc_ctx->dh_istream )
+        {
+            /* Assign input stream */
+            rfc_ctx->dh_istream = data;
+        }
+        else if( rfc_ctx->dh_istream + rfc_ctx->internal.pos != data )
+        {
+            return error_raise( rfc_ctx, RFC_ERROR_DH_BAD_STREAM );
+        }
     }
 
     /* Process data */
@@ -5225,7 +5225,7 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
 #if RFC_DH_SUPPORT
                 rfc_value_tuple_s from_cpy;
 
-                from->adj_pos   = to->pos;
+                from->adj_pos   = to->tp_pos;
                 from->avrg      = (rfc_value_t)fabs( (double)from->value + to->value );
                 /* Don't alter damage values in tp storage! */
                 from_cpy        = *from;
@@ -5233,7 +5233,7 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
                 tp_set( rfc_ctx, from->tp_pos, &from_cpy );
                 *from           = from_cpy;
 #else /*!RFC_DH_SUPPORT*/
-                from->adj_pos   = to->pos;
+                from->adj_pos   = to->tp_pos;
                 from->avrg      = (rfc_value_t)fabs( (double)from->value + to->value );
                 tp_set( rfc_ctx, from->tp_pos, from );
 #endif /*RFC_DH_SUPPORT*/
@@ -5244,7 +5244,7 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
 #if RFC_DH_SUPPORT
                 rfc_value_tuple_s to_cpy;
 
-                to->adj_pos   = from->pos;
+                to->adj_pos   = from->tp_pos;
                 to->avrg      = (rfc_value_t)fabs( (double)from->value + to->value );
                 /* Don't alter damage values in tp storage! */
                 to_cpy        = *to;
@@ -5252,7 +5252,7 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
                 tp_set( rfc_ctx, to->tp_pos, &to_cpy );
                 *to           = to_cpy;
 #else /*!RFC_DH_SUPPORT*/
-                to->adj_pos   = from->pos;
+                to->adj_pos   = from->tp_pos;
                 to->avrg      = (rfc_value_t)fabs( (double)from->value + to->value );
                 tp_set( rfc_ctx, to->tp_pos, to );
 #endif /*RFC_DH_SUPPORT*/
@@ -5638,7 +5638,7 @@ static
 bool tp_inc_damage( rfc_ctx_s *rfc_ctx, size_t tp_pos, double damage )
 {
     assert( rfc_ctx );
-    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state <= RFC_STATE_FINISHED );
 
     /* Add new turning point */
 
@@ -5703,6 +5703,7 @@ void tp_lock( rfc_ctx_s *rfc_ctx, bool do_lock )
 static
 bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param )
 {
+    rfc_value_tuple_s *tp_interim = NULL;
     size_t pos,
            pos_offset,
            tp_cnt,
@@ -5719,17 +5720,16 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
 
-    if( rfc_ctx->state < RFC_STATE_BUSY_INTERIM || new_hysteresis == rfc_ctx->hysteresis )
+    if( ( rfc_ctx->state < RFC_STATE_BUSY_INTERIM || new_hysteresis == rfc_ctx->hysteresis ) && !new_class_param )
     {
         /* Less than 2 turning points in stack */
         return true;
     }
-    else
+
+    if( rfc_ctx->state == RFC_STATE_BUSY_INTERIM )
     {
         /* At least 2 turning points in stack */
-        assert( rfc_ctx->state == RFC_STATE_BUSY_INTERIM );
-
-        rfc_value_tuple_s *tp_interim = &rfc_ctx->residue[rfc_ctx->residue_cnt];
+        tp_interim = &rfc_ctx->residue[rfc_ctx->residue_cnt];
         rfc_ctx->residue_cnt++;
 
         rfc_ctx->state = RFC_STATE_BUSY;
@@ -6089,18 +6089,18 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
         case RFC_SD_TRANSIENT_23:
         {
             const
-            rfc_value_t    *stream = rfc_ctx->stream;
+            rfc_value_t    *dh_istream = rfc_ctx->dh_istream;
             double         *dh = rfc_ctx->dh;
             size_t          pos = from->pos;
             unsigned        class_now = from->cls;
 
-            if( !stream || !dh || !pos )
+            if( !dh_istream || !dh || !pos )
             {
                 return error_raise( rfc_ctx, RFC_ERROR_INVARG );
             }
 
-            stream += from->pos - 1;
-            dh     += from->pos - 1;
+            dh_istream += from->pos - 1;
+            dh         += from->pos - 1;
 
             do
             {
@@ -6118,7 +6118,7 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
                     return error_raise( rfc_ctx, RFC_ERROR_DH );
                 }
 
-                class_new = QUANTIZE( rfc_ctx, *stream++ );
+                class_new = QUANTIZE( rfc_ctx, *dh_istream++ );
 
                 if( class_new != class_now )
                 {
@@ -6149,7 +6149,7 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
         case RFC_SD_TRANSIENT_23c:
         {
             const
-            rfc_value_t    *stream = rfc_ctx->stream;
+            rfc_value_t    *dh_istream = rfc_ctx->dh_istream;
             double         *dh = rfc_ctx->dh;
             size_t          pos = from->pos;
             size_t          pos_end = to->pos;
@@ -6159,7 +6159,7 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
             double          D_weight = next ? 0.5 : 1.0;
             int             second_half = 0;
 
-            if( !stream || !dh || !pos )
+            if( !dh_istream || !dh || !pos )
             {
                 return error_raise( rfc_ctx, RFC_ERROR_INVARG );
             }
@@ -6175,8 +6175,8 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
                 class_max = from->cls;
             }
 
-            stream += from->pos - 1;
-            dh     += from->pos - 1;
+            dh_istream += from->pos - 1;
+            dh         += from->pos - 1;
 
             do
             {
@@ -6192,9 +6192,9 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
 
                 if( pos > rfc_ctx->internal.pos )
                 {
-                    pos    -= rfc_ctx->internal.pos;
-                    dh     -= rfc_ctx->internal.pos;
-                    stream -= rfc_ctx->internal.pos;
+                    pos        -= rfc_ctx->internal.pos;
+                    dh         -= rfc_ctx->internal.pos;
+                    dh_istream -= rfc_ctx->internal.pos;
                 }
 
                 if( pos > rfc_ctx->dh_cap )
@@ -6202,7 +6202,7 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
                     return error_raise( rfc_ctx, RFC_ERROR_DH );
                 }
 
-                class_new = QUANTIZE( rfc_ctx, *stream++ );
+                class_new = QUANTIZE( rfc_ctx, *dh_istream++ );
 
                 if( class_new < class_min )
                 {
@@ -6288,34 +6288,39 @@ static
 bool spread_damage_map_tp( rfc_ctx_s *rfc_ctx )
 {
 #if RFC_TP_SUPPORT
-    if( rfc_ctx->spread_damage_method == RFC_SD_TRANSIENT_23c &&
-        rfc_ctx->tp )
+    if( rfc_ctx->spread_damage_method >= RFC_SD_TRANSIENT_23  &&
+        rfc_ctx->spread_damage_method <= RFC_SD_TRANSIENT_23c &&
+        rfc_ctx->tp_cnt )
     {
         const
         double            *dh_ptr = rfc_ctx->dh;
-        rfc_value_tuple_s *tp_ptr = rfc_ctx->tp;
         size_t             i, i_tp;
         double             D_new = 0.0,
                            D_cum = 0.0;
+        rfc_value_tuple_s *tp    = NULL;
 
         D_cum = 0.0;
-        i_tp  = 0;
 
-        for( i = 0; i < rfc_ctx->internal.pos; i++, dh_ptr++ )
+        for( i_tp = 1, i = 1; i <= rfc_ctx->internal.pos; i++, dh_ptr++ )
         {
             D_new += *dh_ptr;
 
-            if( i_tp < rfc_ctx->tp_cnt && i + 1 == tp_ptr->pos )
+            if( !tp )
             {
-                tp_ptr++->damage = D_new - D_cum;
+                tp_get( rfc_ctx, i_tp, &tp );
+            }
+
+            if( i_tp <= rfc_ctx->tp_cnt && tp && i == tp->pos )
+            {
+                tp_inc_damage( rfc_ctx, i_tp++, D_new - D_cum );
+                tp    = NULL;
                 D_cum = D_new;
-                i_tp++;
             }
         }
 
         if( D_new > D_cum && rfc_ctx->tp_cnt > 0 )
         {
-            rfc_ctx->tp[ rfc_ctx->tp_cnt - 1 ].damage += D_new - D_cum;
+            tp_inc_damage( rfc_ctx, rfc_ctx->tp_cnt, D_new - D_cum );
         }
     }
 #endif /*RFC_TP_SUPPORT*/
@@ -6566,14 +6571,14 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 #if RFC_DH_SUPPORT
         if( spread_damage >= RFC_SD_TRANSIENT_23 )
         {
-            if( !RFC_dh_init( &rfc_ctx, spread_damage, /*stream*/ buffer, /*dh*/ NULL, /*dh_cap*/ 1, /*is_static*/ false ) )
+            if( !RFC_dh_init( &rfc_ctx, spread_damage, /*dh*/, /*dh_cap*/ 1, /*is_static*/ false ) )
             {
                 ok = false;
             }
         }
         else
         {
-            if( !RFC_dh_init( &rfc_ctx, spread_damage, /*stream*/ buffer, /*dh*/ NULL, /*dh_cap*/ 0, /*is_static*/ false ) )
+            if( !RFC_dh_init( &rfc_ctx, spread_damage, /*dh*/ NULL, /*dh_cap*/ 0, /*is_static*/ true ) )
             {
                 ok = false;
             }

@@ -306,10 +306,11 @@ enum rfc_error
     RFC_ERROR_AT                    =  5,                           /**< Error while amplitude transformation */
 #endif /*RFC_AT_SUPPORT*/
 #if RFC_DH_SUPPORT
-    RFC_ERROR_DH                    =  6,                           /**< Error while damage history calculation/access */
+    RFC_ERROR_DH_BAD_STREAM         =  6,                           /**< Input stream must be unique */
+    RFC_ERROR_DH                    =  7,                           /**< Error while damage history calculation/access */
 #endif /*RFC_DH_SUPPORT*/
 #if RFC_DAMAGE_FAST
-    RFC_ERROR_LUT                   =  7,                           /**< Error while accessing look up tables */
+    RFC_ERROR_LUT                   =  8,                           /**< Error while accessing look up tables */
 #endif /*RFC_DAMAGE_FAST*/
 };
 
@@ -453,7 +454,7 @@ bool    RFC_tp_clear                (       void *ctx );
 #endif /*RFC_TP_SUPPORT*/
 
 #if RFC_DH_SUPPORT
-bool    RFC_dh_init                 (       void *ctx, rfc_sd_method_e method, const rfc_value_t *stream, double *dh, size_t dh_cap, bool is_static );
+bool    RFC_dh_init                 (       void *ctx, rfc_sd_method_e method, double *dh, size_t dh_cap, bool is_static );
 #endif /*RFC_DH_SUPPORT*/
 
 #if RFC_AT_SUPPORT
@@ -666,7 +667,7 @@ struct rfc_ctx
 #endif /*RFC_TP_SUPPORT*/
 
 #if RFC_DH_SUPPORT
-    const rfc_value_t                  *stream;                     /**< Input stream */
+    const rfc_value_t                  *dh_istream;                 /**< Input stream */
     double                             *dh;                         /**< Damage history, pointer may be changed whilst memory reallocation! */
     size_t                              dh_cap;                     /**< Capacity of dh */
     size_t                              dh_cnt;                     /**< Number of values in dh */

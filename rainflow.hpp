@@ -44,6 +44,18 @@
 #include <cmath>
 #include "rainflow.h"
 
+#ifndef CALLOC
+#define CALLOC calloc
+#endif
+
+#ifndef REALLOC
+#define REALLOC realloc
+#endif
+
+#ifndef FREE
+#define FREE free
+#endif
+
 /* Suppose correct configuration */
 static
 char compiler_assert_rfc_config
@@ -276,7 +288,7 @@ public:
     bool            tp_prune                ( size_t count, rfc_flags_e flags );
     bool            tp_refeed               ( rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param );
     /* Damage history */
-    bool            dh_init                 ( rfc_sd_method_e method, const rfc_value_t *stream, double *dh, size_t dh_cap, bool is_static );
+    bool            dh_init                 ( rfc_sd_method_e method, double *dh, size_t dh_cap, bool is_static );
     /* Amplitude transformation*/
     bool            at_init                 ( const double *Sa, const double *Sm, unsigned count, 
                                               double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
@@ -333,6 +345,7 @@ public:
         RF::rfc_ctx_s nil = { sizeof( RF::rfc_ctx_s ) };
 
         m_ctx = nil;
+        m_ctx.mem_alloc = RF::mem_alloc;
     } 
     /* ctor */      RainflowT               ( RF::rfc_ctx_s&& other ) { assign_ctx( other ); }   // Move ctor
     RainflowT&      operator=               ( RF::rfc_ctx_s&& other ) { assign_ctx( other ); }   // Move assignment
@@ -651,21 +664,33 @@ bool RainflowT<T>::tp_init_autoprune( bool autoprune, size_t size, size_t thresh
 template< class T >
 bool RainflowT<T>::tp_prune( size_t count, rfc_flags_e flags )
 {
-    return RF::RFC_tp_prune( &m_ctx, count, (RF::rfc_flags_e) flags );
+    bool ok;
+    
+    ok = RF::RFC_tp_prune( &m_ctx, count, (RF::rfc_flags_e) flags );
+
+    m_tp.resize( m_ctx.tp_cnt );
+
+    return ok;
 }
 
 
 template< class T >
 bool RainflowT<T>::tp_refeed( rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param )
 {
-    return RF::RFC_tp_refeed( &m_ctx, new_hysteresis, new_class_param );
+    bool ok;
+
+    ok = RF::RFC_tp_refeed( &m_ctx, new_hysteresis, new_class_param );
+
+    m_tp.resize( m_ctx.tp_cnt );
+
+    return ok;
 }
 
 
 template< class T >
-bool RainflowT<T>::dh_init( rfc_sd_method_e method, const rfc_value_t *stream, double *dh, size_t dh_cap, bool is_static )
+bool RainflowT<T>::dh_init( rfc_sd_method_e method, double *dh, size_t dh_cap, bool is_static )
 {
-    return RF::RFC_dh_init( &m_ctx, (RF::rfc_sd_method_e)method, stream, dh, dh_cap, is_static );
+    return RF::RFC_dh_init( &m_ctx, (RF::rfc_sd_method_e)method, dh, dh_cap, is_static );
 }
 
 
@@ -987,13 +1012,13 @@ void* RainflowT<T>::mem_alloc( void *ptr, size_t num, size_t size, rfc_mem_aim_e
     {
         if( ptr )
         {
-            free( ptr );
+            FREE( ptr );
         }
         return NULL;
     }
     else
     {
-        return ptr ? realloc( ptr, num * size ) : calloc( num, size );
+        return ptr ? REALLOC( ptr, num * size ) : CALLOC( num, size );
     }
 }
 
