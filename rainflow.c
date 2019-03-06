@@ -5463,15 +5463,19 @@ bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
     {
         if( !rfc_ctx->tp )
         {
+            /* Write to non existent tp storage is ok */
             return true;
         }
 
         /* Check to append or alter */
         if( tp_pos )
         {
-            /* Alter or move existing turning point.
-               Writing behind tp_cnt is not ok       */
-            assert( tp_pos <= rfc_ctx->tp_cnt );
+            /* Alter or move existing turning point. */
+            if( tp_pos > rfc_ctx->tp_cnt )
+            {
+                /* Writing behind tp_cnt is not ok */
+                return false;
+            }
 
 #if RFC_DH_SUPPORT
             if( tp->damage < 0.0 )
@@ -5500,9 +5504,6 @@ bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
             /* Append (tp_pos == 0) */
             if( tp->tp_pos )
             {
-                /* Already an element of tp stack */
-                assert( tp->tp_pos <= rfc_ctx->tp_cap );
-
 #if RFC_DEBUG_FLAGS
                 if( rfc_ctx->internal.debug_flags & RFC_FLAGS_LOG_WRITE_TP )
                 {
@@ -5511,7 +5512,8 @@ bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
                                        tp_pos, tp->value, tp->cls, tp->pos );
                 }
 #endif /*RFC_DEBUG_FLAGS*/
-                return true;
+                /* Already an element of tp stack */
+                return tp->tp_pos <= rfc_ctx->tp_cap;
             }
             else
             {
@@ -5584,7 +5586,8 @@ bool tp_get( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s **tp )
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state <= RFC_STATE_FINISHED );
 
-    if( !tp_pos || tp_pos > rfc_ctx->tp_cap )
+    /* Reading behind tp_cnt is ok */
+    if( !tp || !tp_pos || tp_pos > rfc_ctx->tp_cap )
     {
         return false;
     }
@@ -5604,22 +5607,16 @@ bool tp_get( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s **tp )
             return false;
         }
 
-        if( tp )
-        {
-            /* Reading behind tp_cnt is ok */
-            assert( tp_pos <= rfc_ctx->tp_cap );
-
-            *tp = &rfc_ctx->tp[ tp_pos - 1 ];
+        *tp = &rfc_ctx->tp[ tp_pos - 1 ];
 
 #if RFC_DEBUG_FLAGS
-            if( rfc_ctx->internal.debug_flags & RFC_FLAGS_LOG_READ_TP )
-            {
-                RFC_debug_fprintf( rfc_ctx, stdout, 
-                                   "Read tp #%lu (%g[%lu] @ %lu)\n", 
-                                   tp_pos, (*tp)->value, (*tp)->cls, (*tp)->pos );
-            }
-#endif /*RFC_DEBUG_FLAGS*/
+        if( rfc_ctx->internal.debug_flags & RFC_FLAGS_LOG_READ_TP )
+        {
+            RFC_debug_fprintf( rfc_ctx, stdout, 
+                               "Read tp #%lu (%g[%lu] @ %lu)\n", 
+                               tp_pos, (*tp)->value, (*tp)->cls, (*tp)->pos );
         }
+#endif /*RFC_DEBUG_FLAGS*/
     }
 
     return true;

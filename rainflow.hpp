@@ -884,6 +884,12 @@ bool RainflowT<T>::wl_param_get( rfc_wl_param_s &wl_param ) const
 template< class T >
 bool RainflowT<T>::tp_set( size_t tp_pos, rfc_value_tuple_s *tp )
 {
+    if( !rfc_ctx->tp )
+    {
+        /* Write to non existent tp storage is ok */
+        return true;
+    }
+    
     if( tp_pos )
     {
         /* Alter or move existing turning point */
@@ -963,15 +969,20 @@ bool RainflowT<T>::tp_set( size_t tp_pos, rfc_value_tuple_s *tp )
         }
     }
 
+    if( rfc_ctx->internal.flags & RFC_FLAGS_TPAUTOPRUNE && rfc_ctx->tp_cnt > rfc_ctx->tp_prune_threshold )
+    {
+        return RFC_tp_prune( rfc_ctx, rfc_ctx->tp_prune_size, RFC_FLAGS_TPPRUNE_PRESERVE_POS );
+    }
+
     return true;
 }
 
 
 template< class T >
-bool RainflowT<T>::tp_get( size_t pos, rfc_value_tuple_s **tp )
+bool RainflowT<T>::tp_get( size_t tp_pos, rfc_value_tuple_s **tp )
 {
     /* Reading behind tp_cnt is ok */
-    if( !tp || !pos || pos > m_ctx.tp_cap )
+    if( !tp || !tp_pos || tp_pos > m_ctx.tp_cap )
     {
         return false;
     }
@@ -981,11 +992,11 @@ bool RainflowT<T>::tp_get( size_t pos, rfc_value_tuple_s **tp )
     {
         RFC_debug_fprintf( &m_ctx, stdout, 
                            "Read tp #%lu (%g[%lu] @ %lu)\n", 
-                           pos, m_tp[pos-1].value, m_tp[pos-1].cls, m_tp[pos-1].pos );
+                           tp_pos, m_tp[tp_pos-1].value, m_tp[tp_pos-1].cls, m_tp[tp_pos-1].pos );
     }
 #endif /*RFC_DEBUG_FLAGS*/
 
-    *tp = &m_tp[pos-1];
+    *tp = &m_tp[tp_pos-1];
 
     return true;
 }
