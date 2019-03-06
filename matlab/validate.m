@@ -190,7 +190,7 @@ function validate
   end
   
   %% Long series, turning points only
-  y = rfc( 'turningpoints', x, class_width, enforce_margin );
+  y = rfc( 'turningpoints', x, class_width*2, enforce_margin );
   figure
   plot( x, 'k-', 'DisplayName', 'time series' );
   hold all

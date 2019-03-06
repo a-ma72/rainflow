@@ -1368,6 +1368,7 @@ bool RFC_feed( void *ctx, const rfc_value_t * data, size_t data_count )
         return false;
     }
 
+#if RFC_DH_SUPPORT
     if( rfc_ctx->dh )
     {
         if( !rfc_ctx->dh_istream )
@@ -1380,6 +1381,7 @@ bool RFC_feed( void *ctx, const rfc_value_t * data, size_t data_count )
             return error_raise( rfc_ctx, RFC_ERROR_DH_BAD_STREAM );
         }
     }
+#endif /*RFC_DH_SUPPORT*/
 
     /* Process data */
     while( data_count-- )
@@ -6571,7 +6573,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 #if RFC_DH_SUPPORT
         if( spread_damage >= RFC_SD_TRANSIENT_23 )
         {
-            if( !RFC_dh_init( &rfc_ctx, spread_damage, /*dh*/, /*dh_cap*/ 1, /*is_static*/ false ) )
+            if( !RFC_dh_init( &rfc_ctx, spread_damage, /*dh*/ NULL, /*dh_cap*/ 1, /*is_static*/ false ) )
             {
                 ok = false;
             }
