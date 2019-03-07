@@ -7,7 +7,7 @@ function validate
       addpath( '../build' );
     end
   end
-  
+
   %% Empty series
   name              = 'empty';
   class_count       = 100;
@@ -127,11 +127,11 @@ function validate
   use_hcm           = 0;
   residual_method   = 0;  % 0=RFC_RES_NONE, 6=RFC_RES_REPEATED
   spread_damage     = 1;  % 0=RFC_SD_HALF_23, 1=RFC_SD_RAMP_AMPLITUDE_23
-  
+
   [pd,re,rm,rp,lc,tp,dh] = ...
     rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
                 residual_method, enforce_margin, use_hcm, spread_damage );
-              
+
   % With residuum:    pd == 3.8810e-13
   % Without residuum: pd == 4.8703e-16
   assert( abs( sum( tp(:,3) ) / pd - 1 ) < 1e-10 );
@@ -143,15 +143,15 @@ function validate
   [ax, h1, h2] = plotyy( tp(:,1), tp(:,2), tp(:,1), cumsum( tp(:,3) ) );
   set( h1, 'DisplayName', 'time series' );
   set( h2, 'DisplayName', 'cumulative damage (based on TP)' );
-  
+
   grid
-  
+
   spread_damage = 8;  % 7=RFC_SD_TRANSIENT_23, 8=RFC_SD_TRANSIENT_23c
-  
+
   [pd,re,rm,rp,lc,tp,dh] = ...
     rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
                 residual_method, enforce_margin, use_hcm, spread_damage );
-              
+
   assert( abs( sum( dh ) / pd - 1 ) < 1e-10 );
   hold( ax(2), 'all' );
   plot( ax(2), 1:length(dh), cumsum(dh), 'k--', 'DisplayName', 'cumulative damage (based on time series)' )
@@ -188,7 +188,7 @@ function validate
       test = abs( y.residuum ./ re - 1 );
       assert( all( test < 1e-1 ))
   end
-  
+
   %% Long series, turning points only
   y = rfc( 'turningpoints', x, class_width*2, enforce_margin );
   figure
@@ -203,8 +203,8 @@ function rounded_data = export_series( filename, data, class_count )
   rounded_data = round( data, 2 );
   % Avoid values near class boundaries, to avoid rounding effects on
   % different machines
-  class_width = round( ( max(rounded_data) - min(rounded_data) ) / (class_count - 1), 2 );
-  class_offset = round( min(rounded_data) - class_width/2, 3 );
+  class_width  = round( ( max(rounded_data) - min(rounded_data) ) / (class_count - 1), 2 );
+  class_offset = round(   min(rounded_data) - class_width/2, 3 );
   % Normalized data
   rounded_data = ( rounded_data - class_offset) / class_width;
   % Inspect boundaries
@@ -213,8 +213,8 @@ function rounded_data = export_series( filename, data, class_count )
   % Avoid them
   data(i) = data(i) + 0.1;
   rounded_data = round( data, 2 );
-  class_width = round( ( max(rounded_data) - min(rounded_data) ) / (class_count - 1), 2 );
-  class_offset = round( min(rounded_data) - class_width/2, 3 );
+  class_width  = round( ( max(rounded_data) - min(rounded_data) ) / (class_count - 1), 2 );
+  class_offset = round(   min(rounded_data) - class_width/2, 3 );
   rounded_data = ( rounded_data - class_offset) / class_width;
   i = mod( rounded_data, 1 );
   i = find( i > 0.999 | i < 0.001 );

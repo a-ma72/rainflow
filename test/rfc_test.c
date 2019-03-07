@@ -326,7 +326,7 @@ TEST RFC_tp_prune_test( int ccnt )
     }
 
     class_width     =  (RFC_VALUE_TYPE)ROUNDN( (x_max - x_min) / (class_count - 1), 2 );
-    class_offset    =  ROUNDN( x_min - class_width / 2,3 );
+    class_offset    =  (RFC_VALUE_TYPE)ROUNDN( x_min - class_width / 2,3 );
     hysteresis      =  class_width;
 
     GREATEST_FPRINTF( GREATEST_STDOUT, "\nTest long series:" );
@@ -481,7 +481,7 @@ TEST RFC_tp_refeed_test( int ccnt )
         ASSERT( RFC_feed( &ctx2, data, data_len ) );
         ASSERT( RFC_finalize( &ctx2, RFC_RES_NONE ) );
 
-        //ASSERT_IN_RANGE( ctx.damage / ctx2.damage, 1.0, 1e-10 );
+        ASSERT_IN_RANGE( ctx.damage / ctx2.damage, 1.0, 1e-10 );
         ASSERT_EQ( ctx.tp_cnt, ctx2.tp_cnt );
 
         if( ccnt )
@@ -688,7 +688,7 @@ TEST RFC_empty( int ccnt )
     RFC_VALUE_TYPE      x_min           = -1;
     unsigned            class_count     =  ccnt ? 100 : 0;
     RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUNDN( (x_max - x_min) / (class_count - 1), 2 );
-    RFC_VALUE_TYPE      class_offset    =  ROUNDN( x_min - class_width / 2, 3 );
+    RFC_VALUE_TYPE      class_offset    =  (RFC_VALUE_TYPE)ROUNDN( x_min - class_width / 2, 3 );
     RFC_VALUE_TYPE      hysteresis      =  class_width;
 #if RFC_TP_SUPPORT
     rfc_value_tuple_s   tp[10];
@@ -736,7 +736,7 @@ TEST RFC_cycle_up( int ccnt )
     RFC_VALUE_TYPE      x_min           =  1;
     unsigned            class_count     =  ccnt ? 4 : 0;
     RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUNDN( (x_max - x_min) / (class_count - 1), 2 );
-    RFC_VALUE_TYPE      class_offset    =  ROUNDN( x_min - class_width / 2, 3 );
+    RFC_VALUE_TYPE      class_offset    =  (RFC_VALUE_TYPE)ROUNDN( x_min - class_width / 2, 3 );
     RFC_VALUE_TYPE      hysteresis      =  class_width * 0.99;
 #if RFC_TP_SUPPORT
     rfc_value_tuple_s   tp[10];
@@ -814,7 +814,7 @@ TEST RFC_cycle_down( int ccnt )
     RFC_VALUE_TYPE      x_min           =  1;
     unsigned            class_count     =  ccnt ? 4 : 0;
     RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUNDN( (x_max - x_min) / (class_count - 1), 2 );
-    RFC_VALUE_TYPE      class_offset    =  ROUNDN( x_min - class_width / 2, 3 );
+    RFC_VALUE_TYPE      class_offset    =  (RFC_VALUE_TYPE)ROUNDN( x_min - class_width / 2, 3 );
     RFC_VALUE_TYPE      hysteresis      =  class_width * 0.99;
 #if RFC_TP_SUPPORT
     rfc_value_tuple_s   tp[10];
@@ -892,7 +892,7 @@ TEST RFC_small_example( int ccnt )
     RFC_VALUE_TYPE      x_min           =  1;
     unsigned            class_count     =  ccnt ? (unsigned)x_max : 0;
     RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUNDN( (x_max - x_min) / (class_count - 1), 2 );
-    RFC_VALUE_TYPE      class_offset    =  ROUNDN( x_min - class_width / 2, 3 );
+    RFC_VALUE_TYPE      class_offset    =  (RFC_VALUE_TYPE)ROUNDN( x_min - class_width / 2, 3 );
     RFC_VALUE_TYPE      hysteresis      =  class_width;
 #if RFC_TP_SUPPORT
     rfc_value_tuple_s   tp[20];
@@ -1040,7 +1040,7 @@ TEST RFC_long_series( int ccnt )
     if( !need_conf )
     {
         class_width     =  (RFC_VALUE_TYPE)ROUNDN( (x_max - x_min) / (class_count - 1), 2 );
-        class_offset    =  ROUNDN( x_min - class_width / 2, 3 );
+        class_offset    =  (RFC_VALUE_TYPE)ROUNDN( x_min - class_width / 2, 3 );
         hysteresis      =  class_width;
     }
     else
@@ -1780,7 +1780,7 @@ TEST RFC_miner_consequent( void )
     /* Check each representation */
     for( i = 0; i < NUMEL(Sa_hat); i++ )
     {
-        rfc_value_t     class_width = ROUNDN( Sa_hat[i] * 2.0 / ( class_count - 1 ), 2 );
+        rfc_value_t     class_width = (RFC_VALUE_TYPE)ROUNDN( Sa_hat[i] * 2.0 / ( class_count - 1 ), 2 );
         double          Sa[10];
         int             j;
         double          N_bar;
@@ -1852,7 +1852,7 @@ TEST RFC_miner_consequent2( void )
     }
 
     class_width  =  (RFC_VALUE_TYPE)ROUNDN( (x_max - x_min) / (class_count - 1), 2 );
-    class_offset =  ROUNDN( x_min - class_width / 2, 3 );
+    class_offset =  (RFC_VALUE_TYPE)ROUNDN( x_min - class_width / 2, 3 );
     hysteresis   =  class_width;
 
     ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
