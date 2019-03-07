@@ -281,9 +281,6 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
     {
 #if !RFC_MINIMAL
         flags                               = RFC_FLAGS_COUNT_ALL            | 
-#if _DEBUG
-                                              RFC_FLAGS_LOG_CLOSED_CYCLES    |
-#endif /*_DEBUG*/
 #if RFC_TP_SUPPORT  
                                               RFC_FLAGS_TPPRUNE_PRESERVE_POS | 
                                               RFC_FLAGS_TPPRUNE_PRESERVE_RES |
@@ -295,6 +292,7 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
 #endif /*!RFC_MINIMAL*/
     }
     rfc_ctx->internal.flags                 = flags;
+    rfc_ctx->internal.debug_flags           = 0;
 
 #if _DEBUG
     rfc_ctx->internal.finalizing            = false;
@@ -3162,19 +3160,66 @@ bool RFC_class_upper( const void *ctx, unsigned class_number, rfc_value_t *class
  *
  * @return     true on success
  */
-bool RFC_set_flags( void *ctx, int flags, int stack )
+bool RFC_flags_set( void *ctx, int flags, bool overwrite, int stack )
 {
     RFC_CTX_CHECK_AND_ASSIGN
 
     switch( stack )
     {
         case 0:
-            rfc_ctx->internal.flags = (rfc_flags_e)flags;
+            if( overwrite )
+            {
+                rfc_ctx->internal.flags = (rfc_flags_e)flags;
+            }
+            else
+            {
+                rfc_ctx->internal.flags |= (rfc_flags_e)flags;
+            }
             break;
 
 #if RFC_DEBUG_FLAGS
         case 1:
-            rfc_ctx->internal.debug_flags = (rfc_debug_flags_e)flags;
+            if( overwrite )
+            {
+                rfc_ctx->internal.debug_flags = (rfc_debug_flags_e)flags;
+            }
+            else
+            {
+                rfc_ctx->internal.debug_flags |= (rfc_debug_flags_e)flags;
+            }
+            break;
+#endif /*RFC_DEBUG_FLAGS*/
+
+        default:
+            return false;
+    }
+
+    return true;
+}
+
+
+/**
+ * @brief      Unset flags (mask)
+ *
+ * @param      ctx        The rainflow context
+ * @param[in]  flags      The flags
+ * @param[in]  stack      ID of flags stack
+ *
+ * @return     true on success
+ */
+bool RFC_flags_unset( void *ctx, int flags, int stack )
+{
+    RFC_CTX_CHECK_AND_ASSIGN
+
+    switch( stack )
+    {
+        case 0:
+            rfc_ctx->internal.flags &= (rfc_flags_e)~flags;
+            break;
+
+#if RFC_DEBUG_FLAGS
+        case 1:
+            rfc_ctx->internal.debug_flags &= (rfc_debug_flags_e)~flags;
             break;
 #endif /*RFC_DEBUG_FLAGS*/
 
@@ -3195,7 +3240,7 @@ bool RFC_set_flags( void *ctx, int flags, int stack )
  *
  * @return     true on success
  */
-bool RFC_get_flags( const void *ctx, int *flags, int stack )
+bool RFC_flags_get( const void *ctx, int *flags, int stack )
 {
     RFC_CTX_CHECK_AND_ASSIGN
 
@@ -3703,7 +3748,7 @@ bool feed_once_tp_check_margin( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt,
 
                     if( (*tp_residue)->value == rfc_ctx->internal.margin[0].value )
                     {
-                        assert( rfc_ctx->tp_cnt == 1 );
+                        assert( rfc_ctx->tp_cnt <= 1 );
 
                         /* Left margin and first turning point are identical, set reference in residue */
                         (*tp_residue)->tp_pos = 1;
@@ -5212,7 +5257,7 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
             flags & (RFC_FLAGS_COUNT_ALL & ~RFC_FLAGS_COUNT_LC) )
         {
             RFC_debug_fprintf( rfc_ctx, stdout, 
-                               "Closed cycle %g @ %lu[%lu] --> %g @ %lu[%lu]\n", 
+                               "\nClosed cycle %g @ %lu[%lu] --> %g @ %lu[%lu]", 
                                from->value, (long unsigned)from->pos, (long unsigned)from->tp_pos,
                                to->value,   (long unsigned)to->pos,   (long unsigned)to->tp_pos );
         }
@@ -5493,7 +5538,7 @@ bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
             if( rfc_ctx->internal.debug_flags & RFC_FLAGS_LOG_WRITE_TP )
             {
                 RFC_debug_fprintf( rfc_ctx, stdout, 
-                                   "Alter tp #%lu (%g[%lu] @ %lu)\n", 
+                                   "\nAlter tp #%lu (%g[%lu] @ %lu)", 
                                    tp_pos, tp->value, tp->cls, tp->pos );
             }
 #endif /*RFC_DEBUG_FLAGS*/
@@ -5508,7 +5553,7 @@ bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
                 if( rfc_ctx->internal.debug_flags & RFC_FLAGS_LOG_WRITE_TP )
                 {
                     RFC_debug_fprintf( rfc_ctx, stdout, 
-                                       "Try to appen, but already exists: tp #%lu (%g[%lu] @ %lu)\n", 
+                                       "\nTry to append, but already exists: tp #%lu (%g[%lu] @ %lu)", 
                                        tp_pos, tp->value, tp->cls, tp->pos );
                 }
 #endif /*RFC_DEBUG_FLAGS*/
@@ -5556,7 +5601,7 @@ bool tp_set( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s *tp )
         if( rfc_ctx->internal.debug_flags & RFC_FLAGS_LOG_WRITE_TP )
         {
             RFC_debug_fprintf( rfc_ctx, stdout, 
-                               "Append tp #%lu (%g[%lu] @ %lu)\n", 
+                               "\nAppend tp #%lu (%g[%lu] @ %lu)", 
                                tp_pos, tp->value, tp->cls, tp->pos );
         }
 #endif /*RFC_DEBUG_FLAGS*/
@@ -5613,7 +5658,7 @@ bool tp_get( rfc_ctx_s *rfc_ctx, size_t tp_pos, rfc_value_tuple_s **tp )
         if( rfc_ctx->internal.debug_flags & RFC_FLAGS_LOG_READ_TP )
         {
             RFC_debug_fprintf( rfc_ctx, stdout, 
-                               "Read tp #%lu (%g[%lu] @ %lu)\n", 
+                               "\nRead tp #%lu (%g[%lu] @ %lu)", 
                                tp_pos, (*tp)->value, (*tp)->cls, (*tp)->pos );
         }
 #endif /*RFC_DEBUG_FLAGS*/
@@ -5736,7 +5781,7 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
 #if RFC_DEBUG_FLAGS
         if( rfc_ctx->internal.debug_flags & RFC_FLAGS_LOG_TP_REFEED )
         {
-            RFC_debug_fprintf( rfc_ctx, stdout, "Finalize tp storage...\n" );
+            RFC_debug_fprintf( rfc_ctx, stdout, "\nFinalize tp storage...\n" );
         }
 #endif /*RFC_DEBUG_FLAGS*/
 
@@ -5829,9 +5874,9 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
             int flags = rfc_ctx->internal.debug_flags;
 
             RFC_debug_fprintf( rfc_ctx, stdout,
-                               "Content of tp storage:\n" );
+                               "\nContent of tp storage:" );
 
-            RFC_set_flags( rfc_ctx, RFC_FLAGS_LOG_READ_TP, /*debugging*/ true );
+            RFC_flags_set( rfc_ctx, RFC_FLAGS_LOG_READ_TP, /*overwrite*/ true, /*debugging*/ true );
             
             for( i = 1; i <= rfc_ctx->tp_cnt; i++ )
             {
@@ -5840,7 +5885,8 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
                 tp_get( rfc_ctx, i, &tp );
             }
 
-            RFC_set_flags( rfc_ctx, flags, /*debugging*/ true );
+            RFC_debug_fprintf( rfc_ctx, stdout, "%s\n", "" );
+            RFC_flags_set( rfc_ctx, flags, /*overwrite*/ true, /*debugging*/ true );
         }
 #endif /*RFC_DEBUG_FLAGS*/
 
@@ -5849,8 +5895,7 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
     else
 #endif /*!RFC_USE_DELEGATES*/
     {
-        size_t             tp_cnt = rfc_ctx->tp_cnt;
-        rfc_value_tuple_s *tp     = rfc_ctx->tp;
+        rfc_value_tuple_s *tp = rfc_ctx->tp;
 
         for( i = 0; i < tp_cnt; i++, tp++ )
         {
@@ -6532,7 +6577,6 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                        (rfc_value_t)hysteresis, RFC_FLAGS_DEFAULT );
 #if RFC_DEBUG_FLAGS
         rfc_ctx.debug_vfprintf_fcn = rfc_vfprintf_fcn;
-        RFC_set_flags( &rfc_ctx, RFC_FLAGS_LOG_CLOSED_CYCLES, 1 );
 #endif /*RFC_DEBUG_FLAGS*/
 
 #if RFC_TP_SUPPORT

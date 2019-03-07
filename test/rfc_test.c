@@ -137,6 +137,69 @@ void strip_buffer( struct buffer* buffer )
 }
 
 
+void calc_extema( const RFC_VALUE_TYPE* data, size_t data_len, RFC_VALUE_TYPE* data_max, RFC_VALUE_TYPE* data_min )
+{
+    RFC_VALUE_TYPE x_min, x_max;
+    size_t i;
+
+    if( !data || !data_len ) return;
+
+    x_min = x_max = data[0];
+
+    for( i = 1; i < data_len; i++ )
+    {
+        if( data[i] > x_max )
+        {
+            x_max = data[i];
+        }
+        else if( data[i] < x_min )
+        {
+            x_min = data[i];
+        }
+    }
+
+    if( data_min )
+    {
+        *data_min = x_min;
+    }
+
+    if( data_max )
+    {
+        *data_max = x_max;
+    }
+}
+
+
+void calc_class_param( double data_max, double data_min, unsigned class_count, RFC_VALUE_TYPE* class_width, RFC_VALUE_TYPE* class_offset )
+{
+    double width, offset;
+
+    if( data_max < data_min ) abort();
+
+    if( class_count < 1 )
+    {
+        width  = 1.0;
+        offset = 0.0;
+    }
+    else
+    {
+        width  = (data_max - data_min) / (class_count - 1);
+        width  = ceil( width * 100 ) / 100;
+        offset = floor( ( data_min - width / 2 ) * 1000 ) / 1000;
+    }
+
+    if( class_width )
+    {
+        *class_width = (RFC_VALUE_TYPE)width;
+    }
+
+    if( class_offset )
+    {
+        *class_offset = (RFC_VALUE_TYPE)offset;
+    }
+}
+
+
 #if RFC_TP_SUPPORT
 void export_tp( const char *filename, rfc_value_tuple_s* data, size_t count )
 {
@@ -325,9 +388,8 @@ TEST RFC_tp_prune_test( int ccnt )
         }
     }
 
-    class_width     =  (RFC_VALUE_TYPE)ROUNDN( (x_max - x_min) / (class_count - 1), 2 );
-    class_offset    =  (RFC_VALUE_TYPE)ROUNDN( x_min - class_width / 2,3 );
-    hysteresis      =  class_width;
+    calc_class_param( x_max, x_min, class_count, &class_width, &class_offset );
+    hysteresis = class_width;
 
     GREATEST_FPRINTF( GREATEST_STDOUT, "\nTest long series:" );
     GREATEST_FPRINTF( GREATEST_STDOUT, "\nClass count  = %d", class_count );
@@ -391,7 +453,7 @@ TEST RFC_tp_refeed_test( int ccnt )
 {
     RFC_VALUE_TYPE      data[10000];
     size_t              data_len            =  NUMEL( data );
-    const size_t        chunk_maxlen        =  2;
+    const size_t        chunk_maxlen        =  137;
     RFC_VALUE_TYPE      x_max;
     RFC_VALUE_TYPE      x_min;
     unsigned            class_count         = ccnt ? 100 : 0;
@@ -414,12 +476,13 @@ TEST RFC_tp_refeed_test( int ccnt )
     hysteresis   = 0;
 
 
-    ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
-    ASSERT( RFC_tp_init( &ctx, /*tp*/ NULL, /*tp_cnt*/ 1, /* is_static */ false ) );
+    ASSERT( RFC_init(      &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_COUNT_ALL ) );
+    ASSERT( RFC_tp_init(   &ctx, /*tp*/ NULL, /*tp_cnt*/ 1, /* is_static */ false ) );
+//    ASSERT( RFC_set_flags( &ctx, RFC_FLAGS_LOG_TP_REFEED | RFC_FLAGS_LOG_WRITE_TP | RFC_FLAGS_LOG_READ_TP, /*debugging*/ true ) );
 
     x_min = x_max = data[0];
 
-    data_len = 10;
+    data_len = 10000;
 
     for( i = 0; i < data_len; )
     {
@@ -454,7 +517,10 @@ TEST RFC_tp_refeed_test( int ccnt )
 
         if( !i || class_width > ctx.class_width )
         {
+            rfc_ctx_s ctx_check = {sizeof(rfc_ctx_s)};
             rfc_class_param_s class_param;
+
+            calc_class_param( x_max, x_min, class_count, &class_width, &class_offset );
 
             class_param.count  = class_count;
             class_param.width  = class_width;
@@ -463,6 +529,17 @@ TEST RFC_tp_refeed_test( int ccnt )
             hysteresis = class_width;
 
             ASSERT( RFC_tp_refeed( &ctx, hysteresis, &class_param ) );
+
+            // Crucial test
+            ASSERT( RFC_init(      &ctx_check, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_COUNT_ALL ) );
+            ASSERT( RFC_tp_init(   &ctx_check, /*tp*/ NULL, /*tp_cap*/ 1, /*is_static*/ false ) );
+//            ASSERT( RFC_set_flags( &ctx, RFC_FLAGS_LOG_TP_REFEED | RFC_FLAGS_LOG_WRITE_TP | RFC_FLAGS_LOG_READ_TP, /*debugging*/ true ) );
+            ASSERT( RFC_feed(      &ctx_check, data, i ) );
+
+            ASSERT_IN_RANGE( 1.0, ctx.damage / ctx_check.damage, 1e-10 );
+            ASSERT_EQ( ctx.tp_cnt, ctx_check.tp_cnt );
+
+            ASSERT( RFC_deinit( &ctx_check ) );
         }
 
         ASSERT( RFC_feed( &ctx, data + i, /* count */ chunk_len ) );
@@ -474,15 +551,16 @@ TEST RFC_tp_refeed_test( int ccnt )
     do
     {
         FILE* fid = NULL;
-        rfc_ctx_s ctx2 = {sizeof(rfc_ctx_s)};
+        rfc_ctx_s ctx_check = {sizeof(rfc_ctx_s)};
 
-        ASSERT( RFC_init( &ctx2, ctx.class_count, ctx.class_width, ctx.class_offset, ctx.hysteresis, RFC_FLAGS_DEFAULT ) );
-        ASSERT( RFC_tp_init( &ctx2, /*tp*/ NULL, /*tp_cap*/ 1, /*is_static*/ false ) );
-        ASSERT( RFC_feed( &ctx2, data, data_len ) );
-        ASSERT( RFC_finalize( &ctx2, RFC_RES_NONE ) );
+        // Final crucial test
+        ASSERT( RFC_init(     &ctx_check, ctx.class_count, ctx.class_width, ctx.class_offset, ctx.hysteresis, RFC_FLAGS_COUNT_ALL ) );
+        ASSERT( RFC_tp_init(  &ctx_check, /*tp*/ NULL, /*tp_cap*/ 1, /*is_static*/ false ) );
+        ASSERT( RFC_feed(     &ctx_check, data, data_len ) );
+        ASSERT( RFC_finalize( &ctx_check, RFC_RES_NONE ) );
 
-        ASSERT_IN_RANGE( ctx.damage / ctx2.damage, 1.0, 1e-10 );
-        ASSERT_EQ( ctx.tp_cnt, ctx2.tp_cnt );
+        ASSERT_IN_RANGE( 1.0, ctx.damage / ctx_check.damage, 1e-10 );
+        ASSERT_EQ( ctx.tp_cnt, ctx_check.tp_cnt );
 
         if( ccnt )
         {
@@ -515,13 +593,13 @@ TEST RFC_tp_refeed_test( int ccnt )
             fprintf( fid, "\t" );
             fprintf( fid, "%d\t%g\t%u\t%d\t%d\t%g\t%g", 
                      (int) i, 
-                  (double) ctx2.tp[i].value,
-                (unsigned) ctx2.tp[i].cls,
-                     (int) ctx2.tp[i].pos,
-                     (int) ctx2.tp[i].adj_pos,
-                  (double) ctx2.tp[i].avrg,
+                  (double) ctx_check.tp[i].value,
+                (unsigned) ctx_check.tp[i].cls,
+                     (int) ctx_check.tp[i].pos,
+                     (int) ctx_check.tp[i].adj_pos,
+                  (double) ctx_check.tp[i].avrg,
 #if RFC_DH_SUPPORT
-                  (double) ctx2.tp[i].damage );
+                  (double) ctx_check.tp[i].damage );
 #else /*!RFC_DH_SUPPORT*/
                            0.0 );
 #endif /*RFC_DH_SUPPORT*/
@@ -531,34 +609,21 @@ TEST RFC_tp_refeed_test( int ccnt )
 
         for( i = 0; i < ctx.tp_cnt; i++ )
         {
-            size_t j;
-
-            ASSERT_IN_RANGE( ctx.tp[i].value,   ctx2.tp[i].value,  1e-10 );
-            ASSERT_EQ(       ctx.tp[i].cls,     ctx2.tp[i].cls );
-            ASSERT_EQ(       ctx.tp[i].pos,     ctx2.tp[i].pos );
-            ASSERT_EQ(       ctx.tp[i].adj_pos, ctx2.tp[i].adj_pos );
-            ASSERT_IN_RANGE( ctx.tp[i].avrg,    ctx2.tp[i].avrg,   1e-10 );
+            ASSERT_IN_RANGE( ctx.tp[i].value,   ctx_check.tp[i].value,  1e-10 );
+            ASSERT_EQ(       ctx.tp[i].cls,     ctx_check.tp[i].cls );
+            ASSERT_EQ(       ctx.tp[i].pos,     ctx_check.tp[i].pos );
+            ASSERT_EQ(       ctx.tp[i].adj_pos, ctx_check.tp[i].adj_pos );
+            ASSERT_IN_RANGE( ctx.tp[i].avrg,    ctx_check.tp[i].avrg,   1e-10 );
 #if RFC_DH_SUPPORT
-            ASSERT_IN_RANGE( ctx.tp[i].damage,  ctx2.tp[i].damage, 1e-10 );
+            ASSERT_IN_RANGE( ctx.tp[i].damage,  ctx_check.tp[i].damage, 1e-10 );
 #endif /*RFC_DH_SUPPORT*/
 
             if( ctx.tp[i].adj_pos > 0 )
             {
-                bool ok = false;
-
-                for( j = 0; j < ctx.tp_cnt; j++ )
-                {
-                    if( ctx.tp[j].pos == ctx.tp[i].adj_pos )
-                    {
-                        ok = true;
-                        ASSERT( ctx.tp[j].adj_pos == ctx.tp[i].pos );
-                        break;
-                    }
-                }
-                ASSERT( ok );
+                ASSERT( ctx.tp[ ctx.tp[i].adj_pos - 1 ].adj_pos == i + 1 );
             }
         }
-        ASSERT( RFC_deinit( &ctx2 ) );
+        ASSERT( RFC_deinit( &ctx_check ) );
     } while(0);
 
     ASSERT( RFC_deinit( &ctx ) );
@@ -569,7 +634,6 @@ TEST RFC_tp_refeed_test( int ccnt )
 
 TEST RFC_test_turning_points( int ccnt )
 {
-    //rfc_ctx_s         ctx = {sizeof(ctx)};
     rfc_value_tuple_s tp[10];
     
     if( ccnt ) ccnt = 10;
@@ -687,9 +751,13 @@ TEST RFC_empty( int ccnt )
     RFC_VALUE_TYPE      x_max           =  1;
     RFC_VALUE_TYPE      x_min           = -1;
     unsigned            class_count     =  ccnt ? 100 : 0;
-    RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUNDN( (x_max - x_min) / (class_count - 1), 2 );
-    RFC_VALUE_TYPE      class_offset    =  (RFC_VALUE_TYPE)ROUNDN( x_min - class_width / 2, 3 );
-    RFC_VALUE_TYPE      hysteresis      =  class_width;
+    RFC_VALUE_TYPE      class_width;
+    RFC_VALUE_TYPE      class_offset;
+    RFC_VALUE_TYPE      hysteresis;
+
+    calc_class_param( x_max, x_min, class_count, &class_width, &class_offset );
+    hysteresis = class_width;
+
 #if RFC_TP_SUPPORT
     rfc_value_tuple_s   tp[10];
 #endif /*RFC_TP_SUPPORT*/
@@ -735,13 +803,16 @@ TEST RFC_cycle_up( int ccnt )
     RFC_VALUE_TYPE      x_max           =  4;
     RFC_VALUE_TYPE      x_min           =  1;
     unsigned            class_count     =  ccnt ? 4 : 0;
-    RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUNDN( (x_max - x_min) / (class_count - 1), 2 );
-    RFC_VALUE_TYPE      class_offset    =  (RFC_VALUE_TYPE)ROUNDN( x_min - class_width / 2, 3 );
-    RFC_VALUE_TYPE      hysteresis      =  class_width * 0.99;
+    RFC_VALUE_TYPE      class_width;
+    RFC_VALUE_TYPE      class_offset;
+    RFC_VALUE_TYPE      hysteresis;
 #if RFC_TP_SUPPORT
     rfc_value_tuple_s   tp[10];
 #endif /*RFC_TP_SUPPORT*/
     size_t              i;
+
+    calc_class_param( x_max, x_min, class_count, &class_width, &class_offset );
+    hysteresis = class_width * 0.99;
 
     do
     {
@@ -813,13 +884,16 @@ TEST RFC_cycle_down( int ccnt )
     RFC_VALUE_TYPE      x_max           =  4;
     RFC_VALUE_TYPE      x_min           =  1;
     unsigned            class_count     =  ccnt ? 4 : 0;
-    RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUNDN( (x_max - x_min) / (class_count - 1), 2 );
-    RFC_VALUE_TYPE      class_offset    =  (RFC_VALUE_TYPE)ROUNDN( x_min - class_width / 2, 3 );
-    RFC_VALUE_TYPE      hysteresis      =  class_width * 0.99;
+    RFC_VALUE_TYPE      class_width;
+    RFC_VALUE_TYPE      class_offset;
+    RFC_VALUE_TYPE      hysteresis;
 #if RFC_TP_SUPPORT
     rfc_value_tuple_s   tp[10];
 #endif /*RFC_TP_SUPPORT*/
     size_t              i;
+
+    calc_class_param( x_max, x_min, class_count, &class_width, &class_offset );
+    hysteresis = class_width * 0.99;
 
     do
     {
@@ -891,13 +965,16 @@ TEST RFC_small_example( int ccnt )
     RFC_VALUE_TYPE      x_max           =  6;
     RFC_VALUE_TYPE      x_min           =  1;
     unsigned            class_count     =  ccnt ? (unsigned)x_max : 0;
-    RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUNDN( (x_max - x_min) / (class_count - 1), 2 );
-    RFC_VALUE_TYPE      class_offset    =  (RFC_VALUE_TYPE)ROUNDN( x_min - class_width / 2, 3 );
-    RFC_VALUE_TYPE      hysteresis      =  class_width;
+    RFC_VALUE_TYPE      class_width;
+    RFC_VALUE_TYPE      class_offset;
+    RFC_VALUE_TYPE      hysteresis;
 #if RFC_TP_SUPPORT
     rfc_value_tuple_s   tp[20];
 #endif /*RFC_TP_SUPPORT*/
     size_t              i;
+
+    calc_class_param( x_max, x_min, class_count, &class_width, &class_offset );
+    hysteresis = class_width * 0.99;
 
     do
     {
@@ -1039,8 +1116,7 @@ TEST RFC_long_series( int ccnt )
 
     if( !need_conf )
     {
-        class_width     =  (RFC_VALUE_TYPE)ROUNDN( (x_max - x_min) / (class_count - 1), 2 );
-        class_offset    =  (RFC_VALUE_TYPE)ROUNDN( x_min - class_width / 2, 3 );
+        calc_class_param( x_max, x_min, class_count, &class_width, &class_offset );
         hysteresis      =  class_width;
     }
     else
@@ -1067,7 +1143,9 @@ TEST RFC_long_series( int ccnt )
             }
         }
 
-        hysteresis = class_width = (RFC_VALUE_TYPE)ROUNDN( (x_max - x_min) / (class_count - 1), 2 );
+        calc_class_param( x_max, x_min, class_count, &class_width, /*class_offset*/ NULL );
+
+        hysteresis = class_width;
         GREATEST_FPRINTF( GREATEST_STDOUT, "Class width (%g): ", class_width );
         if( fgets( buf, sizeof(buf), stdin ) != NULL )
         {
@@ -1077,7 +1155,8 @@ TEST RFC_long_series( int ccnt )
             }
         }
 
-        class_offset = ROUNDN( x_min - class_width / 2, 3 );
+        calc_class_param( x_min + class_width * class_count, x_min, class_count, /*class_width*/ NULL, &class_offset );
+
         GREATEST_FPRINTF( GREATEST_STDOUT, "Class offset (%g): ", class_offset );
         if( fgets( buf, sizeof(buf), stdin ) != NULL )
         {
@@ -1373,13 +1452,13 @@ TEST RFC_res_repeated( void )
     ASSERT( ctx.tp[2].pos == 3 && ctx.tp[2].adj_pos == 2 );
     ASSERT( ctx.tp[3].pos == 4 && ctx.tp[3].adj_pos == 1 );
 #if RFC_DH_SUPPORT
-    ASSERT(          ctx.tp[0].damage == 0.0 );
-    ASSERT_IN_RANGE( ctx.tp[1].damage / (damage_5_3*2), 1.0, 1e-10 );
-    ASSERT(          ctx.tp[2].damage == 0.0 );
-    ASSERT_IN_RANGE( ctx.tp[3].damage /  damage_7_2,    1.0, 1e-10 );
+    ASSERT(               ctx.tp[0].damage == 0.0 );
+    ASSERT_IN_RANGE( 1.0, ctx.tp[1].damage / (damage_5_3*2), 1e-10 );
+    ASSERT(               ctx.tp[2].damage == 0.0 );
+    ASSERT_IN_RANGE( 1.0, ctx.tp[3].damage /  damage_7_2,    1e-10 );
 #endif /*RFC_DH_SUPPORT*/        
 #endif /*RFC_TP_SUPPORT*/
-    ASSERT_IN_RANGE( ctx.damage / damage,               1.0, 1e-10 );
+    ASSERT_IN_RANGE( 1.0, ctx.damage / damage,               1e-10 );
     ASSERT( RFC_deinit( &ctx ) );
 
     PASS();
@@ -1460,14 +1539,14 @@ TEST RFC_res_fullcycles( void )
     ASSERT( ctx.tp[2].tp_pos == 0 );
     ASSERT( ctx.tp[3].tp_pos == 0 );
 #if RFC_DH_SUPPORT
-    ASSERT_IN_RANGE( ctx.tp[0].damage / ( damage_7_2/2 ), 1.0, 1e-10 );
-    ASSERT_IN_RANGE( ctx.tp[1].damage / ( damage_5_3/2 ), 1.0, 1e-10 );
-    ASSERT_IN_RANGE( ctx.tp[2].damage / ( damage_5_3/2 ), 1.0, 1e-10 );
-    ASSERT_IN_RANGE( ctx.tp[3].damage / ( damage_7_2/2 ), 1.0, 1e-10 );
+    ASSERT_IN_RANGE( 1.0, ctx.tp[0].damage / ( damage_7_2/2 ), 1e-10 );
+    ASSERT_IN_RANGE( 1.0, ctx.tp[1].damage / ( damage_5_3/2 ), 1e-10 );
+    ASSERT_IN_RANGE( 1.0, ctx.tp[2].damage / ( damage_5_3/2 ), 1e-10 );
+    ASSERT_IN_RANGE( 1.0, ctx.tp[3].damage / ( damage_7_2/2 ), 1e-10 );
 #endif /*RFC_DH_SUPPORT*/        
 #endif /*RFC_TP_SUPPORT*/
     damage = damage_7_2 + damage_5_3;
-    ASSERT_IN_RANGE( ctx.damage / damage,                 1.0, 1e-10 );
+    ASSERT_IN_RANGE( 1.0, ctx.damage / damage,                 1e-10 );
     ASSERT( RFC_deinit( &ctx ) );
 
     PASS();
@@ -1548,14 +1627,14 @@ TEST RFC_res_halfcycles( void )
     ASSERT( ctx.tp[2].tp_pos == 0 );
     ASSERT( ctx.tp[3].tp_pos == 0 );
 #if RFC_DH_SUPPORT
-    ASSERT_IN_RANGE( ctx.tp[0].damage / ( damage_7_2_half/2 ), 1.0, 1e-10 );  /* From residue */
-    ASSERT_IN_RANGE( ctx.tp[1].damage / ( damage_5_3_half   ), 1.0, 1e-10 );  /* From regular counting */
-    ASSERT_IN_RANGE( ctx.tp[2].damage / ( damage_5_3_half   ), 1.0, 1e-10 );  /* From regular counting */
-    ASSERT_IN_RANGE( ctx.tp[3].damage / ( damage_7_2_half/2 ), 1.0, 1e-10 );  /* From residue */
+    ASSERT_IN_RANGE( 1.0, ctx.tp[0].damage / ( damage_7_2_half/2 ), 1e-10 );  /* From residue */
+    ASSERT_IN_RANGE( 1.0, ctx.tp[1].damage / ( damage_5_3_half   ), 1e-10 );  /* From regular counting */
+    ASSERT_IN_RANGE( 1.0, ctx.tp[2].damage / ( damage_5_3_half   ), 1e-10 );  /* From regular counting */
+    ASSERT_IN_RANGE( 1.0, ctx.tp[3].damage / ( damage_7_2_half/2 ), 1e-10 );  /* From residue */
 #endif /*RFC_DH_SUPPORT*/        
 #endif /*RFC_TP_SUPPORT*/
     damage = damage_7_2_half + damage_5_3_half * 2;
-    ASSERT_IN_RANGE( ctx.damage / damage,                      1.0, 1e-10 );
+    ASSERT_IN_RANGE( 1.0, ctx.damage / damage,                      1e-10 );
     ASSERT( RFC_deinit( &ctx ) );
 
     PASS();
@@ -1780,7 +1859,7 @@ TEST RFC_miner_consequent( void )
     /* Check each representation */
     for( i = 0; i < NUMEL(Sa_hat); i++ )
     {
-        rfc_value_t     class_width = (RFC_VALUE_TYPE)ROUNDN( Sa_hat[i] * 2.0 / ( class_count - 1 ), 2 );
+        rfc_value_t     class_width = (RFC_VALUE_TYPE)ceil( ( Sa_hat[i] * 2.0 / ( class_count - 1 ) ) * 100 ) / 100;
         double          Sa[10];
         int             j;
         double          N_bar;
@@ -1851,9 +1930,8 @@ TEST RFC_miner_consequent2( void )
         }
     }
 
-    class_width  =  (RFC_VALUE_TYPE)ROUNDN( (x_max - x_min) / (class_count - 1), 2 );
-    class_offset =  (RFC_VALUE_TYPE)ROUNDN( x_min - class_width / 2, 3 );
-    hysteresis   =  class_width;
+    calc_class_param( x_max, x_min, class_count, &class_width, &class_offset );
+    hysteresis = class_width;
 
     ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
     ASSERT( RFC_wl_init_original( &ctx, /*sd */ x_max * 0.075, /* nd */ 1e5, /* k */ -1.5 ) );

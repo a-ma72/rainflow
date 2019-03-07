@@ -442,8 +442,9 @@ bool    RFC_class_param_get         ( const void *ctx, rfc_class_param_s * );
 bool    RFC_class_number            ( const void *ctx, rfc_value_t value, unsigned *class_number );
 bool    RFC_class_mean              ( const void *ctx, unsigned class_number, rfc_value_t *class_mean );
 bool    RFC_class_upper             ( const void *ctx, unsigned class_number, rfc_value_t *class_upper );
-bool    RFC_set_flags               (       void *ctx, int flags, int stack );
-bool    RFC_get_flags               ( const void *ctx, int *flags, int stack );
+bool    RFC_flags_set               (       void *ctx, int flags, bool overwrite, int stack );
+bool    RFC_flags_unset             (       void *ctx, int flags, int stack );
+bool    RFC_flags_get               ( const void *ctx, int *flags, int stack );
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
 bool    RFC_tp_init                 (       void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
