@@ -26,7 +26,7 @@ function validate
   enforce_margin    =  0;
   use_hcm           =  0;
   residual_method   =  0;
-  spread_damage     = -1;
+  spread_damage     =  0;
 
   [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
                           residual_method, enforce_margin, use_hcm, spread_damage );
@@ -50,7 +50,7 @@ function validate
   enforce_margin    =  0;
   use_hcm           =  0;
   residual_method   =  0;
-  spread_damage     = -1;
+  spread_damage     =  0;
 
   [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
                           residual_method, enforce_margin, use_hcm, spread_damage );
@@ -76,7 +76,7 @@ function validate
   enforce_margin    =  0;
   use_hcm           =  0;
   residual_method   =  0;
-  spread_damage     = -1;
+  spread_damage     =  0;
 
   [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
                           residual_method, enforce_margin, use_hcm, spread_damage );
@@ -102,7 +102,7 @@ function validate
   enforce_margin    =  0;
   use_hcm           =  0;
   residual_method   =  0;
-  spread_damage     = -1;
+  spread_damage     =  0;
 
   [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
                           residual_method, enforce_margin, use_hcm, spread_damage );
@@ -259,7 +259,7 @@ end
 
 function [class_width, class_offset] = class_param( data, class_count )
   assert( class_count > 1 );
-  
+
   if isempty( data )
     class_width  = 1;
     class_offset = 0;

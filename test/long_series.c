@@ -626,3 +626,4 @@ static double data_export[] = {
     10.07, 10.53, 10.93, 12.32, 12.25, 13.84, 13.01, 13.09, 13.41, 12.44, 12.50, 12.24, 13.10, 13.64, 15.50, 16.49, 
     16.59
 };
+static size_t data_length = sizeof( data_export ) / sizeof(double);

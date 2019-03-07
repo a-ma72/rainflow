@@ -292,7 +292,10 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
 #endif /*!RFC_MINIMAL*/
     }
     rfc_ctx->internal.flags                 = flags;
+
+#if RFC_DEBUG_FLAGS
     rfc_ctx->internal.debug_flags           = 0;
+#endif /*RFC_DEBUG_FLAGS*/
 
 #if _DEBUG
     rfc_ctx->internal.finalizing            = false;
@@ -324,7 +327,7 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
 
     /* Values for a "pseudo Woehler curve" */
     rfc_ctx->state = RFC_STATE_INIT;   /* Bypass sanity check for state in wl_init() */
-    RFC_wl_init_elementary( rfc_ctx, 1e3 /*sx*/, 1e7 /*nx*/, -5.0 /*k*/ );
+    RFC_wl_init_elementary( rfc_ctx, /*sx*/ RFC_WL_SD_DEFAULT, /*nx*/ RFC_WL_ND_DEFAULT, /*k*/ RFC_WL_K_DEFAULT );
     rfc_ctx->state = RFC_STATE_INIT0;  /* Reset state */
 
     /* Memory allocator */
@@ -1830,6 +1833,7 @@ bool RFC_rfm_set( void *ctx, const rfc_rfm_item_s *buffer, unsigned count, bool 
 
     if( !add_only )
     {
+        /* Initialize with zeros */
         memset( rfm, (rfc_counts_t)0, sizeof(rfc_rfm_item_s) * class_count * class_count );
     }
 
@@ -1838,16 +1842,16 @@ bool RFC_rfm_set( void *ctx, const rfc_rfm_item_s *buffer, unsigned count, bool 
     {
         unsigned from, to;
 
-        assert( item->from >= rfc_ctx->class_offset );
-        assert( item->to   >= rfc_ctx->class_offset );
-
-        from = QUANTIZE( rfc_ctx, item->from );
-        to   = QUANTIZE( rfc_ctx, item->to );
+        from = ( item->from < 0 ) ? 1 : ( item->from + 1 );
+        to   = ( item->to   < 0 ) ? 1 : ( item->to   + 1 );
 
         if( from > class_count ) from = class_count;
         if( to   > class_count ) to   = class_count;
 
-        rfm[ from * class_count + to ] += item->counts;
+        if( from > 0 && to > 0 )
+        {
+            rfm[ (from - 1) * class_count + (to - 1) ] += item->counts;
+        }
     }
 
     return true;
@@ -6575,22 +6579,25 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         ok = RFC_init( &rfc_ctx, 
                        class_count, (rfc_value_t)class_width, (rfc_value_t)class_offset, 
                        (rfc_value_t)hysteresis, RFC_FLAGS_DEFAULT );
+        if( !ok )
+        {
+            RFC_deinit( &rfc_ctx );
+            mexErrMsgTxt( "Error during initialization!" );
+        }
+
 #if RFC_DEBUG_FLAGS
         rfc_ctx.debug_vfprintf_fcn = rfc_vfprintf_fcn;
 #endif /*RFC_DEBUG_FLAGS*/
 
 #if RFC_TP_SUPPORT
-        if( ok )
-        {
-            ok = RFC_tp_init( &rfc_ctx, /*tp*/ NULL, /*tp_cap*/ 128, /* is_static */ false );
-        }
-#endif /*RFC_TP_SUPPORT*/
+        ok = RFC_tp_init( &rfc_ctx, /*tp*/ NULL, /*tp_cap*/ 128, /* is_static */ false );
 
         if( !ok )
         {
             RFC_deinit( &rfc_ctx );
             mexErrMsgTxt( "Error during initialization (tp)!" );
         }
+#endif /*RFC_TP_SUPPORT*/
 
         /* Cast values from double type to rfc_value_t */ 
         if( sizeof( rfc_value_t ) != sizeof(double) && data_len )  /* maybe unsafe! */

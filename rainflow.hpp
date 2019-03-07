@@ -287,6 +287,7 @@ public:
     bool            tp_init_autoprune       ( bool autoprune, size_t size, size_t threshold );
     bool            tp_prune                ( size_t count, rfc_flags_e flags );
     bool            tp_refeed               ( rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param );
+    bool            tp_clear                ();
     /* Damage history */
     bool            dh_init                 ( rfc_sd_method_e method, double *dh, size_t dh_cap, bool is_static );
     /* Amplitude transformation*/
@@ -294,8 +295,9 @@ public:
                                               double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
     bool            at_transform            ( double Sa, double Sm, double *Sa_transformed ) const;
     /* Flags */
-    bool            set_flags               ( int flags, bool debugging = false );
-    bool            get_flags               ( int *flags, bool debugging = false ) const;
+    bool            flags_set               ( int flags, bool overwrite = true, bool debugging = false );
+    bool            flags_unset             ( int flags, bool debugging = false );
+    bool            flags_get               ( int *flags, bool debugging = false ) const;
     inline
     rfc_counts_t    full_inc                () const { return m_ctx.full_inc; }
     inline
@@ -347,14 +349,14 @@ public:
         m_ctx = nil;
         m_ctx.mem_alloc = RF::mem_alloc;
     } 
-    /* ctor */      RainflowT               ( RF::rfc_ctx_s&& other ) { assign_ctx( other ); }   // Move ctor
-    RainflowT&      operator=               ( RF::rfc_ctx_s&& other ) { assign_ctx( other ); }   // Move assignment
+    /* ctor */      RainflowT               ( RF::rfc_ctx_s&& other ) { ctx_assign( other ); }   // Move ctor
+    RainflowT&      operator=               ( RF::rfc_ctx_s&& other ) { ctx_assign( other ); }   // Move assignment
 
     /* ctx access */
     const
-    RF::rfc_ctx_s&  get_ctx                 () const { return m_ctx; }
-    RF::rfc_ctx_s&  get_ctx                 () { return m_ctx; }
-    void            assign_ctx              ( RF::rfc_ctx_s& ctx )
+    RF::rfc_ctx_s&  ctx_get                 () const { return m_ctx; }
+    RF::rfc_ctx_s&  ctx_get                 () { return m_ctx; }
+    void            ctx_assign              ( RF::rfc_ctx_s& ctx )
     { 
         if( ctx.internal.obj != this ) 
         { 
@@ -366,7 +368,7 @@ public:
             ctx = nil; 
         } 
     }
-    void            assign_ctx              ( RF::rfc_ctx_s&& ctx )  // Move assignment
+    void            ctx_assign              ( RF::rfc_ctx_s&& ctx )  // Move assignment
     { 
         if( ctx.internal.obj != this ) 
         { 
@@ -381,7 +383,7 @@ public:
     void*           mem_alloc               ( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim );
 
 private:
-    void            assign_ctx              ( const RF::rfc_ctx_s& );   // Inhibit assign on const ctx
+    void            ctx_assign              ( const RF::rfc_ctx_s& );   // Inhibit assign on const ctx
                     RainflowT               ( const RF::rfc_ctx_s& );   // Inhibit copy ctor on const ctx
                     RainflowT               ( const RainflowT& );       // Inhibit copy ctor on (non-)const RainflowT
     RainflowT&      operator=               ( const rfc_ctx_s& );       // Inhibit copy assignment on const ctx
@@ -453,6 +455,11 @@ bool RainflowT<T>::clear_counts()
 template< class T >
 bool RainflowT<T>::deinit()
 {
+    if( !m_ctx.internal.obj )
+    {
+        return true;
+    }
+
     if( m_ctx.internal.obj != this )
     {
         // Don't have ownership
@@ -688,6 +695,13 @@ bool RainflowT<T>::tp_refeed( rfc_value_t new_hysteresis, const rfc_class_param_
 
 
 template< class T >
+bool RainflowT<T>::tp_clear()
+{
+    return RF::RFC_tp_clear( &m_ctx );
+}
+
+
+template< class T >
 bool RainflowT<T>::dh_init( rfc_sd_method_e method, double *dh, size_t dh_cap, bool is_static )
 {
     return RF::RFC_dh_init( &m_ctx, (RF::rfc_sd_method_e)method, dh, dh_cap, is_static );
@@ -710,16 +724,23 @@ bool RainflowT<T>::at_transform( double Sa, double Sm, double *Sa_transformed ) 
 
 
 template< class T >
-bool RainflowT<T>::set_flags( int flags, bool debugging )
+bool RainflowT<T>::flags_set( int flags, bool overwrite, bool debugging )
 {
-    return RF::RFC_set_flags( &m_ctx, flags, debugging );
+    return RF::RFC_flags_set( &m_ctx, flags, overwrite, debugging );
 }
 
 
 template< class T >
-bool RainflowT<T>::get_flags( int *flags, bool debugging ) const
+bool RainflowT<T>::flags_unset( int flags, bool debugging )
 {
-    return RF::RFC_get_flags( &m_ctx, flags, debugging );
+    return RF::RFC_flags_unset( &m_ctx, flags, debugging );
+}
+
+
+template< class T >
+bool RainflowT<T>::flags_get( int *flags, bool debugging ) const
+{
+    return RF::RFC_flags_get( &m_ctx, flags, debugging );
 }
 
 
@@ -884,12 +905,6 @@ bool RainflowT<T>::wl_param_get( rfc_wl_param_s &wl_param ) const
 template< class T >
 bool RainflowT<T>::tp_set( size_t tp_pos, rfc_value_tuple_s *tp )
 {
-    if( !rfc_ctx->tp )
-    {
-        /* Write to non existent tp storage is ok */
-        return true;
-    }
-    
     if( tp_pos )
     {
         /* Alter or move existing turning point */
@@ -969,9 +984,9 @@ bool RainflowT<T>::tp_set( size_t tp_pos, rfc_value_tuple_s *tp )
         }
     }
 
-    if( rfc_ctx->internal.flags & RFC_FLAGS_TPAUTOPRUNE && rfc_ctx->tp_cnt > rfc_ctx->tp_prune_threshold )
+    if( m_ctx.internal.flags & RFC_FLAGS_TPAUTOPRUNE && m_ctx.tp_cnt > m_ctx.tp_prune_threshold )
     {
-        return RFC_tp_prune( rfc_ctx, rfc_ctx->tp_prune_size, RFC_FLAGS_TPPRUNE_PRESERVE_POS );
+        return RFC_tp_prune( &m_ctx, m_ctx.tp_prune_size, RF::RFC_FLAGS_TPPRUNE_PRESERVE_POS );
     }
 
     return true;

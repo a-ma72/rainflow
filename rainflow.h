@@ -262,9 +262,11 @@ enum rfc_flags
 enum rfc_debug_flags
 {
     RFC_FLAGS_LOG_CLOSED_CYCLES     =  1 << 0,                      /**< Log closed cycles */
+#if RFC_TP_SUPPORT
     RFC_FLAGS_LOG_READ_TP           =  1 << 1,                      /**< Read from tp storage */
     RFC_FLAGS_LOG_WRITE_TP          =  1 << 2,                      /**< Write to tp storage */
     RFC_FLAGS_LOG_TP_REFEED         =  1 << 3,                      /**< Trace tp storage while tp_refeed */
+#endif /*RFC_TP_SUPPORT*/
 };
 
 
@@ -362,6 +364,14 @@ enum rfc_sd_method
     RFC_SD_COUNT                                                    /**< Number of options */
 };
 #endif /*RFC_DH_SUPPORT*/
+
+
+enum rfc_wl_defaults
+{
+    RFC_WL_SD_DEFAULT               =  1000,                        /**< Fatigue strength amplitude (Miner original) */
+    RFC_WL_ND_DEFAULT               =  10000000L,                   /**< Cycles according to wl_sd */
+    RFC_WL_K_DEFAULT                = -5,                           /**< Woehler slope, always negative */
+};
 
 
 /* Typedefs */
@@ -704,11 +714,11 @@ struct rfc_ctx
     {
         int                             flags;                      /**< Flags (enum rfc_flags) */
 #if _DEBUG
-#endif /*_DEBUG*/
         bool                            finalizing;                 /**< true, when finalizing */
 #if RFC_DEBUG_FLAGS
         int                             debug_flags;                /**< Flags for debugging */
 #endif /*RFC_DEBUG_FLAGS*/
+#endif /*_DEBUG*/
         int                             slope;                      /**< Current signal slope */
         rfc_value_tuple_s               extrema[2];                 /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
 #if RFC_GLOBAL_EXTREMA

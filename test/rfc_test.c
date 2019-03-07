@@ -372,6 +372,8 @@ TEST RFC_tp_prune_test( int ccnt )
     {
 #include "long_series.c"
 
+        ASSERT( data_length == 10000 );
+
         for( i = 0; i < data_len; i++ )
         {
             double value = data_export[i];
@@ -464,6 +466,8 @@ TEST RFC_tp_refeed_test( int ccnt )
     rfc_ctx_s           ctx3 = { sizeof(rfc_ctx_s)};
 
 #include "long_series.c"
+
+    ASSERT( data_length == 10000 );
 
     for( i = 0; i < data_len; i++ )
     {
@@ -1048,6 +1052,8 @@ TEST RFC_long_series( int ccnt )
     if(1)
     {
 #include "long_series.c"
+
+        ASSERT( data_length == 10000 );
 
         for( i = 0; i < data_len; i++ )
         {
@@ -1915,6 +1921,8 @@ TEST RFC_miner_consequent2( void )
     ASSERT( NUMEL(rp_hist) == class_count );
 
 #include "long_series.c"
+
+    ASSERT( data_length == 10000 );
 
     for( i = 0; i < data_len; i++ )
     {
