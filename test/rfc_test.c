@@ -399,6 +399,7 @@ TEST RFC_tp_refeed_test( int ccnt )
     RFC_VALUE_TYPE      class_offset;
     RFC_VALUE_TYPE      hysteresis;
     size_t              i;
+    rfc_ctx_s           ctx3 = { sizeof(rfc_ctx_s)};
 
 #include "long_series.c"
 
@@ -413,8 +414,8 @@ TEST RFC_tp_refeed_test( int ccnt )
     class_offset = 0;
     hysteresis   = 0;
 
-
-    ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
+    ctx = ctx3;
+    ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT & ~RFC_FLAGS_ENFORCE_MARGIN) );
     ASSERT( RFC_tp_init( &ctx, /*tp*/ NULL, /*tp_cnt*/ 1, /* is_static */ false ) );
 
     x_min = x_max = data[0];
@@ -476,7 +477,7 @@ TEST RFC_tp_refeed_test( int ccnt )
         FILE* fid = NULL;
         rfc_ctx_s ctx2 = {sizeof(rfc_ctx_s)};
 
-        ASSERT( RFC_init( &ctx2, ctx.class_count, ctx.class_width, ctx.class_offset, ctx.hysteresis, RFC_FLAGS_DEFAULT ) );
+        ASSERT( RFC_init( &ctx2, ctx.class_count, 1.67 /*ctx.class_width*/, ctx.class_offset, ctx.hysteresis, RFC_FLAGS_DEFAULT & ~RFC_FLAGS_ENFORCE_MARGIN) );
         ASSERT( RFC_tp_init( &ctx2, /*tp*/ NULL, /*tp_cap*/ 1, /*is_static*/ false ) );
         ASSERT( RFC_feed( &ctx2, data, data_len ) );
         ASSERT( RFC_finalize( &ctx2, RFC_RES_NONE ) );
