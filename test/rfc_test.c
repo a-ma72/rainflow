@@ -461,6 +461,7 @@ TEST RFC_tp_refeed_test( int ccnt )
     RFC_VALUE_TYPE      class_offset;
     RFC_VALUE_TYPE      hysteresis;
     size_t              i;
+    rfc_ctx_s           ctx3 = { sizeof(rfc_ctx_s)};
 
 #include "long_series.c"
 
@@ -478,7 +479,7 @@ TEST RFC_tp_refeed_test( int ccnt )
 
     ASSERT( RFC_init(      &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_COUNT_ALL ) );
     ASSERT( RFC_tp_init(   &ctx, /*tp*/ NULL, /*tp_cnt*/ 1, /* is_static */ false ) );
-//    ASSERT( RFC_set_flags( &ctx, RFC_FLAGS_LOG_TP_REFEED | RFC_FLAGS_LOG_WRITE_TP | RFC_FLAGS_LOG_READ_TP, /*debugging*/ true ) );
+//    ASSERT( RFC_flags_set( &ctx, RFC_FLAGS_LOG_TP_REFEED | RFC_FLAGS_LOG_WRITE_TP | RFC_FLAGS_LOG_READ_TP, /*overwrite*/ true, /*debugging*/ true ) );
 
     x_min = x_max = data[0];
 
