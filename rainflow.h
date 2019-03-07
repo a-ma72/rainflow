@@ -262,6 +262,11 @@ enum rfc_flags
 enum rfc_debug_flags
 {
     RFC_FLAGS_LOG_CLOSED_CYCLES     =  1 << 0,                      /**< Log closed cycles */
+#if RFC_TP_SUPPORT
+    RFC_FLAGS_LOG_READ_TP           =  1 << 1,                      /**< Read from tp storage */
+    RFC_FLAGS_LOG_WRITE_TP          =  1 << 2,                      /**< Write to tp storage */
+    RFC_FLAGS_LOG_TP_REFEED         =  1 << 3,                      /**< Trace tp storage while tp_refeed */
+#endif /*RFC_TP_SUPPORT*/
 };
 
 
@@ -303,10 +308,11 @@ enum rfc_error
     RFC_ERROR_AT                    =  5,                           /**< Error while amplitude transformation */
 #endif /*RFC_AT_SUPPORT*/
 #if RFC_DH_SUPPORT
-    RFC_ERROR_DH                    =  6,                           /**< Error while damage history calculation/access */
+    RFC_ERROR_DH_BAD_STREAM         =  6,                           /**< Input stream must be unique */
+    RFC_ERROR_DH                    =  7,                           /**< Error while damage history calculation/access */
 #endif /*RFC_DH_SUPPORT*/
 #if RFC_DAMAGE_FAST
-    RFC_ERROR_LUT                   =  7,                           /**< Error while accessing look up tables */
+    RFC_ERROR_LUT                   =  8,                           /**< Error while accessing look up tables */
 #endif /*RFC_DAMAGE_FAST*/
 };
 
@@ -358,6 +364,14 @@ enum rfc_sd_method
     RFC_SD_COUNT                                                    /**< Number of options */
 };
 #endif /*RFC_DH_SUPPORT*/
+
+
+enum rfc_wl_defaults
+{
+    RFC_WL_SD_DEFAULT               =  1000,                        /**< Fatigue strength amplitude (Miner original) */
+    RFC_WL_ND_DEFAULT               =  10000000L,                   /**< Cycles according to wl_sd */
+    RFC_WL_K_DEFAULT                = -5,                           /**< Woehler slope, always negative */
+};
 
 
 /* Typedefs */
@@ -438,8 +452,9 @@ bool    RFC_class_param_get         ( const void *ctx, rfc_class_param_s * );
 bool    RFC_class_number            ( const void *ctx, rfc_value_t value, unsigned *class_number );
 bool    RFC_class_mean              ( const void *ctx, unsigned class_number, rfc_value_t *class_mean );
 bool    RFC_class_upper             ( const void *ctx, unsigned class_number, rfc_value_t *class_upper );
-bool    RFC_set_flags               (       void *ctx, int flags, int stack );
-bool    RFC_get_flags               ( const void *ctx, int *flags, int stack );
+bool    RFC_flags_set               (       void *ctx, int flags, bool overwrite, int stack );
+bool    RFC_flags_unset             (       void *ctx, int flags, int stack );
+bool    RFC_flags_get               ( const void *ctx, int *flags, int stack );
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
 bool    RFC_tp_init                 (       void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
@@ -450,7 +465,7 @@ bool    RFC_tp_clear                (       void *ctx );
 #endif /*RFC_TP_SUPPORT*/
 
 #if RFC_DH_SUPPORT
-bool    RFC_dh_init                 (       void *ctx, rfc_sd_method_e method, const rfc_value_t *stream, double *dh, size_t dh_cap, bool is_static );
+bool    RFC_dh_init                 (       void *ctx, rfc_sd_method_e method, double *dh, size_t dh_cap, bool is_static );
 #endif /*RFC_DH_SUPPORT*/
 
 #if RFC_AT_SUPPORT
@@ -663,7 +678,7 @@ struct rfc_ctx
 #endif /*RFC_TP_SUPPORT*/
 
 #if RFC_DH_SUPPORT
-    const rfc_value_t                  *stream;                     /**< Input stream */
+    const rfc_value_t                  *dh_istream;                 /**< Input stream */
     double                             *dh;                         /**< Damage history, pointer may be changed whilst memory reallocation! */
     size_t                              dh_cap;                     /**< Capacity of dh */
     size_t                              dh_cnt;                     /**< Number of values in dh */
@@ -699,11 +714,11 @@ struct rfc_ctx
     {
         int                             flags;                      /**< Flags (enum rfc_flags) */
 #if _DEBUG
-#endif /*_DEBUG*/
         bool                            finalizing;                 /**< true, when finalizing */
 #if RFC_DEBUG_FLAGS
         int                             debug_flags;                /**< Flags for debugging */
 #endif /*RFC_DEBUG_FLAGS*/
+#endif /*_DEBUG*/
         int                             slope;                      /**< Current signal slope */
         rfc_value_tuple_s               extrema[2];                 /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
 #if RFC_GLOBAL_EXTREMA
