@@ -80,10 +80,10 @@ namespace RFC_CPP_NAMESPACE
     /* C delegates */
     extern "C"
     {
-        static bool  tp_set           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp );
-        static bool  tp_get           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp );
-        static bool  tp_inc_damage    ( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage );
-        static void* mem_alloc        ( void *ptr, size_t num, size_t size, RF::rfc_mem_aim_e aim );
+        static bool  tp_set           ( rfc_ctx_s* ctx, size_t tp_pos, rfc_value_tuple_s *tp );
+        static bool  tp_get           ( rfc_ctx_s* ctx, size_t tp_pos, rfc_value_tuple_s **tp );
+        static bool  tp_inc_damage    ( rfc_ctx_s *ctx, size_t tp_pos, double damage );
+        static void* mem_alloc        ( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim );
     }
 }
 
@@ -333,7 +333,7 @@ public:
     inline const
     rfc_counts_t*   rfm_storage             () const { return m_ctx.rfm; }
     inline
-    rfc_counts_t*   rfm_storage             () { return m_ctx.rfm; }
+    rfc_counts_t*   rfm_storage             ()       { return m_ctx.rfm; }
 
     /* Delegates */
     bool            tp_set                  ( size_t tp_pos, rfc_value_tuple_s *tp );
@@ -344,23 +344,23 @@ public:
     /* dtor */     ~RainflowT               () { deinit(); }
     /* ctor */      RainflowT               ()                                                   // Std ctor
     { 
-        RF::rfc_ctx_s nil = { sizeof( RF::rfc_ctx_s ) };
+        rfc_ctx_s nil = { sizeof( rfc_ctx_s ) };
 
         m_ctx = nil;
         m_ctx.mem_alloc = RF::mem_alloc;
     } 
-    /* ctor */      RainflowT               ( RF::rfc_ctx_s&& other ) { ctx_assign( other ); }   // Move ctor
-    RainflowT&      operator=               ( RF::rfc_ctx_s&& other ) { ctx_assign( other ); }   // Move assignment
+    /* ctor */      RainflowT               ( rfc_ctx_s&& other ) { ctx_assign( other ); }   // Move ctor
+    RainflowT&      operator=               ( rfc_ctx_s&& other ) { ctx_assign( other ); }   // Move assignment
 
     /* ctx access */
     const
-    RF::rfc_ctx_s&  ctx_get                 () const { return m_ctx; }
-    RF::rfc_ctx_s&  ctx_get                 () { return m_ctx; }
-    void            ctx_assign              ( RF::rfc_ctx_s& ctx )
+    rfc_ctx_s&      ctx_get                 () const { return m_ctx; }
+    rfc_ctx_s&      ctx_get                 ()       { return m_ctx; }
+    void            ctx_assign              ( rfc_ctx_s& ctx )
     { 
         if( ctx.internal.obj != this ) 
         { 
-            RF::rfc_ctx_s nil = { sizeof( RF::rfc_ctx_s ) };
+            rfc_ctx_s nil = { sizeof( RF::rfc_ctx_s ) };
 
             (void)deinit(); 
             m_ctx = ctx;
@@ -368,7 +368,7 @@ public:
             ctx = nil; 
         } 
     }
-    void            ctx_assign              ( RF::rfc_ctx_s&& ctx )  // Move assignment
+    void            ctx_assign              ( rfc_ctx_s&& ctx )  // Move assignment
     { 
         if( ctx.internal.obj != this ) 
         { 
@@ -383,14 +383,14 @@ public:
     void*           mem_alloc               ( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim );
 
 private:
-    void            ctx_assign              ( const RF::rfc_ctx_s& );   // Inhibit assign on const ctx
-                    RainflowT               ( const RF::rfc_ctx_s& );   // Inhibit copy ctor on const ctx
+    void            ctx_assign              ( const rfc_ctx_s& );   // Inhibit assign on const ctx
+                    RainflowT               ( const rfc_ctx_s& );   // Inhibit copy ctor on const ctx
                     RainflowT               ( const RainflowT& );       // Inhibit copy ctor on (non-)const RainflowT
     RainflowT&      operator=               ( const rfc_ctx_s& );       // Inhibit copy assignment on const ctx
     RainflowT&      operator=               ( const RainflowT& );       // Inhibit copy assignment on (non-)const RainflowT
 
 protected:
-    RF::rfc_ctx_s   m_ctx;
+    rfc_ctx_s   m_ctx;
     rfc_tp_storage  m_tp;
 };
 
@@ -976,9 +976,9 @@ bool RainflowT<T>::tp_set( size_t tp_pos, rfc_value_tuple_s *tp )
 #if RFC_DEBUG_FLAGS
             if( m_ctx.internal.debug_flags & RF::RFC_FLAGS_LOG_WRITE_TP )
             {
-                RFC_debug_fprintf( &m_ctx, stdout, 
-                                   "Append tp #%lu (%g[%lu] @ %lu)\n", 
-                                   tp->tp_pos, tp->value, tp->cls, tp->pos );
+                RF::RFC_debug_fprintf( &m_ctx, stdout, 
+                                       "Append tp #%lu (%g[%lu] @ %lu)\n", 
+                                       tp->tp_pos, tp->value, tp->cls, tp->pos );
             }
 #endif /*RFC_DEBUG_FLAGS*/
         }
@@ -986,7 +986,7 @@ bool RainflowT<T>::tp_set( size_t tp_pos, rfc_value_tuple_s *tp )
 
     if( m_ctx.internal.flags & RFC_FLAGS_TPAUTOPRUNE && m_ctx.tp_cnt > m_ctx.tp_prune_threshold )
     {
-        return RFC_tp_prune( &m_ctx, m_ctx.tp_prune_size, RF::RFC_FLAGS_TPPRUNE_PRESERVE_POS );
+        return RF::RFC_tp_prune( &m_ctx, m_ctx.tp_prune_size, RF::RFC_FLAGS_TPPRUNE_PRESERVE_POS );
     }
 
     return true;
@@ -1005,9 +1005,9 @@ bool RainflowT<T>::tp_get( size_t tp_pos, rfc_value_tuple_s **tp )
 #if RFC_DEBUG_FLAGS
     if( m_ctx.internal.debug_flags & RF::RFC_FLAGS_LOG_READ_TP )
     {
-        RFC_debug_fprintf( &m_ctx, stdout, 
-                           "Read tp #%lu (%g[%lu] @ %lu)\n", 
-                           tp_pos, m_tp[tp_pos-1].value, m_tp[tp_pos-1].cls, m_tp[tp_pos-1].pos );
+        RF::RFC_debug_fprintf( &m_ctx, stdout, 
+                               "Read tp #%lu (%g[%lu] @ %lu)\n", 
+                               tp_pos, m_tp[tp_pos-1].value, m_tp[tp_pos-1].cls, m_tp[tp_pos-1].pos );
     }
 #endif /*RFC_DEBUG_FLAGS*/
 
@@ -1058,25 +1058,25 @@ namespace RFC_CPP_NAMESPACE
     extern "C"
     {
         static
-        bool tp_set( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp )
+        bool tp_set( rfc_ctx_s* ctx, size_t tp_pos, rfc_value_tuple_s *tp )
         {
             return ctx && static_cast<Rainflow*>(ctx->internal.obj)->tp_set( tp_pos, tp );
         }
 
         static
-        bool tp_get( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp )
+        bool tp_get( rfc_ctx_s* ctx, size_t tp_pos, rfc_value_tuple_s **tp )
         {
             return ctx && static_cast<Rainflow*>(ctx->internal.obj)->tp_get( tp_pos, tp );
         }
 
         static 
-        bool tp_inc_damage( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage )
+        bool tp_inc_damage( rfc_ctx_s *ctx, size_t tp_pos, double damage )
         {
             return ctx && static_cast<Rainflow*>(ctx->internal.obj)->tp_inc_damage( tp_pos, damage );
         }
 
         static
-        void * mem_alloc( void *ptr, size_t num, size_t size, RF::rfc_mem_aim_e aim )
+        void * mem_alloc( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim )
         {
             return Rainflow::mem_alloc( ptr, num, size, (Rainflow::rfc_mem_aim_e)aim );
         }

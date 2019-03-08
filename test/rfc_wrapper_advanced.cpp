@@ -1,16 +1,17 @@
 
 /* Using Rainflow C-Library in a C++ context */
 
-#if   !RFC_MINIMAL              &&  \
-       RFC_TP_SUPPORT           &&  \
-       RFC_HCM_SUPPORT          &&  \
-       RFC_USE_DELEGATES        &&  \
-       RFC_GLOBAL_EXTREMA       &&  \
-       RFC_DAMAGE_FAST          &&  \
-       RFC_DH_SUPPORT           &&  \
-       RFC_AT_SUPPORT           &&  \
-       RFC_DEBUG_FLAGS          
+#include "../config.h"
 
+// Check for correct configuration
+#if !RFC_MINIMAL            && \
+     RFC_TP_SUPPORT         && \
+     RFC_HCM_SUPPORT        && \
+     RFC_USE_DELEGATES      && \
+     RFC_GLOBAL_EXTREMA     && \
+     RFC_DAMAGE_FAST        && \
+     RFC_DH_SUPPORT         && \
+     RFC_AT_SUPPORT
 
 // "Cross-platform C++ Utility Library" [https://github.com/i42output/neolib]
 #define HAVE_NEOLIB 0
@@ -96,9 +97,9 @@ TEST wrapper_test_advanced( void )
 
     rf.init( 10, 1, -0.5, 1 );
 
-    rf.get_flags( &flags, /*debugging*/true );
+    rf.flags_get( &flags, /*debugging*/true );
     flags |= (int)Rainflow::RFC_FLAGS_LOG_CLOSED_CYCLES;
-    rf.set_flags( flags, /*debugging*/ true );
+    rf.flags_set( flags, /*debugging*/ true );
 
     rf.feed( values, NUMEL(values) );
     ASSERT( rf.tp_storage().size() == 3 );
@@ -149,6 +150,8 @@ TEST wrapper_test_advanced( void )
 extern "C"
 SUITE( RFC_WRAPPER_SUITE_ADVANCED )
 {
+    fprintf( stdout, "\nsizeof(RFC_CPP_NAMESPACE::rfc_ctx_s): %lu\n", sizeof( RFC_CPP_NAMESPACE::rfc_ctx_s ) );
+    fprintf( stdout, "\nsizeof(Rainflow::rfc_ctx_s): %lu\n", sizeof( Rainflow::rfc_ctx_s ) );
     RUN_TEST( wrapper_test_advanced );
 }
 
@@ -157,6 +160,7 @@ SUITE( RFC_WRAPPER_SUITE_ADVANCED )
 
 TEST wrapper_test_advanced( void )
 {
+    fprintf( stdout, "\nNothing to do in this configuration!" );
     PASS();
 }
 

@@ -297,9 +297,7 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
     rfc_ctx->internal.debug_flags           = 0;
 #endif /*RFC_DEBUG_FLAGS*/
 
-#if _DEBUG
     rfc_ctx->internal.finalizing            = false;
-#endif /*_DEBUG*/
 
     /* Counter increments */
     rfc_ctx->full_inc                       = RFC_FULL_CYCLE_INCREMENT;
@@ -1218,9 +1216,7 @@ bool RFC_clear_counts( void *ctx )
     } while(0);
 #endif /*!RFC_MINIMAL*/
 
-#if _DEBUG
     rfc_ctx->internal.finalizing        = false;
-#endif /*_DEBUG*/
 
     rfc_ctx->state = RFC_STATE_INIT;
 
@@ -1533,9 +1529,7 @@ bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
         return false;
     }
 
-#if _DEBUG
     rfc_ctx->internal.finalizing = true;
-#endif
 
     damage = rfc_ctx->damage;
 
@@ -1601,9 +1595,7 @@ bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
     rfc_ctx->damage_residue = rfc_ctx->damage - damage;
     rfc_ctx->state          = ok ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
 
-#if _DEBUG
     rfc_ctx->internal.finalizing = false;
-#endif
 
 #if RFC_DH_SUPPORT
     if( ok )

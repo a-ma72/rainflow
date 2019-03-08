@@ -55,6 +55,7 @@
 #include <locale.h>
 #include <math.h>
 #include <float.h>
+#include <stddef.h>  /* offsetof */
 
 
 #define ROUND(x)    ((x)>=0?(long)((x)+0.5):(long)((x)-0.5))
@@ -2073,9 +2074,52 @@ TEST RFC_miner_consequent2( void )
 #endif /*!RFC_MINIMAL*/
 
 
+TEST RFC_ctx_inspect( void )
+{
+    fprintf( stdout, "\n version\t%lu", (unsigned long)offsetof( rfc_ctx_s, version ) );
+    fprintf( stdout, "\n state\t%lu", (unsigned long)offsetof( rfc_ctx_s, state ) );
+    fprintf( stdout, "\n error\t%lu", (unsigned long)offsetof( rfc_ctx_s, error ) );
+    fprintf( stdout, "\n error\t%lu", (unsigned long)offsetof( rfc_ctx_s, error ) );
+    fprintf( stdout, "\n mem_alloc\t%lu", (unsigned long)offsetof( rfc_ctx_s, mem_alloc ) );
+    fprintf( stdout, "\n full_inc\t%lu", (unsigned long)offsetof( rfc_ctx_s, full_inc ) );
+    fprintf( stdout, "\n class_count\t%lu", (unsigned long)offsetof( rfc_ctx_s, class_count ) );
+    fprintf( stdout, "\n wl_sx\t%lu", (unsigned long)offsetof( rfc_ctx_s, wl_sx ) );
+    fprintf( stdout, "\n tp_next_fcn\t%lu", (unsigned long)offsetof( rfc_ctx_s, tp_next_fcn ) );
+    fprintf( stdout, "\n finalize_fcn\t%lu", (unsigned long)offsetof( rfc_ctx_s, finalize_fcn ) );
+    fprintf( stdout, "\n residue\t%lu", (unsigned long)offsetof( rfc_ctx_s, residue ) );
+    fprintf( stdout, "\n rfm\t%lu", (unsigned long)offsetof( rfc_ctx_s, rfm ) );
+    fprintf( stdout, "\n rp\t%lu", (unsigned long)offsetof( rfc_ctx_s, rp ) );
+    fprintf( stdout, "\n lc\t%lu", (unsigned long)offsetof( rfc_ctx_s, lc ) );
+    fprintf( stdout, "\n tp\t%lu", (unsigned long)offsetof( rfc_ctx_s, tp ) );
+    fprintf( stdout, "\n dh\t%lu", (unsigned long)offsetof( rfc_ctx_s, dh ) );
+    fprintf( stdout, "\n damage_lut\t%lu", (unsigned long)offsetof( rfc_ctx_s, damage_lut ) );
+    fprintf( stdout, "\n amplitude_lut\t%lu", (unsigned long)offsetof( rfc_ctx_s, amplitude_lut ) );
+    fprintf( stdout, "\n at.Sa\t%lu", (unsigned long)offsetof( rfc_ctx_s, at.Sa ) );
+    fprintf( stdout, "\n internal.flags\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.flags ) );
+    fprintf( stdout, "\n internal.finalizing\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.finalizing ) );
+#if 0
+    fprintf( stdout, "\n internal.debug_flags\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.debug_flags ) );
+#endif
+    fprintf( stdout, "\n internal.pos\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.pos ) );
+    fprintf( stdout, "\n internal.wl.sd\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.wl.sd ) );
+    fprintf( stdout, "\n internal.tp_static\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.tp_static ) );
+    fprintf( stdout, "\n internal.dh_static\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.dh_static ) );
+    fprintf( stdout, "\n internal.hcm.stack\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.hcm.stack ) );
+    fprintf( stdout, "\n internal.at_haigh.Sa\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.at_haigh.Sa ) );
+    fprintf( stdout, "\n internal.obj\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.obj ) );
+
+    PASS();
+}
+
+
 /* local suite (greatest) */
 SUITE( RFC_TEST_SUITE )
 {
+    fprintf( stdout, "\nssizeof(rfc_ctx_s): %lu\n", sizeof( rfc_ctx_s ) );
+
+    /* Inspect rainflow ctx */
+    RUN_TEST( RFC_ctx_inspect );
+    
     /* Test rainflow counting */
     RUN_TEST1( RFC_empty, 1 );
     RUN_TEST1( RFC_cycle_up, 1 );
