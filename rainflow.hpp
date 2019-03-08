@@ -295,7 +295,7 @@ public:
                                               double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
     bool            at_transform            ( double Sa, double Sm, double *Sa_transformed ) const;
     /* Flags */
-    bool            flags_set               ( int flags, bool overwrite = true, bool debugging = false );
+    bool            flags_set               ( int flags, bool debugging = false, bool overwrite = true );
     bool            flags_unset             ( int flags, bool debugging = false );
     bool            flags_get               ( int *flags, bool debugging = false ) const;
     inline
@@ -724,9 +724,9 @@ bool RainflowT<T>::at_transform( double Sa, double Sm, double *Sa_transformed ) 
 
 
 template< class T >
-bool RainflowT<T>::flags_set( int flags, bool overwrite, bool debugging )
+bool RainflowT<T>::flags_set( int flags, bool debugging, bool overwrite )
 {
-    return RF::RFC_flags_set( &m_ctx, flags, overwrite, debugging );
+    return RF::RFC_flags_set( &m_ctx, flags, debugging, overwrite );
 }
 
 

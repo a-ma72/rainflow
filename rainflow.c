@@ -3150,13 +3150,14 @@ bool RFC_class_upper( const void *ctx, unsigned class_number, rfc_value_t *class
 /**
  * @brief      Set flags
  *
- * @param      ctx    The rainflow context
- * @param[in]  flags  The flags
- * @param[in]  stack  ID of flags stack
+ * @param      ctx        The rainflow context
+ * @param[in]  flags      The flags
+ * @param[in]  overwrite  Overwrites, if true
+ * @param[in]  stack      ID of flags stack
  *
  * @return     true on success
  */
-bool RFC_flags_set( void *ctx, int flags, bool overwrite, int stack )
+bool RFC_flags_set( void *ctx, int flags, int stack, bool overwrite )
 {
     RFC_CTX_CHECK_AND_ASSIGN
 
@@ -5872,7 +5873,7 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
             RFC_debug_fprintf( rfc_ctx, stdout,
                                "\nContent of tp storage:" );
 
-            RFC_flags_set( rfc_ctx, RFC_FLAGS_LOG_READ_TP, /*overwrite*/ true, /*debugging*/ true );
+            RFC_flags_set( rfc_ctx, RFC_FLAGS_LOG_READ_TP, /*debugging*/ true, /*overwrite*/ true );
             
             for( i = 1; i <= rfc_ctx->tp_cnt; i++ )
             {
@@ -5882,7 +5883,7 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
             }
 
             RFC_debug_fprintf( rfc_ctx, stdout, "%s\n", "" );
-            RFC_flags_set( rfc_ctx, flags, /*overwrite*/ true, /*debugging*/ true );
+            RFC_flags_set( rfc_ctx, flags, /*debugging*/ true, /*overwrite*/ true );
         }
 #endif /*RFC_DEBUG_FLAGS*/
 

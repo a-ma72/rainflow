@@ -484,7 +484,7 @@ TEST RFC_tp_refeed_test( int ccnt )
 
     ASSERT( RFC_init(      &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_COUNT_ALL ) );
     ASSERT( RFC_tp_init(   &ctx, /*tp*/ NULL, /*tp_cnt*/ 1, /* is_static */ false ) );
-//    ASSERT( RFC_flags_set( &ctx, RFC_FLAGS_LOG_TP_REFEED | RFC_FLAGS_LOG_WRITE_TP | RFC_FLAGS_LOG_READ_TP, /*overwrite*/ true, /*debugging*/ true ) );
+//    ASSERT( RFC_flags_set( &ctx, RFC_FLAGS_LOG_TP_REFEED | RFC_FLAGS_LOG_WRITE_TP | RFC_FLAGS_LOG_READ_TP, /*debugging*/ true, /*overwrite*/ true ) );
 
     x_min = x_max = data[0];
 
@@ -2076,37 +2076,56 @@ TEST RFC_miner_consequent2( void )
 
 TEST RFC_ctx_inspect( void )
 {
-    fprintf( stdout, "\n version\t%lu", (unsigned long)offsetof( rfc_ctx_s, version ) );
-    fprintf( stdout, "\n state\t%lu", (unsigned long)offsetof( rfc_ctx_s, state ) );
-    fprintf( stdout, "\n error\t%lu", (unsigned long)offsetof( rfc_ctx_s, error ) );
-    fprintf( stdout, "\n error\t%lu", (unsigned long)offsetof( rfc_ctx_s, error ) );
-    fprintf( stdout, "\n mem_alloc\t%lu", (unsigned long)offsetof( rfc_ctx_s, mem_alloc ) );
-    fprintf( stdout, "\n full_inc\t%lu", (unsigned long)offsetof( rfc_ctx_s, full_inc ) );
-    fprintf( stdout, "\n class_count\t%lu", (unsigned long)offsetof( rfc_ctx_s, class_count ) );
-    fprintf( stdout, "\n wl_sx\t%lu", (unsigned long)offsetof( rfc_ctx_s, wl_sx ) );
-    fprintf( stdout, "\n tp_next_fcn\t%lu", (unsigned long)offsetof( rfc_ctx_s, tp_next_fcn ) );
-    fprintf( stdout, "\n finalize_fcn\t%lu", (unsigned long)offsetof( rfc_ctx_s, finalize_fcn ) );
-    fprintf( stdout, "\n residue\t%lu", (unsigned long)offsetof( rfc_ctx_s, residue ) );
-    fprintf( stdout, "\n rfm\t%lu", (unsigned long)offsetof( rfc_ctx_s, rfm ) );
-    fprintf( stdout, "\n rp\t%lu", (unsigned long)offsetof( rfc_ctx_s, rp ) );
-    fprintf( stdout, "\n lc\t%lu", (unsigned long)offsetof( rfc_ctx_s, lc ) );
-    fprintf( stdout, "\n tp\t%lu", (unsigned long)offsetof( rfc_ctx_s, tp ) );
-    fprintf( stdout, "\n dh\t%lu", (unsigned long)offsetof( rfc_ctx_s, dh ) );
-    fprintf( stdout, "\n damage_lut\t%lu", (unsigned long)offsetof( rfc_ctx_s, damage_lut ) );
-    fprintf( stdout, "\n amplitude_lut\t%lu", (unsigned long)offsetof( rfc_ctx_s, amplitude_lut ) );
-    fprintf( stdout, "\n at.Sa\t%lu", (unsigned long)offsetof( rfc_ctx_s, at.Sa ) );
-    fprintf( stdout, "\n internal.flags\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.flags ) );
-    fprintf( stdout, "\n internal.finalizing\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.finalizing ) );
+    fprintf( stdout, "\n %20s\t%lu", "version",             (unsigned long)offsetof( rfc_ctx_s, version ) );
+    fprintf( stdout, "\n %20s\t%lu", "state",               (unsigned long)offsetof( rfc_ctx_s, state ) );
+    fprintf( stdout, "\n %20s\t%lu", "error",               (unsigned long)offsetof( rfc_ctx_s, error ) );
+    fprintf( stdout, "\n %20s\t%lu", "mem_alloc",           (unsigned long)offsetof( rfc_ctx_s, mem_alloc ) );
+    fprintf( stdout, "\n %20s\t%lu", "full_inc",            (unsigned long)offsetof( rfc_ctx_s, full_inc ) );
+    fprintf( stdout, "\n %20s\t%lu", "class_count",         (unsigned long)offsetof( rfc_ctx_s, class_count ) );
+    fprintf( stdout, "\n %20s\t%lu", "wl_sx",               (unsigned long)offsetof( rfc_ctx_s, wl_sx ) );
+#if RFC_USE_DELEGATES
+    fprintf( stdout, "\n %20s\t%lu", "tp_next_fcn",         (unsigned long)offsetof( rfc_ctx_s, tp_next_fcn ) );
+    fprintf( stdout, "\n %20s\t%lu", "finalize_fcn",        (unsigned long)offsetof( rfc_ctx_s, finalize_fcn ) );
+#endif /*RFC_USE_DELEGATES*/
+    fprintf( stdout, "\n %20s\t%lu", "residue",             (unsigned long)offsetof( rfc_ctx_s, residue ) );
+    fprintf( stdout, "\n %20s\t%lu", "rfm",                 (unsigned long)offsetof( rfc_ctx_s, rfm ) );
+    fprintf( stdout, "\n %20s\t%lu", "rp",                  (unsigned long)offsetof( rfc_ctx_s, rp ) );
+    fprintf( stdout, "\n %20s\t%lu", "lc",                  (unsigned long)offsetof( rfc_ctx_s, lc ) );
+#if RFC_TP_SUPPORT
+    fprintf( stdout, "\n %20s\t%lu", "tp",                  (unsigned long)offsetof( rfc_ctx_s, tp ) );
+#endif /*RFC_TP_SUPPORT*/
+#if RFC_DH_SUPPORT
+    fprintf( stdout, "\n %20s\t%lu", "dh",                  (unsigned long)offsetof( rfc_ctx_s, dh ) );
+#endif /*RFC_DH_SUPPORT*/
+#if RFC_DAMAGE_FAST
+    fprintf( stdout, "\n %20s\t%lu", "damage_lut",          (unsigned long)offsetof( rfc_ctx_s, damage_lut ) );
+    fprintf( stdout, "\n %20s\t%lu", "amplitude_lut",       (unsigned long)offsetof( rfc_ctx_s, amplitude_lut ) );
+#endif /*RFC_DAMAGE_FAST*/
+    fprintf( stdout, "\n %20s\t%lu", "at.Sa",               (unsigned long)offsetof( rfc_ctx_s, at.Sa ) );
+    fprintf( stdout, "\n %20s\t%lu", "internal.flags",      (unsigned long)offsetof( rfc_ctx_s, internal.flags ) );
+    fprintf( stdout, "\n %20s\t%lu", "internal.finalizing", (unsigned long)offsetof( rfc_ctx_s, internal.finalizing ) );
 #if 0
     fprintf( stdout, "\n internal.debug_flags\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.debug_flags ) );
 #endif
-    fprintf( stdout, "\n internal.pos\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.pos ) );
-    fprintf( stdout, "\n internal.wl.sd\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.wl.sd ) );
-    fprintf( stdout, "\n internal.tp_static\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.tp_static ) );
-    fprintf( stdout, "\n internal.dh_static\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.dh_static ) );
-    fprintf( stdout, "\n internal.hcm.stack\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.hcm.stack ) );
-    fprintf( stdout, "\n internal.at_haigh.Sa\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.at_haigh.Sa ) );
-    fprintf( stdout, "\n internal.obj\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.obj ) );
+    fprintf( stdout, "\n %20s\t%lu", "internal.pos",         (unsigned long)offsetof( rfc_ctx_s, internal.pos ) );
+#if !RFC_MINIMAL
+    fprintf( stdout, "\n %20s\t%lu", "internal.wl.sd",       (unsigned long)offsetof( rfc_ctx_s, internal.wl.sd ) );
+#endif /*!RFC_MINIMAL*/
+#if RFC_TP_SUPPORT
+    fprintf( stdout, "\n %20s\t%lu", "internal.tp_static",   (unsigned long)offsetof( rfc_ctx_s, internal.tp_static ) );
+#endif /*RFC_TP_SUPPORT*/
+#if RFC_DH_SUPPORT
+    fprintf( stdout, "\n %20s\t%lu", "internal.dh_static",   (unsigned long)offsetof( rfc_ctx_s, internal.dh_static ) );
+#endif /*RFC_DH_SUPPORT*/
+#if RFC_HCM_SUPPORT
+    fprintf( stdout, "\n %20s\t%lu", "internal.hcm.stack",   (unsigned long)offsetof( rfc_ctx_s, internal.hcm.stack ) );
+#endif /*RFC_HCM_SUPPORT*/
+#if RFC_AT_SUPPORT
+    fprintf( stdout, "\n %20s\t%lu", "internal.at_haigh.Sa", (unsigned long)offsetof( rfc_ctx_s, internal.at_haigh.Sa ) );
+#endif /*RFC_AT_SUPPORT*/
+#if RFC_USE_DELEGATES
+    fprintf( stdout, "\n %20s\t%lu", "internal.obj",         (unsigned long)offsetof( rfc_ctx_s, internal.obj ) );
+#endif /*RFC_USE_DELEGATES*/
 
     PASS();
 }

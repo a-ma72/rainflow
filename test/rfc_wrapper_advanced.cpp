@@ -11,7 +11,8 @@
      RFC_GLOBAL_EXTREMA     && \
      RFC_DAMAGE_FAST        && \
      RFC_DH_SUPPORT         && \
-     RFC_AT_SUPPORT
+     RFC_AT_SUPPORT         && \
+     RFC_DEBUG_FLAGS
 
 // "Cross-platform C++ Utility Library" [https://github.com/i42output/neolib]
 #define HAVE_NEOLIB 0
@@ -95,19 +96,17 @@ TEST wrapper_test_advanced( void )
     double values[] = { 1,6,2,8 };
     std::vector<double> data( values, values + 4 );
 
-    rf.init( 10, 1, -0.5, 1 );
+    ASSERT( rf.init( 10, 1, -0.5, 1 ) );
 
-    rf.flags_get( &flags, /*debugging*/true );
-    flags |= (int)Rainflow::RFC_FLAGS_LOG_CLOSED_CYCLES;
-    rf.flags_set( flags, /*debugging*/ true );
+    ASSERT( rf.flags_set( (int)Rainflow::RFC_FLAGS_LOG_CLOSED_CYCLES, /*debugging*/ true, /*overwrite*/ false ) );
 
-    rf.feed( values, NUMEL(values) );
+    ASSERT( rf.feed( values, NUMEL(values) ) );
     ASSERT( rf.tp_storage().size() == 3 );
 
-    rf.feed( data );
+    ASSERT( rf.feed( data ) );
     ASSERT( rf.tp_storage().size() == 7 );
 
-    rf.finalize( Rainflow::RFC_RES_REPEATED );
+    ASSERT( rf.finalize( Rainflow::RFC_RES_REPEATED ) );
     ASSERT( rf.tp_storage().size() == 8 );
 
     ASSERT_EQ( rf.tp_storage()[0].tp_pos, 0 );
@@ -128,20 +127,20 @@ TEST wrapper_test_advanced( void )
     ASSERT_EQ( rf.tp_storage()[6].value, 2 );
     ASSERT_EQ( rf.tp_storage()[7].value, 8 );
 
-    rf.wl_param_get( wl_param );
+    ASSERT( rf.wl_param_get( wl_param ) );
     double damage_6_2 = pow( ( (6.0-2.0)/2 / wl_param.sx ), fabs(wl_param.k) ) / wl_param.nx;
     double damage_8_1 = pow( ( (8.0-1.0)/2 / wl_param.sx ), fabs(wl_param.k) ) / wl_param.nx;
 
-    ASSERT_IN_RANGE( rf.tp_storage()[0].damage / ( damage_8_1*1/2 ), 1.0, 1e-10 );
-    ASSERT_IN_RANGE( rf.tp_storage()[1].damage / ( damage_6_2*1/2 ), 1.0, 1e-10 );
-    ASSERT_IN_RANGE( rf.tp_storage()[2].damage / ( damage_6_2*1/2 ), 1.0, 1e-10 );
-    ASSERT_IN_RANGE( rf.tp_storage()[3].damage / ( damage_8_1*1/1 ), 1.0, 1e-10 );
-    ASSERT_IN_RANGE( rf.tp_storage()[4].damage / ( damage_8_1*1/1 ), 1.0, 1e-10 );
-    ASSERT_IN_RANGE( rf.tp_storage()[5].damage / ( damage_6_2*1/1 ), 1.0, 1e-10 );
-    ASSERT_IN_RANGE( rf.tp_storage()[6].damage / ( damage_6_2*1/1 ), 1.0, 1e-10 );
-    ASSERT_IN_RANGE( rf.tp_storage()[7].damage / ( damage_8_1*1/2 ), 1.0, 1e-10 );
+    ASSERT_IN_RANGE( 1.0, rf.tp_storage()[0].damage / ( damage_8_1*1/2 ), 1e-10 );
+    ASSERT_IN_RANGE( 1.0, rf.tp_storage()[1].damage / ( damage_6_2*1/2 ), 1e-10 );
+    ASSERT_IN_RANGE( 1.0, rf.tp_storage()[2].damage / ( damage_6_2*1/2 ), 1e-10 );
+    ASSERT_IN_RANGE( 1.0, rf.tp_storage()[3].damage / ( damage_8_1*1/1 ), 1e-10 );
+    ASSERT_IN_RANGE( 1.0, rf.tp_storage()[4].damage / ( damage_8_1*1/1 ), 1e-10 );
+    ASSERT_IN_RANGE( 1.0, rf.tp_storage()[5].damage / ( damage_6_2*1/1 ), 1e-10 );
+    ASSERT_IN_RANGE( 1.0, rf.tp_storage()[6].damage / ( damage_6_2*1/1 ), 1e-10 );
+    ASSERT_IN_RANGE( 1.0, rf.tp_storage()[7].damage / ( damage_8_1*1/2 ), 1e-10 );
 
-    rf.deinit();
+    ASSERT( rf.deinit() );
 
     PASS();
 }
