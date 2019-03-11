@@ -58,6 +58,15 @@ char compiler_assert_rfc_config
    RFC_AT_SUPPORT
 ];
 
+#ifndef CALLOC
+#define CALLOC calloc
+#endif
+#ifndef REALLOC
+#define REALLOC realloc
+#endif
+#ifndef FREE
+#define FREE free
+#endif
 
 namespace RF = RFC_CPP_NAMESPACE;
 
