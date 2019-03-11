@@ -31,9 +31,6 @@ if( NOT CMAKE_CONFIGURATION_TYPES )
     endif()
 endif()
 
-set( CMAKE_BUILD_TYPE Debug   CACHE STRING "Debug"   FORCE )
-#set( CMAKE_BUILD_TYPE Release CACHE STRING "Release" FORCE )
-
 # C++11
 set( CMAKE_CXX_STANDARD 11 )
 set( CMAKE_CXX_STANDARD_REQUIRED ON )
@@ -43,6 +40,9 @@ set( CMAKE_POSITION_INDEPENDENT_CODE ON )
 
 # Options valid, if project compiled as standalone only
 if( CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR )
+    #set( CMAKE_BUILD_TYPE Debug   CACHE STRING "Debug"   FORCE )
+    set( CMAKE_BUILD_TYPE Release CACHE STRING "Release" FORCE )
+
     message( STATUS "Build ${PROJECT_NAME} as main project")
     option( RFC_MINIMAL             "(Disable all other flags)" OFF )
     option( RFC_USE_INTEGRAL_COUNTS "Use integral (non-floating) data type for counts" OFF )
@@ -53,7 +53,8 @@ if( CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR )
     option( RFC_DH_SUPPORT          "Support \"spread damage\" over turning points and damage history" ON )
     option( RFC_AT_SUPPORT          "Support amplitude transformation regarding mean load influence on fatigue strength" ON )
     option( RFC_DAMAGE_FAST         "Enables fast damage calculation (per look-up table)" ON )
-    option( RFC_DEBUG_FLAGS         "Enables flags for detailed " OFF )
+    option( RFC_DEBUG_FLAGS         "Enables flags for detailed examination" OFF )
+    option( RFC_EXPORT_MEX          "Export a function wrapper for MATLAB(R)" ON )
 else()
     message( STATUS "Build ${PROJECT_NAME} as subsequent project")
 endif()

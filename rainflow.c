@@ -111,8 +111,19 @@
 #include <string.h>  /* memset() */
 #include <float.h>   /* DBL_MAX */
 
+#ifndef CALLOC
+#define CALLOC calloc
+#endif
+#ifndef REALLOC
+#define REALLOC realloc
+#endif
+#ifndef FREE
+#define FREE free
+#endif
 
-#if MATLAB_MEX_FILE
+
+
+#if MATLAB_MEX_FILE && RFC_EXPORT_MEX
 #if !RFC_MINIMAL
 #define RFC_MEX_USAGE \
 "\nUsage:\n"\
@@ -143,7 +154,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <mex.h>
-#endif /*MATLAB_MEX_FILE*/
+#endif /*MATLAB_MEX_FILE && RFC_EXPORT_MEX*/
 
 /* Core functions */
 #if !RFC_MINIMAL
@@ -808,7 +819,7 @@ bool RFC_tp_prune( void *ctx, size_t limit, rfc_flags_e flags )
                 /* First new turning point delivers new offset */
                 if( !res_i && !preserve_pos )
                 {
-                    pos_offset = res_it->pos;  // pos is base 1
+                    pos_offset = res_it->pos;  /* pos is base 1 */
                     assert( pos_offset );
                     pos_offset--;
                 }
@@ -1643,7 +1654,7 @@ bool RFC_rfm_make_symmetric( void *ctx )
     {
         for( to = from + 1; to < class_count; to++ )
         {
-            // to > from, always
+            /* to > from, always */
             rfm[ class_count * from + to   ] += rfm[ class_count * to + from ];
             rfm[ class_count * to   + from ]  = 0;
         }
@@ -1739,7 +1750,7 @@ bool RFC_rfm_get( const void *ctx, rfc_rfm_item_s **buffer, unsigned *count )
         return false;
     }
 
-    // *buffer = NULL;
+    /* *buffer = NULL; */
     count_old  = *count;
     *count     = 0;
     for( from = 0; from < class_count; from++ )
@@ -5806,7 +5817,7 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
 #if RFC_DH_SUPPORT
     dh_cnt                       = rfc_ctx->dh_cnt;
 #endif /*RFC_DH_SUPPORT*/
-    RFC_clear_counts( rfc_ctx );   // state is RFC_STATE_INIT now and tp storage is unlocked
+    RFC_clear_counts( rfc_ctx );   /* state is RFC_STATE_INIT now and tp storage is unlocked */
     rfc_ctx->internal.pos        = pos;
     rfc_ctx->internal.pos_offset = pos_offset;
 #if RFC_DH_SUPPORT
@@ -6449,13 +6460,13 @@ void * mem_alloc( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim )
     {
         if( ptr )
         {
-            free( ptr );
+            FREE( ptr );
         }
         return NULL;
     }
     else
     {
-        return ptr ? realloc( ptr, num * size ) : calloc( num, size );
+        return ptr ? REALLOC( ptr, num * size ) : CALLOC( num, size );
     }
 }
 
@@ -6471,7 +6482,7 @@ void * mem_alloc( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim )
 /*********************************************************************************************************/
 
 
-#if MATLAB_MEX_FILE
+#if MATLAB_MEX_FILE && RFC_EXPORT_MEX
 
 #if RFC_DEBUG_FLAGS
 static
@@ -6483,7 +6494,7 @@ int rfc_vfprintf_fcn( void *ctx, FILE* stream, const char *fmt, va_list arg )
     length = vsnprintf( NULL, 0, fmt, arg );  
     if( length > 0 )
     {
-        char *buffer = malloc( ++length );
+        char *buffer = CALLOC( ++length, 1 );
 
         if( buffer )
         {
@@ -6491,7 +6502,7 @@ int rfc_vfprintf_fcn( void *ctx, FILE* stream, const char *fmt, va_list arg )
             vsnprintf( buffer, length, fmt, arg );
             mexPrintf( "%s", buffer );
 
-            free( buffer );
+            FREE( buffer );
         }
     }
 
@@ -6814,7 +6825,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                          D     += (double)rfc_ctx.tp[i].damage;
 #endif /*RFC_DH_SUPPORT*/
                     }
-                    //assert( D == rfc_ctx.damage );
+                    /* assert( D == rfc_ctx.damage ); */
                     plhs[5] = tp;
                 }
             }
@@ -6937,7 +6948,7 @@ void mexTP( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         double hysteresis     = mxGetScalar( mxHysteresis );
         bool   enforce_margin = (int)mxGetScalar( mxEnforceMargin );
 
-        tp = (rfc_value_tuple_s*)calloc( mxGetNumberOfElements( mxData ), sizeof(rfc_value_tuple_s) );
+        tp = (rfc_value_tuple_s*)CALLOC( mxGetNumberOfElements( mxData ), sizeof(rfc_value_tuple_s) );
         if( !tp )
         {
             mexErrMsgTxt( "Memory allocation error!" );
@@ -6945,25 +6956,25 @@ void mexTP( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 
         if( !RFC_init( &ctx, 0 /*class_count*/, 0.0 /*class_width*/, 0.0 /*class_offset*/, hysteresis, RFC_FLAGS_DEFAULT ) )
         {
-            free(tp);
+            FREE(tp);
             mexErrMsgTxt( "Error on RFC init!" );
         }
 
         if( !RFC_tp_init( &ctx, tp, mxGetNumberOfElements( mxData ), true /*tp_is_static*/ ) )
         {
-            free(tp);
+            FREE(tp);
             mexErrMsgTxt( "Error on RFC tp init!" );
         }
 
         if( !RFC_feed( &ctx, mxGetPr( mxData ), mxGetNumberOfElements( mxData ) ) )
         {
-            free(tp);
+            FREE(tp);
             mexErrMsgTxt( "Error on RFC feed!" );
         }
 
         if( !finalize_res_ignore( &ctx, ctx.internal.flags ) )
         {
-            free(tp);
+            FREE(tp);
             mexErrMsgTxt( "Error on RFC finalize!" );
         }
 
@@ -6974,7 +6985,7 @@ void mexTP( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
             *ptr++ = tp[n].value;
             *ptr++ = (double)tp[n].pos;
         }
-        free( tp );
+        FREE( tp );
 
         if( !RFC_deinit( &ctx ) )
         {
@@ -7057,4 +7068,4 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 }
 #endif /*!RFC_MINIMAL*/
 
-#endif /*MATLAB_MEX_FILE*/
+#endif /*MATLAB_MEX_FILE && RFC_EXPORT_MEX*/
