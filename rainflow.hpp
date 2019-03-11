@@ -44,18 +44,6 @@
 #include <cmath>
 #include "rainflow.h"
 
-#ifndef CALLOC
-#define CALLOC calloc
-#endif
-
-#ifndef REALLOC
-#define REALLOC realloc
-#endif
-
-#ifndef FREE
-#define FREE free
-#endif
-
 /* Suppose correct configuration */
 static
 char compiler_assert_rfc_config
@@ -75,20 +63,19 @@ namespace RF = RFC_CPP_NAMESPACE;
 
 /* Support external turning point storage */
 #ifdef RFC_TP_STORAGE
-namespace RFC_CPP_NAMESPACE
+
+/* C delegates */
+extern "C"
 {
-    /* C delegates */
-    extern "C"
-    {
-        static bool  tp_set           ( rfc_ctx_s* ctx, size_t tp_pos, rfc_value_tuple_s *tp );
-        static bool  tp_get           ( rfc_ctx_s* ctx, size_t tp_pos, rfc_value_tuple_s **tp );
-        static bool  tp_inc_damage    ( rfc_ctx_s *ctx, size_t tp_pos, double damage );
-        static void* mem_alloc        ( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim );
-    }
+    static bool  rfc_storage_tp_set           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp );
+    static bool  rfc_storage_tp_get           ( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp );
+    static bool  rfc_storage_tp_inc_damage    ( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage );
+    static void* rfc_storage_mem_alloc        ( void *ptr, size_t num, size_t size, RF::rfc_mem_aim_e aim );
 }
 
-    template< class T > class RainflowT;
-    typedef RainflowT<RFC_TP_STORAGE> Rainflow;
+template< class T > class RainflowT;
+typedef RainflowT<RFC_TP_STORAGE> Rainflow;
+
 #endif /*RFC_TP_STORAGE*/
 
 
@@ -347,7 +334,7 @@ public:
         rfc_ctx_s nil = { sizeof( rfc_ctx_s ) };
 
         m_ctx = nil;
-        m_ctx.mem_alloc = RF::mem_alloc;
+        m_ctx.mem_alloc = rfc_storage_mem_alloc;
     } 
     /* ctor */      RainflowT               ( rfc_ctx_s&& other ) { ctx_assign( other ); }   // Move ctor
     RainflowT&      operator=               ( rfc_ctx_s&& other ) { ctx_assign( other ); }   // Move assignment
@@ -390,7 +377,7 @@ private:
     RainflowT&      operator=               ( const RainflowT& );       // Inhibit copy assignment on (non-)const RainflowT
 
 protected:
-    rfc_ctx_s   m_ctx;
+    rfc_ctx_s       m_ctx;
     rfc_tp_storage  m_tp;
 };
 
@@ -407,9 +394,9 @@ bool RainflowT<T>::init( unsigned class_count, rfc_value_t class_width, rfc_valu
     {
         m_ctx.internal.obj          = this;
 #ifdef RFC_TP_STORAGE
-        m_ctx.tp_set_fcn            = RF::tp_set;
-        m_ctx.tp_get_fcn            = RF::tp_get;
-        m_ctx.tp_inc_damage_fcn     = RF::tp_inc_damage;
+        m_ctx.tp_set_fcn            = rfc_storage_tp_set;
+        m_ctx.tp_get_fcn            = rfc_storage_tp_get;
+        m_ctx.tp_inc_damage_fcn     = rfc_storage_tp_inc_damage;
 #endif /*RFC_TP_STORAGE*/
     }
 
@@ -1049,36 +1036,36 @@ void* RainflowT<T>::mem_alloc( void *ptr, size_t num, size_t size, rfc_mem_aim_e
 }
 
 
+#ifdef RFC_TP_STORAGE
 
-namespace RFC_CPP_NAMESPACE
+/* Define a Rainflow class with delegates for external turning point storage */
+
+/* Module static C delegates */
+extern "C"
 {
-    /* Define a Rainflow class with delegates for external turning point storage */
-
-    /* C delegates */
-    extern "C"
+    static
+    bool rfc_storage_tp_set( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp )
     {
-        static
-        bool tp_set( rfc_ctx_s* ctx, size_t tp_pos, rfc_value_tuple_s *tp )
-        {
-            return ctx && static_cast<Rainflow*>(ctx->internal.obj)->tp_set( tp_pos, tp );
-        }
+        return ctx && static_cast<Rainflow*>(ctx->internal.obj)->tp_set( tp_pos, tp );
+    }
 
-        static
-        bool tp_get( rfc_ctx_s* ctx, size_t tp_pos, rfc_value_tuple_s **tp )
-        {
-            return ctx && static_cast<Rainflow*>(ctx->internal.obj)->tp_get( tp_pos, tp );
-        }
+    static
+    bool rfc_storage_tp_get( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp )
+    {
+        return ctx && static_cast<Rainflow*>(ctx->internal.obj)->tp_get( tp_pos, tp );
+    }
 
-        static 
-        bool tp_inc_damage( rfc_ctx_s *ctx, size_t tp_pos, double damage )
-        {
-            return ctx && static_cast<Rainflow*>(ctx->internal.obj)->tp_inc_damage( tp_pos, damage );
-        }
+    static 
+    bool rfc_storage_tp_inc_damage( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage )
+    {
+        return ctx && static_cast<Rainflow*>(ctx->internal.obj)->tp_inc_damage( tp_pos, damage );
+    }
 
-        static
-        void * mem_alloc( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim )
-        {
-            return Rainflow::mem_alloc( ptr, num, size, (Rainflow::rfc_mem_aim_e)aim );
-        }
+    static
+    void * rfc_storage_mem_alloc( void *ptr, size_t num, size_t size, RF::rfc_mem_aim_e aim )
+    {
+        return Rainflow::mem_alloc( ptr, num, size, (Rainflow::rfc_mem_aim_e)aim );
     }
 }
+
+#endif /*RFC_TP_STORAGE*/

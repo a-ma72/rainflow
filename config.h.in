@@ -14,4 +14,5 @@
   #define RFC_DH_SUPPORT           ${RFC_DH_SUPPORT}
   #define RFC_AT_SUPPORT           ${RFC_AT_SUPPORT}
   #define RFC_DEBUG_FLAGS          ${RFC_DEBUG_FLAGS}
+  #define RFC_EXPORT_MEX           ${RFC_EXPORT_MEX}
 #endif /*RFC_VERSION_MAJOR*/
