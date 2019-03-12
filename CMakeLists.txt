@@ -15,6 +15,8 @@ cmake_minimum_required( VERSION 3.12 )
 set( CMAKE_VERBOSE_MAKEFILE OFF )
 set( CMAKE_BUILD_PARALLEL_LEVEL 12 )
 
+cmake_policy(SET CMP0076 NEW)
+
 # Project name and version
 project( rainflow )
 set( RFC_VERSION_MAJOR "0" )

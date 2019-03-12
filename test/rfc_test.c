@@ -2164,9 +2164,11 @@ TEST RFC_ctx_inspect( void )
     fprintf( stdout, "\n %20s\t%lu", "finalize_fcn",        (unsigned long)offsetof( rfc_ctx_s, finalize_fcn ) );
 #endif /*RFC_USE_DELEGATES*/
     fprintf( stdout, "\n %20s\t%lu", "residue",             (unsigned long)offsetof( rfc_ctx_s, residue ) );
+#if !RFC_MINIMAL
     fprintf( stdout, "\n %20s\t%lu", "rfm",                 (unsigned long)offsetof( rfc_ctx_s, rfm ) );
     fprintf( stdout, "\n %20s\t%lu", "rp",                  (unsigned long)offsetof( rfc_ctx_s, rp ) );
     fprintf( stdout, "\n %20s\t%lu", "lc",                  (unsigned long)offsetof( rfc_ctx_s, lc ) );
+#endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
     fprintf( stdout, "\n %20s\t%lu", "tp",                  (unsigned long)offsetof( rfc_ctx_s, tp ) );
 #endif /*RFC_TP_SUPPORT*/
@@ -2177,7 +2179,9 @@ TEST RFC_ctx_inspect( void )
     fprintf( stdout, "\n %20s\t%lu", "damage_lut",          (unsigned long)offsetof( rfc_ctx_s, damage_lut ) );
     fprintf( stdout, "\n %20s\t%lu", "amplitude_lut",       (unsigned long)offsetof( rfc_ctx_s, amplitude_lut ) );
 #endif /*RFC_DAMAGE_FAST*/
+#if RFC_AT_SUPPORT
     fprintf( stdout, "\n %20s\t%lu", "at.Sa",               (unsigned long)offsetof( rfc_ctx_s, at.Sa ) );
+#endif /*RFC_AT_SUPPORT*/
     fprintf( stdout, "\n %20s\t%lu", "internal.flags",      (unsigned long)offsetof( rfc_ctx_s, internal.flags ) );
     fprintf( stdout, "\n %20s\t%lu", "internal.finalizing", (unsigned long)offsetof( rfc_ctx_s, internal.finalizing ) );
 #if 0
@@ -2212,7 +2216,7 @@ TEST RFC_ctx_inspect( void )
 /* local suite (greatest) */
 SUITE( RFC_TEST_SUITE )
 {
-    fprintf( stdout, "\nssizeof(rfc_ctx_s): %lu\n", (unsigned long)sizeof( rfc_ctx_s ) );
+    fprintf( stdout, "\nsizeof(rfc_ctx_s): %lu\n", (unsigned long)sizeof( rfc_ctx_s ) );
 
     /* Inspect rainflow ctx */
     RUN_TEST( RFC_ctx_inspect );
