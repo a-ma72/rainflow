@@ -1047,7 +1047,10 @@ void* RainflowT<T>::mem_alloc( void *ptr, size_t num, size_t size, rfc_mem_aim_e
 
 #ifdef RFC_TP_STORAGE
 
-/* Define a Rainflow class with delegates for external turning point storage */
+/* Define a Rainflow class with delegates for external turning point storage.
+   Templates and namespaces use name mangling, which is not supported 
+   for extern "C" linkage. */
+
 
 /* Module static C delegates */
 extern "C"
@@ -1055,19 +1058,25 @@ extern "C"
     static
     bool rfc_storage_tp_set( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp )
     {
-        return ctx && static_cast<Rainflow*>(ctx->internal.obj)->tp_set( tp_pos, tp );
+        return ctx && 
+               ctx->internal.obj && 
+               static_cast<Rainflow*>(ctx->internal.obj)->tp_set( tp_pos, tp );
     }
 
     static
     bool rfc_storage_tp_get( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp )
     {
-        return ctx && static_cast<Rainflow*>(ctx->internal.obj)->tp_get( tp_pos, tp );
+        return ctx && 
+               ctx->internal.obj && 
+               static_cast<Rainflow*>(ctx->internal.obj)->tp_get( tp_pos, tp );
     }
 
     static 
     bool rfc_storage_tp_inc_damage( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage )
     {
-        return ctx && static_cast<Rainflow*>(ctx->internal.obj)->tp_inc_damage( tp_pos, damage );
+        return ctx && 
+               ctx->internal.obj && 
+               static_cast<Rainflow*>(ctx->internal.obj)->tp_inc_damage( tp_pos, damage );
     }
 
     static

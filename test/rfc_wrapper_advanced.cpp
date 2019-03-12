@@ -37,6 +37,14 @@ namespace RFC_CPP_NAMESPACE
     {
         public:
             inline size_t capacity() const { return size(); }  /* Rainflow needs a capacity() method */
+        
+        private:
+            class notifier
+            {
+                public:
+                    notifier() { fprintf( stdout, "\nneolib ctor\n" ); }
+                   ~notifier() { fprintf( stdout, "\nneolib dtor\n" ); }
+            } m_notifier;
     };
 #else /*!HAVE_NEOLIB*/
     typedef std::vector<rfc_value_tuple_s> tp_storage;  /**< Turning points storage */
