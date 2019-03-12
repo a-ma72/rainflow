@@ -123,9 +123,9 @@
 
 
 
-// Notes on mix C and C++ headers:
-// https://developers.redhat.com/blog/2016/02/29/why-cstdlib-is-more-complicated-than-you-might-think/
-// Avoid including C standard headers in a C++ namespace!
+/* Notes on mix C and C++ headers:
+ * https://developers.redhat.com/blog/2016/02/29/why-cstdlib-is-more-complicated-than-you-might-think/
+ * Avoid including C standard headers in a C++ namespace! */
 #ifdef __cplusplus
 #include <cstdbool>  /* bool, true, false */
 #include <cstdint>   /* ULLONG_MAX */
@@ -202,6 +202,14 @@ enum rfc_res_method
 };
 
 
+enum rfc_wl_defaults
+{
+    RFC_WL_SD_DEFAULT               =  1000,                        /**< Fatigue strength amplitude (Miner original) */
+    RFC_WL_ND_DEFAULT               =  10000000L,                   /**< Cycles according to wl_sd */
+    RFC_WL_K_DEFAULT                = -5,                           /**< Woehler slope, always negative */
+};
+
+
 /* Typedefs */
 typedef                 RFC_VALUE_TYPE          rfc_value_t;                /** Input data value type */
 typedef                 RFC_COUNTS_VALUE_TYPE   rfc_counts_t;               /** Type of counting values */
@@ -231,7 +239,7 @@ bool    RFC_finalize                (       void *ctx, rfc_res_method_e residual
 
 
 #ifdef __cplusplus
-}  // extern "C"
+}  /* extern "C" */
 #endif /*__cplusplus*/
 
 
@@ -264,7 +272,7 @@ struct rfc_ctx
     /* Counter increments */
     rfc_counts_t                        full_inc;                   /**< Increment for a full cycle */
     rfc_counts_t                        half_inc;                   /**< Increment for a half cycle, used by some residual algorithms */
-    rfc_counts_t                        curr_inc;                   /**< Current increment, used by counting algorithms */
+    rfc_counts_t                        curr_inc;                   /**< Current increment, used by counting algorithms (changed by finalize_res_weight_cycles() only) */
 
     /* Rainflow class parameters */
     unsigned                            class_count;                /**< Class count */
@@ -293,6 +301,7 @@ struct rfc_ctx
     struct internal
     {
         int                             flags;                      /**< Flags (enum rfc_flags) */
+        bool                            finalizing;                 /**< true, when finalizing */
         int                             slope;                      /**< Current signal slope */
         rfc_value_tuple_s               extrema[2];                 /**< Local or global extrema depending on RFC_GLOBAL_EXTREMA */
         size_t                          pos;                        /**< Absolute position in data input stream, base 1 */
@@ -305,7 +314,7 @@ struct rfc_ctx
 };
 
 #ifdef __cplusplus
-}  // namespace RFC_CPP_NAMESPACE
+}  /* namespace RFC_CPP_NAMESPACE */
 #endif /*__cplusplus*/
 
 #endif /*RAINFLOW_H*/

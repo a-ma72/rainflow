@@ -109,8 +109,19 @@
 #include <string.h>  /* memset() */
 #include <float.h>   /* DBL_MAX */
 
+#ifndef CALLOC
+#define CALLOC calloc
+#endif
+#ifndef REALLOC
+#define REALLOC realloc
+#endif
+#ifndef FREE
+#define FREE free
+#endif
 
-#if MATLAB_MEX_FILE
+
+
+#if MATLAB_MEX_FILE && RFC_EXPORT_MEX
 #define RFC_MEX_USAGE \
 "\nUsage:\n"\
 "[pd,re,rm] = rfc( data, class_count, class_width, class_offset, hysteresis )\n"\
@@ -121,7 +132,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <mex.h>
-#endif /*MATLAB_MEX_FILE*/
+#endif /*MATLAB_MEX_FILE && RFC_EXPORT_MEX*/
 
 /* Core functions */
 #define cycle_find          cycle_find_4ptm
@@ -142,10 +153,10 @@ static bool                 error_raise                     (       rfc_ctx_s *,
 static rfc_value_t          value_delta                     (       rfc_value_t from_val, rfc_value_t to, int *sign_ptr );
 
 
-#define QUANTIZE( r, v )    ( (unsigned)( ((v) - (r)->class_offset) / (r)->class_width ) )
-#define AMPLITUDE( r, i )   ( (double)(r)->class_width * (i) / 2 )
-#define CLASS_MEAN( r, c )  ( (double)(r)->class_width * (0.5 + (c)) + (r)->class_offset )
-#define CLASS_UPPER( r, c ) ( (double)(r)->class_width * (1.0 + (c)) + (r)->class_offset )
+#define QUANTIZE( r, v )    ( (r)->class_count ? (unsigned)( ((v) - (r)->class_offset) / (r)->class_width ) : 0 )
+#define AMPLITUDE( r, i )   ( (r)->class_count ? ( (double)(r)->class_width * (i) / 2 ) : 0.0 )
+#define CLASS_MEAN( r, c )  ( (r)->class_count ? ( (double)(r)->class_width * (0.5 + (c)) + (r)->class_offset ) : 0.0 )
+#define CLASS_UPPER( r, c ) ( (r)->class_count ? ( (double)(r)->class_width * (1.0 + (c)) + (r)->class_offset ) : 0.0 )
 #define NUMEL( x )          ( sizeof(x) / sizeof(*(x)) )
 
 #define RFC_CTX_CHECK_AND_ASSIGN                                                    \
@@ -187,6 +198,9 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
     }
     rfc_ctx->internal.flags                 = flags;
 
+
+    rfc_ctx->internal.finalizing            = false;
+
     /* Counter increments */
     rfc_ctx->full_inc                       = RFC_FULL_CYCLE_INCREMENT;
     rfc_ctx->half_inc                       = RFC_HALF_CYCLE_INCREMENT;
@@ -199,6 +213,11 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
             return error_raise( rfc_ctx, RFC_ERROR_INVARG );
         }
     }
+    else
+    {
+        class_width  = 1.0;
+        class_offset = 0.0;
+    }
 
     /* Rainflow class parameters */
     rfc_ctx->class_count                    = class_count;
@@ -208,7 +227,7 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
 
     /* Values for a "pseudo Woehler curve" */
     rfc_ctx->state = RFC_STATE_INIT;   /* Bypass sanity check for state in wl_init() */
-    RFC_wl_init_elementary( rfc_ctx, 1e3 /*sx*/, 1e7 /*nx*/, -5.0 /*k*/ );
+    RFC_wl_init_elementary( rfc_ctx, /*sx*/ RFC_WL_SD_DEFAULT, /*nx*/ RFC_WL_ND_DEFAULT, /*k*/ RFC_WL_K_DEFAULT );
     rfc_ctx->state = RFC_STATE_INIT0;  /* Reset state */
 
     /* Memory allocator */
@@ -291,6 +310,7 @@ bool RFC_wl_init_elementary( void *ctx, double sx, double nx, double k )
     rfc_ctx->wl_nx        =  nx;
     rfc_ctx->wl_k         = -fabs(k);
 
+
     return true;
 }
 
@@ -349,7 +369,7 @@ bool RFC_feed( void *ctx, const rfc_value_t * data, size_t data_count )
 {
     RFC_CTX_CHECK_AND_ASSIGN
 
-    if( data_count && !data ) return false;
+    if( !data ) return !data_count;
 
     if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state >= RFC_STATE_FINISHED )
     {
@@ -396,6 +416,8 @@ bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
         return false;
     }
 
+    rfc_ctx->internal.finalizing = true;
+
     damage = rfc_ctx->damage;
 
     {
@@ -423,6 +445,8 @@ bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
 
     rfc_ctx->damage_residue = rfc_ctx->damage - damage;
     rfc_ctx->state          = ok ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
+
+    rfc_ctx->internal.finalizing = false;
 
     return ok;
 }
@@ -914,6 +938,15 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
 
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
+
+    if( !rfc_ctx->class_count || ( from->value > rfc_ctx->class_offset && to->value > rfc_ctx->class_offset ) )
+    {
+    }
+    else
+    {
+        assert( false );
+    }
+
     assert( !rfc_ctx->class_count || ( from->value > rfc_ctx->class_offset && to->value > rfc_ctx->class_offset ) );
 
 
@@ -1037,13 +1070,13 @@ void * mem_alloc( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim )
     {
         if( ptr )
         {
-            free( ptr );
+            FREE( ptr );
         }
         return NULL;
     }
     else
     {
-        return ptr ? realloc( ptr, num * size ) : calloc( num, size );
+        return ptr ? REALLOC( ptr, num * size ) : CALLOC( num, size );
     }
 }
 
@@ -1058,7 +1091,7 @@ void * mem_alloc( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim )
 /*********************************************************************************************************/
 
 
-#if MATLAB_MEX_FILE
+#if MATLAB_MEX_FILE && RFC_EXPORT_MEX
 /**
  * MATLAB wrapper for the rainflow algorithm
  */
@@ -1073,6 +1106,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
             return;
         }
         mexErrMsgTxt( "Function needs exact 5 arguments!" );
+
     }
     else
     {
@@ -1101,9 +1135,9 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         ok = RFC_init( &rfc_ctx, 
                        class_count, (rfc_value_t)class_width, (rfc_value_t)class_offset, 
                        (rfc_value_t)hysteresis, RFC_FLAGS_DEFAULT );
-
         if( !ok )
         {
+            RFC_deinit( &rfc_ctx );
             mexErrMsgTxt( "Error during initialization!" );
         }
 
@@ -1116,7 +1150,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
             if( !buffer )
             {
                 RFC_deinit( &rfc_ctx );
-                mexErrMsgTxt( "Error during initialization!" );
+                mexErrMsgTxt( "Error during initialization (memory)!" );
             }
 
             for( i = 0; i < data_len; i++ )
@@ -1134,8 +1168,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         /* Free temporary buffer (cast) */
         if( (void*)buffer != (void*)data )
         {
-            mem_alloc( buffer, 0, 0, RFC_MEM_AIM_TEMP );
-            buffer = NULL;
+            buffer = mem_alloc( buffer, 0, 0, RFC_MEM_AIM_TEMP );
         }
 
         if( !ok )
@@ -1212,4 +1245,4 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
     mexRainflow( nlhs, plhs, nrhs, prhs );
 }
 
-#endif /*MATLAB_MEX_FILE*/
+#endif /*MATLAB_MEX_FILE && RFC_EXPORT_MEX*/

@@ -55,9 +55,12 @@
 #include <locale.h>
 #include <math.h>
 #include <float.h>
+#include <stddef.h>  /* offsetof */
 
-#define ROUND(x) ((x)>=0?(long)((x)+0.5):(long)((x)-0.5))
-#define NUMEL(x) (sizeof(x)/sizeof((x)[0]))
+
+#define ROUND(x)    ((x)>=0?(long)((x)+0.5):(long)((x)-0.5))
+#define ROUNDN(x,n) (round((x)*pow(10.0,(n)))/pow(10.0,(n)))
+#define NUMEL(x)    (sizeof(x)/sizeof((x)[0]))
 
 static
 struct buffer
@@ -135,6 +138,69 @@ void strip_buffer( struct buffer* buffer )
 }
 
 
+void calc_extema( const RFC_VALUE_TYPE* data, size_t data_len, RFC_VALUE_TYPE* data_max, RFC_VALUE_TYPE* data_min )
+{
+    RFC_VALUE_TYPE x_min, x_max;
+    size_t i;
+
+    if( !data || !data_len ) return;
+
+    x_min = x_max = data[0];
+
+    for( i = 1; i < data_len; i++ )
+    {
+        if( data[i] > x_max )
+        {
+            x_max = data[i];
+        }
+        else if( data[i] < x_min )
+        {
+            x_min = data[i];
+        }
+    }
+
+    if( data_min )
+    {
+        *data_min = x_min;
+    }
+
+    if( data_max )
+    {
+        *data_max = x_max;
+    }
+}
+
+
+void calc_class_param( double data_max, double data_min, unsigned class_count, RFC_VALUE_TYPE* class_width, RFC_VALUE_TYPE* class_offset )
+{
+    double width, offset;
+
+    if( data_max < data_min ) abort();
+
+    if( class_count < 1 )
+    {
+        width  = 1.0;
+        offset = 0.0;
+    }
+    else
+    {
+        width  = (data_max - data_min) / (class_count - 1);
+        width  = ceil( width * 100 ) / 100;
+        offset = floor( ( data_min - width / 2 ) * 1000 ) / 1000;
+    }
+
+    if( class_width )
+    {
+        *class_width = (RFC_VALUE_TYPE)width;
+    }
+
+    if( class_offset )
+    {
+        *class_offset = (RFC_VALUE_TYPE)offset;
+    }
+}
+
+
 
 
 rfc_counts_t rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
@@ -153,9 +219,13 @@ TEST RFC_empty( int ccnt )
     RFC_VALUE_TYPE      x_max           =  1;
     RFC_VALUE_TYPE      x_min           = -1;
     unsigned            class_count     =  ccnt ? 100 : 0;
-    RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
-    RFC_VALUE_TYPE      class_offset    =  x_min - class_width / 2;
-    RFC_VALUE_TYPE      hysteresis      =  class_width;
+    RFC_VALUE_TYPE      class_width;
+    RFC_VALUE_TYPE      class_offset;
+    RFC_VALUE_TYPE      hysteresis;
+
+    calc_class_param( x_max, x_min, class_count, &class_width, &class_offset );
+    hysteresis = class_width;
+
     size_t              i;
 
     do
@@ -191,10 +261,13 @@ TEST RFC_cycle_up( int ccnt )
     RFC_VALUE_TYPE      x_max           =  4;
     RFC_VALUE_TYPE      x_min           =  1;
     unsigned            class_count     =  ccnt ? 4 : 0;
-    RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
-    RFC_VALUE_TYPE      class_offset    =  x_min - class_width / 2;
-    RFC_VALUE_TYPE      hysteresis      =  class_width * 0.99;
+    RFC_VALUE_TYPE      class_width;
+    RFC_VALUE_TYPE      class_offset;
+    RFC_VALUE_TYPE      hysteresis;
     size_t              i;
+
+    calc_class_param( x_max, x_min, class_count, &class_width, &class_offset );
+    hysteresis = class_width * 0.99;
 
     do
     {
@@ -237,10 +310,13 @@ TEST RFC_cycle_down( int ccnt )
     RFC_VALUE_TYPE      x_max           =  4;
     RFC_VALUE_TYPE      x_min           =  1;
     unsigned            class_count     =  ccnt ? 4 : 0;
-    RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
-    RFC_VALUE_TYPE      class_offset    =  x_min - class_width / 2;
-    RFC_VALUE_TYPE      hysteresis      =  class_width * 0.99;
+    RFC_VALUE_TYPE      class_width;
+    RFC_VALUE_TYPE      class_offset;
+    RFC_VALUE_TYPE      hysteresis;
     size_t              i;
+
+    calc_class_param( x_max, x_min, class_count, &class_width, &class_offset );
+    hysteresis = class_width * 0.99;
 
     do
     {
@@ -283,10 +359,13 @@ TEST RFC_small_example( int ccnt )
     RFC_VALUE_TYPE      x_max           =  6;
     RFC_VALUE_TYPE      x_min           =  1;
     unsigned            class_count     =  ccnt ? (unsigned)x_max : 0;
-    RFC_VALUE_TYPE      class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
-    RFC_VALUE_TYPE      class_offset    =  x_min - class_width / 2;
-    RFC_VALUE_TYPE      hysteresis      =  class_width;
+    RFC_VALUE_TYPE      class_width;
+    RFC_VALUE_TYPE      class_offset;
+    RFC_VALUE_TYPE      hysteresis;
     size_t              i;
+
+    calc_class_param( x_max, x_min, class_count, &class_width, &class_offset );
+    hysteresis = class_width * 0.99;
 
     do
     {
@@ -334,7 +413,7 @@ TEST RFC_long_series( int ccnt )
     bool                need_conf           =  false;
     bool                do_result_check     =  true;
     RFC_VALUE_TYPE      data[10000];
-    size_t              data_len            =  NUMEL( data );
+    size_t              data_len;
     RFC_VALUE_TYPE      x_max;
     RFC_VALUE_TYPE      x_min;
     unsigned            class_count         =  ccnt ? 100 : 0;
@@ -347,6 +426,10 @@ TEST RFC_long_series( int ccnt )
     if(1)
     {
 #include "long_series.c"
+
+        ASSERT( data_length == 10000 );
+
+        data_len = data_length;
 
         for( i = 0; i < data_len; i++ )
         {
@@ -416,8 +499,7 @@ TEST RFC_long_series( int ccnt )
 
     if( !need_conf )
     {
-        class_width     =  (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
-        class_offset    =  x_min - class_width / 2;
+        calc_class_param( x_max, x_min, class_count, &class_width, &class_offset );
         hysteresis      =  class_width;
     }
     else
@@ -444,7 +526,9 @@ TEST RFC_long_series( int ccnt )
             }
         }
 
-        hysteresis = class_width = (RFC_VALUE_TYPE)ROUND( 100 * (x_max - x_min) / (class_count - 1) ) / 100;
+        calc_class_param( x_max, x_min, class_count, &class_width, /*class_offset*/ NULL );
+
+        hysteresis = class_width;
         GREATEST_FPRINTF( GREATEST_STDOUT, "Class width (%g): ", class_width );
         if( fgets( buf, sizeof(buf), stdin ) != NULL )
         {
@@ -454,7 +538,8 @@ TEST RFC_long_series( int ccnt )
             }
         }
 
-        class_offset  =  x_min - class_width / 2;
+        calc_class_param( x_min + class_width * class_count, x_min, class_count, /*class_width*/ NULL, &class_offset );
+
         GREATEST_FPRINTF( GREATEST_STDOUT, "Class offset (%g): ", class_offset );
         if( fgets( buf, sizeof(buf), stdin ) != NULL )
         {
@@ -555,7 +640,7 @@ TEST RFC_long_series( int ccnt )
             /* Check matrix sum */
             ASSERT_EQ( sum, 602.0 );
             /* Check damage value */
-            GREATEST_ASSERT_IN_RANGE( ctx.damage, 4.8703e-16, 0.00005e-16 );
+            GREATEST_ASSERT_IN_RANGE( 4.8703e-16, ctx.damage, 0.00005e-16 );
             /* Check residue */
             ASSERT_EQ( ctx.residue_cnt, 10 );
             ASSERT_EQ_FMT( ctx.residue[0].value,   0.54, "%.2f" );
@@ -595,9 +680,37 @@ TEST RFC_long_series( int ccnt )
 
 
 
+TEST RFC_ctx_inspect( void )
+{
+    fprintf( stdout, "\n %20s\t%lu", "version",             (unsigned long)offsetof( rfc_ctx_s, version ) );
+    fprintf( stdout, "\n %20s\t%lu", "state",               (unsigned long)offsetof( rfc_ctx_s, state ) );
+    fprintf( stdout, "\n %20s\t%lu", "error",               (unsigned long)offsetof( rfc_ctx_s, error ) );
+    fprintf( stdout, "\n %20s\t%lu", "mem_alloc",           (unsigned long)offsetof( rfc_ctx_s, mem_alloc ) );
+    fprintf( stdout, "\n %20s\t%lu", "full_inc",            (unsigned long)offsetof( rfc_ctx_s, full_inc ) );
+    fprintf( stdout, "\n %20s\t%lu", "class_count",         (unsigned long)offsetof( rfc_ctx_s, class_count ) );
+    fprintf( stdout, "\n %20s\t%lu", "wl_sx",               (unsigned long)offsetof( rfc_ctx_s, wl_sx ) );
+    fprintf( stdout, "\n %20s\t%lu", "residue",             (unsigned long)offsetof( rfc_ctx_s, residue ) );
+    fprintf( stdout, "\n %20s\t%lu", "internal.flags",      (unsigned long)offsetof( rfc_ctx_s, internal.flags ) );
+    fprintf( stdout, "\n %20s\t%lu", "internal.finalizing", (unsigned long)offsetof( rfc_ctx_s, internal.finalizing ) );
+#if 0
+    fprintf( stdout, "\n internal.debug_flags\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.debug_flags ) );
+#endif
+    fprintf( stdout, "\n %20s\t%lu", "internal.pos",         (unsigned long)offsetof( rfc_ctx_s, internal.pos ) );
+
+    fprintf( stdout, "\n" );
+
+    PASS();
+}
+
+
 /* local suite (greatest) */
 SUITE( RFC_TEST_SUITE )
 {
+    fprintf( stdout, "\nsizeof(rfc_ctx_s): %lu\n", (unsigned long)sizeof( rfc_ctx_s ) );
+
+    /* Inspect rainflow ctx */
+    RUN_TEST( RFC_ctx_inspect );
+    
     /* Test rainflow counting */
     RUN_TEST1( RFC_empty, 1 );
     RUN_TEST1( RFC_cycle_up, 1 );

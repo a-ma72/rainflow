@@ -21,37 +21,6 @@ This implementation uses the 4-point algorithm mentioned in [3,4] and the 3-poin
 To take the residue into account, you may implement a custom method or use some
 predefined functions.
  
-### Features of this package
- 1. Modular architecture in two layers:  
-    a) Module _rainflow.c_ (with _rainflow.h_) holds all necessary functions for rainflow counting and histogram extraction. You may select multiple optional features at compile time:  
-    `RFC_MINIMAL`: To use core functions for rainflow counting only (for porting to µControllers for example).  
-    `RFC_TP_SUPPORT`: Turning point storage.  
-    `RFC_HCM_SUPPORT`: Use HCM algorithm (Clormann/Seeger).  
-    `RFC_AT_SUPPORT`: User defined amplitude transformation (Haigh diagram).   
-    `RFC_DH_SUPPORT`:  Damage history storage.  
-    `RFC_USE_DELEGATES`: Delegates for various core functions to implement user defined behavior.  
-    `RFC_GLOBAL_EXTREMA`:  Store global data extrema.    
-    `RFC_DAMAGE_FAST`: Using lookup tables for damage and amplitude transformation.  
-    Using _COAN_ [[http://coan2.sourceforge.net/]] for example, you can tidy up the code from unwanted features. (The minimal version of this package is created using _COAN_ with option `RFC_MINMAL`set.)  
-    b) C++ wrapper _rainflow.hpp_ encapsulates functions from rainflow.h in a namespace and offers a template class _Rainflow_ for object oriented access and inheritance.
-    This class also offers container class based turning point storage.  
- 2. Streamable: You may count you data at once, as data packages or sample-wise.  
- 3. Class width fit to your needs. Dynamically increase class width, when needed. (Needs turning point storage.)  
- 4. Optional HCM counting method (Clormann/Seeger).
- 5. Woehler curve with up to two slopes, fatigue limit and omission.  
- 6. Miners rule for damage accumulation (elementary, original, modified and consequent).  
- 7. In-time damage indicator (Miners' consequent rule).  
- 8. In-time histograms: rainflow matrix, level crossing and range pair counting.  
- 9. Turning points with hysteresis filtering. Turning points involved in a closed hysteresis are marked as pairs, with its partial assigned damage. (Compact history)  
- 10. Look-up tables for damage calculation and amplitude transformation.  
- 11. Amplitude transformation (Haigh diagram) according to FKM (symmetrical, unsymmetrical or user defined).  
- 12. Damage history (uncompressed), TBD  
- 13. Various methods on residual data:  
-     - According to DIN 45667  
-     - ASTM method (halfcycle, fullcycle)  
-     - Second run  
-     - HCM  
-
 ---
 ### References:
 [1] "Standard Practices for Cycle Counting in Fatigue Analysis."  

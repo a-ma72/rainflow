@@ -1,3 +1,6 @@
+# CMakeLists for rainflow
+# 2019, Andreas Martin
+
 # First set Matlab_ROOT_DIR environment variable to your installed matlab path,
 # such as 'export Matlab_ROOT_DIR=/usr/local/MATLAB/R2017b'!
 # (GNUC: gcc for C file, g++ for CXX files)
@@ -8,21 +11,45 @@
 # cmake -G "Visual Studio 14 2015 Win64" ..
 
 
-cmake_minimum_required( VERSION 3.6 )
-project( Rainflow )
-set( CMAKE_CONFIGURATION_TYPES Release Debug )
-set( RFC_VERSION_MAJOR "0" )
-set( RFC_VERSION_MINOR "1" )
+cmake_minimum_required( VERSION 3.12 )
+set( CMAKE_VERBOSE_MAKEFILE OFF )
+set( CMAKE_BUILD_PARALLEL_LEVEL 12 )
 
-# options valid, if project compiled as standalone only
+# Project name and version
+project( rainflow )
+set( RFC_VERSION_MAJOR "0" )
+set( RFC_VERSION_MINOR "2" )
+
+cmake_policy( SET CMP0076 NEW )
+
+# Build type and compiler selection
+if( NOT CMAKE_CONFIGURATION_TYPES )
+    get_property( HAVE_MULTI_CONFIG_GENERATOR GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG )
+    # Set default configuration types for multi-config generators
+    if( HAVE_MULTI_CONFIG_GENERATOR )
+        set( CMAKE_CONFIGURATION_TYPES "Release;Debug" )
+    endif()
+endif()
+
+# C++11
+set( CMAKE_CXX_STANDARD 11 )
+set( CMAKE_CXX_STANDARD_REQUIRED ON )
+set( CMAKE_CXX_EXTENSIONS ON )
+set( CMAKE_POSITION_INDEPENDENT_CODE ON )
+
+
+# Options valid, if project compiled as standalone only
 if( CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR )
+    #set( CMAKE_BUILD_TYPE Debug   CACHE STRING "Debug"   FORCE )
+    set( CMAKE_BUILD_TYPE Release CACHE STRING "Release" FORCE )
+
     message( STATUS "Build ${PROJECT_NAME} as main project")
     option( RFC_USE_INTEGRAL_COUNTS "Use integral (non-floating) data type for counts" OFF )
+    option( RFC_EXPORT_MEX          "Export a function wrapper for MATLAB(R)" ON )
 else()
     message( STATUS "Build ${PROJECT_NAME} as subsequent project")
 endif()
 
-set( CMAKE_POSITION_INDEPENDENT_CODE ON )
 
 if( MSVC )
     # Turn off misguided "secure CRT" warnings in MSVC.
@@ -32,8 +59,10 @@ if( MSVC )
     add_definitions( -D_CRT_SECURE_NO_WARNINGS )
 endif()
 
-if( UNIX )
-    set( MATH_LIB m )
+# Math library
+find_library( LIBM_LIBRARY NAMES m )
+if( NOT LIBM_LIBRARY )
+    set( LIBM_LIBRARY "" )
 endif()
 
 set( MATLAB_FIND_DEBUG 1 )
@@ -48,21 +77,24 @@ endif()
 
 # set up matlab libraries
 include_directories( ${Matlab_INCLUDE_DIRS} )
+
+# Configuration file
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/config.h )
 
+# MEX function (MATLAB)
 matlab_add_mex( NAME ${PROJECT_NAME} SRC rainflow.c OUTPUT_NAME rfc )
 target_compile_definitions( ${PROJECT_NAME} PRIVATE MATLAB_MEX_FILE _SCL_SECURE_NO_WARNINGS )
-target_link_libraries( ${PROJECT_NAME} ${Matlab_LIBRARIES} ${MATH_LIB} )
+target_link_libraries( ${PROJECT_NAME} ${Matlab_LIBRARIES} ${LIBM_LIBRARY} )
 
+# Static rainflow library
 add_library( rfc STATIC rainflow.c )
-target_link_libraries( ${PROJECT_NAME} ${MATH_LIB} )
+target_link_libraries( rfc ${LIBM_LIBRARY} )
 
 # Test application, start project for MSVC
 add_executable( rfc_test rainflow.c test/rfc_test.c test/rfc_wrapper_simple.cpp )
 target_compile_definitions( rfc_test PRIVATE _SCL_SECURE_NO_WARNINGS )
-target_link_libraries( rfc_test ${MATH_LIB} )
+target_link_libraries( rfc_test ${LIBM_LIBRARY} )
 target_sources( rfc_test PUBLIC greatest/greatest.h )
-set_target_properties( rfc_test PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS YES )
 set_property( DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT rfc_test )
 
 # install to /bin by default
@@ -80,7 +112,7 @@ set( CPACK_PACKAGE_VERSION_MAJOR ${RFC_VERSION_MAJOR} )
 set( CPACK_PACKAGE_VERSION_MINOR ${RFC_VERSION_MINOR} )
 set( CPACK_PACKAGE_VERSION_PATCH "" )
 set( CPACK_PACKAGE_VERSION ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR} )
-set( CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README.MD" )
+set( CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README.md" )
 set( CPACK_PACKAGE_DESCRIPTION_SUMMARY "Fast rainflow counting written in C (C99)" )
 set( CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE" )
 set( CPACK_SOURCE_IGNORE_FILES 
