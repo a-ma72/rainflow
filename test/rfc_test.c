@@ -2177,7 +2177,9 @@ TEST RFC_ctx_inspect( void )
 #endif /*RFC_DH_SUPPORT*/
 #if RFC_DAMAGE_FAST
     fprintf( stdout, "\n %20s\t%lu", "damage_lut",          (unsigned long)offsetof( rfc_ctx_s, damage_lut ) );
+#if RFC_AT_SUPPORT
     fprintf( stdout, "\n %20s\t%lu", "amplitude_lut",       (unsigned long)offsetof( rfc_ctx_s, amplitude_lut ) );
+#endif /*RFC_AT_SUPPORT*/
 #endif /*RFC_DAMAGE_FAST*/
 #if RFC_AT_SUPPORT
     fprintf( stdout, "\n %20s\t%lu", "at.Sa",               (unsigned long)offsetof( rfc_ctx_s, at.Sa ) );
