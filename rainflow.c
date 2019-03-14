@@ -6367,12 +6367,12 @@ bool spread_damage_map_tp( rfc_ctx_s *rfc_ctx )
         {
             D_new += *dh_ptr;
 
-            if( !tp )
+            if( !tp && i_tp < rfc_ctx->tp_cnt )
             {
                 tp_get( rfc_ctx, i_tp, &tp );
             }
 
-            if( i_tp <= rfc_ctx->tp_cnt && tp && i == tp->pos )
+            if( tp && i == tp->pos )
             {
                 tp_inc_damage( rfc_ctx, i_tp++, D_new - D_cum );
                 tp    = NULL;
