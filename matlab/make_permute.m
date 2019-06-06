@@ -15,16 +15,17 @@ if ispc
 end
 
 for loop = 2^10-1:-1:0
-  VALUE_TYPE              = bitconf( loop, 1, 'float', 'double' );
-  RFC_USE_INTEGRAL_COUNTS = bitconf( loop, 2 );
-  RFC_MINIMAL             = bitconf( loop, 3 );
-  RFC_TP_SUPPORT          = bitconf( loop, 4 );
-  RFC_HCM_SUPPORT         = bitconf( loop, 5 );
-  RFC_GLOBAL_EXTREMA      = bitconf( loop, 6 );
-  RFC_DAMAGE_FAST         = bitconf( loop, 7 );
-  RFC_DH_SUPPORT          = bitconf( loop, 8 );
-  RFC_AT_SUPPORT          = bitconf( loop, 9 );
-  RFC_USE_DELEGATES       = bitconf( loop, 10 );
+  VALUE_TYPE               = bitconf( loop, 1, 'float', 'double' );
+  RFC_USE_INTEGRAL_COUNTS  = bitconf( loop, 2 );
+  RFC_USE_HISTOGRAM_FILTER = bitconf( loop, 3 );
+  RFC_MINIMAL              = bitconf( loop, 4 );
+  RFC_TP_SUPPORT           = bitconf( loop, 5 );
+  RFC_HCM_SUPPORT          = bitconf( loop, 6 );
+  RFC_GLOBAL_EXTREMA       = bitconf( loop, 7 );
+  RFC_DAMAGE_FAST          = bitconf( loop, 8 );
+  RFC_DH_SUPPORT           = bitconf( loop, 9 );
+  RFC_AT_SUPPORT           = bitconf( loop, 10 );
+  RFC_USE_DELEGATES        = bitconf( loop, 11 );
   
   fprintf( 'Configuration %d\n', loop );
   clear defs rfc

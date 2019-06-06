@@ -5176,7 +5176,7 @@ label_2:
 
         /* Place cycle able to close */
         IZ++;
-        assert( IZ < rfc_ctx->internal.hcm.stack_cap );
+        assert( IZ < (int)rfc_ctx->internal.hcm.stack_cap );
         rfc_ctx->internal.hcm.stack[IZ] = *K;
 
         /* "goto" not necessary: while loop */
@@ -6735,7 +6735,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                     mxArray* re = mxCreateDoubleMatrix( rfc_ctx.internal.hcm.IZ, 1, mxREAL );
                     if( re )
                     {
-                        size_t i;
+                        int i;
                         double *val = mxGetPr(re);
 
                         for( i = 0; i < rfc_ctx.internal.hcm.IZ; i++ )
