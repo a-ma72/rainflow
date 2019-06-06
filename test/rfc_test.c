@@ -425,7 +425,7 @@ TEST RFC_tp_prune_test( int ccnt )
     ASSERT( RFC_tp_prune( &ctx, /*count*/ 0, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS | RFC_FLAGS_TPPRUNE_PRESERVE_RES ) );
     ASSERT( ctx.tp_cnt == ctx.residue_cnt );
 
-    for( i = 0; i < ctx.residue_cnt; i++ )
+    for( i = 0; i < (int)ctx.residue_cnt; i++ )
     {
         ASSERT( ctx.tp[i].tp_pos == 0 );
         ASSERT( ctx.residue[i].tp_pos == i + 1 );
@@ -440,7 +440,7 @@ TEST RFC_tp_prune_test( int ccnt )
     ASSERT( RFC_tp_prune( &ctx, /*count*/ 0, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS ) );
     ASSERT( ctx.tp_cnt == 0 );
 
-    for( i = 0; i < ctx.residue_cnt; i++ )
+    for( i = 0; i < (int)ctx.residue_cnt; i++ )
     {
         ASSERT( ctx.residue[i].tp_pos == 0 );
     }
@@ -537,6 +537,13 @@ TEST RFC_tp_refeed_test( int ccnt )
     RFC_VALUE_TYPE      hysteresis;
     size_t              i, i_step, j_step;
     const int           fraction            = 100;
+
+#if !RFC_USE_HYSTERESIS_FILTER
+    if( ccnt )
+    {
+        SKIP();
+    }
+#endif /*RFC_USE_HYSTERESIS_FILTER*/
 
 #include "long_series.c"
 
@@ -775,16 +782,26 @@ TEST RFC_test_turning_points( int ccnt )
 
     /* Series with 3 turning points */
     SIMPLE_RFC( ccnt, tp, 10, 0.0, (1.0f, 1.1f, 1.2f, 2.0f, 2.1f, 1.1f, 1.3f, 1.0f, 1.98f, 1.0f) );
+#if RFC_USE_HYSTERESIS_FILTER
     ASSERT( ctx.tp_cnt == 3 );
     ASSERT( ctx.tp[0].value == 1.0f && ctx.tp[0].pos == 1 );
     ASSERT( ctx.tp[1].value == 2.1f && ctx.tp[1].pos == 5 );
     ASSERT( ctx.tp[2].value == 1.0f && ctx.tp[2].pos == 8 );
+#else /*RFC_USE_HYSTERESIS_FILTER*/
+    ASSERT( ctx.tp_cnt == 0 );
+#endif /*RFC_USE_HYSTERESIS_FILTER*/
+
+
     if( ctx.class_count )
     {
+#if RFC_USE_HYSTERESIS_FILTER
         ASSERT( ctx.residue_cnt == 3 );
         ASSERT( ctx.residue[0].value == 1.0f && ctx.residue[0].pos == 1 && ctx.residue[0].tp_pos == 1 );
         ASSERT( ctx.residue[1].value == 2.1f && ctx.residue[1].pos == 5 && ctx.residue[1].tp_pos == 2 );
         ASSERT( ctx.residue[2].value == 1.0f && ctx.residue[2].pos == 8 && ctx.residue[2].tp_pos == 3 );
+#else /*RFC_USE_HYSTERESIS_FILTER*/
+        ASSERT( ctx.residue_cnt == 0 );
+#endif /*RFC_USE_HYSTERESIS_FILTER*/
     }
     ASSERT( RFC_deinit( &ctx ) );
 
@@ -806,16 +823,26 @@ TEST RFC_test_turning_points( int ccnt )
 
     /* Series with 3 turning points */
     SIMPLE_RFC_MARGIN( ccnt, tp, 10, 0.0, (1.0f, 1.0f, 2.1f, 2.1f, 1.0f, 1.0f) );
+#if RFC_USE_HYSTERESIS_FILTER
     ASSERT( ctx.tp_cnt == 3 );
     ASSERT( ctx.tp[0].value == 1.0f && ctx.tp[0].pos == 1 );
     ASSERT( ctx.tp[1].value == 2.1f && ctx.tp[1].pos == 3 );
     ASSERT( ctx.tp[2].value == 1.0f && ctx.tp[2].pos == 6 ); /* Turning point at right margin! */
+#else /*RFC_USE_HYSTERESIS_FILTER*/
+    ASSERT( ctx.tp_cnt == 2 );
+    ASSERT( ctx.tp[0].value == 1.0f && ctx.tp[0].pos == 1 );
+    ASSERT( ctx.tp[1].value == 1.0f && ctx.tp[1].pos == 6 );
+#endif /*RFC_USE_HYSTERESIS_FILTER*/
     if( ctx.class_count )
     {
+#if RFC_USE_HYSTERESIS_FILTER
         ASSERT( ctx.residue_cnt == 3 );
         ASSERT( ctx.residue[0].value == 1.0f && ctx.residue[0].pos == 1 && ctx.residue[0].tp_pos == 1 );
         ASSERT( ctx.residue[1].value == 2.1f && ctx.residue[1].pos == 3 && ctx.residue[1].tp_pos == 2 );
         ASSERT( ctx.residue[2].value == 1.0f && ctx.residue[2].pos == 5 && ctx.residue[2].tp_pos == 3 );  /* In residue, turning point at original position! */
+#else /*RFC_USE_HYSTERESIS_FILTER*/
+        ASSERT( ctx.residue_cnt == 0 );
+#endif /*RFC_USE_HYSTERESIS_FILTER*/
     }
     ASSERT( RFC_deinit( &ctx ) );
 
@@ -1318,7 +1345,7 @@ TEST RFC_long_series( int ccnt )
             }
         }
         fprintf( file, "\n\nResidue (classes base 0):\n" );
-        for( i = 0; i < ctx.residue_cnt; i++ )
+        for( i = 0; i < (int)ctx.residue_cnt; i++ )
         {
             fprintf( file, "%s%d", i ? ", " : "", ctx.residue[i].cls );
         }
@@ -1340,25 +1367,34 @@ TEST RFC_long_series( int ccnt )
             }
 
             /* Check matrix sum */
+#if RFC_USE_HYSTERESIS_FILTER
             ASSERT_EQ( sum, 602.0 );
+#else /*RFC_USE_HYSTERESIS_FILTER*/
+            ASSERT_EQ( sum, 386.0 );
+#endif /*RFC_USE_HYSTERESIS_FILTER*/
             /* Check damage value */
-            GREATEST_ASSERT_IN_RANGE( 4.8703e-16, ctx.damage, 0.00005e-16 );
 #if !RFC_MINIMAL
             /* Damage must equal to damage calculated in postprocess */
             ASSERT( RFC_damage_from_rp( &ctx, NULL /*rp*/, NULL /*Sa*/, &damage, RFC_RP_DAMAGE_CALC_METHOD_DEFAULT ) );
+#if RFC_USE_HYSTERESIS_FILTER
             GREATEST_ASSERT_IN_RANGE( 4.8703e-16, damage, 0.00005e-16 );
+#else /*RFC_USE_HYSTERESIS_FILTER*/
+            GREATEST_ASSERT_IN_RANGE( 4.8702e-16, damage, 0.00005e-16 );
+#endif /*RFC_USE_HYSTERESIS_FILTER*/
             damage = 0.0;
             ASSERT( RFC_damage_from_rfm( &ctx, NULL /*rfm*/, &damage ) );
+#if RFC_USE_HYSTERESIS_FILTER
             GREATEST_ASSERT_IN_RANGE( 4.8703e-16, damage, 0.00005e-16 );
+#else /*RFC_USE_HYSTERESIS_FILTER*/
+            GREATEST_ASSERT_IN_RANGE( 4.8702e-16, damage, 0.00005e-16 );
+#endif /*RFC_USE_HYSTERESIS_FILTER*/
 
-#if !RFC_MINIMAL
             /* Check lc count */
             CHECK_CALL( RFC_lc_test( &ctx, true ) );
             strip_buffer( NULL );
 #endif /*!RFC_MINIMAL*/
-
-#endif /*!RFC_MINIMAL*/
             /* Check residue */
+#if RFC_USE_HYSTERESIS_FILTER
             ASSERT_EQ( ctx.residue_cnt, 10 );
             ASSERT_EQ_FMT( ctx.residue[0].value,   0.54, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[1].value,   2.37, "%.2f" );
@@ -1370,6 +1406,18 @@ TEST RFC_long_series( int ccnt )
             ASSERT_EQ_FMT( ctx.residue[7].value,  31.00, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[8].value,  -0.65, "%.2f" );
             ASSERT_EQ_FMT( ctx.residue[9].value,  16.59, "%.2f" );
+#else /*RFC_USE_HYSTERESIS_FILTER*/
+            ASSERT_EQ( ctx.residue_cnt, 9 );
+            ASSERT_EQ_FMT( ctx.residue[0].value,   2.37, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[1].value,  -0.01, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[2].value,  17.04, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[3].value, -50.52, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[4].value, 114.14, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[5].value, -23.63, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[6].value,  30.33, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[7].value,  -0.65, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[8].value,  16.59, "%.2f" );
+#endif /*RFC_USE_HYSTERESIS_FILTER*/
 #if !RFC_MINIMAL
             /* Check matrix consistency */
             ASSERT( RFC_rfm_check( &ctx ) );
@@ -1429,6 +1477,7 @@ TEST RFC_res_DIN45667( void )
     }
     else FAIL();
 
+#if RFC_USE_HYSTERESIS_FILTER
     ASSERT( ctx.residue_cnt == 8 );
     ASSERT( RFC_finalize( &ctx, RFC_RES_RP_DIN45667 ) );
     ASSERT( ctx.state == RFC_STATE_FINISHED );
@@ -1442,6 +1491,17 @@ TEST RFC_res_DIN45667( void )
     ASSERT( ctx.rp[7] == 0 );
     ASSERT( ctx.rp[8] == 0 );
     ASSERT( ctx.rp[9] == 0 );
+#else /*RFC_USE_HYSTERESIS_FILTER*/
+    ASSERT( ctx.residue_cnt == 6 );
+    ASSERT( RFC_finalize( &ctx, RFC_RES_RP_DIN45667 ) );
+    ASSERT( ctx.state == RFC_STATE_FINISHED );
+    ASSERT( ctx.rp[0] == 0 );
+    ASSERT( ctx.rp[1] == 0 );
+    ASSERT( ctx.rp[2] == ctx.full_inc );
+    ASSERT( ctx.rp[3] == ctx.full_inc );
+    ASSERT( ctx.rp[4] == ctx.full_inc );
+    ASSERT( ctx.rp[5] == 0 );
+#endif /*RFC_USE_HYSTERESIS_FILTER*/
 #if !RFC_MINIMAL
     CHECK_CALL( RFC_lc_test( &ctx, false ) );
     strip_buffer( NULL );
@@ -2185,7 +2245,9 @@ TEST RFC_ctx_inspect( void )
     fprintf( stdout, "\n %20s\t%lu", "at.Sa",               (unsigned long)offsetof( rfc_ctx_s, at.Sa ) );
 #endif /*RFC_AT_SUPPORT*/
     fprintf( stdout, "\n %20s\t%lu", "internal.flags",      (unsigned long)offsetof( rfc_ctx_s, internal.flags ) );
+#if _DEBUG
     fprintf( stdout, "\n %20s\t%lu", "internal.finalizing", (unsigned long)offsetof( rfc_ctx_s, internal.finalizing ) );
+#endif /*_DEBUG*/
 #if 0
     fprintf( stdout, "\n internal.debug_flags\t%lu", (unsigned long)offsetof( rfc_ctx_s, internal.debug_flags ) );
 #endif

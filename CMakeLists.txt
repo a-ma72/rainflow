@@ -15,13 +15,12 @@ cmake_minimum_required( VERSION 3.12 )
 set( CMAKE_VERBOSE_MAKEFILE OFF )
 set( CMAKE_BUILD_PARALLEL_LEVEL 12 )
 
-cmake_policy(SET CMP0076 NEW)
+#cmake_policy(SET CMP0076 NEW)
 
 # Project name and version
 project( rainflow )
 set( RFC_VERSION_MAJOR "0" )
 set( RFC_VERSION_MINOR "2" )
-
 
 
 # Build type and compiler selection
@@ -32,6 +31,8 @@ if( NOT CMAKE_CONFIGURATION_TYPES )
         set( CMAKE_CONFIGURATION_TYPES "Release;Debug" )
     endif()
 endif()
+
+set( VERSION_MATLAB 9.3 CACHE STRING "The required Matlab installation (R2017b)"  )
 
 # C++11
 set( CMAKE_CXX_STANDARD 11 )
@@ -46,17 +47,18 @@ if( CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR )
     set( CMAKE_BUILD_TYPE Release CACHE STRING "Release" FORCE )
 
     message( STATUS "Build ${PROJECT_NAME} as main project")
-    option( RFC_MINIMAL             "(Disable all other flags)" OFF )
-    option( RFC_USE_INTEGRAL_COUNTS "Use integral (non-floating) data type for counts" OFF )
-    option( RFC_USE_DELEGATES       "Use delegates (functors)" ON )
-    option( RFC_GLOBAL_EXTREMA      "Always calculate global extrema" ON )
-    option( RFC_HCM_SUPPORT         "Support HCM (Clormann/Seeger) algorithm" ON )
-    option( RFC_TP_SUPPORT          "Support turning points" ON )
-    option( RFC_DH_SUPPORT          "Support \"spread damage\" over turning points and damage history" ON )
-    option( RFC_AT_SUPPORT          "Support amplitude transformation regarding mean load influence on fatigue strength" ON )
-    option( RFC_DAMAGE_FAST         "Enables fast damage calculation (per look-up table)" ON )
-    option( RFC_DEBUG_FLAGS         "Enables flags for detailed examination" OFF )
-    option( RFC_EXPORT_MEX          "Export a function wrapper for MATLAB(R)" ON )
+    option( RFC_MINIMAL                "(Disable all other flags)" OFF )
+    option( RFC_USE_INTEGRAL_COUNTS    "Use integral (non-floating) data type for counts" OFF )
+    option( RFC_USE_HYSTERESIS_FILTER  "Use hysteresis filtering" ON )
+    option( RFC_USE_DELEGATES          "Use delegates (functors)" ON )
+    option( RFC_GLOBAL_EXTREMA         "Always calculate global extrema" ON )
+    option( RFC_HCM_SUPPORT            "Support HCM (Clormann/Seeger) algorithm" ON )
+    option( RFC_TP_SUPPORT             "Support turning points" ON )
+    option( RFC_DH_SUPPORT             "Support \"spread damage\" over turning points and damage history" ON )
+    option( RFC_AT_SUPPORT             "Support amplitude transformation regarding mean load influence on fatigue strength" ON )
+    option( RFC_DAMAGE_FAST            "Enables fast damage calculation (per look-up table)" ON )
+    option( RFC_DEBUG_FLAGS            "Enables flags for detailed examination" OFF )
+    option( RFC_EXPORT_MEX             "Export a function wrapper for MATLAB(R)" ON )
 else()
     message( STATUS "Build ${PROJECT_NAME} as subsequent project")
 endif()
@@ -81,8 +83,14 @@ if( NOT LIBM_LIBRARY )
     set( LIBM_LIBRARY "" )
 endif()
 
+
+# find MATLAB
 set( MATLAB_FIND_DEBUG 1 )
-find_package( Matlab QUIET REQUIRED COMPONENTS MX_LIBRARY )
+set( MATLAB_ADDITIONAL_VERSIONS "R2017b=9.3" )
+if( NOT Matlab_ROOT_DIR )
+    set( Matlab_ROOT_DIR /appl/matlab/2017b )
+endif()
+find_package( Matlab ${VERSION_MATLAB} EXACT COMPONENTS MX_LIBRARY MAIN_PROGRAM )
 
 if( MATLAB_FOUND )
     message( STATUS "MATLAB Found, MATLAB MEX will be compiled." )
@@ -91,12 +99,18 @@ else()
     message( FATAL_ERROR "MATLAB not found...nothing will be built." )
 endif()
 
+
+
+# MATLAB version dependent definitions
 if( UNIX )
+    matlab_get_version_from_matlab_run( ${Matlab_MAIN_PROGRAM} matlab_version )
     if( $ENV{USER} STREQUAL "emartna" )
         # These switches could not be set (redhat 6.10, gcc 4.4.7)
         set( CMAKE_CXX_FLAGS -std=gnu++0x )
         set( CMAKE_C_FLAGS -fPIC )
     endif()
+else()
+    set( matlab_version ${VERSION_MATLAB} )
 endif()
 
 # set up matlab libraries

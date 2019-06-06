@@ -713,7 +713,9 @@ struct rfc_ctx
     struct internal
     {
         int                             flags;                      /**< Flags (enum rfc_flags) */
+#if _DEBUG
         bool                            finalizing;                 /**< true, when finalizing */
+#endif /*_DEBUG*/
 #if RFC_DEBUG_FLAGS
         int                             debug_flags;                /**< Flags for debugging */
 #endif /*RFC_DEBUG_FLAGS*/

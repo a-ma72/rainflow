@@ -228,7 +228,7 @@ static bool                 damage_lut_init                 (       rfc_ctx_s * 
 static bool                 damage_calc_fast                (       rfc_ctx_s *, unsigned class_from, unsigned class_to, double *damage, double *Sa_ret );
 #endif /*RFC_DAMAGE_FAST*/
 static bool                 error_raise                     (       rfc_ctx_s *, rfc_error_e );
-static rfc_value_t          value_delta                     (       rfc_value_t from_val, rfc_value_t to, int *sign_ptr );
+static rfc_value_t          value_delta                     (       rfc_ctx_s *, const rfc_value_tuple_s* pt_from, const rfc_value_tuple_s* pt_to, int *sign_ptr );
 
 
 #define QUANTIZE( r, v )    ( (r)->class_count ? (unsigned)( ((v) - (r)->class_offset) / (r)->class_width ) : 0 )
@@ -308,7 +308,9 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
     rfc_ctx->internal.debug_flags           = 0;
 #endif /*RFC_DEBUG_FLAGS*/
 
+#if _DEBUG
     rfc_ctx->internal.finalizing            = false;
+#endif /*_DEBUG*/
 
     /* Counter increments */
     rfc_ctx->full_inc                       = RFC_FULL_CYCLE_INCREMENT;
@@ -1227,7 +1229,9 @@ bool RFC_clear_counts( void *ctx )
     } while(0);
 #endif /*!RFC_MINIMAL*/
 
+#if _DEBUG
     rfc_ctx->internal.finalizing        = false;
+#endif /*_DEBUG*/
 
     rfc_ctx->state = RFC_STATE_INIT;
 
@@ -1540,7 +1544,9 @@ bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
         return false;
     }
 
+#if _DEBUG
     rfc_ctx->internal.finalizing = true;
+#endif /*_DEBUG*/
 
     damage = rfc_ctx->damage;
 
@@ -1606,7 +1612,9 @@ bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
     rfc_ctx->damage_residue = rfc_ctx->damage - damage;
     rfc_ctx->state          = ok ? RFC_STATE_FINISHED : RFC_STATE_ERROR;
 
+#if _DEBUG
     rfc_ctx->internal.finalizing = false;
+#endif /*_DEBUG*/
 
 #if RFC_DH_SUPPORT
     if( ok )
@@ -4861,7 +4869,7 @@ rfc_value_tuple_s * feed_filter_pt( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s 
             }
 
             /* Local hysteresis filtering */
-            delta = value_delta( rfc_ctx->internal.extrema[0].value, rfc_ctx->internal.extrema[1].value, NULL /* sign_ptr */ );
+            delta = value_delta( rfc_ctx, &rfc_ctx->internal.extrema[0], &rfc_ctx->internal.extrema[1], NULL /* sign_ptr */ );
 
             if( is_falling_slope >= 0 && delta > rfc_ctx->hysteresis )
             {
@@ -4905,7 +4913,7 @@ rfc_value_tuple_s * feed_filter_pt( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s 
 #endif /*RFC_GLOBAL_EXTREMA*/
 
         /* Hysteresis Filtering, check against interim turning point */
-        delta = value_delta( rfc_ctx->residue[rfc_ctx->residue_cnt].value, pt->value, &slope /* sign_ptr */ );
+        delta = value_delta( rfc_ctx, &rfc_ctx->residue[rfc_ctx->residue_cnt], pt, &slope /* sign_ptr */ );
 
         /* There are three scenarios possible here:
          *   1. Previous slope is continued
@@ -5235,6 +5243,7 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
 
     if( !rfc_ctx->class_count || ( from->value > rfc_ctx->class_offset && to->value > rfc_ctx->class_offset ) )
     {
+        /* ok */
     }
     else
     {
@@ -5248,7 +5257,7 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
     /* If flag RFC_FLAGS_ENFORCE_MARGIN is set, cycles less than hysteresis are possible */
     if( flags & RFC_FLAGS_ENFORCE_MARGIN )
     {
-        if( value_delta( from->value, to->value, NULL /* sign_ptr */ ) <= rfc_ctx->hysteresis )
+        if( value_delta( rfc_ctx, from, to, NULL /* sign_ptr */ ) <= rfc_ctx->hysteresis )
         {
             return;
         }
@@ -6423,16 +6432,26 @@ bool error_raise( rfc_ctx_s *rfc_ctx, rfc_error_e error )
  * @brief      Returns the unsigned difference of two values, sign optionally
  *             returned as -1 or 1.
  *
- * @param      from_val  Left hand value
- * @param      to_val    Right hand value
+ * @param      rfc_ctx   The rainflow context
+ * @param[in]  pt_from   The point from
+ * @param[in]  pt_to     The point to
  * @param[out] sign_ptr  Pointer to catch sign (may be NULL)
  *
  * @return     Returns the absolute difference of given values
  */
 static
-rfc_value_t value_delta( rfc_value_t from_val, rfc_value_t to_val, int *sign_ptr )
+rfc_value_t value_delta( rfc_ctx_s* rfc_ctx, const rfc_value_tuple_s* pt_from, const rfc_value_tuple_s* pt_to, int *sign_ptr )
 {
-    double delta = (double)to_val - (double)from_val;
+    double delta;
+
+    assert( rfc_ctx );
+    assert( pt_from && pt_to );
+
+#if RFC_USE_HYSTERESIS_FILTER
+    delta = (double)pt_to->value - (double)pt_from->value;
+#else /*RFC_USE_HYSTERESIS_FILTER*/
+    delta = rfc_ctx->class_width * ( (int)pt_to->cls - (int)pt_from->cls );
+#endif /*RFC_USE_HYSTERESIS_FILTER*/
 
     if( sign_ptr )
     {

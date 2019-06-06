@@ -2,17 +2,18 @@
 #define OFF 0
 
 #ifndef RFC_VERSION_MAJOR
-  #define RFC_VERSION_MAJOR       "${RFC_VERSION_MAJOR}"
-  #define RFC_VERSION_MINOR       "${RFC_VERSION_MINOR}"
-  #define RFC_USE_INTEGRAL_COUNTS  ${RFC_USE_INTEGRAL_COUNTS}
-  #define RFC_MINIMAL              ${RFC_MINIMAL}
-  #define RFC_TP_SUPPORT           ${RFC_TP_SUPPORT}
-  #define RFC_HCM_SUPPORT          ${RFC_HCM_SUPPORT}
-  #define RFC_USE_DELEGATES        ${RFC_USE_DELEGATES}
-  #define RFC_GLOBAL_EXTREMA       ${RFC_GLOBAL_EXTREMA}
-  #define RFC_DAMAGE_FAST          ${RFC_DAMAGE_FAST}
-  #define RFC_DH_SUPPORT           ${RFC_DH_SUPPORT}
-  #define RFC_AT_SUPPORT           ${RFC_AT_SUPPORT}
-  #define RFC_DEBUG_FLAGS          ${RFC_DEBUG_FLAGS}
-  #define RFC_EXPORT_MEX           ${RFC_EXPORT_MEX}
+  #define RFC_VERSION_MAJOR         "${RFC_VERSION_MAJOR}"
+  #define RFC_VERSION_MINOR         "${RFC_VERSION_MINOR}"
+  #define RFC_USE_INTEGRAL_COUNTS    ${RFC_USE_INTEGRAL_COUNTS}
+  #define RFC_USE_HYSTERESIS_FILTER  ${RFC_USE_HYSTERESIS_FILTER}
+  #define RFC_MINIMAL                ${RFC_MINIMAL}
+  #define RFC_TP_SUPPORT             ${RFC_TP_SUPPORT}
+  #define RFC_HCM_SUPPORT            ${RFC_HCM_SUPPORT}
+  #define RFC_USE_DELEGATES          ${RFC_USE_DELEGATES}
+  #define RFC_GLOBAL_EXTREMA         ${RFC_GLOBAL_EXTREMA}
+  #define RFC_DAMAGE_FAST            ${RFC_DAMAGE_FAST}
+  #define RFC_DH_SUPPORT             ${RFC_DH_SUPPORT}
+  #define RFC_AT_SUPPORT             ${RFC_AT_SUPPORT}
+  #define RFC_DEBUG_FLAGS            ${RFC_DEBUG_FLAGS}
+  #define RFC_EXPORT_MEX             ${RFC_EXPORT_MEX}
 #endif /*RFC_VERSION_MAJOR*/
