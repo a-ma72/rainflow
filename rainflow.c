@@ -5300,7 +5300,7 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
                 rfc_value_tuple_s from_cpy;
 
                 from->adj_pos   = to->tp_pos;
-                from->avrg      = (rfc_value_t)fabs( (double)from->value + to->value );
+                from->avrg      = (rfc_value_t)( fabs( (double)from->value + to->value ) / 2 );
                 /* Don't alter damage values in tp storage! */
                 from_cpy        = *from;
                 from_cpy.damage = -1;
@@ -5308,7 +5308,7 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
                 *from           = from_cpy;
 #else /*!RFC_DH_SUPPORT*/
                 from->adj_pos   = to->tp_pos;
-                from->avrg      = (rfc_value_t)fabs( (double)from->value + to->value );
+                from->avrg      = (rfc_value_t)( fabs( (double)from->value + to->value ) / 2 );
                 tp_set( rfc_ctx, from->tp_pos, from );
 #endif /*RFC_DH_SUPPORT*/
             }
@@ -5319,7 +5319,7 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
                 rfc_value_tuple_s to_cpy;
 
                 to->adj_pos   = from->tp_pos;
-                to->avrg      = (rfc_value_t)fabs( (double)from->value + to->value );
+                to->avrg      = (rfc_value_t)( fabs( (double)from->value + to->value ) / 2 );
                 /* Don't alter damage values in tp storage! */
                 to_cpy        = *to;
                 to_cpy.damage = -1;
@@ -5327,7 +5327,7 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
                 *to           = to_cpy;
 #else /*!RFC_DH_SUPPORT*/
                 to->adj_pos   = from->tp_pos;
-                to->avrg      = (rfc_value_t)fabs( (double)from->value + to->value );
+                to->avrg      = (rfc_value_t)( fabs( (double)from->value + to->value ) / 2 );
                 tp_set( rfc_ctx, to->tp_pos, to );
 #endif /*RFC_DH_SUPPORT*/
             }
