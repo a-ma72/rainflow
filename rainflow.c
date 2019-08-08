@@ -4632,7 +4632,8 @@ bool damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_to, do
         {
             return false;
         }
-    } else
+    } 
+    else
 #endif /*RFC_DAMAGE_FAST*/
 
 #if RFC_USE_DELEGATES
@@ -4642,7 +4643,8 @@ bool damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_to, do
         {
             return false;
         }
-    } else
+    }
+    else
 #endif /*RFC_USE_DELEGATES*/
 
 
