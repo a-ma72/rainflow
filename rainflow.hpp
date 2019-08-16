@@ -212,6 +212,15 @@ public:
         RFC_SD_COUNT                            = RF::RFC_SD_COUNT,                             /**< Number of options */
     };
 
+
+    enum rfc_lc_count_method
+    {
+        RFC_LC_COUNT_METHOD_SLOPES_UP           = RF::RFC_LC_COUNT_METHOD_SLOPES_UP,            /**< Count on rising slopes only (default) */
+        RFC_LC_COUNT_METHOD_SLOPES_DOWN         = RF::RFC_LC_COUNT_METHOD_SLOPES_DOWN,          /**< Count on falling slopes only */
+        RFC_LC_COUNT_METHOD_SLOPES_ALL          = RF::RFC_LC_COUNT_METHOD_SLOPES_ALL,           /**< Count on rising AND falling slopes */
+    };
+
+
     /* Typedefs */
     typedef                 RF::rfc_value_t         rfc_value_t;                                /** Input data value type */
     typedef                 RF::rfc_counts_t        rfc_counts_t;                               /** Type of counting values */
@@ -228,6 +237,7 @@ public:
     typedef     enum        rfc_counting_method     rfc_counting_method_e;                      /** Counting method, see RFC_COUNTING... */
     typedef     enum        rfc_rp_damage_method    rfc_rp_damage_method_e;                     /** Method when calculating damage from range pair counting, see RFC_RP_DAMAGE_CALC_METHOD... */
     typedef     enum        rfc_sd_method           rfc_sd_method_e;                            /** Spread damage method, see RFC_SD... */
+    typedef     enum        rfc_lc_count_method     rfc_lc_count_method_e;                      /** Controls which slopes to take into account, when doing the level crossing counting */
 
     typedef     std::vector<double>                 rfc_double_v;                               /** Vector of double */
     typedef     std::vector<rfc_value_t>            rfc_value_v;                                /** Vector of values */

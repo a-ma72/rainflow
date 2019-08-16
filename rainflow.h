@@ -279,6 +279,13 @@ enum rfc_rp_damage_method
     RFC_RP_DAMAGE_CALC_METHOD_MODIFIED    = 2,
     RFC_RP_DAMAGE_CALC_METHOD_CONSEQUENT  = 3,
 };
+
+enum rfc_lc_count_method
+{
+    RFC_LC_COUNT_METHOD_SLOPES_UP    = 0,
+    RFC_LC_COUNT_METHOD_SLOPES_DOWN  = 1,
+    RFC_LC_COUNT_METHOD_SLOPES_ALL   = 2,
+};
 #endif /*!RFC_MINIMAL*/
 
 
@@ -388,6 +395,7 @@ typedef     enum        rfc_res_method          rfc_res_method_e;           /** 
 #if !RFC_MINIMAL
 typedef     enum        rfc_counting_method     rfc_counting_method_e;      /** Counting method, see RFC_COUNTING... */
 typedef     enum        rfc_rp_damage_method    rfc_rp_damage_method_e;     /** Method when calculating damage from range pair counting, see RFC_RP_DAMAGE_CALC_METHOD... */
+typedef     enum        rfc_lc_count_method     rfc_lc_count_method_e;      /** Controls which slopes to take into account, when doing the level crossing counting */
 #if RFC_DH_SUPPORT
 typedef     enum        rfc_sd_method           rfc_sd_method_e;            /** Spread damage method, see RFC_SD... */
 #endif /*RFC_DH_SUPPORT*/
