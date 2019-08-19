@@ -22,7 +22,7 @@ endif()
 # Project name and version
 project( rainflow )
 set( RFC_VERSION_MAJOR "0" )
-set( RFC_VERSION_MINOR "2" )
+set( RFC_VERSION_MINOR "3" )
 
 
 # Build type and compiler selection
