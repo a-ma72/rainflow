@@ -34,8 +34,6 @@ if( NOT CMAKE_CONFIGURATION_TYPES )
     endif()
 endif()
 
-set( VERSION_MATLAB 9.3 CACHE STRING "The required Matlab installation (R2017b)"  )
-
 # C++11
 set( CMAKE_CXX_STANDARD 11 )
 set( CMAKE_CXX_STANDARD_REQUIRED ON )
@@ -86,46 +84,50 @@ if( NOT LIBM_LIBRARY )
 endif()
 
 
-# find MATLAB
-set( MATLAB_FIND_DEBUG 1 )
-set( MATLAB_ADDITIONAL_VERSIONS "R2017b=9.3" )
-if( NOT Matlab_ROOT_DIR )
-    set( Matlab_ROOT_DIR /appl/matlab/2017b )
-endif()
-find_package( Matlab ${VERSION_MATLAB} EXACT COMPONENTS MX_LIBRARY MAIN_PROGRAM )
-
-if( MATLAB_FOUND )
-    message( STATUS "MATLAB Found, MATLAB MEX will be compiled." )
-    # message( STATUS ${Matlab_LIBRARIES} )
-else()
-    message( FATAL_ERROR "MATLAB not found...nothing will be built." )
-endif()
-
-
-
-# MATLAB version dependent definitions
-if( UNIX )
-    matlab_get_version_from_matlab_run( ${Matlab_MAIN_PROGRAM} matlab_version )
-    if( $ENV{USER} STREQUAL "emartna" )
-        # These switches could not be set (redhat 6.10, gcc 4.4.7)
-        set( CMAKE_CXX_FLAGS -std=gnu++0x )
-        set( CMAKE_C_FLAGS -fPIC )
-    endif()
-else()
-    set( matlab_version ${VERSION_MATLAB} )
-endif()
-
-# set up matlab libraries
-include_directories( ${Matlab_INCLUDE_DIRS} )
-
 # Configuration file
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/config.h )
 
-# MEX function (MATLAB)
+# MATLAB
 if( RFC_EXPORT_MEX )
-  matlab_add_mex( NAME ${PROJECT_NAME} SRC rainflow.c OUTPUT_NAME rfc )
-  target_compile_definitions( ${PROJECT_NAME} PRIVATE MATLAB_MEX_FILE _SCL_SECURE_NO_WARNINGS )
-  target_link_libraries( ${PROJECT_NAME} ${Matlab_LIBRARIES} ${LIBM_LIBRARY} )
+    set( MATLAB_FIND_DEBUG 1 )
+    set( MATLAB_ADDITIONAL_VERSIONS "R2017b=9.3" )
+    set( VERSION_MATLAB 9.3 CACHE STRING "The required Matlab installation (R2017b)"  )
+    # find MATLAB
+    if( NOT Matlab_ROOT_DIR )
+        set( Matlab_ROOT_DIR /appl/matlab/2017b )
+    endif()
+    find_package( Matlab ${VERSION_MATLAB} EXACT COMPONENTS MX_LIBRARY MAIN_PROGRAM )
+
+    if( MATLAB_FOUND )
+        message( STATUS "MATLAB Found, MATLAB MEX will be compiled." )
+        # message( STATUS ${Matlab_LIBRARIES} )
+    else()
+        message( FATAL_ERROR "MATLAB not found...nothing will be built." )
+    endif()
+
+
+
+    # MATLAB version dependent definitions
+    if( UNIX )
+        matlab_get_version_from_matlab_run( ${Matlab_MAIN_PROGRAM} matlab_version )
+        if( $ENV{USER} STREQUAL "emartna" )
+            # These switches could not be set (redhat 6.10, gcc 4.4.7)
+            set( CMAKE_CXX_FLAGS -std=gnu++0x )
+            set( CMAKE_C_FLAGS -fPIC )
+        endif()
+    else()
+        set( matlab_version ${VERSION_MATLAB} )
+    endif()
+
+    # set up matlab libraries
+    include_directories( ${Matlab_INCLUDE_DIRS} )
+
+    # MEX function (MATLAB)
+    matlab_add_mex( NAME ${PROJECT_NAME} SRC rainflow.c OUTPUT_NAME rfc )
+    target_compile_definitions( ${PROJECT_NAME} PRIVATE MATLAB_MEX_FILE _SCL_SECURE_NO_WARNINGS )
+    target_link_libraries( ${PROJECT_NAME} ${Matlab_LIBRARIES} ${LIBM_LIBRARY} )
+    # install to /bin by default
+    install( TARGETS ${PROJECT_NAME} RUNTIME DESTINATION bin LIBRARY DESTINATION bin )
 endif()
 
 # Static rainflow library
@@ -140,11 +142,7 @@ target_sources( rfc_test PUBLIC greatest/greatest.h )
 set_property( DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT rfc_test )
 
 # install to /bin by default
-if( RFC_EXPORT_MEX )
-  install( TARGETS ${PROJECT_NAME} RUNTIME DESTINATION bin LIBRARY DESTINATION bin )
-endif()
 install( TARGETS rfc_test RUNTIME DESTINATION bin LIBRARY DESTINATION bin )
-
 install( FILES test/long_series.csv test/long_series.c matlab/validate.m DESTINATION bin )
 
 

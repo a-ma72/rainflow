@@ -123,7 +123,8 @@
 
 
 
-#if MATLAB_MEX_FILE && RFC_EXPORT_MEX
+#if MATLAB_MEX_FILE
+#if RFC_EXPORT_MEX
 #if !RFC_MINIMAL
 #define RFC_MEX_USAGE \
 "\nUsage:\n"\
@@ -154,7 +155,8 @@
 #include <ctype.h>
 #include <string.h>
 #include <mex.h>
-#endif /*MATLAB_MEX_FILE && RFC_EXPORT_MEX*/
+#endif /*RFC_EXPORT_MEX*/
+#endif /*MATLAB_MEX_FILE*/
 
 /* Core functions */
 #if !RFC_MINIMAL
@@ -6503,7 +6505,8 @@ void * mem_alloc( void *ptr, size_t num, size_t size, rfc_mem_aim_e aim )
 /*********************************************************************************************************/
 
 
-#if MATLAB_MEX_FILE && RFC_EXPORT_MEX
+#if MATLAB_MEX_FILE
+#if RFC_EXPORT_MEX
 
 #if RFC_DEBUG_FLAGS
 static
@@ -7088,5 +7091,5 @@ void mexFunction( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
     mexRainflow( nlhs, plhs, nrhs, prhs );
 }
 #endif /*!RFC_MINIMAL*/
-
-#endif /*MATLAB_MEX_FILE && RFC_EXPORT_MEX*/
+#endif /*RFC_EXPORT_MEX*/
+#endif /*MATLAB_MEX_FILE*/
