@@ -1,0 +1,29 @@
+RAINFLOW
+|   CMakeLists.txt                Makefile (CMake)
+|   config.h                      Configuration file (Rainflow)
+|   config.h.in                   Configuration file (Input for CMake)
+|   content.txt                   This file
+|   LICENSE                       License information
+|   rainflow.c                    Main routines
+|   rainflow.h                    Header file for rainflow.c
+|   README.MD                     Readme
+|
++---MATLAB
+|   make.m                        Build rfc.m
+|   validate.m                    Examples an checks
+|
++---tools
+|   where_to_get_coan.txt         Link
+|
++---greatest
+|       greatest.h                3rd party tool for automatic testing of C-code
+|       LICENSE                   License information
+|       README.md                 Readme
+|
+\---test
+        long_series.c             Long dataset for testing
+        long_series.csv           Long dataset for testing as CSV file
+        rfc_test.c                Main program (windows console application) for self-check, uses "greatest"
+	rfc_wrapper_advanced.cpp  Example using rainflow in CPP context applying an advanced wrapper
+	rfc_wrapper_simple.cpp    Example using rainflow in CPP context applying an simple wrapper
+

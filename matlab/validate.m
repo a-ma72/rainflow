@@ -1,15 +1,35 @@
 function validate
+
+  if 1
+    build = 'Release';
+  else
+    build = 'Debug';
+  end
+
+  if exist( 'rfc', 'file' ) ~= 3
+    if ispc
+      addpath( ['../build/', build] );
+    else
+      addpath( '../build' );
+    end
+  end
+
   %% Empty series
-  name              = 'empty';
-  class_count       = 100;
-  x                 = export_series( name, [], class_count );
-  x_max             = 1;
+  name              =  'empty';
+  class_count       =  100;
+  x                 =  export_series( name, [], class_count );
+  x_max             =  1;
   x_min             = -1;
   [class_width, ...
    class_offset]    =  class_param( x, class_count );
   hysteresis        =  class_width;
+  enforce_margin    =  0;
+  use_hcm           =  0;
+  residual_method   =  0;
+  spread_damage     =  0;
 
-  [~,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis );
+  [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
+                          residual_method, enforce_margin, use_hcm, spread_damage );
 
   assert( sum( sum( rm ) ) == 0 );
 
@@ -27,8 +47,13 @@ function validate
   [class_width, ...
    class_offset]    =  class_param( x, class_count );
   hysteresis        =  class_width * 0.99;
+  enforce_margin    =  0;
+  use_hcm           =  0;
+  residual_method   =  0;
+  spread_damage     =  0;
 
-  [~,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis );
+  [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
+                          residual_method, enforce_margin, use_hcm, spread_damage );
 
   assert( sum( sum( rm ) ) == 1 );
   assert( rm( 3,2 ) == 1 );
@@ -48,8 +73,13 @@ function validate
   [class_width, ...
    class_offset]    =  class_param( x, class_count );
   hysteresis        =  class_width * 0.99;
+  enforce_margin    =  0;
+  use_hcm           =  0;
+  residual_method   =  0;
+  spread_damage     =  0;
 
-  [~,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis );
+  [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
+                          residual_method, enforce_margin, use_hcm, spread_damage );
 
   assert( sum( sum( rm ) ) == 1 );
   assert( rm( 2,3 ) == 1 );
@@ -69,8 +99,13 @@ function validate
   [class_width, ...
    class_offset]    =  class_param( x, class_count );
   hysteresis        =  class_width;
+  enforce_margin    =  0;
+  use_hcm           =  0;
+  residual_method   =  0;
+  spread_damage     =  0;
 
-  [~,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis );
+  [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
+                          residual_method, enforce_margin, use_hcm, spread_damage );
 
   assert( sum( sum( rm ) ) == 7 );
   assert( rm( 5,3 ) == 2 );
@@ -94,12 +129,42 @@ function validate
   [class_width, ...
    class_offset]    =  class_param( x, class_count );
   hysteresis        =  class_width;
+  enforce_margin    =  1;
+  use_hcm           =  0;
+  residual_method   =  0;  % 0=RFC_RES_NONE, 6=RFC_RES_REPEATED
+  spread_damage     =  1;  % 0=RFC_SD_HALF_23, 1=RFC_SD_RAMP_AMPLITUDE_23
 
-  [pd,re,rm] = rfc( x, class_count, class_width, class_offset, hysteresis );
+  [pd,re,rm,rp,lc,tp,dh] = ...
+    rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
+                residual_method, enforce_margin, use_hcm, spread_damage );
+
+  % With residuum:    pd == 3.8810e-13
+  % Without residuum: pd == 4.8703e-16
+  assert( abs( sum( tp(:,3) ) / pd - 1 ) < 1e-10 );
 
   save( name, 'rm', 're' );
 
   close all
+  figure
+  [ax, h1, h2] = plotyy( tp(:,1), tp(:,2), tp(:,1), cumsum( tp(:,3) ) );
+  set( h1, 'DisplayName', 'time series' );
+  set( h2, 'DisplayName', 'cumulative damage (based on TP)' );
+
+  grid
+
+  spread_damage = 8;  % 7=RFC_SD_TRANSIENT_23, 8=RFC_SD_TRANSIENT_23c
+
+  [pd,re,rm,rp,lc,tp,dh] = ...
+    rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
+                residual_method, enforce_margin, use_hcm, spread_damage );
+
+  assert( abs( sum( dh ) / pd - 1 ) < 1e-10 );
+  hold( ax(2), 'all' );
+  plot( ax(2), 1:length(dh), cumsum(dh), 'k--', 'DisplayName', 'cumulative damage (based on time series)' )
+  plot( ax(2), tp(:,1), cumsum(tp(:,3)), 'g-.', 'DisplayName', 'mapped on turning points' );
+  legend( 'show' )
+
+  figure
   plot( re );
   title( 'Residuum' );
   xlabel( 'Index' );
@@ -129,6 +194,14 @@ function validate
       test = abs( y.residuum ./ re - 1 );
       assert( all( test < 1e-1 ))
   end
+
+  %% Long series, turning points only
+  y = rfc( 'turningpoints', x, class_width*2, enforce_margin );
+  figure
+  plot( x, 'k-', 'DisplayName', 'time series' );
+  hold all
+  plot( y(2,:), y(1,:), 'r--', 'DisplayName', 'turning points' );
+  legend( 'show' );
 end
 
 function rounded_data = export_series( filename, data, class_count )
