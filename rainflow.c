@@ -128,7 +128,7 @@
 #if !RFC_MINIMAL
 #define RFC_MEX_USAGE \
 "\nUsage:\n"\
-"[pd,re,rm,rp,lc,tp,dh] = rfc( 'rfc', data, class_count, class_width, class_offset, hysteresis, residual_method, enfore_margin, use_hcm )\n"\
+"[pd,re,rm,rp,lc,tp,dh] = rfc( 'rfc', data, class_count, class_width, class_offset, hysteresis, residual_method, enforce_margin, use_hcm )\n"\
 "    pd = Pseudo damage\n"\
 "    re = Residue\n"\
 "    rm = Rainflow matrix (from/to)\n"\
