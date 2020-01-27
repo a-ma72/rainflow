@@ -44,7 +44,7 @@ predefined functions.
  8. In-time histograms: rainflow matrix, level crossing and range pair counting.  
  9. Turning points with hysteresis filtering. Turning points involved in a closed hysteresis are marked as pairs, with its partial assigned damage. (Compact history)  
  10. Look-up tables for damage calculation and amplitude transformation.  
- 11. Amplitude transformation (Haigh diagram) according to FKM (symmetrical, unsymmetrical or user defined).  
+ 11. Amplitude transformation (Haigh diagram) according to FKM (symmetrical, non-symmetrical or user defined).  
  12. Damage history (uncompressed)  
  13. Various methods on residual data:  
      - According to DIN 45667  
