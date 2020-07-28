@@ -619,8 +619,9 @@ bool RFC_wl_init_modified( void *ctx, double sx, double nx, double k, double k2 
     }
 #endif /*RFC_DAMAGE_FAST*/
 
-/* Woehler curve */
-    rfc_ctx->wl_k2 =  rfc_ctx->wl_k2;   /* Woehler slope after sx/nx */
+    /* Woehler curve */
+    /* wl_sd, wl_omission remain zero, as initialized by RFC_wl_init_elementary()! */
+    rfc_ctx->wl_k2 =  k2;               /* Woehler slope after sx/nx */
     rfc_ctx->wl_q2 =  fabs(k2) - 1;     /* Default value for fatigue strength depression */
 
     /* Make a shadow copy of the Woehler parameters */
