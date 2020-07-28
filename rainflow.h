@@ -573,7 +573,7 @@ struct rfc_class_param
  */
 struct rfc_wl_param
 {
-    double                              sd;                         /**< Fatigue strength amplitude (Miner original) */
+    double                              sd;                         /**< Fatigue strength amplitude (Miner original only!) */
     double                              nd;                         /**< Cycles according to wl_sd */
     double                              k;                          /**< Woehler slope, always negative */
     double                              sx;                         /**< Junction point between k and k2 */

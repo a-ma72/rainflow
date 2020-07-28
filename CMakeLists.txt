@@ -59,6 +59,7 @@ if( CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR )
     option( RFC_DAMAGE_FAST            "Enables fast damage calculation (per look-up table)" ON )
     option( RFC_DEBUG_FLAGS            "Enables flags for detailed examination" OFF )
     option( RFC_EXPORT_MEX             "Export a function wrapper for MATLAB(R)" ON )
+    option( RFC_TEST                   "Generate rainflow testing program" ON )
 else()
     message( STATUS "Build ${PROJECT_NAME} as subsequent project")
 endif()
@@ -135,16 +136,17 @@ add_library( rfc STATIC rainflow.c )
 target_link_libraries( rfc ${LIBM_LIBRARY} )
 
 # Test application, start project for MSVC
-add_executable( rfc_test rainflow.c test/rfc_test.c test/rfc_wrapper_simple.cpp test/rfc_wrapper_advanced.cpp )
-target_compile_definitions( rfc_test PRIVATE _SCL_SECURE_NO_WARNINGS )
-target_link_libraries( rfc_test ${LIBM_LIBRARY} )
-target_sources( rfc_test PUBLIC greatest/greatest.h )
-set_property( DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT rfc_test )
+if( RFC_TEST )
+    add_executable( rfc_test rainflow.c test/rfc_test.c test/rfc_wrapper_simple.cpp test/rfc_wrapper_advanced.cpp )
+    target_compile_definitions( rfc_test PRIVATE _SCL_SECURE_NO_WARNINGS )
+    target_link_libraries( rfc_test ${LIBM_LIBRARY} )
+    target_sources( rfc_test PUBLIC greatest/greatest.h )
+    set_property( DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT rfc_test )
 
-# install to /bin by default
-install( TARGETS rfc_test RUNTIME DESTINATION bin LIBRARY DESTINATION bin )
-install( FILES test/long_series.csv test/long_series.c matlab/validate.m DESTINATION bin )
-
+    # install to /bin by default
+    install( TARGETS rfc_test RUNTIME DESTINATION bin LIBRARY DESTINATION bin )
+    install( FILES test/long_series.csv test/long_series.c matlab/validate.m DESTINATION bin )
+endif()
 
 # CPack
 include( InstallRequiredSystemLibraries )

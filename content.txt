@@ -24,6 +24,5 @@ RAINFLOW
         long_series.c             Long dataset for testing
         long_series.csv           Long dataset for testing as CSV file
         rfc_test.c                Main program (windows console application) for self-check, uses "greatest"
-	rfc_wrapper_advanced.cpp  Example using rainflow in CPP context applying an advanced wrapper
-	rfc_wrapper_simple.cpp    Example using rainflow in CPP context applying an simple wrapper
-
+        rfc_wrapper_advanced.cpp  Example using rainflow in CPP context applying an advanced wrapper
+        rfc_wrapper_simple.cpp    Example using rainflow in CPP context applying a simple wrapper
