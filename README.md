@@ -32,6 +32,7 @@ predefined functions.
     `RFC_USE_DELEGATES`: Delegates for various core functions to implement user defined behavior.  
     `RFC_GLOBAL_EXTREMA`:  Store global data extrema.    
     `RFC_DAMAGE_FAST`: Using lookup tables for damage and amplitude transformation.  
+    `RFC_EXPORT_MEX`: Export a mexFunction() to use the rainflow counting in MATLAB (R).  
     Using _COAN_ [[http://coan2.sourceforge.net/]] for example, you can tidy up the code from unwanted features. (The minimal version of this package is created using _COAN_ with option `RFC_MINMAL`set.)  
     b) C++ wrapper _rainflow.hpp_ encapsulates functions from rainflow.h in a namespace and offers a template class _Rainflow_ for object oriented access and inheritance.
     This class also offers container class based turning point storage.  
