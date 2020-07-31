@@ -493,6 +493,41 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
     return true;
 }
 
+/**
+ * @brief      Return state
+ *
+ * @param      ctx   The rfc context
+ *
+ * @return     state
+ */
+rfc_state_e RFC_state_get( const void *ctx )
+{
+//    RFC_CTX_CHECK_AND_ASSIGN
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;                                           
+                                                                                    
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )                         
+    {                                                                               
+        return error_raise( rfc_ctx, RFC_ERROR_INVARG );                            
+    }                                                                               
+
+    return rfc_ctx->state;
+}
+
+
+/**
+ * @brief      Return error
+ *
+ * @param      ctx   The rfc context
+ *
+ * @return     error
+ */
+rfc_error_e RFC_error_get( const void *ctx )
+{
+    RFC_CTX_CHECK_AND_ASSIGN
+
+    return rfc_ctx->error;
+}
+
 
 /**
  * @brief      Initialize Woehler parameters to Miners' elementary rule
