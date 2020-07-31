@@ -412,78 +412,80 @@ extern "C" {
 #endif /*__cplusplus*/
 
 /* Core functions */
-bool    RFC_init                    (       void *ctx, unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
-                                                       rfc_value_t hysteresis, rfc_flags_e flags );
-bool    RFC_wl_init_elementary      (       void *ctx, double sx, double nx, double k );
+bool        RFC_init                    (       void *ctx, unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
+                                                           rfc_value_t hysteresis, rfc_flags_e flags );
+rfc_state_e RFC_state_get               ( const void *ctx );
+rfc_error_e RFC_error_get               ( const void *ctx );
+bool        RFC_wl_init_elementary      (       void *ctx, double sx, double nx, double k );
 #if !RFC_MINIMAL
-bool    RFC_wl_init_original        (       void *ctx, double sd, double nd, double k );
-bool    RFC_wl_init_modified        (       void *ctx, double sx, double nx, double k, double k2 );
-bool    RFC_wl_init_any             (       void *ctx, const rfc_wl_param_s* wl_param );
-bool    RFC_clear_counts            (       void *ctx );
+bool        RFC_wl_init_original        (       void *ctx, double sd, double nd, double k );
+bool        RFC_wl_init_modified        (       void *ctx, double sx, double nx, double k, double k2 );
+bool        RFC_wl_init_any             (       void *ctx, const rfc_wl_param_s* wl_param );
+bool        RFC_clear_counts            (       void *ctx );
 #endif /*!RFC_MINIMAL*/
-bool    RFC_deinit                  (       void *ctx );
-bool    RFC_feed                    (       void *ctx, const rfc_value_t* data, size_t count );
+bool        RFC_deinit                  (       void *ctx );
+bool        RFC_feed                    (       void *ctx, const rfc_value_t* data, size_t count );
 #if !RFC_MINIMAL
-bool    RFC_cycle_process_counts    (       void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_flags_e flags );
-bool    RFC_feed_scaled             (       void *ctx, const rfc_value_t* data, size_t count, double factor );
-bool    RFC_feed_tuple              (       void *ctx, rfc_value_tuple_s *data, size_t count );
+bool        RFC_cycle_process_counts    (       void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_flags_e flags );
+bool        RFC_feed_scaled             (       void *ctx, const rfc_value_t* data, size_t count, double factor );
+bool        RFC_feed_tuple              (       void *ctx, rfc_value_tuple_s *data, size_t count );
 #endif /*!RFC_MINIMAL*/
-bool    RFC_finalize                (       void *ctx, rfc_res_method_e residual_method );
+bool        RFC_finalize                (       void *ctx, rfc_res_method_e residual_method );
 #if !RFC_MINIMAL
 /* Functions on rainflow matrix */
-bool    RFC_rfm_make_symmetric      (       void *ctx );
-bool    RFC_rfm_non_zeros           ( const void *ctx, unsigned *count );
-bool    RFC_rfm_get                 ( const void *ctx, rfc_rfm_item_s **buffer, unsigned *count );
-bool    RFC_rfm_set                 (       void *ctx, const rfc_rfm_item_s *buffer, unsigned count, bool add_only );
-bool    RFC_rfm_peek                ( const void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t *counts );
-bool    RFC_rfm_poke                (       void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t counts, bool add_only );
-bool    RFC_rfm_sum                 ( const void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, rfc_counts_t *count );
-bool    RFC_rfm_damage              ( const void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage );
-bool    RFC_rfm_check               ( const void *ctx );
-bool    RFC_rfm_refeed              (       void *ctx, rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param );
-bool    RFC_lc_get                  ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level );
-bool    RFC_lc_from_rfm             ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags );
-bool    RFC_lc_from_residue         ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, rfc_flags_e flags );
-bool    RFC_rp_get                  ( const void *ctx, rfc_counts_t *rp, rfc_value_t *Sa );
-bool    RFC_rp_from_rfm             ( const void *ctx, rfc_counts_t *rp, rfc_value_t *Sa, const rfc_counts_t *rfm );
-bool    RFC_damage_from_rp          ( const void *ctx, const rfc_counts_t *counts, const rfc_value_t *Sa, double *damage, rfc_rp_damage_method_e rp_calc_type );
-bool    RFC_damage_from_rfm         ( const void *ctx, const rfc_counts_t *rfm, double *damage );
-bool    RFC_wl_calc_sx              ( const void *ctx, double s0, double n0, double k, double *sx, double nx, double  k2, double  sd, double nd );
-bool    RFC_wl_calc_sd              ( const void *ctx, double s0, double n0, double k, double  sx, double nx, double  k2, double *sd, double nd );
-bool    RFC_wl_calc_k2              ( const void *ctx, double s0, double n0, double k, double  sx, double nx, double *k2, double  sd, double nd );
-bool    RFC_wl_calc_sa              ( const void *ctx, double s0, double n0, double k, double  n,  double *sa );
-bool    RFC_wl_calc_n               ( const void *ctx, double s0, double n0, double k, double  sa, double *n );
-bool    RFC_wl_param_set            (       void *ctx, const rfc_wl_param_s * );
-bool    RFC_wl_param_get            ( const void *ctx, rfc_wl_param_s * );
-bool    RFC_class_param_set         (       void *ctx, const rfc_class_param_s * );
-bool    RFC_class_param_get         ( const void *ctx, rfc_class_param_s * );
-bool    RFC_class_number            ( const void *ctx, rfc_value_t value, unsigned *class_number );
-bool    RFC_class_mean              ( const void *ctx, unsigned class_number, rfc_value_t *class_mean );
-bool    RFC_class_upper             ( const void *ctx, unsigned class_number, rfc_value_t *class_upper );
-bool    RFC_flags_set               (       void *ctx, int flags, int stack, bool overwrite );
-bool    RFC_flags_unset             (       void *ctx, int flags, int stack );
-bool    RFC_flags_get               ( const void *ctx, int *flags, int stack );
+bool        RFC_rfm_make_symmetric      (       void *ctx );
+bool        RFC_rfm_non_zeros           ( const void *ctx, unsigned *count );
+bool        RFC_rfm_get                 ( const void *ctx, rfc_rfm_item_s **buffer, unsigned *count );
+bool        RFC_rfm_set                 (       void *ctx, const rfc_rfm_item_s *buffer, unsigned count, bool add_only );
+bool        RFC_rfm_peek                ( const void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t *counts );
+bool        RFC_rfm_poke                (       void *ctx, rfc_value_t from_val, rfc_value_t to_val, rfc_counts_t counts, bool add_only );
+bool        RFC_rfm_sum                 ( const void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, rfc_counts_t *count );
+bool        RFC_rfm_damage              ( const void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage );
+bool        RFC_rfm_check               ( const void *ctx );
+bool        RFC_rfm_refeed              (       void *ctx, rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param );
+bool        RFC_lc_get                  ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level );
+bool        RFC_lc_from_rfm             ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags );
+bool        RFC_lc_from_residue         ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, rfc_flags_e flags );
+bool        RFC_rp_get                  ( const void *ctx, rfc_counts_t *rp, rfc_value_t *Sa );
+bool        RFC_rp_from_rfm             ( const void *ctx, rfc_counts_t *rp, rfc_value_t *Sa, const rfc_counts_t *rfm );
+bool        RFC_damage_from_rp          ( const void *ctx, const rfc_counts_t *counts, const rfc_value_t *Sa, double *damage, rfc_rp_damage_method_e rp_calc_type );
+bool        RFC_damage_from_rfm         ( const void *ctx, const rfc_counts_t *rfm, double *damage );
+bool        RFC_wl_calc_sx              ( const void *ctx, double s0, double n0, double k, double *sx, double nx, double  k2, double  sd, double nd );
+bool        RFC_wl_calc_sd              ( const void *ctx, double s0, double n0, double k, double  sx, double nx, double  k2, double *sd, double nd );
+bool        RFC_wl_calc_k2              ( const void *ctx, double s0, double n0, double k, double  sx, double nx, double *k2, double  sd, double nd );
+bool        RFC_wl_calc_sa              ( const void *ctx, double s0, double n0, double k, double  n,  double *sa );
+bool        RFC_wl_calc_n               ( const void *ctx, double s0, double n0, double k, double  sa, double *n );
+bool        RFC_wl_param_set            (       void *ctx, const rfc_wl_param_s * );
+bool        RFC_wl_param_get            ( const void *ctx, rfc_wl_param_s * );
+bool        RFC_class_param_set         (       void *ctx, const rfc_class_param_s * );
+bool        RFC_class_param_get         ( const void *ctx, rfc_class_param_s * );
+bool        RFC_class_number            ( const void *ctx, rfc_value_t value, unsigned *class_number );
+bool        RFC_class_mean              ( const void *ctx, unsigned class_number, rfc_value_t *class_mean );
+bool        RFC_class_upper             ( const void *ctx, unsigned class_number, rfc_value_t *class_upper );
+bool        RFC_flags_set               (       void *ctx, int flags, int stack, bool overwrite );
+bool        RFC_flags_unset             (       void *ctx, int flags, int stack );
+bool        RFC_flags_get               ( const void *ctx, int *flags, int stack );
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
-bool    RFC_tp_init                 (       void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
-bool    RFC_tp_init_autoprune       (       void *ctx, bool autoprune, size_t size, size_t threshold );
-bool    RFC_tp_prune                (       void *ctx, size_t count, rfc_flags_e flags );
-bool    RFC_tp_refeed               (       void *ctx, rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param );
-bool    RFC_tp_clear                (       void *ctx );
+bool        RFC_tp_init                 (       void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
+bool        RFC_tp_init_autoprune       (       void *ctx, bool autoprune, size_t size, size_t threshold );
+bool        RFC_tp_prune                (       void *ctx, size_t count, rfc_flags_e flags );
+bool        RFC_tp_refeed               (       void *ctx, rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param );
+bool        RFC_tp_clear                (       void *ctx );
 #endif /*RFC_TP_SUPPORT*/
 
 #if RFC_DH_SUPPORT
-bool    RFC_dh_init                 (       void *ctx, rfc_sd_method_e method, double *dh, size_t dh_cap, bool is_static );
+bool        RFC_dh_init                 (       void *ctx, rfc_sd_method_e method, double *dh, size_t dh_cap, bool is_static );
 #endif /*RFC_DH_SUPPORT*/
 
 #if RFC_AT_SUPPORT
-bool    RFC_at_init                 (       void *ctx, const double *Sa, const double *Sm, unsigned count, 
-                                                       double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
-bool    RFC_at_transform            ( const void *ctx, double Sa, double Sm, double *Sa_transformed );
+bool        RFC_at_init                 (       void *ctx, const double *Sa, const double *Sm, unsigned count, 
+                                                           double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
+bool        RFC_at_transform            ( const void *ctx, double Sa, double Sm, double *Sa_transformed );
 #endif /*RFC_AT_SUPPORT*/
 
 #if RFC_DEBUG_FLAGS
-int     RFC_debug_fprintf           (       void *ctx, FILE *stream, const char *fmt, ... );
+int         RFC_debug_fprintf           (       void *ctx, FILE *stream, const char *fmt, ... );
 #endif /*RFC_DEBUG_FLAGS*/
 
 #ifdef __cplusplus

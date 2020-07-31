@@ -253,6 +253,8 @@ public:
     /* Core function wrapper */
     bool            init                    ( unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
                                               rfc_value_t hysteresis, rfc_flags_e flags = RFC_FLAGS_DEFAULT );
+    rfc_state_e     state_get               () const { return (rfc_state_e)RF::RFC_state_get( &ctx_get() ); }
+    rfc_error_e     error_get               () const { return (rfc_error_e)RF::RFC_error_get( &ctx_get() ); }
     bool            wl_init_elementary      ( double sx, double nx, double k );
     bool            wl_init_original        ( double sd, double nd, double k );
     bool            wl_init_modified        ( double sx, double nx, double k, double k2 );
