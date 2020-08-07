@@ -321,6 +321,7 @@ enum rfc_error
 #if RFC_DAMAGE_FAST
     RFC_ERROR_LUT                   =  8,                           /**< Error while accessing look up tables */
 #endif /*RFC_DAMAGE_FAST*/
+    RFC_ERROR_DATA_OUT_OF_RANGE     =  9,                           /**< Input data leaves classrange */
 };
 
 
