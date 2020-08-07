@@ -1444,7 +1444,7 @@ bool RFC_feed( void *ctx, const rfc_value_t * data, size_t data_count )
 
         if( tp.cls >= rfc_ctx->class_count && rfc_ctx->class_count )
         {
-            return error_raise( rfc_ctx, RFC_ERROR_INVARG );
+            return error_raise( rfc_ctx, RFC_ERROR_DATA_OUT_OF_RANGE );
         }
         
         if( !feed_once( rfc_ctx, &tp, rfc_ctx->internal.flags ) ) return false;
@@ -1517,7 +1517,7 @@ bool RFC_feed_scaled( void *ctx, const rfc_value_t * data, size_t data_count, do
 
         if( tp.cls >= rfc_ctx->class_count && rfc_ctx->class_count )
         {
-            return error_raise( rfc_ctx, RFC_ERROR_INVARG );
+            return error_raise( rfc_ctx, RFC_ERROR_DATA_OUT_OF_RANGE );
         }
         
         if( !feed_once( rfc_ctx, &tp, rfc_ctx->internal.flags ) ) return false;
@@ -1552,7 +1552,7 @@ bool RFC_feed_tuple( void *ctx, rfc_value_tuple_s *data, size_t data_count )
     {
         if( data->cls >= rfc_ctx->class_count && rfc_ctx->class_count )
         {
-            return error_raise( rfc_ctx, RFC_ERROR_INVARG );
+            return error_raise( rfc_ctx, RFC_ERROR_DATA_OUT_OF_RANGE );
         }
         
         if( !feed_once( rfc_ctx, data++, rfc_ctx->internal.flags ) ) return false;
