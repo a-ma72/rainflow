@@ -370,7 +370,7 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
     /* Residue */
     rfc_ctx->internal.residue_cap           = NUMEL( rfc_ctx->internal.residue );
     rfc_ctx->residue_cnt                    = 0;
-    rfc_ctx->residue_cap                    = 2 * rfc_ctx->class_count; /* max size is 2*n-1 plus interim point = 2*n */
+    rfc_ctx->residue_cap                    = 2 * rfc_ctx->class_count + 1; /* max size is 2*n plus interim point = 2*n+1 */
 
     if( rfc_ctx->residue_cap <= rfc_ctx->internal.residue_cap )
     {
@@ -456,7 +456,7 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
         rfc_ctx->internal.hcm.IZ            = 0;
         rfc_ctx->internal.hcm.IR            = 1;
         /* Residue */
-        rfc_ctx->internal.hcm.stack_cap     = 2 * rfc_ctx->class_count; /* max size is 2*n-1 plus interim point = 2*n */
+        rfc_ctx->internal.hcm.stack_cap     = 2 * rfc_ctx->class_count + 1; /* max size is 2*n plus interim point = 2*n+1 */
         rfc_ctx->internal.hcm.stack         = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( NULL, rfc_ctx->internal.hcm.stack_cap, 
                                                                                       sizeof(rfc_value_tuple_s), RFC_MEM_AIM_HCM );
     }
@@ -5003,7 +5003,7 @@ rfc_value_tuple_s * feed_filter_pt( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s 
         assert( rfc_ctx->state == RFC_STATE_BUSY_INTERIM );
 
         /* Increment and set new interim turning point */
-        assert( rfc_ctx->residue_cnt < rfc_ctx->residue_cap );
+        assert( rfc_ctx->residue_cnt + 1 < rfc_ctx->residue_cap );
         rfc_ctx->residue[++rfc_ctx->residue_cnt] = *pt;
 
         /* Return new turning point */
@@ -5281,17 +5281,14 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
 
-    if( !rfc_ctx->class_count || ( from->value > rfc_ctx->class_offset && to->value > rfc_ctx->class_offset ) )
+    if( !rfc_ctx->class_count || ( from->value >= rfc_ctx->class_offset && to->value >= rfc_ctx->class_offset ) )
     {
-        /* ok */
+        /* If class_count is zero, no counting is done. Otherwise values must be greater than class_offset */
     }
     else
     {
         assert( false );
     }
-
-
-    assert( !rfc_ctx->class_count || ( from->value > rfc_ctx->class_offset && to->value > rfc_ctx->class_offset ) );
 
 #if RFC_TP_SUPPORT
     /* If flag RFC_FLAGS_ENFORCE_MARGIN is set, cycles less than hysteresis are possible */
