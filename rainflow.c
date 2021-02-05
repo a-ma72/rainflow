@@ -4487,6 +4487,14 @@ bool damage_calc_amplitude( rfc_ctx_s *rfc_ctx, double Sa, double *damage )
             /* D = exp( (log(h)-log(ND)) + (log(Sa)-log(SD)) * ABS(k) ) */
             /* D = exp(      0 -log(ND)  + (log(Sa)-log(SD)) * ABS(k) ) */
 
+            /* If D is integer format count:
+             * 
+             * D_integer = class_number ^ ABS(k)  // where class_number is 0..class_count-1
+             * 
+             * D = D_integer_sum * exp( log( SD * ND * 2 / class_width ) * -ABS(k) )
+             * 
+             */
+
 #if !RFC_MINIMAL
             if( Sa > rfc_ctx->wl_omission )
             {
