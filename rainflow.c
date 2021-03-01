@@ -195,6 +195,7 @@ static void                 cycle_process_lc                (       rfc_ctx_s *,
 static void                 cycle_process_counts            (       rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, rfc_flags_e flags );
 /* Methods on residue */
 static bool                 finalize_res_ignore             (       rfc_ctx_s *, rfc_flags_e flags );
+static bool                 finalize_res_no_finalize        (       rfc_ctx_s *, rfc_flags_e flags );
 #if !RFC_MINIMAL
 static bool                 finalize_res_discard            (       rfc_ctx_s *, rfc_flags_e flags );
 static bool                 finalize_res_weight_cycles      (       rfc_ctx_s *, rfc_counts_t weight, rfc_flags_e flags );
@@ -1609,6 +1610,9 @@ bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
                 /* FALLTHROUGH */
             case RFC_RES_IGNORE:
                 ok = finalize_res_ignore( rfc_ctx, flags );
+                break;
+            case RFC_RES_NO_FINALIZE:
+                ok = finalize_res_no_finalize( rfc_ctx, flags );
                 break;
 #if !RFC_MINIMAL
             case RFC_RES_DISCARD:
@@ -4014,6 +4018,26 @@ bool finalize_res_ignore( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
 
     /* Include interim turning point */
     return feed_finalize( rfc_ctx );
+}
+
+
+/**
+ * @brief      Finalize pending counts, ignore residue, don't finalize
+ *
+ * @param      rfc_ctx  The rainflow context
+ * @param      flags    The flags
+ *
+ * @return     true on success
+ */
+static
+bool finalize_res_no_finalize( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
+{
+    assert( rfc_ctx );
+    assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
+
+    rfc_ctx->state = RFC_STATE_FINALIZE;
+
+    return true;
 }
 
 
