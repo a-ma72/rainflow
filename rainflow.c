@@ -6762,7 +6762,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 #endif /*RFC_DAMAGE_FAST*/
                 case RFC_ERROR_UNEXP:
                 default:
-                    mexErrMsgTxt( "Unexpected error occured!" );
+                    mexErrMsgTxt( "Unexpected error occurred!" );
             }
         }
 
