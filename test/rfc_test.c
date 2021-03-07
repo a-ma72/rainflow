@@ -1460,25 +1460,25 @@ TEST RFC_long_series( int ccnt )
 
             /* Check matrix sum */
 #if RFC_USE_HYSTERESIS_FILTER
-            ASSERT_EQ( sum, 602.0 );
+            ASSERT_EQ( sum, 730.0 );
 #else /*RFC_USE_HYSTERESIS_FILTER*/
-            ASSERT_EQ( sum, 386.0 );
+            ASSERT_EQ( sum, 473.0 );
 #endif /*RFC_USE_HYSTERESIS_FILTER*/
             /* Check damage value */
 #if !RFC_MINIMAL
             /* Damage must equal to damage calculated in postprocess */
             ASSERT( RFC_damage_from_rp( &ctx, NULL /*rp*/, NULL /*Sa*/, &damage, RFC_RP_DAMAGE_CALC_METHOD_DEFAULT ) );
 #if RFC_USE_HYSTERESIS_FILTER
-            GREATEST_ASSERT_IN_RANGE( 4.8703e-16, damage, 0.00005e-16 );
+            GREATEST_ASSERT_IN_RANGE( 7.29179e-08, damage, 0.00005e-08 );
 #else /*RFC_USE_HYSTERESIS_FILTER*/
-            GREATEST_ASSERT_IN_RANGE( 4.8702e-16, damage, 0.00005e-16 );
+            GREATEST_ASSERT_IN_RANGE( 7.29177e-08, damage, 0.00005e-08 );
 #endif /*RFC_USE_HYSTERESIS_FILTER*/
             damage = 0.0;
             ASSERT( RFC_damage_from_rfm( &ctx, NULL /*rfm*/, &damage ) );
 #if RFC_USE_HYSTERESIS_FILTER
-            GREATEST_ASSERT_IN_RANGE( 4.8703e-16, damage, 0.00005e-16 );
+            GREATEST_ASSERT_IN_RANGE( 7.29179e-08, damage, 0.00005e-08 );
 #else /*RFC_USE_HYSTERESIS_FILTER*/
-            GREATEST_ASSERT_IN_RANGE( 4.8702e-16, damage, 0.00005e-16 );
+            GREATEST_ASSERT_IN_RANGE( 7.29177e-08, damage, 0.00005e-08 );
 #endif /*RFC_USE_HYSTERESIS_FILTER*/
 
             /* Check lc count */
@@ -1487,28 +1487,25 @@ TEST RFC_long_series( int ccnt )
 #endif /*!RFC_MINIMAL*/
             /* Check residue */
 #if RFC_USE_HYSTERESIS_FILTER
-            ASSERT_EQ( ctx.residue_cnt, 10 );
-            ASSERT_EQ_FMT( ctx.residue[0].value,   0.54, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[1].value,   2.37, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[2].value,  -0.45, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[3].value,  17.04, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[4].value, -50.90, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[5].value, 114.14, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[6].value, -24.85, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[7].value,  31.00, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[8].value,  -0.65, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[9].value,  16.59, "%.2f" );
+            ASSERT_EQ( ctx.residue_cnt, 8 );
+            ASSERT_EQ_FMT( ctx.residue[0].value,    42.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[1].value,  -210.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[2].value,   360.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[3].value, -1548.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[4].value,  2193.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[5].value, -2000.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[6].value,  2950.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[7].value,   881.0, "%.2f" );
 #else /*RFC_USE_HYSTERESIS_FILTER*/
-            ASSERT_EQ( ctx.residue_cnt, 9 );
-            ASSERT_EQ_FMT( ctx.residue[0].value,   2.37, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[1].value,  -0.01, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[2].value,  17.04, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[3].value, -50.52, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[4].value, 114.14, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[5].value, -23.63, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[6].value,  30.33, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[7].value,  -0.65, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[8].value,  16.59, "%.2f" );
+            ASSERT_EQ( ctx.residue_cnt, 8 );
+            ASSERT_EQ_FMT( ctx.residue[0].value,    42.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[1].value,  -210.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[2].value,   360.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[3].value, -1548.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[4].value,  2193.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[5].value, -2000.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[6].value,  2950.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[7].value,   888.0, "%.2f" );
 #endif /*RFC_USE_HYSTERESIS_FILTER*/
 #if !RFC_MINIMAL
             /* Check matrix consistency */

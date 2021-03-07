@@ -120,14 +120,13 @@ function validate
 
 
   %% Long data series
-  rng(0);  % Init random seed
+  rng(1,'twister')  % Init random seed
   name              =  'long_series';
   class_count       =  100;
-  x                 =  export_series( name, cumsum( randn( 1e4, 1 ) ), class_count );
-  x_max             =  max(x);
-  x_min             =  min(x);
-  [class_width, ...
-   class_offset]    =  class_param( x, class_count );
+  class_offset      = -2025;
+  class_width       =  50;
+  x                 =  valid_series_generator( class_offset, class_width, class_count, 40.5, 1e4, true );
+  x                 =  export_series( name, x, class_count, '%+ 5.0f' );
   hysteresis        =  class_width;
   enforce_margin    =  1;
   use_hcm           =  0;
@@ -179,10 +178,10 @@ function validate
 
   disp( pd )
 
-  assert( strcmp( sprintf( '%.4e', pd ), '4.8703e-16' ) )
-  assert( sum( sum(rm) ) == 601 );
-  assert( length(re) == 10 );
-  test = re ./ [0.538;2.372;-0.448;17.0373;-50.901;114.136;-24.851;31.002;-0.646;16.594];
+  assert( strcmp( sprintf( '%.4e', pd ), '7.2918e-08' ) )
+  assert( sum( rm(:) ) == 731 );
+  assert( length(re) == 8 );
+  test = re ./ [42;-210;360;-1548;2193;-2000;2950;881];
   test = abs( test - 1 );
   assert( all( test < 1e-3 ))
 
@@ -204,7 +203,10 @@ function validate
   legend( 'show' );
 end
 
-function rounded_data = export_series( filename, data, class_count )
+function rounded_data = export_series( filename, data, class_count, format )
+  if nargin < 4
+    format = '%.2f';
+  end
   % Round data first
   rounded_data = round( data, 2 );
   % Avoid values near class boundaries, to avoid rounding effects on
@@ -212,7 +214,7 @@ function rounded_data = export_series( filename, data, class_count )
   [class_width, ...
    class_offset]    = class_param( rounded_data, class_count );
   % Normalized data
-  rounded_data = ( rounded_data - class_offset) / class_width;
+  rounded_data = ( rounded_data - class_offset ) / class_width;
   % Inspect boundaries
   i = mod( rounded_data, 1 );
   i = find( i > 0.999 | i < 0.001 );
@@ -221,14 +223,19 @@ function rounded_data = export_series( filename, data, class_count )
   rounded_data = round( data, 2 );
   [class_width, ...
    class_offset]    = class_param( rounded_data, class_count );
-  rounded_data = ( rounded_data - class_offset) / class_width;
+  rounded_data = ( rounded_data - class_offset ) / class_width;
   i = mod( rounded_data, 1 );
   i = find( i > 0.999 | i < 0.001 );
   assert( isempty(i) );
   rounded_data = data;
+  write_series( filename, data, format );
+end
+
+
+function data = write_series( filename, data, format )
   fid = fopen( [filename, '.csv'], 'wt' );
   if fid ~= -1
-    fprintf( fid, '%.2f\n', rounded_data );
+    fprintf( fid, [format,'\n'], data );
     fclose( fid );
   end
 
@@ -237,16 +244,16 @@ function rounded_data = export_series( filename, data, class_count )
   if fid ~= -1
       fprintf( fid, 'static double data_export[] = {\n' );
       s = '';
-      left = numel(rounded_data);
+      left = numel(data);
       i = 1;
       while left
-          s = [s,sprintf('%.2f', rounded_data(i))];
+          s = [s,sprintf(format, data(i))];
           left = left - 1;
           i = i + 1;
           if left
             s = [s,', '];
           end
-          if mod(i,16)==0 || ~left
+          if mod(i-1,16)==0 || ~left
             fprintf( fid, '    %s\n', s );
             s= '';
           end
