@@ -4513,9 +4513,9 @@ bool damage_calc_amplitude( rfc_ctx_s *rfc_ctx, double Sa, double *damage )
 
             /* If D is integer format count:
              * 
-             * D_integer = class_number ^ ABS(k)  // where class_number is 0..class_count-1
+             * D_integer = (double)(int)range ^ ABS(k)  // where range is 0..class_count-1
              * 
-             * D = D_integer_sum * exp( log( SD * ND * 2 / class_width ) * -ABS(k) )
+             * D = D_integer_sum * exp( log( ND * 2*SD/class_width ) * -ABS(k) )
              * 
              */
 
