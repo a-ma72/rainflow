@@ -2375,18 +2375,18 @@ SUITE( RFC_TEST_SUITE )
     RUN_TEST( RFC_ctx_inspect );
     
     /* Test rainflow counting */
-    RUN_TEST1( RFC_empty, 1 );
-    RUN_TEST1( RFC_cycle_up, 1 );
-    RUN_TEST1( RFC_cycle_down, 1 );
-    RUN_TEST1( RFC_residue_stress_test, 1 );
-    RUN_TEST1( RFC_small_example, 1 );
-    RUN_TEST1( RFC_long_series, 1 );
     RUN_TEST1( RFC_empty, 0 );
     RUN_TEST1( RFC_cycle_up, 0 );
     RUN_TEST1( RFC_cycle_down, 0 );
     RUN_TEST1( RFC_residue_stress_test, 0 );
     RUN_TEST1( RFC_small_example, 0 );
     RUN_TEST1( RFC_long_series, 0 );
+    RUN_TEST1( RFC_empty, 1 );
+    RUN_TEST1( RFC_cycle_up, 1 );
+    RUN_TEST1( RFC_cycle_down, 1 );
+    RUN_TEST1( RFC_residue_stress_test, 1 );
+    RUN_TEST1( RFC_small_example, 1 );
+    RUN_TEST1( RFC_long_series, 1 );
 #if !RFC_MINIMAL
     /* Residual methods */
     RUN_TEST( RFC_res_DIN45667 );
@@ -2400,12 +2400,12 @@ SUITE( RFC_TEST_SUITE )
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
     /* Test turning points */
-    RUN_TEST1( RFC_test_turning_points, 1 );
-    RUN_TEST1( RFC_tp_prune_test, 1 );
-    RUN_TEST1( RFC_tp_refeed_test, 1 );
     RUN_TEST1( RFC_test_turning_points, 0 );
     RUN_TEST1( RFC_tp_prune_test, 0 );
     RUN_TEST1( RFC_tp_refeed_test, 0 );
+    RUN_TEST1( RFC_test_turning_points, 1 );
+    RUN_TEST1( RFC_tp_prune_test, 1 );
+    RUN_TEST1( RFC_tp_refeed_test, 1 );
 
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_AT_SUPPORT
