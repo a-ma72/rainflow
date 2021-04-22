@@ -344,13 +344,14 @@ enum rfc_res_method
     /* Don't change order! */
     RFC_RES_NONE                    = 0,                            /**< No residual method */
     RFC_RES_IGNORE                  = 1,                            /**< Ignore residue (same as RFC_RES_NONE) */
+    RFC_RES_NO_FINALIZE             = 2,                            /**< Don't finalize the data stream */
 #if !RFC_MINIMAL
-    RFC_RES_DISCARD                 = 2,                            /**< Discard residue (empty residue) */
-    RFC_RES_HALFCYCLES              = 3,                            /**< ASTM */
-    RFC_RES_FULLCYCLES              = 4,                            /**< Count half cycles as full cycles */
-    RFC_RES_CLORMANN_SEEGER         = 5,                            /**< Clormann/Seeger method */
-    RFC_RES_REPEATED                = 6,                            /**< Repeat residue and count closed cycles */
-    RFC_RES_RP_DIN45667             = 7,                            /**< Count residue according to range pair in DIN-45667 */
+    RFC_RES_DISCARD                 = 3,                            /**< Discard residue (empty residue) */
+    RFC_RES_HALFCYCLES              = 4,                            /**< ASTM */
+    RFC_RES_FULLCYCLES              = 5,                            /**< Count half cycles as full cycles */
+    RFC_RES_CLORMANN_SEEGER         = 6,                            /**< Clormann/Seeger method */
+    RFC_RES_REPEATED                = 7,                            /**< Repeat residue and count closed cycles */
+    RFC_RES_RP_DIN45667             = 8,                            /**< Count residue according to range pair in DIN-45667 */
 #endif /*!RFC_MINIMAL*/
     RFC_RES_COUNT                                                   /**< Number of options */
 };

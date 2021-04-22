@@ -187,6 +187,7 @@ public:
         /* Don't change order! */
         RFC_RES_NONE                            = RF::RFC_RES_NONE,                             /**< No residual method */
         RFC_RES_IGNORE                          = RF::RFC_RES_IGNORE,                           /**< Ignore residue (same as RFC_RES_NONE) */
+        RFC_RES_NO_FINALIZE                     = RF::RFC_RES_NO_FINALIZE,                      /**< Don't finalize data stream */
         RFC_RES_DISCARD                         = RF::RFC_RES_DISCARD,                          /**< Discard residue (empty residue) */
         RFC_RES_HALFCYCLES                      = RF::RFC_RES_HALFCYCLES,                       /**< ASTM */
         RFC_RES_FULLCYCLES                      = RF::RFC_RES_FULLCYCLES,                       /**< Count half cycles as full cycles */

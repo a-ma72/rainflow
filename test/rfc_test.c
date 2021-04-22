@@ -1065,6 +1065,98 @@ TEST RFC_cycle_down( int ccnt )
 }
 
 
+TEST RFC_residue_stress_test( int ccnt )
+{
+    RFC_VALUE_TYPE      x_max           =  4;
+    RFC_VALUE_TYPE      x_min           =  1;
+    unsigned            class_count     =  ccnt ? 4 : 0;
+    RFC_VALUE_TYPE      class_width;
+    RFC_VALUE_TYPE      class_offset;
+    RFC_VALUE_TYPE      hysteresis;
+#if RFC_TP_SUPPORT
+    rfc_value_tuple_s   tp[30];
+#endif /*RFC_TP_SUPPORT*/
+    size_t              i;
+
+    calc_class_param( x_max, x_min, class_count, &class_width, &class_offset );
+    hysteresis = class_width * 0.99;
+
+    do
+    {
+        RFC_VALUE_TYPE data[] = {2,3,1,4,1,3,2,3, 2,3,1,4,1,3,2,3, 2,3,1,4,1,3,2,3, 1.9};
+        RFC_VALUE_TYPE sum = 0.0;
+
+#if RFC_TP_SUPPORT
+        ASSERT( NUMEL(tp) >= NUMEL(data) );
+#endif /*RFC_TP_SUPPORT*/
+
+        ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
+#if RFC_TP_SUPPORT
+        ASSERT( RFC_tp_init( &ctx, tp, NUMEL(tp), /* is_static */ true ) );
+#endif /*RFC_TP_SUPPORT*/
+        ASSERT( RFC_feed( &ctx, data, /* count */ NUMEL( data ) ) );
+        ASSERT( RFC_finalize( &ctx, /* residual_method */ RFC_RES_NONE ) );
+
+        for( i = 0; i < class_count * class_count; i++ )
+        {
+            sum += ctx.rfm[i] / ctx.full_inc;
+        }
+
+        if( class_count )
+        {
+            ASSERT_EQ( sum, 9.0 );
+            ASSERT_EQ( rfm_peek( &ctx, 1, 3 ), 2 * ctx.full_inc );
+            ASSERT_EQ( rfm_peek( &ctx, 3, 2 ), 5 * ctx.full_inc );
+            ASSERT_EQ( rfm_peek( &ctx, 4, 1 ), 2 * ctx.full_inc );
+            ASSERT_EQ( ctx.residue_cnt, 7 );
+            ASSERT_EQ( ctx.residue[0].value, 2.0 );
+            ASSERT_EQ( ctx.residue[1].value, 3.0 );
+            ASSERT_EQ( ctx.residue[2].value, 1.0 );
+            ASSERT_EQ( ctx.residue[3].value, 4.0 );
+            ASSERT_EQ( ctx.residue[4].value, 1.0 );
+            ASSERT_EQ( ctx.residue[5].value, 3.0 );
+            ASSERT_EQ( ctx.residue[6].value, 1.9 );
+            ASSERT_EQ( ctx.residue[7].value, 3.0 );
+            ASSERT_EQ( ctx.residue[8].value, 1.9 );
+            ASSERT_EQ( ctx.state, RFC_STATE_FINISHED );
+            ASSERT_EQ( ctx.residue[0].pos, 1 );
+            ASSERT_EQ( ctx.residue[1].pos, 2 );
+            ASSERT_EQ( ctx.residue[2].pos, 3 );
+            ASSERT_EQ( ctx.residue[3].pos, 20 );
+            ASSERT_EQ( ctx.residue[4].pos, 21 );
+            ASSERT_EQ( ctx.residue[5].pos, 24 );
+            ASSERT_EQ( ctx.residue[6].pos, 25 );
+            ASSERT_EQ( ctx.residue[7].pos, 24 );
+            ASSERT_EQ( ctx.residue[8].pos, 25 );
+        }
+#if RFC_TP_SUPPORT
+        if( class_count )
+        {
+            ASSERT_EQ( ctx.residue[0].tp_pos, 1 );
+            ASSERT_EQ( ctx.residue[1].tp_pos, 2 );
+            ASSERT_EQ( ctx.residue[2].tp_pos, 3 );
+            ASSERT_EQ( ctx.residue[3].tp_pos, 20 );
+            ASSERT_EQ( ctx.residue[4].tp_pos, 21 );
+            ASSERT_EQ( ctx.residue[5].tp_pos, 24 );
+            ASSERT_EQ( ctx.residue[6].tp_pos, 25 );
+        }
+        for( i = 0; i < ctx.tp_cnt; i++ )
+        {
+            ASSERT_EQ( ctx.tp[i].pos, i + 1 );
+            ASSERT_EQ( ctx.tp[i].tp_pos, 0 );
+        }
+#endif /*RFC_TP_SUPPORT*/
+    } while(0);
+
+    if( ctx.state != RFC_STATE_INIT0 )
+    {
+        ASSERT( RFC_deinit( &ctx ) );
+    }
+
+    PASS();
+}
+
+
 TEST RFC_small_example( int ccnt )
 {
     RFC_VALUE_TYPE      x_max           =  6;
@@ -1368,25 +1460,25 @@ TEST RFC_long_series( int ccnt )
 
             /* Check matrix sum */
 #if RFC_USE_HYSTERESIS_FILTER
-            ASSERT_EQ( sum, 602.0 );
+            ASSERT_EQ( sum, 730.0 );
 #else /*RFC_USE_HYSTERESIS_FILTER*/
-            ASSERT_EQ( sum, 386.0 );
+            ASSERT_EQ( sum, 473.0 );
 #endif /*RFC_USE_HYSTERESIS_FILTER*/
             /* Check damage value */
 #if !RFC_MINIMAL
             /* Damage must equal to damage calculated in postprocess */
             ASSERT( RFC_damage_from_rp( &ctx, NULL /*rp*/, NULL /*Sa*/, &damage, RFC_RP_DAMAGE_CALC_METHOD_DEFAULT ) );
 #if RFC_USE_HYSTERESIS_FILTER
-            GREATEST_ASSERT_IN_RANGE( 4.8703e-16, damage, 0.00005e-16 );
+            GREATEST_ASSERT_IN_RANGE( 7.29179e-08, damage, 0.00005e-08 );
 #else /*RFC_USE_HYSTERESIS_FILTER*/
-            GREATEST_ASSERT_IN_RANGE( 4.8702e-16, damage, 0.00005e-16 );
+            GREATEST_ASSERT_IN_RANGE( 7.29177e-08, damage, 0.00005e-08 );
 #endif /*RFC_USE_HYSTERESIS_FILTER*/
             damage = 0.0;
             ASSERT( RFC_damage_from_rfm( &ctx, NULL /*rfm*/, &damage ) );
 #if RFC_USE_HYSTERESIS_FILTER
-            GREATEST_ASSERT_IN_RANGE( 4.8703e-16, damage, 0.00005e-16 );
+            GREATEST_ASSERT_IN_RANGE( 7.29179e-08, damage, 0.00005e-08 );
 #else /*RFC_USE_HYSTERESIS_FILTER*/
-            GREATEST_ASSERT_IN_RANGE( 4.8702e-16, damage, 0.00005e-16 );
+            GREATEST_ASSERT_IN_RANGE( 7.29177e-08, damage, 0.00005e-08 );
 #endif /*RFC_USE_HYSTERESIS_FILTER*/
 
             /* Check lc count */
@@ -1395,28 +1487,25 @@ TEST RFC_long_series( int ccnt )
 #endif /*!RFC_MINIMAL*/
             /* Check residue */
 #if RFC_USE_HYSTERESIS_FILTER
-            ASSERT_EQ( ctx.residue_cnt, 10 );
-            ASSERT_EQ_FMT( ctx.residue[0].value,   0.54, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[1].value,   2.37, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[2].value,  -0.45, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[3].value,  17.04, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[4].value, -50.90, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[5].value, 114.14, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[6].value, -24.85, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[7].value,  31.00, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[8].value,  -0.65, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[9].value,  16.59, "%.2f" );
+            ASSERT_EQ( ctx.residue_cnt, 8 );
+            ASSERT_EQ_FMT( ctx.residue[0].value,    42.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[1].value,  -210.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[2].value,   360.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[3].value, -1548.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[4].value,  2193.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[5].value, -2000.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[6].value,  2950.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[7].value,   881.0, "%.2f" );
 #else /*RFC_USE_HYSTERESIS_FILTER*/
-            ASSERT_EQ( ctx.residue_cnt, 9 );
-            ASSERT_EQ_FMT( ctx.residue[0].value,   2.37, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[1].value,  -0.01, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[2].value,  17.04, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[3].value, -50.52, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[4].value, 114.14, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[5].value, -23.63, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[6].value,  30.33, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[7].value,  -0.65, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[8].value,  16.59, "%.2f" );
+            ASSERT_EQ( ctx.residue_cnt, 8 );
+            ASSERT_EQ_FMT( ctx.residue[0].value,    42.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[1].value,  -210.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[2].value,   360.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[3].value, -1548.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[4].value,  2193.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[5].value, -2000.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[6].value,  2950.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[7].value,   888.0, "%.2f" );
 #endif /*RFC_USE_HYSTERESIS_FILTER*/
 #if !RFC_MINIMAL
             /* Check matrix consistency */
@@ -2289,11 +2378,13 @@ SUITE( RFC_TEST_SUITE )
     RUN_TEST1( RFC_empty, 1 );
     RUN_TEST1( RFC_cycle_up, 1 );
     RUN_TEST1( RFC_cycle_down, 1 );
+    RUN_TEST1( RFC_residue_stress_test, 1 );
     RUN_TEST1( RFC_small_example, 1 );
     RUN_TEST1( RFC_long_series, 1 );
     RUN_TEST1( RFC_empty, 0 );
     RUN_TEST1( RFC_cycle_up, 0 );
     RUN_TEST1( RFC_cycle_down, 0 );
+    RUN_TEST1( RFC_residue_stress_test, 0 );
     RUN_TEST1( RFC_small_example, 0 );
     RUN_TEST1( RFC_long_series, 0 );
 #if !RFC_MINIMAL
