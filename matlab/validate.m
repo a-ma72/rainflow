@@ -130,15 +130,15 @@ function validate
   hysteresis        =  class_width;
   enforce_margin    =  1;
   use_hcm           =  0;
-  residual_method   =  0;  % 0=RFC_RES_NONE, 6=RFC_RES_REPEATED
+  residual_method   =  7;  % 0=RFC_RES_NONE, 7=RFC_RES_REPEATED
   spread_damage     =  1;  % 0=RFC_SD_HALF_23, 1=RFC_SD_RAMP_AMPLITUDE_23
 
   [pd,re,rm,rp,lc,tp,dh] = ...
     rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
                 residual_method, enforce_margin, use_hcm, spread_damage );
 
-  % With residuum:    pd == 3.8810e-13
-  % Without residuum: pd == 4.8703e-16
+  % With residuum:    pd == 1.167751604296875e-05
+  % Without residuum: pd == 7.291794042968684e-08
   assert( abs( sum( tp(:,3) ) / pd - 1 ) < 1e-10 );
 
   save( name, 'rm', 're' );
