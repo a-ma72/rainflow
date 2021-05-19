@@ -120,21 +120,25 @@ function validate
 
 
   %% Long data series
-  rng(1,'twister')  % Init random seed
+  rng(5,'twister')  % Init random seed
   name              =  'long_series';
   class_count       =  100;
   class_offset      = -2025;
   class_width       =  50;
-  x                 =  valid_series_generator( class_offset, class_width, class_count, 40.5, 1e4, true );
-  x                 =  export_series( name, x, class_count, '%+ 5.0f' );
+  xx                =  valid_series_generator( class_offset, class_width, class_count, 40.5, 1e4, true );
+  xx                =  export_series( name, xx, class_count, '%+ 5.0f' );
+  x_int             =  int16(round(xx));
+  x                 =  double(x_int);
   hysteresis        =  class_width;
   enforce_margin    =  1;
   use_hcm           =  0;
-  residual_method   =  7;  % 0=RFC_RES_NONE, 7=RFC_RES_REPEATED
+  residual_method   =  0;  % 0=RFC_RES_NONE, 7=RFC_RES_REPEATED
   spread_damage     =  1;  % 0=RFC_SD_HALF_23, 1=RFC_SD_RAMP_AMPLITUDE_23
+  
+  assert( sum(abs(xx-x)) < 1e-4 );
 
   [pd,re,rm,rp,lc,tp,dh] = ...
-    rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
+    rfc( 'rfc', double(x_int), class_count, class_width, class_offset, hysteresis, ...
                 residual_method, enforce_margin, use_hcm, spread_damage );
 
   % With residuum:    pd == 1.167751604296875e-05
@@ -178,11 +182,11 @@ function validate
 
   disp( pd )
 
-  assert( strcmp( sprintf( '%.4e', pd ), '7.2918e-08' ) )
-  assert( sum( rm(:) ) == 731 );
-  assert( length(re) == 8 );
-  test = re ./ [42;-210;360;-1548;2193;-2000;2950;881];
-  test = abs( test - 1 );
+  assert( strcmp( sprintf( '%.4e', pd ), '1.1486e-07' ) )
+  assert( sum( rm(:) ) == 640 );
+  assert( length(re) == 10 );
+  test = re(:)' - [0,142,-609,2950,-2000,2159,1894,2101,1991,2061];
+  test = sum( abs( test ) );
   assert( all( test < 1e-3 ))
 
   if ~isempty( which( 'ftc2' ) )
@@ -190,7 +194,7 @@ function validate
                 'dilation', 0, 'hysteresis', class_width, 'residuum', 1 );
 
       assert( abs( pd / y.bkz - 1 ) < 1e-10 );
-      test = abs( y.residuum ./ re - 1 );
+      test = sum( abs( y.residuum(:) - re(:) ) );
       assert( all( test < 1e-1 ))
   end
 
