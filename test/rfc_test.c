@@ -367,7 +367,7 @@ TEST RFC_tp_prune_test( int ccnt )
     RFC_VALUE_TYPE      class_width;
     RFC_VALUE_TYPE      class_offset;
     RFC_VALUE_TYPE      hysteresis;
-    rfc_value_tuple_s   tp[DATA_LEN]           = {0};
+    rfc_value_tuple_s   tp[DATA_LEN]        = {0};
     size_t              i;
 
     if(1)
