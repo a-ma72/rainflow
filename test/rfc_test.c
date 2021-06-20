@@ -56,6 +56,7 @@
 #include <math.h>
 #include <float.h>
 #include <stddef.h>  /* offsetof */
+#include "long_series.h"
 
 
 #define ROUND(x)    ((x)>=0?(long)((x)+0.5):(long)((x)-0.5))
@@ -358,7 +359,7 @@ TEST RFC_lc_test( rfc_ctx_s *ctx, bool cond )
 
 TEST RFC_tp_prune_test( int ccnt )
 {
-    RFC_VALUE_TYPE      data[10000];
+    RFC_VALUE_TYPE      data[DATA_LEN];
     size_t              data_len;
     RFC_VALUE_TYPE      x_max;
     RFC_VALUE_TYPE      x_min;
@@ -366,14 +367,14 @@ TEST RFC_tp_prune_test( int ccnt )
     RFC_VALUE_TYPE      class_width;
     RFC_VALUE_TYPE      class_offset;
     RFC_VALUE_TYPE      hysteresis;
-    rfc_value_tuple_s   tp[10000]           = {0};
+    rfc_value_tuple_s   tp[DATA_LEN]           = {0};
     size_t              i;
 
     if(1)
     {
 #include "long_series.c"
 
-        ASSERT( data_length == 10000 );
+        ASSERT( data_length == DATA_LEN );
 
         data_len = data_length;
 
@@ -526,7 +527,7 @@ TEST RFC_tp_refeed_test( int ccnt )
 {
     const int           stepwidth[]         =  { 2, 3, 4, 5, 7, 11, 13, 137, 7, 0, 17, 233, 1777 };
     bool                failed              = false;
-    RFC_VALUE_TYPE      data[10000];
+    RFC_VALUE_TYPE      data[DATA_LEN];
     size_t              data_len;
     RFC_VALUE_TYPE      x_max;
     RFC_VALUE_TYPE      x_min;
@@ -547,7 +548,7 @@ TEST RFC_tp_refeed_test( int ccnt )
 
 #include "long_series.c"
 
-    ASSERT( data_length == 10000 );
+    ASSERT( data_length == DATA_LEN );
 
     for( i = 0; i < data_length; i++ )
     {
@@ -1230,7 +1231,7 @@ TEST RFC_long_series( int ccnt )
 {
     bool                need_conf           =  false;
     bool                do_result_check     =  true;
-    RFC_VALUE_TYPE      data[10000];
+    RFC_VALUE_TYPE      data[DATA_LEN];
     size_t              data_len;
     RFC_VALUE_TYPE      x_max;
     RFC_VALUE_TYPE      x_min;
@@ -1238,14 +1239,14 @@ TEST RFC_long_series( int ccnt )
     RFC_VALUE_TYPE      class_width;
     RFC_VALUE_TYPE      class_offset;
     RFC_VALUE_TYPE      hysteresis;
-    rfc_value_tuple_s   tp[10000]           = {0};
+    rfc_value_tuple_s   tp[DATA_LEN]        = {0};
     size_t              i;
 
     if(1)
     {
 #include "long_series.c"
 
-        ASSERT( data_length == 10000 );
+        ASSERT( data_length == DATA_LEN );
 
         data_len = data_length;
 
@@ -1460,25 +1461,25 @@ TEST RFC_long_series( int ccnt )
 
             /* Check matrix sum */
 #if RFC_USE_HYSTERESIS_FILTER
-            ASSERT_EQ( sum, 730.0 );
+            ASSERT_EQ( sum, 640.0 );
 #else /*RFC_USE_HYSTERESIS_FILTER*/
-            ASSERT_EQ( sum, 473.0 );
+            ASSERT_EQ( sum, 416.0 );
 #endif /*RFC_USE_HYSTERESIS_FILTER*/
             /* Check damage value */
 #if !RFC_MINIMAL
             /* Damage must equal to damage calculated in postprocess */
             ASSERT( RFC_damage_from_rp( &ctx, NULL /*rp*/, NULL /*Sa*/, &damage, RFC_RP_DAMAGE_CALC_METHOD_DEFAULT ) );
 #if RFC_USE_HYSTERESIS_FILTER
-            GREATEST_ASSERT_IN_RANGE( 7.29179e-08, damage, 0.00005e-08 );
+            GREATEST_ASSERT_IN_RANGE( 1.14856e-07, damage, 0.00005e-08 );
 #else /*RFC_USE_HYSTERESIS_FILTER*/
-            GREATEST_ASSERT_IN_RANGE( 7.29177e-08, damage, 0.00005e-08 );
+            GREATEST_ASSERT_IN_RANGE( 1.14856e-07, damage, 0.00005e-08 );
 #endif /*RFC_USE_HYSTERESIS_FILTER*/
             damage = 0.0;
             ASSERT( RFC_damage_from_rfm( &ctx, NULL /*rfm*/, &damage ) );
 #if RFC_USE_HYSTERESIS_FILTER
-            GREATEST_ASSERT_IN_RANGE( 7.29179e-08, damage, 0.00005e-08 );
+            GREATEST_ASSERT_IN_RANGE( 1.14856e-07, damage, 0.00005e-08 );
 #else /*RFC_USE_HYSTERESIS_FILTER*/
-            GREATEST_ASSERT_IN_RANGE( 7.29177e-08, damage, 0.00005e-08 );
+            GREATEST_ASSERT_IN_RANGE( 1.14856e-07, damage, 0.00005e-08 );
 #endif /*RFC_USE_HYSTERESIS_FILTER*/
 
             /* Check lc count */
@@ -1487,25 +1488,28 @@ TEST RFC_long_series( int ccnt )
 #endif /*!RFC_MINIMAL*/
             /* Check residue */
 #if RFC_USE_HYSTERESIS_FILTER
-            ASSERT_EQ( ctx.residue_cnt, 8 );
-            ASSERT_EQ_FMT( ctx.residue[0].value,    42.0, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[1].value,  -210.0, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[2].value,   360.0, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[3].value, -1548.0, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[4].value,  2193.0, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[5].value, -2000.0, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[6].value,  2950.0, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[7].value,   881.0, "%.2f" );
+            ASSERT_EQ( ctx.residue_cnt, 10 );
+            ASSERT_EQ_FMT( ctx.residue[0].value,     0.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[1].value,   142.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[2].value,  -609.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[3].value,  2950.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[4].value, -2000.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[5].value,  2159.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[6].value,  1894.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[7].value,  2101.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[8].value,  1991.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[9].value,  2061.0, "%.2f" );
 #else /*RFC_USE_HYSTERESIS_FILTER*/
-            ASSERT_EQ( ctx.residue_cnt, 8 );
-            ASSERT_EQ_FMT( ctx.residue[0].value,    42.0, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[1].value,  -210.0, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[2].value,   360.0, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[3].value, -1548.0, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[4].value,  2193.0, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[5].value, -2000.0, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[6].value,  2950.0, "%.2f" );
-            ASSERT_EQ_FMT( ctx.residue[7].value,   888.0, "%.2f" );
+            ASSERT_EQ( ctx.residue_cnt, 9 );
+            ASSERT_EQ_FMT( ctx.residue[0].value,     0.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[1].value,   142.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[2].value,  -606.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[3].value,  2950.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[4].value, -2000.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[5].value,  2143.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[6].value,  1905.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[7].value,  2097.0, "%.2f" );
+            ASSERT_EQ_FMT( ctx.residue[8].value,  2009.0, "%.2f" );
 #endif /*RFC_USE_HYSTERESIS_FILTER*/
 #if !RFC_MINIMAL
             /* Check matrix consistency */
@@ -2128,7 +2132,7 @@ TEST RFC_miner_consequent( void )
 
 TEST RFC_miner_consequent2( void )
 {
-    RFC_VALUE_TYPE      data[10000];
+    RFC_VALUE_TYPE      data[DATA_LEN];
     size_t              data_len;
     RFC_VALUE_TYPE      x_max;
     RFC_VALUE_TYPE      x_min;
@@ -2146,7 +2150,7 @@ TEST RFC_miner_consequent2( void )
 
 #include "long_series.c"
 
-    ASSERT( data_length == 10000 );
+    ASSERT( data_length == DATA_LEN );
 
     data_len = data_length;
 

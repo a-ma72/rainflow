@@ -243,7 +243,12 @@ function data = write_series( filename, data, format )
     fclose( fid );
   end
 
-  % Build include file
+  % Build include files
+  fid = fopen( [filename, '.h'], 'wt' );
+  if fid ~= -1
+      fprintf( fid, '#define DATA_LEN %d\n', length(data) );
+      fclose( fid );
+  end
   fid = fopen( [filename, '.c'], 'wt' );
   if fid ~= -1
       fprintf( fid, 'static double data_export[] = {\n' );
