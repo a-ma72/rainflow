@@ -141,8 +141,8 @@ function validate
     rfc( 'rfc', double(x_int), class_count, class_width, class_offset, hysteresis, ...
                 residual_method, enforce_margin, use_hcm, spread_damage );
 
-  % With residuum:    pd == 1.167751604296875e-05
-  % Without residuum: pd == 7.291794042968684e-08
+  % With residuum:    pd == 9.8934e-06 (repeated)
+  % Without residuum: pd == 1.1486e-07
   assert( abs( sum( tp(:,3) ) / pd - 1 ) < 1e-10 );
 
   save( name, 'rm', 're' );
