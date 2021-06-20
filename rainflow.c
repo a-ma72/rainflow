@@ -6655,7 +6655,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         size_t          i;
         bool            ok;
 
-        mxAssert( residual_method >= RFC_RES_NONE && residual_method <= RFC_RES_COUNT, 
+        mxAssert( residual_method >= 0 && residual_method < RFC_RES_COUNT, 
                   "Invalid residual method!" );
 
 #if !RFC_MINIMAL
