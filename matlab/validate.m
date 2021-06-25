@@ -23,8 +23,8 @@ function validate
   [class_width, ...
    class_offset]    =  class_param( x, class_count );
   hysteresis        =  class_width;
-  enforce_margin    =  0;
-  use_hcm           =  0;
+  enforce_margin    =  0;  % First and last data point may be excluded in tp
+  use_hcm           =  0;  % Use 4 point method, not HCM
   residual_method   =  0;
   spread_damage     =  0;
 
@@ -47,8 +47,8 @@ function validate
   [class_width, ...
    class_offset]    =  class_param( x, class_count );
   hysteresis        =  class_width * 0.99;
-  enforce_margin    =  0;
-  use_hcm           =  0;
+  enforce_margin    =  0;  % First and last data point may be excluded in tp
+  use_hcm           =  0;  % Use 4 point method, not HCM
   residual_method   =  0;
   spread_damage     =  0;
 
@@ -73,8 +73,8 @@ function validate
   [class_width, ...
    class_offset]    =  class_param( x, class_count );
   hysteresis        =  class_width * 0.99;
-  enforce_margin    =  0;
-  use_hcm           =  0;
+  enforce_margin    =  0;  % First and last data point may be excluded in tp
+  use_hcm           =  0;  % Use 4 point method, not HCM
   residual_method   =  0;
   spread_damage     =  0;
 
@@ -99,8 +99,8 @@ function validate
   [class_width, ...
    class_offset]    =  class_param( x, class_count );
   hysteresis        =  class_width;
-  enforce_margin    =  0;
-  use_hcm           =  0;
+  enforce_margin    =  0;  % First and last data point may be excluded in tp
+  use_hcm           =  0;  % Use 4 point method, not HCM
   residual_method   =  0;
   spread_damage     =  0;
 
@@ -130,8 +130,8 @@ function validate
   x_int             =  int16(round(xx));
   x                 =  double(x_int);
   hysteresis        =  class_width;
-  enforce_margin    =  1;
-  use_hcm           =  0;
+  enforce_margin    =  1;  % Enforce first and last data point included in tp
+  use_hcm           =  0;  % Use 4 point method, not HCM
   residual_method   =  0;  % 0=RFC_RES_NONE, 7=RFC_RES_REPEATED
   spread_damage     =  1;  % 0=RFC_SD_HALF_23, 1=RFC_SD_RAMP_AMPLITUDE_23
   
@@ -198,6 +198,63 @@ function validate
       assert( all( test < 1e-1 ))
   end
 
+  %% Compare with ASTM E 1049-85 (MATLAB)
+  if 0
+    enforce_margin    =  1;  % Enforce first and last data point included in tp
+    use_hcm           =  0;  % Use 4 point method, not HCM
+    residual_method   =  4;  % 4=ASTM related
+    spread_damage     =  0;  % 0=RFC_SD_HALF_23, 1=RFC_SD_RAMP_AMPLITUDE_23
+    class_count       =  100;
+    class_width       =  50;
+    class_offset      = -2025;
+    hysteresis        =  class_width;
+
+    if 1
+      load long_series_csv.mat
+    else
+      x_int             = [2,5,3,6,2,4,1,6,1,4,1,5,3,6,3,6,1,5,2];
+      x_max             =  max(x_int)+0.5;
+      x_min             =  min(x_int)-0.5;
+      class_width       =  1;
+      class_offset      =  x_min;
+      hysteresis        =  0;
+      class_count       =  (x_max - x_min) / class_width;
+    end
+
+   residual_method = 7; % 7=repeated
+   [pd7,re7,rm7,rp7,lc7,tp7] = ...
+      rfc( 'rfc', double(x_int), class_count, class_width, class_offset, hysteresis, ...
+                  residual_method, enforce_margin, use_hcm, spread_damage );
+
+   residual_method = 4;  % 4=ASTM related
+   [pd4,re4,rm4,rp4,lc4,tp4] = ...
+      rfc( 'rfc', double(x_int), class_count, class_width, class_offset, hysteresis, ...
+                  residual_method, enforce_margin, use_hcm, spread_damage );
+
+    % MATLAB - Rainflow counts for fatigue analysis (according to ASTM 1049)
+    c = rainflow( tp4(:,2), 'ext' );
+    edges = (0:class_count) .* class_width;
+    [~,bin] = histc( c(:,2), edges );
+    N = accumarray( bin, c(:,1) );
+    N(class_count+1) = 0;
+    N = N(1:class_count);
+    Range = (edges(1:end-1)+edges(2:end)) / 2;
+    pd_astm = sum( N(:)' ./ (1e7*(Range/2/1e3).^-5) );
+
+    figure
+    plot( cumsum(N,  'reverse'),  edges(1:end-1), 'r-',  'Disp', '3-point method, ASTM E 1049-85' ), hold all
+    plot( cumsum(rp4, 'reverse'), edges(1:end-1), 'k--', 'Disp', '4-point method, res=half cycles' ), hold all
+    plot( cumsum(rp7, 'reverse'), edges(1:end-1), 'g--', 'Disp', '4-point method, res=repeated' ), hold all
+    set( gca, 'XScale', 'log' );
+    set( gca, 'YScale', 'log' );
+    xlim( [0.9 1e3] );
+    xlabel( 'Counts' );
+    ylabel( 'Range (normalized, prepared)' );
+    grid
+    legend
+    fprintf( 'Damage ratio 4pt,repeated vs. ASTM: %g%%\n', pd7/pd_astm );
+  end
+  
   %% Long series, turning points only
   y = rfc( 'turningpoints', x, class_width*2, enforce_margin );
   figure
@@ -205,6 +262,7 @@ function validate
   hold all
   plot( y(2,:), y(1,:), 'r--', 'DisplayName', 'turning points' );
   legend( 'show' );
+
 end
 
 function rounded_data = export_series( filename, data, class_count, format )

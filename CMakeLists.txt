@@ -97,7 +97,7 @@ if( RFC_EXPORT_MEX )
     if( NOT Matlab_ROOT_DIR )
         set( Matlab_ROOT_DIR /appl/matlab/2017b )
     endif()
-    find_package( Matlab ${VERSION_MATLAB} EXACT COMPONENTS MX_LIBRARY MAIN_PROGRAM )
+    find_package( Matlab ${VERSION_MATLAB} COMPONENTS MX_LIBRARY MAIN_PROGRAM )
 
     if( MATLAB_FOUND )
         message( STATUS "MATLAB Found, MATLAB MEX will be compiled." )

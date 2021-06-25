@@ -6866,7 +6866,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                     size_t i;
                     for( i = 0; i < class_count; i++ )
                     {
-                        *ptr++ = (double)rfc_ctx.rp[i];
+                        *ptr++ = (double)rfc_ctx.rp[i] / rfc_ctx.curr_inc;
                     }
                     plhs[3] = rp;
                 }

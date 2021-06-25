@@ -111,7 +111,7 @@
 #define RFC_VALUE_TYPE double
 #endif /*RFC_VALUE_TYPE*/
 
-#ifdef RFC_USE_INTEGRAL_COUNTS
+#if RFC_USE_INTEGRAL_COUNTS
 #define RFC_COUNTS_VALUE_TYPE    unsigned long long
 #define RFC_FULL_CYCLE_INCREMENT (2)
 #define RFC_HALF_CYCLE_INCREMENT (1)
@@ -347,7 +347,7 @@ enum rfc_res_method
     RFC_RES_NO_FINALIZE             = 2,                            /**< Don't finalize the data stream */
 #if !RFC_MINIMAL
     RFC_RES_DISCARD                 = 3,                            /**< Discard residue (empty residue) */
-    RFC_RES_HALFCYCLES              = 4,                            /**< ASTM */
+    RFC_RES_HALFCYCLES              = 4,                            /**< Related to ASTM, count as half cycles */
     RFC_RES_FULLCYCLES              = 5,                            /**< Count half cycles as full cycles */
     RFC_RES_CLORMANN_SEEGER         = 6,                            /**< Clormann/Seeger method */
     RFC_RES_REPEATED                = 7,                            /**< Repeat residue and count closed cycles */
