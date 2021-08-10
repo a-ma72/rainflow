@@ -1,7 +1,7 @@
 
 /* Using Rainflow C-Library in a C++ context */
 
-#include "../rainflow.h"
+#include "../src/rainflow.h"
 #include "../greatest/greatest.h"
 
 

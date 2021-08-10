@@ -1,6 +1,11 @@
 /build
-
 rainflow\.sublime-project
-
 rainflow\.sublime-workspace
 /sf
+/python/__pycache__
+/python/build
+/python/venv
+/python/dist
+/python/pyrfc*
+/python/MANIFEST
+/src/config.h

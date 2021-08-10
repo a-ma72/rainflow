@@ -9,6 +9,7 @@
   #define RFC_MINIMAL                ${RFC_MINIMAL}
   #define RFC_TP_SUPPORT             ${RFC_TP_SUPPORT}
   #define RFC_HCM_SUPPORT            ${RFC_HCM_SUPPORT}
+  #define RFC_ASTM_SUPPORT           ${RFC_ASTM_SUPPORT}
   #define RFC_USE_DELEGATES          ${RFC_USE_DELEGATES}
   #define RFC_GLOBAL_EXTREMA         ${RFC_GLOBAL_EXTREMA}
   #define RFC_DAMAGE_FAST            ${RFC_DAMAGE_FAST}

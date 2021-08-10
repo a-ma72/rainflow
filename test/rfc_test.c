@@ -50,7 +50,7 @@
 #define GREATEST_FPRINTF fprintf
 #define RFC_VALUE_TYPE   double
 
-#include "../rainflow.h"
+#include "../src/rainflow.h"
 #include "../greatest/greatest.h"
 #include <locale.h>
 #include <math.h>

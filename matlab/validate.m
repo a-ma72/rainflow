@@ -25,18 +25,18 @@ function validate
   hysteresis        =  class_width;
   enforce_margin    =  0;  % First and last data point may be excluded in tp
   use_hcm           =  0;  % Use 4 point method, not HCM
+  use_astm          =  0;  % Use 4 point method, not ASTM
   residual_method   =  0;
   spread_damage     =  0;
 
   [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
-                          residual_method, enforce_margin, use_hcm, spread_damage );
+                          residual_method, enforce_margin, use_hcm, use_astm, spread_damage );
 
   assert( sum( sum( rm ) ) == 0 );
 
   assert( isempty(re) );
 
   save( name, 'rm', 're' );
-
 
   %% One single cycle (up)
   name              =  'one_cycle_up';
@@ -49,11 +49,12 @@ function validate
   hysteresis        =  class_width * 0.99;
   enforce_margin    =  0;  % First and last data point may be excluded in tp
   use_hcm           =  0;  % Use 4 point method, not HCM
+  use_astm          =  0;  % Use 4 point method, not ASTM
   residual_method   =  0;
   spread_damage     =  0;
 
   [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
-                          residual_method, enforce_margin, use_hcm, spread_damage );
+                          residual_method, enforce_margin, use_hcm, use_astm, spread_damage );
 
   assert( sum( sum( rm ) ) == 1 );
   assert( rm( 3,2 ) == 1 );
@@ -62,24 +63,23 @@ function validate
 
   save( name, 'rm', 're' );
 
-
   %% One single cycle (down)
   name              =  'one_cycle_down';
   class_count       =  4;
   x                 =  export_series( name, [4,2,3,1], class_count );
   x_max             =  4;
   x_min             =  1;
-  class_count       =  4;
   [class_width, ...
    class_offset]    =  class_param( x, class_count );
   hysteresis        =  class_width * 0.99;
   enforce_margin    =  0;  % First and last data point may be excluded in tp
   use_hcm           =  0;  % Use 4 point method, not HCM
+  use_astm          =  0;  % Use 4 point method, not ASTM
   residual_method   =  0;
   spread_damage     =  0;
 
   [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
-                          residual_method, enforce_margin, use_hcm, spread_damage );
+                          residual_method, enforce_margin, use_hcm, use_astm, spread_damage );
 
   assert( sum( sum( rm ) ) == 1 );
   assert( rm( 2,3 ) == 1 );
@@ -87,7 +87,6 @@ function validate
   assert( isequal( re, [4;1] ) );
 
   save( name, 'rm', 're' );
-
 
   %% Small example, taken from url:
   % [https://community.plm.automation.siemens.com/t5/Testing-Knowledge-Base/Rainflow-Counting/ta-p/383093]
@@ -101,11 +100,12 @@ function validate
   hysteresis        =  class_width;
   enforce_margin    =  0;  % First and last data point may be excluded in tp
   use_hcm           =  0;  % Use 4 point method, not HCM
+  use_astm          =  0;  % Use 4 point method, not ASTM
   residual_method   =  0;
   spread_damage     =  0;
 
   [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
-                          residual_method, enforce_margin, use_hcm, spread_damage );
+                          residual_method, enforce_margin, use_hcm, use_astm, spread_damage );
 
   assert( sum( sum( rm ) ) == 7 );
   assert( rm( 5,3 ) == 2 );
@@ -117,7 +117,6 @@ function validate
   assert( isequal(re,[2;6;1;5;2] ) );
 
   save( name, 'rm', 're' );
-
 
   %% Long data series
   rng(5,'twister')  % Init random seed
@@ -132,6 +131,7 @@ function validate
   hysteresis        =  class_width;
   enforce_margin    =  1;  % Enforce first and last data point included in tp
   use_hcm           =  0;  % Use 4 point method, not HCM
+  use_astm          =  0;  % Use 4 point method, not ASTM
   residual_method   =  0;  % 0=RFC_RES_NONE, 7=RFC_RES_REPEATED
   spread_damage     =  1;  % 0=RFC_SD_HALF_23, 1=RFC_SD_RAMP_AMPLITUDE_23
   
@@ -139,7 +139,7 @@ function validate
 
   [pd,re,rm,rp,lc,tp,dh] = ...
     rfc( 'rfc', double(x_int), class_count, class_width, class_offset, hysteresis, ...
-                residual_method, enforce_margin, use_hcm, spread_damage );
+                residual_method, enforce_margin, use_hcm, use_astm, spread_damage );
 
   % With residuum:    pd == 9.8934e-06 (repeated)
   % Without residuum: pd == 1.1486e-07
@@ -159,7 +159,7 @@ function validate
 
   [pd,re,rm,rp,lc,tp,dh] = ...
     rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
-                residual_method, enforce_margin, use_hcm, spread_damage );
+                residual_method, enforce_margin, use_hcm, use_astm, spread_damage );
 
   assert( abs( sum( dh ) / pd - 1 ) < 1e-10 );
   hold( ax(2), 'all' );
@@ -202,10 +202,11 @@ function validate
   if 0
     enforce_margin    =  1;  % Enforce first and last data point included in tp
     use_hcm           =  0;  % Use 4 point method, not HCM
+    use_astm          =  0;  % Use 4 point method, not ASTM
     residual_method   =  4;  % 4=ASTM related
     spread_damage     =  0;  % 0=RFC_SD_HALF_23, 1=RFC_SD_RAMP_AMPLITUDE_23
-    class_count       =  100;
-    class_width       =  50;
+    class_count       =  1000;
+    class_width       =  5;
     class_offset      = -2025;
     hysteresis        =  class_width;
 
@@ -224,15 +225,21 @@ function validate
    residual_method = 7; % 7=repeated
    [pd7,re7,rm7,rp7,lc7,tp7] = ...
       rfc( 'rfc', double(x_int), class_count, class_width, class_offset, hysteresis, ...
-                  residual_method, enforce_margin, use_hcm, spread_damage );
+                  residual_method, enforce_margin, use_hcm, use_astm, spread_damage );
 
    residual_method = 4;  % 4=ASTM related
    [pd4,re4,rm4,rp4,lc4,tp4] = ...
       rfc( 'rfc', double(x_int), class_count, class_width, class_offset, hysteresis, ...
-                  residual_method, enforce_margin, use_hcm, spread_damage );
+                  residual_method, enforce_margin, use_hcm, use_astm, spread_damage );
 
-    % MATLAB - Rainflow counts for fatigue analysis (according to ASTM 1049)
-    c = rainflow( tp4(:,2), 'ext' );
+   use_astm = 1; % Use ASTM algorithm
+   residual_method = 4;  % 4=ASTM related
+   [pd4a,re4a,rm4a,rp4a,lc4a,tp4a] = ...
+      rfc( 'rfc', double(x_int), class_count, class_width, class_offset, hysteresis, ...
+                  residual_method, enforce_margin, use_hcm, use_astm, spread_damage );
+
+    % MATLAB - Rainflow counts for fatigue analysis (according to ASTM E 1049)
+    c = rainflow( tp4a(:,2), 'ext' );
     edges = (0:class_count) .* class_width;
     [~,bin] = histc( c(:,2), edges );
     N = accumarray( bin, c(:,1) );
@@ -242,9 +249,10 @@ function validate
     pd_astm = sum( N(:)' ./ (1e7*(Range/2/1e3).^-5) );
 
     figure
-    plot( cumsum(N,  'reverse'),  edges(1:end-1), 'r-',  'Disp', '3-point method, ASTM E 1049-85' ), hold all
-    plot( cumsum(rp4, 'reverse'), edges(1:end-1), 'k--', 'Disp', '4-point method, res=half cycles' ), hold all
-    plot( cumsum(rp7, 'reverse'), edges(1:end-1), 'g--', 'Disp', '4-point method, res=repeated' ), hold all
+    plot( cumsum(rp7,  'reverse'), edges(1:end-1), 'g-',  'Disp', '4-point method, res=repeated' ), hold all
+    plot( cumsum(rp4,  'reverse'), edges(1:end-1), 'k--', 'Disp', '4-point method, res=half cycles' ), hold all
+    plot( cumsum(rp4a, 'reverse'), edges(1:end-1), 'b--', 'Disp', '3-point method, ASTM E 1049-85, res=half cycles' ), hold all
+    plot( cumsum(N,    'reverse'), edges(1:end-1), 'r-',  'Disp', '3-point method, ASTM E 1049-85 (MATLAB)' ), hold all
     set( gca, 'XScale', 'log' );
     set( gca, 'YScale', 'log' );
     xlim( [0.9 1e3] );
