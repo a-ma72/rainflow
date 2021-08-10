@@ -1,0 +1,4 @@
+*.c linguist-detectable=true
+*.hpp linguist-detectable=false
+*.cpp linguist-detectable=false
+*.m linguist-detectable=false
