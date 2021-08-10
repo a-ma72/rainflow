@@ -105,13 +105,15 @@
 /* This version is generated via coan (http://coan2.sourceforge.net/) */
 #endif /*COAN_INVOKED*/
 
+#if RFC_HAVE_CONFIG_H
 #include "config.h"  /* Configuration */
+#endif
 
 #ifndef RFC_VALUE_TYPE
 #define RFC_VALUE_TYPE double
 #endif /*RFC_VALUE_TYPE*/
 
-#ifdef RFC_USE_INTEGRAL_COUNTS
+#if RFC_USE_INTEGRAL_COUNTS
 #define RFC_COUNTS_VALUE_TYPE    unsigned long long
 #define RFC_FULL_CYCLE_INCREMENT (2)
 #define RFC_HALF_CYCLE_INCREMENT (1)
@@ -145,6 +147,9 @@
 #ifndef RFC_HCM_SUPPORT
 #define RFC_HCM_SUPPORT OFF
 #endif /*RFC_HCM_SUPPORT*/
+#ifndef RFC_ASTM_SUPPORT
+#define RFC_ASTM_SUPPORT OFF
+#endif /*RFC_ASTM_SUPPORT*/
 #ifndef RFC_TP_SUPPORT
 #define RFC_TP_SUPPORT ON
 #endif /*RFC_TP_SUPPORT*/
@@ -309,7 +314,7 @@ enum rfc_error
     RFC_ERROR_UNSUPPORTED           =  2,                           /**< Unsupported feature */
     RFC_ERROR_MEMORY                =  3,                           /**< Error on memory allocation */
 #if RFC_TP_SUPPORT
-    RFC_ERROR_TP                    =  4,                           /**< Error while amplitude transformation */
+    RFC_ERROR_TP                    =  4,                           /**< Error while processing turning points */
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_AT_SUPPORT
     RFC_ERROR_AT                    =  5,                           /**< Error while amplitude transformation */
@@ -334,6 +339,9 @@ enum rfc_counting_method
 #if RFC_HCM_SUPPORT
     RFC_COUNTING_METHOD_HCM         =  2,                           /**< 3 point algorithm, Clormann/Seeger (HCM) method */
 #endif /*RFC_HCM_SUPPORT*/
+#if RFC_ASTM_SUPPORT
+    RFC_COUNTING_METHOD_ASTM        =  3,                           /**< 3 point algorithm,  ASTM E1049-85 */
+#endif /*RFC_ASTM_SUPPORT*/
     RFC_COUNTING_METHOD_COUNT                                       /**< Number of options */
 };
 #endif /*!RFC_MINIMAL*/
@@ -347,7 +355,7 @@ enum rfc_res_method
     RFC_RES_NO_FINALIZE             = 2,                            /**< Don't finalize the data stream */
 #if !RFC_MINIMAL
     RFC_RES_DISCARD                 = 3,                            /**< Discard residue (empty residue) */
-    RFC_RES_HALFCYCLES              = 4,                            /**< ASTM */
+    RFC_RES_HALFCYCLES              = 4,                            /**< Related to ASTM, count as half cycles */
     RFC_RES_FULLCYCLES              = 5,                            /**< Count half cycles as full cycles */
     RFC_RES_CLORMANN_SEEGER         = 6,                            /**< Clormann/Seeger method */
     RFC_RES_REPEATED                = 7,                            /**< Repeat residue and count closed cycles */
@@ -407,7 +415,7 @@ typedef     struct      rfc_rfm_item            rfc_rfm_item_s;             /** 
 #endif /*!RFC_MINIMAL*/
 
 /* Memory allocation functions typedef */
-typedef     void *   ( *rfc_mem_alloc_fcn_t )   ( void *, size_t num, size_t size, rfc_mem_aim_e aim );     /** Memory allocation functor */
+typedef     void *   ( *rfc_mem_alloc_fcn_t )   ( void *, size_t num, size_t size, int aim );     /** Memory allocation functor */
 
 #ifdef __cplusplus
 extern "C" {
@@ -450,6 +458,7 @@ bool        RFC_lc_from_rfm             ( const void *ctx, rfc_counts_t *lc, rfc
 bool        RFC_lc_from_residue         ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, rfc_flags_e flags );
 bool        RFC_rp_get                  ( const void *ctx, rfc_counts_t *rp, rfc_value_t *Sa );
 bool        RFC_rp_from_rfm             ( const void *ctx, rfc_counts_t *rp, rfc_value_t *Sa, const rfc_counts_t *rfm );
+bool        RFC_damage                  ( const void *ctx, rfc_value_t *damage, rfc_value_t *damage_residue );
 bool        RFC_damage_from_rp          ( const void *ctx, const rfc_counts_t *counts, const rfc_value_t *Sa, double *damage, rfc_rp_damage_method_e rp_calc_type );
 bool        RFC_damage_from_rfm         ( const void *ctx, const rfc_counts_t *rfm, double *damage );
 bool        RFC_wl_calc_sx              ( const void *ctx, double s0, double n0, double k, double *sx, double nx, double  k2, double  sd, double nd );
@@ -464,6 +473,10 @@ bool        RFC_class_param_get         ( const void *ctx, rfc_class_param_s * )
 bool        RFC_class_number            ( const void *ctx, rfc_value_t value, unsigned *class_number );
 bool        RFC_class_mean              ( const void *ctx, unsigned class_number, rfc_value_t *class_mean );
 bool        RFC_class_upper             ( const void *ctx, unsigned class_number, rfc_value_t *class_upper );
+bool        RFC_class_count             ( const void *ctx, unsigned *class_count );
+bool        RFC_class_offset            ( const void *ctx, rfc_value_t *class_offset );
+bool        RFC_class_width             ( const void *ctx, rfc_value_t *class_width );
+bool        RFC_hysteresis              ( const void *ctx, rfc_value_t *hysteresis );
 bool        RFC_flags_set               (       void *ctx, int flags, int stack, bool overwrite );
 bool        RFC_flags_unset             (       void *ctx, int flags, int stack );
 bool        RFC_flags_get               ( const void *ctx, int *flags, int stack );
@@ -475,9 +488,10 @@ bool        RFC_tp_prune                (       void *ctx, size_t count, rfc_fla
 bool        RFC_tp_refeed               (       void *ctx, rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param );
 bool        RFC_tp_clear                (       void *ctx );
 #endif /*RFC_TP_SUPPORT*/
-
+bool        RFC_res_get                 ( const void *ctx, const rfc_value_tuple_s **residue, unsigned *count );
 #if RFC_DH_SUPPORT
 bool        RFC_dh_init                 (       void *ctx, rfc_sd_method_e method, double *dh, size_t dh_cap, bool is_static );
+bool        RFC_dh_get                  ( const void *ctx, const double **dh, size_t *count );
 #endif /*RFC_DH_SUPPORT*/
 
 #if RFC_AT_SUPPORT
@@ -704,7 +718,7 @@ struct rfc_ctx
     double                             *amplitude_lut;              /**< Amplitude look-up table, only valid if damage_lut_inapt = 0 */
 #endif /*RFC_AT_SUPPORT*/
 #endif /*RFC_DAMAGE_FAST*/
-    double                              damage;                     /**< Cumulated damage */
+    double                              damage;                     /**< Cumulated damage (damage resulting from residue included) */
     double                              damage_residue;             /**< Partial damage in .damage influenced by taking residue into account (after finalizing) */
 
 #if RFC_AT_SUPPORT

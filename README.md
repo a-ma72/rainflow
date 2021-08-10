@@ -1,4 +1,4 @@
-## Rainflow Counting Algorithm (4-point-method), C99 compliant
+## Rainflow Counting Algorithm (4-point-methods), C99 compliant
   
 ### "Rainflow Counting" consists of four main steps:
 
@@ -17,7 +17,7 @@
 
 These steps are fully documented in standards such as  
 ASTM E1049 "Standard Practices for Cycle Counting in Fatigue Analysis" [1]  
-This implementation uses the 4-point algorithm mentioned in [3,4] and the 3-point HCM method proposed in [2]  
+This implementation uses the 4-point algorithm mentioned in [3,4] and the 3-point HCM method proposed in [2] as well as the ASTM E 1049 (2011) standard in [1].
 To take the residue into account, you may implement a custom method or use some
 predefined functions.
  

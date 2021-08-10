@@ -22,7 +22,7 @@ endif()
 # Project name and version
 project( rainflow )
 set( RFC_VERSION_MAJOR "0" )
-set( RFC_VERSION_MINOR "4" )
+set( RFC_VERSION_MINOR "5" )
 
 
 # Build type and compiler selection
@@ -53,6 +53,7 @@ if( CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR )
     option( RFC_USE_DELEGATES          "Use delegates (functors)" ON )
     option( RFC_GLOBAL_EXTREMA         "Always calculate global extrema" ON )
     option( RFC_HCM_SUPPORT            "Support HCM (Clormann/Seeger) algorithm" ON )
+    option( RFC_ASTM_SUPPORT           "Support ASTM E 1049-85 algorithm" ON )
     option( RFC_TP_SUPPORT             "Support turning points" ON )
     option( RFC_DH_SUPPORT             "Support \"spread damage\" over turning points and damage history" ON )
     option( RFC_AT_SUPPORT             "Support amplitude transformation regarding mean load influence on fatigue strength" ON )
@@ -64,10 +65,13 @@ else()
     message( STATUS "Build ${PROJECT_NAME} as subsequent project")
 endif()
 
+# Save options in configuration file
+add_definitions( -DRFC_HAVE_CONFIG_H )
+configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/src/config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/src/config.h )
+
 
 if( CMAKE_BUILD_TYPE MATCHES DEBUG )
 endif()
-
 
 # Compiler dependencies
 if( MSVC )
@@ -84,9 +88,6 @@ if( NOT LIBM_LIBRARY )
     set( LIBM_LIBRARY "" )
 endif()
 
-
-# Configuration file
-configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/config.h )
 
 # MATLAB
 if( RFC_EXPORT_MEX )
@@ -124,7 +125,7 @@ if( RFC_EXPORT_MEX )
     include_directories( ${Matlab_INCLUDE_DIRS} )
 
     # MEX function (MATLAB)
-    matlab_add_mex( NAME ${PROJECT_NAME} SRC rainflow.c OUTPUT_NAME rfc )
+    matlab_add_mex( NAME ${PROJECT_NAME} SRC src/rainflow.c OUTPUT_NAME rfc )
     target_compile_definitions( ${PROJECT_NAME} PRIVATE MATLAB_MEX_FILE _SCL_SECURE_NO_WARNINGS )
     target_link_libraries( ${PROJECT_NAME} ${Matlab_LIBRARIES} ${LIBM_LIBRARY} )
     # install to /bin by default
@@ -132,12 +133,12 @@ if( RFC_EXPORT_MEX )
 endif()
 
 # Static rainflow library
-add_library( rfc STATIC rainflow.c )
+add_library( rfc STATIC src/rainflow.c )
 target_link_libraries( rfc ${LIBM_LIBRARY} )
 
 # Test application, start project for MSVC
 if( RFC_TEST )
-    add_executable( rfc_test rainflow.c test/rfc_test.c test/rfc_wrapper_simple.cpp test/rfc_wrapper_advanced.cpp )
+    add_executable( rfc_test src/rainflow.c test/rfc_test.c test/rfc_wrapper_simple.cpp test/rfc_wrapper_advanced.cpp )
     target_compile_definitions( rfc_test PRIVATE _SCL_SECURE_NO_WARNINGS )
     target_link_libraries( rfc_test ${LIBM_LIBRARY} )
     target_sources( rfc_test PUBLIC greatest/greatest.h )
