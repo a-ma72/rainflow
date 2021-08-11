@@ -13,7 +13,7 @@ def main():
     with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
         long_description = f.read()
 
-    setup(name="pyrfc",
+    setup(name="rfcnt",
           version="%d.%d.%d" % version,
           description="Python interface for rainflow counting",
           long_description=long_description,
@@ -23,12 +23,12 @@ def main():
           license='BSD-2-Clause License',
           url='http://github.com/AndreasMartin72/rainflow',
           install_requires=['numpy'],
-          py_modules=["pyrfc.utils", "pyrfc.examples"],
-          packages=["pyrfc", "pyrfc.test"],
-          package_dir={"pyrfc": "", "pyrfc.test": "test"},
-          package_data={"pyrfc": ["run_examples.py", "run_tests.py", "requirements.txt", "README.md"],
-                        "pyrfc.test": ["long_series.csv"]},
-          ext_modules=[Extension("pyrfc.pyrfc", ["src/pyrfc.cpp", "src/rainflow.c"],
+          py_modules=["rfcnt.utils", "rfcnt.examples"],
+          packages=["rfcnt", "rfcnt.tests"],
+          package_dir={"rfcnt": "", "rfcnt.tests": "tests"},
+          package_data={"rfcnt": ["run_examples.py", "run_tests.py", "requirements.txt", "README.md", "LICENSE"],
+                        "rfcnt.tests": ["long_series.csv"]},
+          ext_modules=[Extension("rfcnt.rfcnt", ["src/rfcnt.cpp", "src/rainflow.c"],
                        define_macros=[
                             ('NPY_NO_DEPRECATED_API',     'NPY_1_7_API_VERSION'),
                             ('RFC_HAVE_CONFIG_H',         '0'),
@@ -62,7 +62,7 @@ def main():
               'Operating System :: MacOS :: MacOS X',
               'Operating System :: Microsoft :: Windows',
               'Operating System :: POSIX',
-              'Programming Language :: Python : 3',
+              'Programming Language :: Python :: 3',
               'Programming Language :: C++',
               'Programming Language :: C',
               'Topic :: Scientific/Engineering',

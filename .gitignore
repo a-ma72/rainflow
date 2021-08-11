@@ -6,6 +6,6 @@ rainflow\.sublime-workspace
 /python/build
 /python/venv
 /python/dist
-/python/pyrfc*
+/python/rfcnt*
 /python/MANIFEST
 /src/config.h

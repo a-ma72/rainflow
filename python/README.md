@@ -1,4 +1,4 @@
-## **pyrfc** a rainflow counting algorithm Python package
+## **rfcnt** a rainflow counting algorithm Python package
   
 ### "Rainflow Counting" consists of four main steps:
 
@@ -22,13 +22,13 @@ To take the residue into account, you may implement a custom method or use some
 predefined functions.
  
 ### Install
-    pip install _{packagename}_.tar.gz
+    pip install {packagename}.tar.gz
 where _{packagename}_ is the current package release, for example:
 
-    pip install pyrfc-0.1.0.tar.gz
+    pip install rfcnt-0.1.0.tar.gz
 
 ### Test
-_pyrfc_ packages include some unit tests, which can be run:
+_rfcnt_ packages include some unit tests, which can be run:
 
     python run_tests.py
     

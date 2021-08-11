@@ -1,4 +1,4 @@
-from pyrfc.test import test
+from rfcnt.tests import test_rfcnt
 from unittest.case import TestCase
 import unittest
 from io import StringIO
@@ -6,7 +6,7 @@ from pprint import pprint
 
 stream = StringIO()
 runner = unittest.TextTestRunner(stream=stream)
-result = runner.run(unittest.makeSuite(test.TestRainflowCounting))
+result = runner.run(unittest.makeSuite(test_rfcnt.TestRainflowCounting))
 print( 'Tests run ', result.testsRun )
 print( 'Errors ', result.errors )
 pprint(result.failures)

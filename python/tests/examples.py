@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from pyrfc import pyrfc, utils # Rainflow module (ftc2)
+from rfcnt import rfcnt, utils # Rainflow module (ftc2)
 import os
 import sys
 
@@ -18,7 +18,7 @@ def example_1():
     class_width = class_range / (class_count - 1)
     class_offset = data.min() - class_width / 2
 
-    res = pyrfc.rfc(data, class_count=class_count, 
+    res = rfcnt.rfc(data, class_count=class_count, 
                           class_offset=class_offset, 
                           class_width=class_width, 
                           hysteresis=class_width,

@@ -1,4 +1,4 @@
-project(pyrfc)
+project(rfcnt)
 
 # Find Python 3
 find_package(Python3 COMPONENTS Interpreter Development)
@@ -13,6 +13,6 @@ if(NUMPY_NOT_FOUND)
     message(FATAL_ERROR "NumPy headers not found")
 endif()
 
-add_library(pyrfc SHARED pyrfc.cpp)
-target_include_directories(pyrfc PRIVATE ${_Python3_INCLUDE_DIR})
-target_link_libraries(pyrfc PRIVATE ${_Python3_LIBRARY_RELEASE})
+add_library(rfcnt SHARED rfcnt.cpp)
+target_include_directories(rfcnt PRIVATE ${_Python3_INCLUDE_DIR})
+target_link_libraries(rfcnt PRIVATE ${_Python3_LIBRARY_RELEASE})

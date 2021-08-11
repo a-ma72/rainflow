@@ -420,7 +420,7 @@ PyMethodDef method_table[] = {
 // A struct contains the definition of a module
 PyModuleDef mymath_module = {
     PyModuleDef_HEAD_INIT,
-    "pyrfc", // Module name
+    "rfcnt", // Module name
     "Rainflow counting module",
     -1,   // Optional size of the module state memory
     method_table,
@@ -432,7 +432,7 @@ PyModuleDef mymath_module = {
 
 
 // The module init function
-PyMODINIT_FUNC PyInit_pyrfc(void) {
+PyMODINIT_FUNC PyInit_rfcnt(void) {
     PyObject* mod = PyModule_Create(&mymath_module);
     // Initialize numpy
     import_array();

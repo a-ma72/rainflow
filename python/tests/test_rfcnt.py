@@ -1,6 +1,6 @@
 import os
 import unittest
-from pyrfc import pyrfc
+from rfcnt import rfcnt
 import numpy as np
 import pandas as pd
 
@@ -37,7 +37,7 @@ class TestRainflowCounting(unittest.TestCase):
         residual_method   =  0  # No processing on residue
         spread_damage     =  0  # No damage spreading
   
-        res = pyrfc.rfc( x, class_count=class_count, 
+        res = rfcnt.rfc( x, class_count=class_count, 
                             class_width=class_width,
                             class_offset=class_offset, 
                             hysteresis=hysteresis,
@@ -64,7 +64,7 @@ class TestRainflowCounting(unittest.TestCase):
         residual_method   =  0  # No processing on residue
         spread_damage     =  0  # No damage spreading
 
-        res = pyrfc.rfc( x, class_count=class_count, 
+        res = rfcnt.rfc( x, class_count=class_count, 
                             class_width=class_width,
                             class_offset=class_offset, 
                             hysteresis=hysteresis,
@@ -92,7 +92,7 @@ class TestRainflowCounting(unittest.TestCase):
         residual_method   =  0  # No processing on residue
         spread_damage     =  0  # No damage spreading
 
-        res = pyrfc.rfc( x, class_count=class_count, 
+        res = rfcnt.rfc( x, class_count=class_count, 
                             class_width=class_width,
                             class_offset=class_offset, 
                             hysteresis=hysteresis,
@@ -120,7 +120,7 @@ class TestRainflowCounting(unittest.TestCase):
         residual_method   =  0  # No processing on residue
         spread_damage     =  0  # No damage spreading
 
-        res = pyrfc.rfc( x, class_count=class_count, 
+        res = rfcnt.rfc( x, class_count=class_count, 
                             class_width=class_width,
                             class_offset=class_offset, 
                             hysteresis=hysteresis,
@@ -153,7 +153,7 @@ class TestRainflowCounting(unittest.TestCase):
         residual_method   =  0  # 0=RFC_RES_NONE, 7=RFC_RES_REPEATED
         spread_damage     =  1  # 0=RFC_SD_HALF_23, 1=RFC_SD_RAMP_AMPLITUDE_23
 
-        res = pyrfc.rfc( x, class_count=class_count, 
+        res = rfcnt.rfc( x, class_count=class_count, 
                             class_width=class_width,
                             class_offset=class_offset, 
                             hysteresis=hysteresis,
@@ -169,7 +169,7 @@ class TestRainflowCounting(unittest.TestCase):
 
         spread_damage = 8;  # 7=RFC_SD_TRANSIENT_23, 8=RFC_SD_TRANSIENT_23c
 
-        res = pyrfc.rfc( x, class_count=class_count, 
+        res = rfcnt.rfc( x, class_count=class_count, 
                             class_width=class_width,
                             class_offset=class_offset, 
                             hysteresis=hysteresis,
