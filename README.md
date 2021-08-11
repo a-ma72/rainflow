@@ -16,7 +16,7 @@
            * A  
 
 These steps are fully documented in standards such as  
-ASTM E1049 "Standard Practices for Cycle Counting in Fatigue Analysis" [1]  
+ASTM E 1049 "Standard Practices for Cycle Counting in Fatigue Analysis" [1]  
 This implementation uses the 4-point algorithm mentioned in [3,4] and the 3-point HCM method proposed in [2] as well as the ASTM E 1049 (2011) standard in [1].
 To take the residue into account, you may implement a custom method or use some
 predefined functions.
@@ -26,7 +26,8 @@ predefined functions.
     a) Module _rainflow.c_ (with _rainflow.h_) holds all necessary functions for rainflow counting and histogram extraction. You may select multiple optional features at compile time:  
     `RFC_MINIMAL`: To use core functions for rainflow counting only (for porting to µControllers for example).  
     `RFC_TP_SUPPORT`: Turning point storage.  
-    `RFC_HCM_SUPPORT`: Use HCM algorithm (Clormann/Seeger).  
+    `RFC_HCM_SUPPORT`: HCM algorithm (Clormann/Seeger).  
+    `RFC_ASTM_SUPPORT`: ASTM ASTM E 1049 (2011) algorithm.  
     `RFC_AT_SUPPORT`: User defined amplitude transformation (Haigh diagram).   
     `RFC_DH_SUPPORT`:  Damage history storage.  
     `RFC_USE_DELEGATES`: Delegates for various core functions to implement user defined behavior.  
