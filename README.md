@@ -27,7 +27,7 @@ predefined functions.
     `RFC_MINIMAL`: To use core functions for rainflow counting only (for porting to µControllers for example).  
     `RFC_TP_SUPPORT`: Turning point storage.  
     `RFC_HCM_SUPPORT`: HCM algorithm (Clormann/Seeger).  
-    `RFC_ASTM_SUPPORT`: ASTM ASTM E 1049 (2011) algorithm.  
+    `RFC_ASTM_SUPPORT`: ASTM E 1049 (2011) algorithm.  
     `RFC_AT_SUPPORT`: User defined amplitude transformation (Haigh diagram).   
     `RFC_DH_SUPPORT`:  Damage history storage.  
     `RFC_USE_DELEGATES`: Delegates for various core functions to implement user defined behavior.  
