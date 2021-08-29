@@ -7,7 +7,7 @@ try:
     from numpy import get_include as get_numpy_include
 except ImportError:
     def get_numpy_include():
-        return "NOTFOUND"
+        return "NUMPY_NOTFOUND"
 
 
 def main():
