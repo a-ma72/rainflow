@@ -1,4 +1,4 @@
 include src/rainflow.c
 include src/rainflow.h
 include src/rainflow.hpp
-LICENSE
+include LICENSE

@@ -1,14 +1,18 @@
-import sys
 from rfcnt.tests import examples
 
-print( "Running example 1..." )
-examples.example_1()
+
+def main():
+    print("Running example 1...")
+    examples.example_1()
+
+
+if __name__ == '__main__':
+    main()
 
 
 """
 Jupyter Notebook:
-!pip install ./rfcnt-0.1.0.tar.gz
+!pip install ./rfcnt-0.1.1.tar.gz
 !pip install --upgrade matplotlib
-from rfcnt.tests import examples
-examples.example_1()
+!python -m rfcnt.run_examples
 """

@@ -25,16 +25,17 @@ predefined functions.
     pip install {packagename}.tar.gz
 where _{packagename}_ is the current package release, for example:
 
-    pip install rfcnt-0.1.0.tar.gz
+    pip install rfcnt-0.1.1.tar.gz
 
 ### Test
 _rfcnt_ packages include some unit tests, which can be run:
 
-    python run_tests.py
+    python -m rfcnt.run_tests
     
 ### Examples
 For a quick introduction you can run and inspect a small example:
-    python run_examples.py
+
+    python -m rfcnt.run_examples
 
 ![](jupyter_screenshot.png)
 
