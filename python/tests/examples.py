@@ -11,6 +11,7 @@ def example_1():
     try:
         import pandas as pd
         import matplotlib.pyplot as plt
+        from matplotlib.gridspec import GridSpec
         import seaborn as sns
     except ImportError as err:
         print("This example requires modules 'pandas', 'matplotlib' and 'seaborn!'")
@@ -38,9 +39,8 @@ def example_1():
         residual_method=7, # RFC_RES_REPEATED
         wl={"sd": 1e3, "nd": 1e7, "k": 5})
 
-    fig = plt.figure(constrained_layout=True, figsize=(14, 10))
-    fig.tight_layout()
-    gs = fig.add_gridspec(3, 2)
+    fig = plt.figure(figsize=(14, 10))
+    gs = GridSpec(nrows=3, ncols=2, width_ratios=[1, 2])
     ax1 = fig.add_subplot(gs[0, 0])
     sns.heatmap(res["rfm"], cmap="YlOrRd", ax=ax1)
     ax1.invert_yaxis()
@@ -69,4 +69,6 @@ def example_1():
     plt.grid(which="both")
     plt.xlabel("Sample #")
     plt.ylabel("Value")
+
+    fig.tight_layout()
     plt.show()
