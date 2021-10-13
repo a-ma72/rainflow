@@ -1,5 +1,8 @@
 RAINFLOW
 |   CMakeLists.txt                Makefile (CMake)
+|   coan-args-minimal.in          Input arguments file for coan invocation
+|   coan_invoke-minimal.bat       Invoke coan (cmd shell)
+|   coan_invoke-minimal.sh        Invoke coan (linux shell)
 |   config.h                      Configuration file (Rainflow)
 |   config.h.in                   Configuration file (Input for CMake)
 |   content.txt                   This file

@@ -57,6 +57,7 @@ def main():
                     ('RFC_DEBUG_FLAGS',           '0'),
                     ('RFC_EXPORT_MEX',            '0')],
                 include_dirs=['src', get_numpy_include()],
+                extra_compile_args=['-std=c++11'],
             )
         ],
         classifiers=[
