@@ -1,7 +1,7 @@
 from setuptools import setup, Extension
 from os import path
 
-version = (0, 1, 2)
+version = (0, 2, 0)
 
 try:
     from numpy import get_include as get_numpy_include

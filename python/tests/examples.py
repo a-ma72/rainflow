@@ -54,7 +54,7 @@ def example_1():
         y=r["sa"],
         drawstyle='steps-pre', ci=None, ax=ax2)
     plt.xscale("log")
-    plt.ylim(bottom=0, top=1000)
+    plt.ylim(bottom=0, top=2000)
     plt.xlim(left=0.9)
     plt.grid(which="both")
     plt.xlabel("N (log) [1]")

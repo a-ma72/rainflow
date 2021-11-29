@@ -33,26 +33,28 @@ const char* rfc_err_str( int nr )
 static
 int parse_rfc_kwargs( PyObject* kwargs, Py_ssize_t len, Rainflow *rf, Rainflow::rfc_res_method *res_method )
 {
-    PyObject *empty = PyTuple_New(0);
-    int class_count = 100;
-    double class_width = -1;
-    double class_offset = 0;
-    double hysteresis = -1;
-    int enforce_margin = 1;
-    int use_hcm = 0;
-    int use_astm = 0;
-    int spread_damage = Rainflow::RFC_SD_TRANSIENT_23c;
-    PyObject *wl = NULL;
-    double wl_sd = 1e3, wl_nd = 1e7, 
-           wl_k  =   5, wl_k2 =   5;
+    PyObject   *empty           =  PyTuple_New(0);
+    int         class_count     =  100;
+    double      class_width     = -1;  // -1 = "calculated"
+    double      class_offset    =  0;
+    double      hysteresis      = -1;  // -1 = "calculated"
+    int         enforce_margin  =  1;  // true
+    int         use_hcm         =  0;  // false
+    int         use_astm        =  0;  // false
+    int         lc_method       =  0;  // Count rising slopes only
+    int         flags           =  Rainflow::RFC_FLAGS_DEFAULT;
+    int         spread_damage   =  Rainflow::RFC_SD_TRANSIENT_23c;
+    PyObject   *wl              =  NULL;
+    double      wl_sd           =  1e3, wl_nd = 1e7, 
+                wl_k            =  5,   wl_k2 = 5;
 
     *res_method = Rainflow::RFC_RES_REPEATED;
 
     char* kw[] = {"class_width", "class_count", "class_offset", 
                   "hysteresis","residual_method", "enforce_margin", 
-                  "use_HCM", "use_ASTM", "spread_damage", "wl", NULL};
+                  "use_HCM", "use_ASTM", "spread_damage", "lc_method", "wl", NULL};
 
-    if( !PyArg_ParseTupleAndKeywords( empty, kwargs, "d|iddiiiiiO", kw,
+    if( !PyArg_ParseTupleAndKeywords( empty, kwargs, "d|iddiiiiiiO", kw,
                                       &class_width,
                                       &class_count,
                                       &class_offset,
@@ -62,6 +64,7 @@ int parse_rfc_kwargs( PyObject* kwargs, Py_ssize_t len, Rainflow *rf, Rainflow::
                                       &use_hcm,
                                       &use_astm,
                                       &spread_damage,
+                                      &lc_method,
                                       &wl ) )
     {
         Py_DECREF( empty );
@@ -117,7 +120,29 @@ int parse_rfc_kwargs( PyObject* kwargs, Py_ssize_t len, Rainflow *rf, Rainflow::
         if( hysteresis < 0 ) hysteresis = class_width;
     }
 
-    if( !rf->init( class_count, class_width, class_offset, hysteresis ) )
+    // lc_method
+    flags &= ~Rainflow::RFC_FLAGS_COUNT_LC;
+
+    switch( lc_method )
+    {
+        case 0:
+            flags |= Rainflow::RFC_FLAGS_COUNT_LC_UP;
+            break;
+
+        case 1:
+            flags |= Rainflow::RFC_FLAGS_COUNT_LC_DN;
+            break;
+
+        case 2:
+            flags |= Rainflow::RFC_FLAGS_COUNT_LC;
+            break;
+
+        default:
+            PyErr_SetString( PyExc_RuntimeError, "Parameter 'lc_method' must be in range 0 to 2!" );
+            return 0;
+    }
+
+    if( !rf->init( class_count, class_width, class_offset, hysteresis, (Rainflow::rfc_flags_e)flags ) )
     {
         PyErr_Format( PyExc_RuntimeError, "Rainflow initialization error (%s)", rfc_err_str( rf->error_get() ) );
         return 0;
@@ -275,7 +300,7 @@ int prepare_results( Rainflow *rf, Rainflow::rfc_res_method res_method, PyObject
     PyArray_FILLWBYTE( arr, 0 );
     for( unsigned i = 0; i < class_count; i++ )
     {
-        *(double*)PyArray_GETPTR2( arr, i, 0 ) = (double)sa[i];
+        *(double*)PyArray_GETPTR2( arr, i, 0 ) = (double)sa[i] * 2;  // range = 2 * amplitude
         *(double*)PyArray_GETPTR2( arr, i, 1 ) = (double)ct[i];
     }
     PyDict_SetItemString( *ret, "rp", (PyObject*)arr );
@@ -290,7 +315,7 @@ int prepare_results( Rainflow *rf, Rainflow::rfc_res_method res_method, PyObject
     PyArray_FILLWBYTE( arr, 0 );
     for( unsigned i = 0; i < class_count; i++ )
     {
-        *(double*)PyArray_GETPTR2( arr, i, 0 ) = (double)sa[i];
+        *(double*)PyArray_GETPTR2( arr, i, 0 ) = (double)sa[i];  // class upper limit
         *(double*)PyArray_GETPTR2( arr, i, 1 ) = (double)ct[i];
     }
     PyDict_SetItemString( *ret, "lc", (PyObject*)arr );

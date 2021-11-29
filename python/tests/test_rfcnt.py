@@ -155,7 +155,7 @@ class TestRainflowCounting(unittest.TestCase):
         class_width       =  50
         x                 =  pd.read_csv(os.path.join(self.get_script_path(), "long_series.csv"), header=None)
         x                 =  x.to_numpy().squeeze()
-        hysteresis        = class_width
+        hysteresis        =  class_width
         use_HCM           =  0
         enforce_margin    =  1  # Enforce first and last data point included in tp
         use_HCM           =  0  # Use 4 point method, not HCM

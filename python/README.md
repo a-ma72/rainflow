@@ -25,7 +25,7 @@ predefined functions.
     pip install {packagename}.tar.gz
 where _{packagename}_ is the current package release, for example:
 
-    pip install rfcnt-0.1.1.tar.gz
+    pip install rfcnt-0.2.0.tar.gz
 
 ### Test
 _rfcnt_ packages include some unit tests, which can be run:
