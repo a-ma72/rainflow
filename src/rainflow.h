@@ -101,6 +101,8 @@
 #ifndef RAINFLOW_H
 #define RAINFLOW_H
 
+#pragma pack(push, 1)
+
 #if COAN_INVOKED
 /* This version is generated via coan (http://coan2.sourceforge.net/) */
 #endif /*COAN_INVOKED*/
@@ -794,5 +796,7 @@ struct rfc_ctx
 #ifdef __cplusplus
 }  /* namespace RFC_CPP_NAMESPACE */
 #endif /*__cplusplus*/
+
+#pragma pack(pop)
 
 #endif /*RAINFLOW_H*/
