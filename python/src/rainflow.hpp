@@ -44,6 +44,7 @@
 #include <cfloat>
 #include <cmath>
 #include "rainflow.h"
+
 #pragma pack(push, 1)
 
 /* Suppose correct configuration */
