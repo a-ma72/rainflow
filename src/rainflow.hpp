@@ -45,6 +45,8 @@
 #include <cmath>
 #include "rainflow.h"
 
+#pragma pack(push, 1)
+
 /* Suppose correct configuration */
 static
 char compiler_assert_rfc_config
@@ -1173,3 +1175,5 @@ extern "C"
     }
 }
 #endif /*RFC_TP_STORAGE*/
+
+#pragma pack(pop)

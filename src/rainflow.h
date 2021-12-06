@@ -101,8 +101,6 @@
 #ifndef RAINFLOW_H
 #define RAINFLOW_H
 
-#pragma pack(push, 1)
-
 #if COAN_INVOKED
 /* This version is generated via coan (http://coan2.sourceforge.net/) */
 #endif /*COAN_INVOKED*/
@@ -189,6 +187,7 @@
 #define RFC_CPP_NAMESPACE rainflow_C
 #endif /*RFC_CPP_NAMESPACE*/
 namespace RFC_CPP_NAMESPACE {
+extern "C" {
 #else /*!__cplusplus*/
 #include <stdbool.h> /* bool, true, false */
 #include <stdint.h>  /* ULLONG_MAX */
@@ -199,6 +198,8 @@ namespace RFC_CPP_NAMESPACE {
 #include <stdarg.h>
 #endif /*RFC_DEBUG_FLAGS*/
 #endif /*__cplusplus*/
+
+#pragma pack(push, 1)
 
 
 /* Memory allocation aim info */
@@ -419,10 +420,6 @@ typedef     struct      rfc_rfm_item            rfc_rfm_item_s;             /** 
 /* Memory allocation functions typedef */
 typedef     void *   ( *rfc_mem_alloc_fcn_t )   ( void *, size_t num, size_t size, int aim );     /** Memory allocation functor */
 
-#ifdef __cplusplus
-extern "C" {
-#endif /*__cplusplus*/
-
 /* Core functions */
 bool        RFC_init                    (       void *ctx, unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
                                                            rfc_value_t hysteresis, rfc_flags_e flags );
@@ -506,9 +503,6 @@ bool        RFC_at_transform            ( const void *ctx, double Sa, double Sm,
 int         RFC_debug_fprintf           (       void *ctx, FILE *stream, const char *fmt, ... );
 #endif /*RFC_DEBUG_FLAGS*/
 
-#ifdef __cplusplus
-}  /* extern "C" */
-#endif /*__cplusplus*/
 
 #if RFC_USE_DELEGATES
 /* Delegates typedef */
@@ -794,6 +788,7 @@ struct rfc_ctx
 };
 
 #ifdef __cplusplus
+}  /* extern "C" */
 }  /* namespace RFC_CPP_NAMESPACE */
 #endif /*__cplusplus*/
 
