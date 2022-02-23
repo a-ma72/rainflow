@@ -21,7 +21,7 @@
  *================================================================================
  * BSD 2-Clause License
  * 
- * Copyright (c) 2019, Andras Martin
+ * Copyright (c) 2022, Andras Martin
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -1227,7 +1227,7 @@ TEST RFC_small_example( int ccnt )
 }
 
 
-TEST RFC_long_series( int ccnt )
+TEST RFC_long_series( int ccnt, int class_count_ar )
 {
     bool                need_conf           =  false;
     bool                do_result_check     =  true;
@@ -1335,7 +1335,6 @@ TEST RFC_long_series( int ccnt )
         GREATEST_FPRINTF( GREATEST_STDOUT, "\nEnter class parameters:" );
         GREATEST_FPRINTF( GREATEST_STDOUT, "\n" );
 
-        class_count = 100;
         GREATEST_FPRINTF( GREATEST_STDOUT, "Class count (%d): ", class_count );
         if( fgets( buf, sizeof(buf), stdin ) != NULL )
         {
@@ -1370,21 +1369,39 @@ TEST RFC_long_series( int ccnt )
         GREATEST_FPRINTF( GREATEST_STDOUT, "\n" );
     }
 
+    if( class_count_ar > 0 )
+    {
+        class_count = class_count_ar;
+    }
+
     GREATEST_FPRINTF( GREATEST_STDOUT, "\nTest long series:" );
     GREATEST_FPRINTF( GREATEST_STDOUT, "\nClass count  = %d", class_count );
     GREATEST_FPRINTF( GREATEST_STDOUT, "\nClass width  = %g", class_width );
     GREATEST_FPRINTF( GREATEST_STDOUT, "\nClass offset = %g", class_offset );
+    GREATEST_FPRINTF( GREATEST_STDOUT, "\nHysteresis   = %g", hysteresis );
     GREATEST_FPRINTF( GREATEST_STDOUT, "\n" );
 
     if( class_count )
     {
         ASSERT( class_width > 0.0 );
         ASSERT( class_count > 1 );
-        ASSERT( x_min >= class_offset );
-        ASSERT( x_max <  class_offset + class_width * class_count );
+
+        if( class_count_ar <= 0 )
+        {
+            ASSERT( x_min >= class_offset );
+            ASSERT( x_max <  class_offset + class_width * class_count );
+        }
     }
 
     ASSERT( RFC_init( &ctx, class_count, class_width, class_offset, hysteresis, RFC_FLAGS_DEFAULT ) );
+
+#if RFC_AR_SUPPORT
+    if( class_count_ar > 0 )
+    {
+        RFC_flags_set( &ctx, RFC_FLAGS_AUTORESIZE, /* stack */ 0, /* overwrite */ false );
+    }
+#endif /*RFC_AR_SUPPORT*/
+
 #if RFC_TP_SUPPORT
     ASSERT( RFC_tp_init( &ctx, tp, NUMEL(tp), /* is_static */ true ) );
 #endif /*RFC_TP_SUPPORT*/
@@ -1454,7 +1471,7 @@ TEST RFC_long_series( int ccnt )
             RFC_VALUE_TYPE sum = 0.0;
             double damage = 0.0;
 
-            for( i = 0; i < class_count * class_count; i++ )
+            for( i = 0; i < ctx.class_count * ctx.class_count; i++ )
             {
                 sum += ctx.rfm[i] / ctx.full_inc;
             }
@@ -2384,13 +2401,16 @@ SUITE( RFC_TEST_SUITE )
     RUN_TEST1( RFC_cycle_down, 0 );
     RUN_TEST1( RFC_residue_stress_test, 0 );
     RUN_TEST1( RFC_small_example, 0 );
-    RUN_TEST1( RFC_long_series, 0 );
+    RUN_TESTp( RFC_long_series, 0, 0 );
     RUN_TEST1( RFC_empty, 1 );
     RUN_TEST1( RFC_cycle_up, 1 );
     RUN_TEST1( RFC_cycle_down, 1 );
     RUN_TEST1( RFC_residue_stress_test, 1 );
     RUN_TEST1( RFC_small_example, 1 );
-    RUN_TEST1( RFC_long_series, 1 );
+    RUN_TESTp( RFC_long_series, 1, 0 );   /* Using default class count */
+#if RFC_AR_SUPPORT
+    RUN_TESTp( RFC_long_series, 1, 50 );  /* Using reduced class_count to test auto resizing */
+#endif /*RFC_AR_SUPPORT*/
 #if !RFC_MINIMAL
     /* Residual methods */
     RUN_TEST( RFC_res_DIN45667 );

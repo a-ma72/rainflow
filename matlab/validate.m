@@ -28,9 +28,10 @@ function validate
   use_astm          =  0;  % Use 4 point method, not ASTM
   residual_method   =  0;
   spread_damage     =  0;
+  auto_resize       =  0;
 
   [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
-                          residual_method, enforce_margin, use_hcm, use_astm, spread_damage );
+                          residual_method, enforce_margin, use_hcm, use_astm, spread_damage, auto_resize );
 
   assert( sum( sum( rm ) ) == 0 );
 
@@ -52,9 +53,10 @@ function validate
   use_astm          =  0;  % Use 4 point method, not ASTM
   residual_method   =  0;
   spread_damage     =  0;
+  auto_resize       =  0;
 
   [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
-                          residual_method, enforce_margin, use_hcm, use_astm, spread_damage );
+                          residual_method, enforce_margin, use_hcm, use_astm, spread_damage, auto_resize );
 
   assert( sum( sum( rm ) ) == 1 );
   assert( rm( 3,2 ) == 1 );
@@ -77,9 +79,10 @@ function validate
   use_astm          =  0;  % Use 4 point method, not ASTM
   residual_method   =  0;
   spread_damage     =  0;
+  auto_resize       =  0;
 
   [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
-                          residual_method, enforce_margin, use_hcm, use_astm, spread_damage );
+                          residual_method, enforce_margin, use_hcm, use_astm, spread_damage, auto_resize );
 
   assert( sum( sum( rm ) ) == 1 );
   assert( rm( 2,3 ) == 1 );
@@ -103,9 +106,10 @@ function validate
   use_astm          =  0;  % Use 4 point method, not ASTM
   residual_method   =  0;
   spread_damage     =  0;
+  auto_resize       =  0;
 
   [~,re,rm] = rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
-                          residual_method, enforce_margin, use_hcm, use_astm, spread_damage );
+                          residual_method, enforce_margin, use_hcm, use_astm, spread_damage, auto_resize );
 
   assert( sum( sum( rm ) ) == 7 );
   assert( rm( 5,3 ) == 2 );
@@ -134,12 +138,13 @@ function validate
   use_astm          =  0;  % Use 4 point method, not ASTM
   residual_method   =  0;  % 0=RFC_RES_NONE, 7=RFC_RES_REPEATED
   spread_damage     =  1;  % 0=RFC_SD_HALF_23, 1=RFC_SD_RAMP_AMPLITUDE_23
-  
+  auto_resize       =  0;
+
   assert( sum(abs(xx-x)) < 1e-4 );
 
   [pd,re,rm,rp,lc,tp,dh] = ...
     rfc( 'rfc', double(x_int), class_count, class_width, class_offset, hysteresis, ...
-                residual_method, enforce_margin, use_hcm, use_astm, spread_damage );
+                residual_method, enforce_margin, use_hcm, use_astm, spread_damage, auto_resize );
 
   % With residuum:    pd == 9.8934e-06 (repeated)
   % Without residuum: pd == 1.1486e-07
@@ -159,7 +164,7 @@ function validate
 
   [pd,re,rm,rp,lc,tp,dh] = ...
     rfc( 'rfc', x, class_count, class_width, class_offset, hysteresis, ...
-                residual_method, enforce_margin, use_hcm, use_astm, spread_damage );
+                residual_method, enforce_margin, use_hcm, use_astm, spread_damage, auto_resize );
 
   assert( abs( sum( dh ) / pd - 1 ) < 1e-10 );
   hold( ax(2), 'all' );
@@ -205,6 +210,7 @@ function validate
     use_astm          =  0;  % Use 4 point method, not ASTM
     residual_method   =  4;  % 4=ASTM related
     spread_damage     =  0;  % 0=RFC_SD_HALF_23, 1=RFC_SD_RAMP_AMPLITUDE_23
+    auto_resize       =  0;
     class_count       =  1000;
     class_width       =  5;
     class_offset      = -2025;
@@ -225,18 +231,18 @@ function validate
    residual_method = 7; % 7=repeated
    [pd7,re7,rm7,rp7,lc7,tp7] = ...
       rfc( 'rfc', double(x_int), class_count, class_width, class_offset, hysteresis, ...
-                  residual_method, enforce_margin, use_hcm, use_astm, spread_damage );
+                  residual_method, enforce_margin, use_hcm, use_astm, spread_damage, auto_resize );
 
    residual_method = 4;  % 4=ASTM related
    [pd4,re4,rm4,rp4,lc4,tp4] = ...
       rfc( 'rfc', double(x_int), class_count, class_width, class_offset, hysteresis, ...
-                  residual_method, enforce_margin, use_hcm, use_astm, spread_damage );
+                  residual_method, enforce_margin, use_hcm, use_astm, spread_damage, auto_resize );
 
    use_astm = 1; % Use ASTM algorithm
    residual_method = 4;  % 4=ASTM related
    [pd4a,re4a,rm4a,rp4a,lc4a,tp4a] = ...
       rfc( 'rfc', double(x_int), class_count, class_width, class_offset, hysteresis, ...
-                  residual_method, enforce_margin, use_hcm, use_astm, spread_damage );
+                  residual_method, enforce_margin, use_hcm, use_astm, spread_damage, auto_resize );
 
     % MATLAB - Rainflow counts for fatigue analysis (according to ASTM E 1049)
     c = rainflow( tp4a(:,2), 'ext' );

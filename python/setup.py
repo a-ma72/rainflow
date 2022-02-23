@@ -1,7 +1,7 @@
 from setuptools import setup, Extension
 from os import path
 
-version = (0, 2, 0)
+version = (0, 3, 1)
 
 try:
     from numpy import get_include as get_numpy_include
@@ -54,6 +54,7 @@ def main():
                     ('RFC_DAMAGE_FAST',           '1'),
                     ('RFC_DH_SUPPORT',            '1'),
                     ('RFC_AT_SUPPORT',            '1'),
+                    ('RFC_AR_SUPPORT',            '1'),
                     ('RFC_DEBUG_FLAGS',           '0'),
                     ('RFC_EXPORT_MEX',            '0')],
                 include_dirs=['src', get_numpy_include()],

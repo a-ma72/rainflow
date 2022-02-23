@@ -59,7 +59,8 @@ char compiler_assert_rfc_config
    RFC_GLOBAL_EXTREMA       &&
    RFC_DAMAGE_FAST          &&
    RFC_DH_SUPPORT           &&
-   RFC_AT_SUPPORT
+   RFC_AT_SUPPORT           &&
+   RFC_AR_SUPPORT
 ];
 
 #ifndef CALLOC
@@ -147,6 +148,7 @@ public:
         RFC_FLAGS_TPPRUNE_PRESERVE_POS          = RF::RFC_FLAGS_TPPRUNE_PRESERVE_POS,           /**< Preserve stream position information on pruning */
         RFC_FLAGS_TPPRUNE_PRESERVE_RES          = RF::RFC_FLAGS_TPPRUNE_PRESERVE_RES,           /**< Preserve turning points that exist in resiude on pruning */
         RFC_FLAGS_TPAUTOPRUNE                   = RF::RFC_FLAGS_TPAUTOPRUNE,                    /**< Automatic prune on tp */
+        RFC_FLAGS_AUTORESIZE                    = RF::RFC_FLAGS_AUTORESIZE,                     /**< Automatically resize buffers for rp, lc, and rfm */
     };
 
 
@@ -192,6 +194,7 @@ public:
         RFC_ERROR_DH                            = RF::RFC_ERROR_DH,                             /**< Error while damage history calculation/access */
         RFC_ERROR_LUT                           = RF::RFC_ERROR_LUT,                            /**< Error while accessing look up tables */
         RFC_ERROR_DATA_OUT_OF_RANGE             = RF::RFC_ERROR_DATA_OUT_OF_RANGE,              /**< Input data leaves classrange */
+        RFC_ERROR_DATA_INCONSISTENT             = RF::RFC_ERROR_DATA_INCONSISTENT,              /**< Processed data is inconsistent (internal error) */
     };
 
 

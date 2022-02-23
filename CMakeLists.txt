@@ -1,5 +1,5 @@
 # CMakeLists for rainflow
-# 2019, Andreas Martin
+# 2022, Andreas Martin
 
 # First set Matlab_ROOT_DIR environment variable to your installed matlab path,
 # such as 'export Matlab_ROOT_DIR=/usr/local/MATLAB/R2017b'!
@@ -22,7 +22,7 @@ endif()
 # Project name and version
 project( rainflow )
 set( RFC_VERSION_MAJOR "0" )
-set( RFC_VERSION_MINOR "5" )
+set( RFC_VERSION_MINOR "6" )
 
 
 # Build type and compiler selection
@@ -43,8 +43,8 @@ set( CMAKE_POSITION_INDEPENDENT_CODE ON )
 
 # Options valid, if project compiled as standalone only
 if( CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR )
-    #set( CMAKE_BUILD_TYPE Debug   CACHE STRING "Debug"   FORCE )
     set( CMAKE_BUILD_TYPE Release CACHE STRING "Release" FORCE )
+    #set( CMAKE_BUILD_TYPE Debug   CACHE STRING "Debug"   FORCE )
 
     message( STATUS "Build ${PROJECT_NAME} as main project")
     option( RFC_MINIMAL                "(Disable all other flags)" OFF )
@@ -57,6 +57,7 @@ if( CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR )
     option( RFC_TP_SUPPORT             "Support turning points" ON )
     option( RFC_DH_SUPPORT             "Support \"spread damage\" over turning points and damage history" ON )
     option( RFC_AT_SUPPORT             "Support amplitude transformation regarding mean load influence on fatigue strength" ON )
+    option( RFC_AR_SUPPORT             "Support automatic growth of counting buffers" OFF )
     option( RFC_DAMAGE_FAST            "Enables fast damage calculation (per look-up table)" ON )
     option( RFC_DEBUG_FLAGS            "Enables flags for detailed examination" OFF )
     option( RFC_EXPORT_MEX             "Export a function wrapper for MATLAB(R)" ON )
@@ -70,8 +71,10 @@ add_definitions( -DRFC_HAVE_CONFIG_H )
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/src/config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/src/config.h )
 
 
-if( CMAKE_BUILD_TYPE MATCHES DEBUG )
-endif()
+if( CMAKE_BUILD_TYPE MATCHES Debug ) 
+    message( STATUS "Rainflow: Debug build" ) 
+    add_definitions( -DDEBUG -D_DEBUG ) 
+endif() 
 
 # Compiler dependencies
 if( MSVC )
@@ -98,7 +101,7 @@ if( RFC_EXPORT_MEX )
     if( NOT Matlab_ROOT_DIR )
         set( Matlab_ROOT_DIR /appl/matlab/2017b )
     endif()
-    find_package( Matlab ${VERSION_MATLAB} EXACT COMPONENTS MX_LIBRARY MAIN_PROGRAM )
+    find_package( Matlab ${VERSION_MATLAB} COMPONENTS MX_LIBRARY MAIN_PROGRAM )
 
     if( MATLAB_FOUND )
         message( STATUS "MATLAB Found, MATLAB MEX will be compiled." )
@@ -139,7 +142,7 @@ target_link_libraries( rfc ${LIBM_LIBRARY} )
 # Test application, start project for MSVC
 if( RFC_TEST )
     add_executable( rfc_test src/rainflow.c test/rfc_test.c test/rfc_wrapper_simple.cpp test/rfc_wrapper_advanced.cpp )
-    target_compile_definitions( rfc_test PRIVATE _SCL_SECURE_NO_WARNINGS )
+    target_compile_definitions( rfc_test PRIVATE _SCL_SECURE_NO_WARNINGS GREATEST_VA_ARGS )
     target_link_libraries( rfc_test ${LIBM_LIBRARY} )
     target_sources( rfc_test PUBLIC greatest/greatest.h )
     set_property( DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT rfc_test )
@@ -148,6 +151,17 @@ if( RFC_TEST )
     install( TARGETS rfc_test RUNTIME DESTINATION bin LIBRARY DESTINATION bin )
     install( FILES test/long_series.csv test/long_series.c matlab/validate.m DESTINATION bin )
 endif()
+
+# Update sources for Python module
+if( CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR )
+    add_custom_command( TARGET rfc
+                        POST_BUILD
+                        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/src/rainflow.h ${CMAKE_SOURCE_DIR}/python/src/
+                        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/src/rainflow.c ${CMAKE_SOURCE_DIR}/python/src/
+                        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/src/rainflow.hpp ${CMAKE_SOURCE_DIR}/python/src/
+                        COMMENT "Copy sources to python submodule" )
+endif()
+
 
 # CPack
 include( InstallRequiredSystemLibraries )

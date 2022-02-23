@@ -72,7 +72,7 @@
  *================================================================================
  * BSD 2-Clause License
  * 
- * Copyright (c) 2019, Andras Martin
+ * Copyright (c) 2022, Andras Martin
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -166,6 +166,9 @@ static void                 clear_at                        (       rfc_ctx_s * 
 #if RFC_DAMAGE_FAST
 static void                 clear_lut                       (       rfc_ctx_s * );
 #endif /*RFC_DAMAGE_FAST*/
+#if RFC_AR_SUPPORT
+static bool                 autoresize                      (       rfc_ctx_s *, rfc_value_tuple_s* pt );
+#endif /*RFC_AR_SUPPORT*/
 static void                 cycle_find                      (       rfc_ctx_s *, rfc_flags_e flags );
 #else /*RFC_MINIMAL*/
 #define cycle_find          cycle_find_4ptm
@@ -326,7 +329,7 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
 
     if( class_count )
     {
-        if( class_count > 1024 || class_width <= 0.0 )
+        if( class_count > RFC_CLASS_COUNT_MAX || class_width <= 0.0 )
         {
             return error_raise( rfc_ctx, RFC_ERROR_INVARG );
         }
@@ -1503,9 +1506,21 @@ bool RFC_feed( void *ctx, const rfc_value_t * data, size_t data_count )
         tp.pos = ++rfc_ctx->internal.pos;
         tp.cls = QUANTIZE( rfc_ctx, tp.value );
 
-        if( tp.cls >= rfc_ctx->class_count && rfc_ctx->class_count )
+        if( rfc_ctx->class_count && ( tp.cls >= rfc_ctx->class_count || tp.value < rfc_ctx->class_offset ) )
         {
+#if !RFC_AR_SUPPORT
             return error_raise( rfc_ctx, RFC_ERROR_DATA_OUT_OF_RANGE );
+#else
+            if( !RFC_flags_check( ctx, RFC_FLAGS_AUTORESIZE, 0 ) )
+            {
+                return error_raise( rfc_ctx, RFC_ERROR_DATA_OUT_OF_RANGE );
+            }
+
+            if( !autoresize( ctx, &tp ) )
+            {
+                return false;
+            }
+#endif /*RFC_AR_SUPPORT*/
         }
         
         if( !feed_once( rfc_ctx, &tp, rfc_ctx->internal.flags ) ) return false;
@@ -1576,9 +1591,18 @@ bool RFC_feed_scaled( void *ctx, const rfc_value_t * data, size_t data_count, do
         tp.cls = QUANTIZE( rfc_ctx, tp.value );
         tp.pos = ++rfc_ctx->internal.pos;
 
-        if( tp.cls >= rfc_ctx->class_count && rfc_ctx->class_count )
+        if( rfc_ctx->class_count && ( tp.cls >= rfc_ctx->class_count || tp.value < rfc_ctx->class_offset ) )
         {
-            return error_raise( rfc_ctx, RFC_ERROR_DATA_OUT_OF_RANGE );
+#if RFC_FLAGS_AUTORESIZE
+            if( RFC_flags_check( ctx, RFC_FLAGS_AUTORESIZE, 0 ) && !autoresize( ctx, &tp ) )
+            {
+                return false;
+            }
+            else
+#endif /*RFC_FLAGS_AUTORESIZE*/
+            {
+                return error_raise( rfc_ctx, RFC_ERROR_DATA_OUT_OF_RANGE );
+            }
         }
         
         if( !feed_once( rfc_ctx, &tp, rfc_ctx->internal.flags ) ) return false;
@@ -1611,9 +1635,20 @@ bool RFC_feed_tuple( void *ctx, rfc_value_tuple_s *data, size_t data_count )
     /* Process data */
     while( data_count-- )
     {
-        if( data->cls >= rfc_ctx->class_count && rfc_ctx->class_count )
+        if( rfc_ctx->class_count && ( data->cls >= rfc_ctx->class_count || data->value < rfc_ctx->class_offset ) )
         {
-            return error_raise( rfc_ctx, RFC_ERROR_DATA_OUT_OF_RANGE );
+#if RFC_FLAGS_AUTORESIZE
+            unsigned cls = QUANTIZE( ctx, data->value );
+
+            if( data->cls != cls )
+            {
+                return error_raise( rfc_ctx, RFC_ERROR_DATA_INCONSISTENT );
+            }
+            else
+#endif /*RFC_FLAGS_AUTORESIZE*/
+            {
+                return error_raise( rfc_ctx, RFC_ERROR_DATA_OUT_OF_RANGE );
+            }
         }
         
         if( !feed_once( rfc_ctx, data++, rfc_ctx->internal.flags ) ) return false;
@@ -3118,7 +3153,7 @@ bool RFC_wl_calc_sa( const void *ctx, double s0, double n0, double k, double n, 
     k  = fabs(k);
 
     if(    s0 <= 0.0    ||    n0 <= 0.0    ||
-           n  <= 0.0    ||   !sa )
+           n  <= 0.0    ||   !sa           )
     {
         return false;
     }
@@ -3149,7 +3184,7 @@ bool RFC_wl_calc_n( const void *ctx, double s0, double n0, double k, double sa, 
     k  = fabs(k);
 
     if(    s0 <= 0.0    ||    n0 <= 0.0    ||
-           sa <= 0.0    ||   !n )
+           sa <= 0.0    ||   !n            )
     {
         return false;
     }
@@ -3511,6 +3546,30 @@ bool RFC_flags_get( const void *ctx, int *flags, int stack )
 
 
 /**
+ * @brief      Check flags
+ *
+ * @param      ctx              The rainflow context
+ * @param[in]  flags_to_check   flags to test if set
+ * @param[in]  stack            ID of flags stack
+ *
+ * @return     true if flags are set
+ */
+bool RFC_flags_check( const void *ctx, int flags_to_check, int stack )
+{
+    RFC_CTX_CHECK_AND_ASSIGN
+
+    int flags;
+
+    if( !RFC_flags_get( ctx, &flags, stack ) )
+    {
+        return false;
+    }
+
+    return ( flags & flags_to_check ) == flags_to_check;
+}
+
+
+/**
  * @brief      Set Woehler curve parameters
  *
  * @param      ctx       The rainflow context
@@ -3824,6 +3883,227 @@ void clear_lut( rfc_ctx_s *rfc_ctx )
 #endif /*RFC_DH_SUPPORT*/
 
 
+#if RFC_AR_SUPPORT
+static
+bool autoresize( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
+{
+    unsigned     cls             = QUANTIZE( rfc_ctx, pt->value );
+    unsigned     class_count     = rfc_ctx->class_count,
+                 class_count_old = class_count,
+                 class_shift     = 0;
+    rfc_value_t  class_offset    = rfc_ctx->class_offset;
+    void        *ptr;
+
+
+    if( pt->value < rfc_ctx->class_offset )
+    {
+        class_shift   = (unsigned)ceil( ( class_offset - (rfc_value_t)(pt->value) ) / rfc_ctx->class_width + 0.5 );
+        class_count  += class_shift;
+        class_offset -= rfc_ctx->class_width * class_shift;
+    }
+    else if( pt->cls >= class_count )
+    {
+        class_count = (unsigned)ceil( ( (rfc_value_t)(pt->value) - class_offset ) / rfc_ctx->class_width + 0.5 );
+    }
+    else
+    {
+        return true;
+    }
+
+    if( class_count > RFC_CLASS_COUNT_MAX )
+    {
+        return error_raise( rfc_ctx, RFC_ERROR_MEMORY );
+    }
+
+    rfc_ctx->class_count  = class_count;
+    rfc_ctx->class_offset = class_offset;
+
+    pt->cls = QUANTIZE( rfc_ctx, pt->value );
+
+#if RFC_DAMAGE_FAST
+    {
+        rfc_state_e old_state = rfc_ctx->state;
+
+        if( rfc_ctx->damage_lut )
+        {
+            ptr = rfc_ctx->mem_alloc( rfc_ctx->damage_lut, class_count * class_count, 
+                                      sizeof(double), RFC_MEM_AIM_DLUT );
+            if( !ptr )
+            {
+                rfc_ctx->state = old_state;
+                return false;
+            }
+            else
+            {
+                rfc_ctx->damage_lut       = (double*)ptr;
+                rfc_ctx->damage_lut_inapt = 1;
+            }
+        }
+
+#if RFC_AT_SUPPORT
+        if( rfc_ctx->amplitude_lut )
+        {
+            ptr = rfc_ctx->mem_alloc( rfc_ctx->amplitude_lut, class_count * class_count, 
+                                      sizeof(double), RFC_MEM_AIM_ALUT );
+            if( !ptr )
+            {
+                rfc_ctx->state = old_state;
+                return false;
+            }
+            else
+            {
+                rfc_ctx->amplitude_lut = (double*)ptr;
+            }
+        }
+#endif /*RFC_AT_SUPPORT*/
+    
+        rfc_ctx->state = RFC_STATE_INIT;
+        damage_lut_init( rfc_ctx );
+        rfc_ctx->state = old_state;
+    }
+#endif /*RFC_DAMAGE_FAST*/
+
+    if( rfc_ctx->residue )
+    {
+        size_t residue_cap = 2 * class_count + 1;
+
+        ptr = rfc_ctx->mem_alloc( rfc_ctx->residue, residue_cap, 
+                                  sizeof( rfc_value_tuple_s ), RFC_MEM_AIM_RESIDUE );
+
+        if( !ptr )
+        {
+            return false;
+        }
+
+        rfc_ctx->residue     = (rfc_value_tuple_s*)ptr;
+        rfc_ctx->residue_cap = residue_cap;
+
+        /* Residuum */
+        for( size_t i = 0; i < rfc_ctx->residue_cnt; i++ )
+        {
+            rfc_ctx->residue[i].cls = QUANTIZE( rfc_ctx, rfc_ctx->residue[i].value );
+        }
+    }
+
+    for( size_t i = 0; i < rfc_ctx->internal.residue_cap; i++ )
+    {
+        rfc_ctx->internal.residue[i].cls = QUANTIZE( rfc_ctx, rfc_ctx->internal.residue[i].value );
+    }
+
+    /* RFM */
+    if( rfc_ctx->rfm )
+    {
+        ptr = rfc_ctx->mem_alloc( NULL, class_count * class_count, 
+                                  sizeof(rfc_counts_t), RFC_MEM_AIM_MATRIX );    
+        if( !ptr )
+        {
+            return error_raise( rfc_ctx, RFC_ERROR_MEMORY );
+        }
+        else
+        {
+            rfc_counts_t *rfm = (rfc_counts_t*)ptr;
+
+            for( size_t i = 0; i < class_count_old; i++ )
+            {
+                for( size_t j = 0; j < class_count_old; j++ )
+                {
+                    rfm[ MAT_OFFS( i + class_shift, j + class_shift ) ] = rfc_ctx->rfm[ i * class_count_old + j ];
+                }
+            }
+
+            ptr = rfc_ctx->rfm;
+            rfc_ctx->rfm = rfm;
+            rfc_ctx->mem_alloc( ptr, 0, 0, RFC_MEM_AIM_MATRIX );
+        }
+    }
+
+#if !RFC_MINIMAL
+    /* LC */
+    if( rfc_ctx->lc )
+    {
+        ptr = rfc_ctx->mem_alloc( NULL, class_count,
+                                  sizeof(rfc_counts_t), RFC_MEM_AIM_LC );
+        if( !ptr )
+        {
+            return error_raise( rfc_ctx, RFC_ERROR_MEMORY );
+        }
+        else
+        {
+            rfc_counts_t* lc = (rfc_counts_t*)ptr;
+
+            for( size_t i = 0; i < class_count_old; i++ )
+            {
+                lc[i + class_shift] = rfc_ctx->lc[i];
+            }
+
+            ptr = rfc_ctx->lc;
+            rfc_ctx->lc = lc;
+            rfc_ctx->mem_alloc( ptr, 0, 0, RFC_MEM_AIM_LC );
+        }
+
+        /* RP */
+        ptr = rfc_ctx->mem_alloc( NULL, class_count,
+                                  sizeof(rfc_counts_t), RFC_MEM_AIM_RP );
+        if( !ptr )
+        {
+            return error_raise( rfc_ctx, RFC_ERROR_MEMORY );
+        }
+        else
+        {
+            rfc_counts_t* rp = (rfc_counts_t*)ptr;
+
+            for( size_t i = 0; i < class_count_old; i++ )
+            {
+                rp[i] = rfc_ctx->rp[i];
+            }
+
+            ptr = rfc_ctx->rp;
+            rfc_ctx->rp = rp;
+            rfc_ctx->mem_alloc( ptr, 0, 0, RFC_MEM_AIM_RP );
+        }
+    }
+#endif /*!RFC_MINIMAL*/
+
+#if RFC_TP_SUPPORT
+    for( size_t i = 0; i < rfc_ctx->tp_cnt + ( rfc_ctx->state == RFC_STATE_BUSY_INTERIM ); i++ )
+    {
+#if RFC_USE_DELEGATES
+        if( rfc_ctx->tp_get_fcn || rfc_ctx->tp_set_fcn )
+        {
+            rfc_value_tuple_s *pt;
+
+            tp_get( rfc_ctx, i + 1, &pt );  /* tp_pos is bas 1 */
+            pt->cls = QUANTIZE( rfc_ctx, pt->value );
+            tp_set( rfc_ctx, i + 1, pt );  /* tp_pos is bas 1 */
+        }
+#else /*!RFC_USE_DELEGATES*/
+        rfc_ctx->tp[i].cls = QUANTIZE( rfc_ctx, rfc_ctx->tp[i].value );
+#endif /*RFC_USE_DELEGATES*/
+    }
+
+    rfc_ctx->internal.margin[0].cls = QUANTIZE( rfc_ctx, rfc_ctx->internal.margin[0].value );
+    rfc_ctx->internal.margin[1].cls = QUANTIZE( rfc_ctx, rfc_ctx->internal.margin[1].value );
+
+#endif /*RFC_TP_SUPPORT*/
+
+#if RFC_GLOBAL_EXTREMA
+    rfc_ctx->internal.extrema[0].cls = QUANTIZE( rfc_ctx, rfc_ctx->internal.extrema[0].value );
+    rfc_ctx->internal.extrema[1].cls = QUANTIZE( rfc_ctx, rfc_ctx->internal.extrema[1].value );
+#endif /*RFC_GLOBAL_EXTREMA*/
+
+#if RFC_HCM_SUPPORT
+    for( size_t i = 0; i < rfc_ctx->internal.hcm.stack_cap; i++ )
+    {
+        rfc_ctx->internal.hcm.stack[i].cls = QUANTIZE( rfc_ctx, rfc_ctx->internal.hcm.stack[i].value );
+    }
+#endif /*RFC_HCM_SUPPORT*/
+
+    return true;
+}
+
+#endif /*RFC_AR_SUPPORT*/
+
+
 /**
  * @brief      Processing one data point. Find turning points and check for
  *             closed cycles.
@@ -3904,7 +4184,7 @@ bool feed_once( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt, rfc_flags_e fla
  * @brief      Resize damage history if necessary.
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  pt       The point
+ * @param[in]  pt       The data tuple
  *
  * @return     true on success
  */
@@ -3946,7 +4226,7 @@ bool feed_once_dh( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s* pt )
  * @brief         Check if pt influences margins.
  *
  * @param         rfc_ctx     The rainflow context
- * @param[in]     pt          The new data point
+ * @param[in]     pt          The new data tuple
  * @param[in,out] tp_residue  The new turning point (or NULL)
  *
  * @return        true on success
@@ -4858,7 +5138,7 @@ bool at_alleviation( rfc_ctx_s *rfc_ctx, double Sm_norm, double *alleviation )
 
 
 /**
- * @brief      Calculate fictive damage for one closed (full) cycle.
+ * @brief      Calculate pseudo damage for one closed (full) cycle.
  *
  * @param      rfc_ctx     The rainflow context
  * @param      class_from  The starting class
@@ -4871,7 +5151,7 @@ bool at_alleviation( rfc_ctx_s *rfc_ctx, double Sm_norm, double *alleviation )
 static
 bool damage_calc( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_to, double *damage, double *Sa_ret )
 {
-    double Sa = -1.0;  /* Negative amplitude indicates unset value */
+    double Sa = -1.0;  /* Negative amplitude states undefined */
     double D  =  0.0;
 
     assert( damage );
@@ -4978,6 +5258,7 @@ bool damage_lut_init( rfc_ctx_s *rfc_ctx )
 
                 if( !damage_calc( rfc_ctx, from, to, &D, &Sa ) )
                 {
+                    rfc_ctx->mem_alloc( lut, 0, 0, RFC_MEM_AIM_DLUT );
                     return false;
                 }
                 lut[from * rfc_ctx->class_count + to] = D;
@@ -4999,7 +5280,7 @@ bool damage_lut_init( rfc_ctx_s *rfc_ctx )
 
 
 /**
- * @brief      Calculate fictive damage for one closed (full) cycle, using
+ * @brief      Calculate pseudo damage for one closed (full) cycle, using
  *             look-up table.
  *
  * @param      rfc_ctx     The rainflow context
@@ -5057,7 +5338,7 @@ bool damage_calc_fast( rfc_ctx_s *rfc_ctx, unsigned class_from, unsigned class_t
  *             - 2. Peak-Valley Filtering
  *
  * @param      rfc_ctx  The rainflow context
- * @param[in]  pt       The data point, must not be NULL
+ * @param[in]  pt       The data tuple, must not be NULL
  *
  * @return     Returns pointer to new turning point in residue or NULL
  */
@@ -6182,7 +6463,7 @@ bool tp_refeed( rfc_ctx_s *rfc_ctx, rfc_value_t new_hysteresis, const rfc_class_
     }
 
 #if RFC_USE_DELEGATES
-    if( rfc_ctx->tp_get_fcn )
+    if( rfc_ctx->tp_get_fcn || rfc_ctx->tp_set_fcn )
     {
         rfc_value_tuple_s *tp, *tp_ext;
         int                n      = 0;
@@ -6870,9 +7151,9 @@ static
 void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
 {
 #if !RFC_MINIMAL
-    if( nrhs != 10 )
+    if( nrhs != 10 + 1 )
     {
-        mexErrMsgTxt( "Function needs exact 9 arguments!" );
+        mexErrMsgTxt( "Function needs exact 10 arguments!" );
 #else /*RFC_MINIMAL*/
     if( nrhs != 5 )
     {
@@ -6900,6 +7181,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         const mxArray  *mxUseHCM         = prhs[7];
         const mxArray  *mxUseASTM        = prhs[8];
         const mxArray  *mxSpreadDamage   = prhs[9];
+        const mxArray  *mxAutoResize     = prhs[10];
 #endif /*!RFC_MINIMAL*/        
 
         rfc_value_t    *buffer           = NULL;
@@ -6915,6 +7197,7 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         int             use_hcm          = (int)mxGetScalar( mxUseHCM );
         int             use_astm         = (int)mxGetScalar( mxUseASTM );
         int             spread_damage    = (int)mxGetScalar( mxSpreadDamage );
+        int             auto_resize      = (int)mxGetScalar( mxAutoResize );
 #else /*RFC_MINIMAL*/
         int             residual_method  = RFC_RES_NONE;
 #endif /*!RFC_MINIMAL*/
@@ -6955,6 +7238,16 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
             mexErrMsgTxt( "Invalid spread damage method, only 0 accepted!" );
         }
 #endif /*RFC_DH_SUPPORT*/
+
+#if RFC_AR_SUPPORT
+        mxAssert( auto_resize == 0 || auto_resize == 1,
+                  "Invalid auto resize flag, use 0 or 1!" );
+#else
+        if( auto_resize != 0 )
+        {
+            mexErrMsgTxt( "Invalid auto resize flag, only 0 accepted!" );
+        }
+#endif /*RFC_AR_SUPPORT*/
 #endif /*!RFC_MINIMAL*/
 
         ok = RFC_init( &rfc_ctx, 
@@ -7017,6 +7310,13 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         
 #endif /*RFC_DH_SUPPORT*/
 
+#if RFC_AR_SUPPORT
+        if( auto_resize )
+        {
+            RFC_flags_set( &rfc_ctx, RFC_FLAGS_AUTORESIZE, /* stack */ 0, /* overwrite */ false );
+        }
+#endif /*RFC_AR_SUPPORT*/
+
         /* Rainflow counting */
 
 #if !RFC_MINIMAL
@@ -7024,9 +7324,15 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
         rfc_ctx.internal.flags  |= enforce_margin ? RFC_FLAGS_ENFORCE_MARGIN : 0;
 #endif /*!RFC_MINIMAL*/
 
-#if RFC_HCM_SUPPORT || RFC_ASTM_SUPPORT
+#if RFC_HCM_SUPPORT && RFC_ASTM_SUPPORT
              if( use_hcm )  rfc_ctx.counting_method = RFC_COUNTING_METHOD_HCM;
         else if( use_astm ) rfc_ctx.counting_method = RFC_COUNTING_METHOD_ASTM;
+        else                rfc_ctx.counting_method = RFC_COUNTING_METHOD_4PTM;
+#elif RFC_HCM_SUPPORT
+        if( use_hcm )       rfc_ctx.counting_method = RFC_COUNTING_METHOD_HCM;
+        else                rfc_ctx.counting_method = RFC_COUNTING_METHOD_4PTM;
+#elif RFC_ASTM_SUPPORT
+        if( use_astm )      rfc_ctx.counting_method = RFC_COUNTING_METHOD_ASTM;
         else                rfc_ctx.counting_method = RFC_COUNTING_METHOD_4PTM;
 #else /*!(RFC_HCM_SUPPORT  || RFC_ASTM_SUPPORT)*/
 #if !RFC_MINIMAL

@@ -72,7 +72,7 @@
  *================================================================================
  * BSD 2-Clause License
  * 
- * Copyright (c) 2019, Andras Martin
+ * Copyright (c) 2022, Andras Martin
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -109,6 +109,15 @@
 #include "config.h"  /* Configuration */
 #endif
 
+#ifndef ON
+#define ON (1)
+#endif /*ON*/
+#ifndef OFF
+#define OFF (0)
+#endif /*OFF*/
+
+#define RFC_CLASS_COUNT_MAX (1024)
+
 #ifndef RFC_VALUE_TYPE
 #define RFC_VALUE_TYPE double
 #endif /*RFC_VALUE_TYPE*/
@@ -130,17 +139,24 @@
 #define RFC_USE_DELEGATES    OFF
 #undef  RFC_HCM_SUPPORT
 #define RFC_HCM_SUPPORT      OFF
+#undef  RFC_ASTM_SUPPORT
+#define RFC_ASTM_SUPPORT     OFF
 #undef  RFC_TP_SUPPORT
 #define RFC_TP_SUPPORT       OFF
 #undef  RFC_DH_SUPPORT
 #define RFC_DH_SUPPORT       OFF
 #undef  RFC_AT_SUPPORT
 #define RFC_AT_SUPPORT       OFF
+#undef  RFC_AR_SUPPORT
+#define RFC_AR_SUPPORT       OFF
 #undef  RFC_GLOBAL_EXTREMA
 #define RFC_GLOBAL_EXTREMA   OFF
 #undef  RFC_DAMAGE_FAST
 #define RFC_DAMAGE_FAST      OFF
 #else /*!RFC_MINIMAL*/
+#ifndef RFC_MINIMAL
+#define RFC_MINIMAL OFF
+#endif /*RFC_MINIMAL*/
 #ifndef RFC_USE_DELEGATES
 #define RFC_USE_DELEGATES OFF
 #endif /*RFC_USE_DELEGATES*/
@@ -159,6 +175,9 @@
 #ifndef RFC_AT_SUPPORT
 #define RFC_AT_SUPPORT OFF
 #endif /*RFC_AT_SUPPORT*/
+#ifndef RFC_AR_SUPPORT
+#define RFC_AR_SUPPORT OFF
+#endif /*RFC_AR_SUPPORT*/
 #ifndef RFC_GLOBAL_EXTREMA
 #define RFC_GLOBAL_EXTREMA OFF
 #endif /*RFC_GLOBAL_EXTREMA*/
@@ -264,6 +283,9 @@ enum rfc_flags
     RFC_FLAGS_TPPRUNE_PRESERVE_RES  =  1 << 9,                      /**< Preserve turning points that exist in resiude on pruning */
     RFC_FLAGS_TPAUTOPRUNE           =  1 << 10,                     /**< Automatic prune on tp */
 #endif /*RFC_TP_SUPPORT*/
+#if RFC_AR_SUPPORT
+    RFC_FLAGS_AUTORESIZE            =  1 << 11,                     /**< Automatically resize buffers for rp, lc, and rfm */
+#endif /*RFC_AR_SUPPORT*/
 };
 
 
@@ -330,6 +352,7 @@ enum rfc_error
     RFC_ERROR_LUT                   =  8,                           /**< Error while accessing look up tables */
 #endif /*RFC_DAMAGE_FAST*/
     RFC_ERROR_DATA_OUT_OF_RANGE     =  9,                           /**< Input data leaves classrange */
+    RFC_ERROR_DATA_INCONSISTENT     =  10,                          /**< Processed data is inconsistent (internal error) */
 };
 
 
@@ -479,6 +502,7 @@ bool        RFC_hysteresis              ( const void *ctx, rfc_value_t *hysteres
 bool        RFC_flags_set               (       void *ctx, int flags, int stack, bool overwrite );
 bool        RFC_flags_unset             (       void *ctx, int flags, int stack );
 bool        RFC_flags_get               ( const void *ctx, int *flags, int stack );
+bool        RFC_flags_check             ( const void *ctx, int flags_to_check, int stack );
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
 bool        RFC_tp_init                 (       void *ctx, rfc_value_tuple_s *tp, size_t tp_cap, bool is_static );
@@ -711,7 +735,7 @@ struct rfc_ctx
     double                             *damage_lut;                 /**< Damage look-up table */
     int                                 damage_lut_inapt;           /**< Greater 0, if values in damage_lut aren't proper to Woehler curve parameters */
 #if RFC_AT_SUPPORT
-    double                             *amplitude_lut;              /**< Amplitude look-up table, only valid if damage_lut_inapt = 0 */
+    double                             *amplitude_lut;              /**< Amplitude look-up table, only valid if damage_lut_inapt == 0 */
 #endif /*RFC_AT_SUPPORT*/
 #endif /*RFC_DAMAGE_FAST*/
     double                              damage;                     /**< Cumulated damage (damage resulting from residue included) */
