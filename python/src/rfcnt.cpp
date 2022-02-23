@@ -1,21 +1,9 @@
 #define PY_SSIZE_T_CLEAN
-
-//#define RFC_MEM_ALLOC      NULL
-#define RFC_MINIMAL         0
-#define RFC_TP_SUPPORT      1
-#define RFC_HCM_SUPPORT     1
-#define RFC_ASTM_SUPPORT    1
-#define RFC_USE_DELEGATES   1
-#define RFC_GLOBAL_EXTREMA  1
-#define RFC_DAMAGE_FAST     1
-#define RFC_DH_SUPPORT      1
-#define RFC_AT_SUPPORT      1
-#define RFC_AR_SUPPORT      1
-#define RFC_TP_STORAGE      std::vector<RF::rfc_value_tuple_s>
-
 #include <Python.h>
 #include <numpy/arrayobject.h>
 #include <vector>
+//#define RFC_MEM_ALLOC NULL
+#define RFC_TP_STORAGE std::vector<RF::rfc_value_tuple_s>
 #include <rainflow.hpp>
 
 
