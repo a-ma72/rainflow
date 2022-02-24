@@ -3893,7 +3893,7 @@ bool autoresize( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
                  class_shift     = 0;
     rfc_value_t  class_offset    = rfc_ctx->class_offset;
     void        *ptr;
-
+    size_t       i, j;
 
     if( pt->value < rfc_ctx->class_offset )
     {
@@ -3979,13 +3979,13 @@ bool autoresize( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
         rfc_ctx->residue_cap = residue_cap;
 
         /* Residuum */
-        for( size_t i = 0; i < rfc_ctx->residue_cnt; i++ )
+        for( i = 0; i < rfc_ctx->residue_cnt; i++ )
         {
             rfc_ctx->residue[i].cls = QUANTIZE( rfc_ctx, rfc_ctx->residue[i].value );
         }
     }
 
-    for( size_t i = 0; i < rfc_ctx->internal.residue_cap; i++ )
+    for( i = 0; i < rfc_ctx->internal.residue_cap; i++ )
     {
         rfc_ctx->internal.residue[i].cls = QUANTIZE( rfc_ctx, rfc_ctx->internal.residue[i].value );
     }
@@ -4003,9 +4003,9 @@ bool autoresize( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
         {
             rfc_counts_t *rfm = (rfc_counts_t*)ptr;
 
-            for( size_t i = 0; i < class_count_old; i++ )
+            for( i = 0; i < class_count_old; i++ )
             {
-                for( size_t j = 0; j < class_count_old; j++ )
+                for( j = 0; j < class_count_old; j++ )
                 {
                     rfm[ MAT_OFFS( i + class_shift, j + class_shift ) ] = rfc_ctx->rfm[ i * class_count_old + j ];
                 }
@@ -4031,7 +4031,7 @@ bool autoresize( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
         {
             rfc_counts_t* lc = (rfc_counts_t*)ptr;
 
-            for( size_t i = 0; i < class_count_old; i++ )
+            for( i = 0; i < class_count_old; i++ )
             {
                 lc[i + class_shift] = rfc_ctx->lc[i];
             }
@@ -4052,7 +4052,7 @@ bool autoresize( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
         {
             rfc_counts_t* rp = (rfc_counts_t*)ptr;
 
-            for( size_t i = 0; i < class_count_old; i++ )
+            for( i = 0; i < class_count_old; i++ )
             {
                 rp[i] = rfc_ctx->rp[i];
             }
@@ -4065,7 +4065,7 @@ bool autoresize( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
 #endif /*!RFC_MINIMAL*/
 
 #if RFC_TP_SUPPORT
-    for( size_t i = 0; i < rfc_ctx->tp_cnt + ( rfc_ctx->state == RFC_STATE_BUSY_INTERIM ); i++ )
+    for( i = 0; i < rfc_ctx->tp_cnt + ( rfc_ctx->state == RFC_STATE_BUSY_INTERIM ); i++ )
     {
 #if RFC_USE_DELEGATES
         if( rfc_ctx->tp_get_fcn || rfc_ctx->tp_set_fcn )
@@ -4092,7 +4092,7 @@ bool autoresize( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
 #endif /*RFC_GLOBAL_EXTREMA*/
 
 #if RFC_HCM_SUPPORT
-    for( size_t i = 0; i < rfc_ctx->internal.hcm.stack_cap; i++ )
+    for( i = 0; i < rfc_ctx->internal.hcm.stack_cap; i++ )
     {
         rfc_ctx->internal.hcm.stack[i].cls = QUANTIZE( rfc_ctx, rfc_ctx->internal.hcm.stack[i].value );
     }
