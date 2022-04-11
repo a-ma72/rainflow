@@ -269,6 +269,7 @@ public:
 
     typedef     std::vector<double>                 rfc_double_v;                               /** Vector of double */
     typedef     std::vector<rfc_value_t>            rfc_value_v;                                /** Vector of values */
+    typedef     std::vector<rfc_value_tuple_s>      rfc_value_tuple_v;                          /** Vector of value tuples */
     typedef     std::vector<rfc_counts_t>           rfc_counts_v;                               /** Vector of counts */
     typedef     std::vector<rfc_rfm_item_s>         rfc_rfm_item_v;                             /** Vector of rainflow matrix items */
 
@@ -308,12 +309,13 @@ public:
 /* Functions on histograms */           
     bool            lc_get                  ( rfc_counts_t *lc, rfc_value_t *level ) const;
     bool            lc_from_rfm             ( rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags ) const;
-    bool            lc_from_residue         ( rfc_counts_t *lc, rfc_value_t *level, rfc_flags_e flags ) const;
+    bool            lc_from_residue         ( rfc_counts_t *lc, rfc_value_t *level, const rfc_value_tuple_s* residue, unsigned residue_cnt, rfc_flags_e flags ) const;
+    bool            lc_from_residue         ( rfc_counts_t *lc, rfc_value_t *level, const rfc_value_t* residue, unsigned residue_cnt, rfc_flags_e flags ) const;
     bool            rp_get                  ( rfc_counts_t *rp, rfc_value_t *Sa ) const;
     bool            rp_from_rfm             ( rfc_counts_t *rp, rfc_value_t *Sa, const rfc_counts_t *rfm ) const;
     bool            damage                  ( rfc_value_t *damage = NULL, rfc_value_t *damage_residue = NULL ) const;
-    bool            damage_from_rp          ( const rfc_counts_t *counts, const rfc_value_t *Sa, double *damage, rfc_rp_damage_method_e rp_calc_type ) const;
-    bool            damage_from_rfm         ( const rfc_counts_t *rfm, double *damage ) const;
+    bool            damage_from_rp          ( double *damage, const rfc_counts_t *counts, const rfc_value_t *Sa, rfc_rp_damage_method_e rp_calc_type ) const;
+    bool            damage_from_rfm         ( double *damage, const rfc_counts_t *rfm ) const;
     /* Woehler curve */
     bool            wl_calc_sx              ( double s0, double n0, double k, double *sx, double nx, double  k2, double  sd, double nd ) const;
     bool            wl_calc_sd              ( double s0, double n0, double k, double  sx, double nx, double  k2, double *sd, double nd ) const;
@@ -357,10 +359,13 @@ public:
     bool            rfm_set                 ( const rfc_rfm_item_v &buffer, bool add_only );
     bool            lc_get                  ( rfc_counts_v &lc, rfc_value_v &level ) const;
     bool            lc_from_rfm             ( rfc_counts_v &lc, rfc_value_v &level, const rfc_counts_t *rfm, rfc_flags_e flags ) const;
-    bool            lc_from_residue         ( rfc_counts_v &lc, rfc_value_v &level, rfc_flags_e flags ) const;
+    bool            lc_from_residue         ( rfc_counts_v &lc, rfc_value_v &level, const rfc_value_tuple_s *residue, unsigned residue_cnt, rfc_flags_e flags ) const;
+    bool            lc_from_residue         ( rfc_counts_v &lc, rfc_value_v &level, const rfc_value_tuple_v &residue, rfc_flags_e flags ) const;
+    bool            lc_from_residue         ( rfc_counts_v &lc, rfc_value_v &level, const rfc_value_t *residue, unsigned residue_cnt, rfc_flags_e flags ) const;
+    bool            lc_from_residue         ( rfc_counts_v &lc, rfc_value_v &level, const rfc_value_v &residue, rfc_flags_e flags ) const;
     bool            rp_get                  ( rfc_counts_v &rp, rfc_value_v &Sa ) const;
     bool            rp_from_rfm             ( rfc_counts_v &rp, rfc_value_v &Sa, const rfc_counts_t *rfm ) const;
-    bool            damage_from_rp          ( const rfc_counts_v &counts, const rfc_value_v &Sa, double &damage, rfc_rp_damage_method_e rp_calc_type ) const;
+    bool            damage_from_rp          ( double &damage, const rfc_counts_v &counts, const rfc_value_v &Sa, rfc_rp_damage_method_e rp_calc_type ) const;
     bool            at_init                 ( const rfc_double_v &Sa, const rfc_double_v &Sm, 
                                               double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
     bool            at_init                 ( double M, double Sm_rig, double R_rig, bool R_pinned );
@@ -638,9 +643,16 @@ bool RainflowT<T>::lc_from_rfm( rfc_counts_t *lc, rfc_value_t *level, const rfc_
 
 
 template< class T >
-bool RainflowT<T>::lc_from_residue( rfc_counts_t *lc, rfc_value_t *level, rfc_flags_e flags ) const
+bool RainflowT<T>::lc_from_residue( rfc_counts_t *lc, rfc_value_t *level, const rfc_value_tuple_s *residue, unsigned residue_cnt, rfc_flags_e flags ) const
 {
-    return RF::RFC_lc_from_residue( &m_ctx, (RF::rfc_counts_t *)lc, (RF::rfc_value_t *)level, (RF::rfc_flags_e) flags );
+    return RF::RFC_lc_from_residue( &m_ctx, (RF::rfc_counts_t *)lc, (RF::rfc_value_t *)level, (const RF::rfc_value_tuple_s *)residue, (unsigned)residue_cnt, (RF::rfc_flags_e) flags );
+}
+
+
+template< class T >
+bool RainflowT<T>::lc_from_residue( rfc_counts_t *lc, rfc_value_t *level, const rfc_value_t *residue, unsigned residue_cnt, rfc_flags_e flags ) const
+{
+    return RF::RFC_lc_from_residue2( &m_ctx, (RF::rfc_counts_t *)lc, (RF::rfc_value_t *)level, (const RF::rfc_value_t *)residue, (unsigned)residue_cnt, (RF::rfc_flags_e) flags );
 }
 
 
@@ -665,16 +677,16 @@ bool RainflowT<T>::damage( rfc_value_t *damage, rfc_value_t *damage_residue ) co
 
 
 template< class T >
-bool RainflowT<T>::damage_from_rp( const rfc_counts_t *counts, const rfc_value_t *Sa, double *damage, rfc_rp_damage_method_e rp_calc_type ) const
+bool RainflowT<T>::damage_from_rp( double *damage, const rfc_counts_t *counts, const rfc_value_t *Sa, rfc_rp_damage_method_e rp_calc_type ) const
 {
-    return RF::RFC_damage_from_rp( &m_ctx, (const RF::rfc_counts_t *)counts, (const RF::rfc_value_t *)Sa, damage, (RF::rfc_rp_damage_method_e)rp_calc_type );
+    return RF::RFC_damage_from_rp( &m_ctx, damage, (const RF::rfc_counts_t *)counts, (const RF::rfc_value_t *)Sa, (RF::rfc_rp_damage_method_e)rp_calc_type );
 }
 
 
 template< class T >
-bool RainflowT<T>::damage_from_rfm( const rfc_counts_t *rfm, double *damage ) const
+bool RainflowT<T>::damage_from_rfm( double *damage, const rfc_counts_t *rfm ) const
 {
-    return RF::RFC_damage_from_rfm( &m_ctx, (const RF::rfc_counts_t *)rfm, damage );
+    return RF::RFC_damage_from_rfm( &m_ctx, damage, (const RF::rfc_counts_t *)rfm );
 }
 
 
@@ -925,12 +937,33 @@ bool RainflowT<T>::lc_from_rfm( rfc_counts_v &lc, rfc_value_v &level, const rfc_
 
 
 template< class T >
-bool RainflowT<T>::lc_from_residue( rfc_counts_v &lc, rfc_value_v &level, rfc_flags_e flags ) const
+bool RainflowT<T>::lc_from_residue( rfc_counts_v &lc, rfc_value_v &level, const rfc_value_tuple_s *residue, unsigned residue_cnt, rfc_flags_e flags ) const
 {
     lc.resize( m_ctx.class_count );
     level.resize( m_ctx.class_count );
 
-    return lc_from_residue( &lc[0], &level[0], flags );
+    return lc_from_residue( &lc[0], &level[0], residue, residue_cnt, flags );
+}
+
+
+template< class T >
+bool RainflowT<T>::lc_from_residue( rfc_counts_v &lc, rfc_value_v &level, const rfc_value_tuple_v &residue, rfc_flags_e flags ) const
+{
+    return lc_from_residue( lc, level, &residue[0], (unsigned)residue.size(), flags );
+}
+
+
+template< class T >
+bool RainflowT<T>::lc_from_residue( rfc_counts_v &lc, rfc_value_v &level, const rfc_value_t *residue, unsigned residue_cnt, rfc_flags_e flags ) const
+{
+    return RF::RFC_lc_from_residue2( (RF::rfc_counts_t*)&lc[0], (RF::rfc_value_t*)&level[0], (RF::rfc_value_t*)&residue[0], residue_cnt, flags );
+}
+
+
+template< class T >
+bool RainflowT<T>::lc_from_residue( rfc_counts_v &lc, rfc_value_v &level, const rfc_value_v &residue, rfc_flags_e flags ) const
+{
+    return lc_from_residue( lc, level, &residue[0], (unsigned)residue.size(), flags );
 }
 
 
@@ -955,9 +988,9 @@ bool RainflowT<T>::rp_from_rfm( rfc_counts_v &rp, rfc_value_v &Sa, const rfc_cou
 
 
 template< class T >
-bool RainflowT<T>::damage_from_rp( const rfc_counts_v &counts, const rfc_value_v &Sa, double &damage, rfc_rp_damage_method_e rp_calc_type ) const
+bool RainflowT<T>::damage_from_rp( double &damage, const rfc_counts_v &counts, const rfc_value_v &Sa, rfc_rp_damage_method_e rp_calc_type ) const
 {
-    return damage_from_rp( &counts[0], &Sa[0], &damage, rp_calc_type );
+    return damage_from_rp( &damage, &counts[0], &Sa[0], rp_calc_type );
 }
 
 

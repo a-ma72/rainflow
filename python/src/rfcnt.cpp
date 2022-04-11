@@ -6,6 +6,8 @@
 #define RFC_TP_STORAGE std::vector<RF::rfc_value_tuple_s>
 #include <rainflow.hpp>
 
+typedef std::vector<Rainflow::rfc_value_tuple_s> rfc_residuum_vec;
+
 
 
 // Convert RFC error numbers to strings
@@ -270,9 +272,18 @@ int parse_rfc_input_series( PyObject* input_series_arg, PyArrayObject **arr_data
 
 // Process rainflow counting
 static
-int do_rainflow( Rainflow *rf, npy_double *data, Py_ssize_t len, Rainflow::rfc_res_method res_method )
+int do_rainflow( Rainflow *rf, npy_double *data, Py_ssize_t len, Rainflow::rfc_res_method res_method, rfc_residuum_vec &residuum_raw )
 {
-    if( !rf->feed( data, len ) || !rf->finalize( res_method ) ) goto fail;
+    const Rainflow::rfc_value_tuple_s *residuum;
+    unsigned residuum_len;
+
+    if( !rf->feed( data, len ) ) goto fail;
+
+    if( !rf->res_get( &residuum, &residuum_len ) ) goto fail;
+
+    residuum_raw = rfc_residuum_vec( residuum, residuum + residuum_len );
+
+    if( !rf->finalize( res_method ) ) goto fail;
 
     return 1;
 fail:
@@ -283,7 +294,7 @@ fail:
 
 // Prepare results
 static
-int prepare_results( Rainflow *rf, Rainflow::rfc_res_method res_method, PyObject **ret )
+int prepare_results( Rainflow *rf, Rainflow::rfc_res_method res_method, rfc_residuum_vec &residuum_raw, PyObject **ret )
 {
     const Rainflow::rfc_value_tuple_s *p_residue;
     Rainflow::rfc_counts_v ct;
@@ -359,6 +370,20 @@ int prepare_results( Rainflow *rf, Rainflow::rfc_res_method res_method, PyObject
     PyDict_SetItemString( *ret, "tp", (PyObject*)arr );
     Py_DECREF( arr );
 
+    // Insert residue_raw
+    u = residuum_raw.size();
+    len[0] = u;
+    len[1] = 0;
+    arr = (PyArrayObject*)PyArray_SimpleNew( 1, len, NPY_DOUBLE );
+    if( !arr ) goto fail_cont;
+    PyArray_FILLWBYTE( arr, 0 );
+    for( unsigned i = 0; i < u; i++ )
+    {
+        *(double*)PyArray_GETPTR1( arr, i ) = (double)residuum_raw[i].value;
+    }
+    PyDict_SetItemString( *ret, "res_raw", (PyObject*)arr );
+    Py_DECREF( arr );
+
     // Insert residue
     if( !rf->res_get( &p_residue, &u ) ) goto fail;
     len[0] = u;
@@ -425,6 +450,7 @@ static PyObject* rfc( PyObject *self, PyObject *args, PyObject *kwargs )
     npy_double *data = NULL;
     Rainflow rf;
     Rainflow::rfc_res_method res_method;
+    rfc_residuum_vec residuum_raw;
     Py_ssize_t len;
     bool ok = false;
 
@@ -440,12 +466,12 @@ static PyObject* rfc( PyObject *self, PyObject *args, PyObject *kwargs )
             break;
         }
 
-        if( !do_rainflow( &rf, data, len, res_method ) )
+        if( !do_rainflow( &rf, data, len, res_method, residuum_raw ) )
         {
             break;
         }
 
-        if( !prepare_results( &rf, res_method, &ret ) )
+        if( !prepare_results( &rf, res_method, residuum_raw, &ret ) )
         {
             break;
         }

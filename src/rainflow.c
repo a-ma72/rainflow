@@ -378,7 +378,7 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
     /* Residue */
     rfc_ctx->internal.residue_cap           = NUMEL( rfc_ctx->internal.residue );
     rfc_ctx->residue_cnt                    = 0;
-    rfc_ctx->residue_cap                    = 2 * rfc_ctx->class_count + 1; /* max size is 2*n plus interim point = 2*n+1 */
+    rfc_ctx->residue_cap                    = 2 * rfc_ctx->class_count + 1; /* 4pt-method fills max 2*n-2 (+1 candidate), +2 extra points ("enforce margin", "interim point") = 2*n+1 */
 
     if( rfc_ctx->residue_cap <= rfc_ctx->internal.residue_cap )
     {
@@ -1016,7 +1016,7 @@ bool RFC_tp_clear( void *ctx )
  * @brief      Returns the residuum
  *
  * @param      ctx              The rainflow context
- * @param[out] residue          The residue
+ * @param[out] residue          The residue (last point is interim, if its tp_pos is zero)
  * @param[out] count            The residue count
  *
  * @return     true on success
@@ -1037,7 +1037,7 @@ bool RFC_res_get( const void *ctx, const rfc_value_tuple_s **residue, unsigned *
 
     if( count )
     {
-        *count = (unsigned)rfc_ctx->residue_cnt;
+        *count = (unsigned)rfc_ctx->residue_cnt + (rfc_ctx->state == RFC_STATE_BUSY_INTERIM);
     }
 
     return true;
@@ -2364,8 +2364,8 @@ bool RFC_rfm_refeed( void *ctx, rfc_value_t new_hysteresis, const rfc_class_para
  * @brief      Get level crossing histogram
  *
  * @param      ctx    The rainflow context
- * @param[out] lc     The buffer for LC histogram (counts), .full_inc represents one "count"!
- * @param[out] level  The buffer for LC upper class borders (dropped if NULL)
+ * @param[out] lc     The buffer for LC histogram (counts), .full_inc represents one "count", space for 1..class_count values must be preserved!
+ * @param[out] level  The buffer for LC upper class borders (dropped if NULL, otherwise space for 1..class_count values must be preserved!)
  *
  * @return     true on success
  */
@@ -2411,9 +2411,9 @@ bool RFC_lc_get( const void *ctx, rfc_counts_t *lc, rfc_value_t *level )
  * @brief      Create level crossing histogram from rainflow matrix
  *
  * @param      ctx     The rainflow context
- * @param[out] lc      The buffer for LC histogram (counts), .full_inc represents one "count"
- * @param[out] level   The buffer for LC upper class borders (dropped if NULL)
- * @param[in]  rfm     The input rainflow matrix, max be NULL
+ * @param[out] lc      The buffer for LC histogram (counts), .full_inc represents one "count", space for 1..class_count values must be preserved!
+ * @param[out] level   The buffer for LC upper class borders (dropped if NULL, otherwise space for 1..class_count values must be preserved!)
+ * @param[in]  rfm     The input rainflow matrix to use instead of ctx rfm, may be NULL
  * @param      flags   The flags
  *
  * @return     true on success
@@ -2432,20 +2432,25 @@ bool RFC_lc_from_rfm( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, con
     {
         return error_raise( rfc_ctx, RFC_ERROR_INVARG );
     }
-    
+
     if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
     {
         return false;
     }
 
+    if( !rfm )
+    {
+        rfm = rfc_ctx->rfm;
+    }
+
     class_count = rfc_ctx->class_count;
-
-    rfm = rfc_ctx->rfm;
-
+    
     if( !rfm || !class_count )
     {
         return false;
     }
+
+    memset( lc, 0, sizeof(rfc_counts_t) * class_count );
 
     for( i = 0; i < class_count; i++ ) 
     {
@@ -2495,14 +2500,16 @@ bool RFC_lc_from_rfm( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, con
  * Calculate level crossing counts from rainflow matrix, write results to lc
  * histogram buffer.
  *
- * @param      ctx    The rainflow context
- * @param[out] lc     The buffer for LC histogram (counts), .full_inc represents one "count"!
- * @param[out] level  The buffer for LC upper class borders (dropped if NULL)
- * @param      flags  The flags
+ * @param      ctx          The rainflow context
+ * @param[out] lc           The buffer for LC histogram (counts), .full_inc represents one "count", space for 1..class_count values must be preserved!
+ * @param[out] level        The buffer for LC upper class borders (dropped if NULL, otherwise space for 1..class_count values must be preserved!)
+ * @param[in]  residue      The residue to use instead of ctx residue (may be NULL)
+ * @param[in]  residue_cnt  The length of the residue
+ * @param      flags        The flags
  *
  * @return     true on success
  */
-bool RFC_lc_from_residue( const void *ctx, rfc_counts_t* lc, rfc_value_t *level, rfc_flags_e flags )
+bool RFC_lc_from_residue( const void *ctx, rfc_counts_t* lc, rfc_value_t *level, const rfc_value_tuple_s *residue, unsigned residue_cnt, rfc_flags_e flags )
 {
           unsigned           i;
           unsigned           class_count;
@@ -2522,9 +2529,15 @@ bool RFC_lc_from_residue( const void *ctx, rfc_counts_t* lc, rfc_value_t *level,
         return false;
     }
 
+    if( !residue )
+    {
+        residue     = rfc_ctx->residue;
+        residue_cnt = rfc_ctx->residue_cnt;
+    }
+
     class_count = rfc_ctx->class_count;
 
-    if( !class_count )
+    if( !residue || !class_count )
     {
         return false;
     }
@@ -2539,8 +2552,8 @@ bool RFC_lc_from_residue( const void *ctx, rfc_counts_t* lc, rfc_value_t *level,
         }
     }
 
-    from = rfc_ctx->residue;
-    for( i = 1; i < rfc_ctx->residue_cnt; i++ ) 
+    from = residue;
+    for( i = 1; i < residue_cnt; i++ ) 
     {
         const rfc_value_tuple_s *to         = from + 1;
               unsigned           class_from = from->cls;
@@ -2580,11 +2593,59 @@ bool RFC_lc_from_residue( const void *ctx, rfc_counts_t* lc, rfc_value_t *level,
 
 
 /**
+ * Calculate level crossing counts from rainflow matrix, write results to lc
+ * histogram buffer.
+ *
+ * @param      ctx          The rainflow context
+ * @param[out] lc           The buffer for LC histogram (counts), .full_inc represents one "count", space for 1..class_count values must be preserved!
+ * @param[out] level        The buffer for LC upper class borders (dropped if NULL, otherwise space for 1..class_count values must be preserved!)
+ * @param[in]  residue      The residue to use instead of ctx residue (may be NULL)
+ * @param[in]  residue_cnt  The length of the residue
+ * @param      flags        The flags
+ *
+ * @return     true on success
+ */
+bool RFC_lc_from_residue2( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, const rfc_value_t* residue, unsigned residue_cnt, rfc_flags_e flags )
+{
+    rfc_value_tuple_s* residue_tuples;
+    unsigned i;
+    bool result;
+
+    RFC_CTX_CHECK_AND_ASSIGN
+
+    if( !residue || !residue_cnt )
+    {
+        return RFC_lc_from_residue( ctx, lc, level, NULL, 0, flags );
+    }
+
+    residue_tuples = (rfc_value_tuple_s*)CALLOC( residue_cnt, sizeof(rfc_value_tuple_s) );
+
+    if( !residue_tuples )
+    {
+        return false;
+    }
+
+    for( i = 0; i < residue_cnt; i++ )
+    {
+        residue_tuples[i].value = residue[i];
+        residue_tuples[i].cls   = QUANTIZE( rfc_ctx, residue[i] );
+        residue_tuples[i].pos   = 0;
+    }
+
+    result = RFC_lc_from_residue( ctx, lc, level, residue_tuples, residue_cnt, flags );
+
+    FREE( residue_tuples );
+
+    return result;
+}
+
+
+/**
  * @brief      Get range pair histogram
  *
  * @param      ctx          The rainflow context
- * @param[out] rp           The histogram (counts), .full_inc represent one "cycle"!
- * @param[out] Sa           The amplitudes (dropped if NULL)
+ * @param[out] rp           The histogram (counts), .full_inc represent one "cycle", space for 1..class_count values must be preserved!
+ * @param[out] Sa           The amplitudes (dropped if NULL, otherwise space for 1..class_count values must be preserved!)
  *
  * @return     true on success
  */
@@ -2612,6 +2673,8 @@ bool RFC_rp_get( const void *ctx, rfc_counts_t *rp, rfc_value_t *Sa )
         return false;
     }
 
+    memset( rp, 0, sizeof(rfc_counts_t) * class_count );
+
     for( i = 0; i < class_count; i++ )
     {
         rp[i] = rfc_ctx->rp[i];
@@ -2630,9 +2693,9 @@ bool RFC_rp_get( const void *ctx, rfc_counts_t *rp, rfc_value_t *Sa )
  * @brief      Generate range pair histogram from rainflow matrix
  *
  * @param      ctx          The rainflow context
- * @param[out] rp           The buffer for range pair counts (not cycles!), .full_inc represents one "cycle"!
- * @param[out] Sa           The buffer for amplitudes (dropped if NULL)
- * @param[in]  rfm          The input rainflow matrix (may be NULL)
+ * @param[out] rp           The buffer for range pair counts (not cycles!), .full_inc represents one "cycle", space for 1..class_count values must be preserved!
+ * @param[out] Sa           The buffer for amplitudes (dropped if NULL, otherwise space for 1..class_count values must be preserved!)
+ * @param[in]  rfm          The input rainflow matrix to use instead of the ctx matrix (may be NULL)
  *
  * @return     true on success
  */
@@ -2653,17 +2716,19 @@ bool RFC_rp_from_rfm( const void *ctx, rfc_counts_t *rp, rfc_value_t *Sa, const 
         return false;
     }
 
-    class_count = rfc_ctx->class_count;
-
     if( !rfm )
     {
         rfm = rfc_ctx->rfm;
     }
 
+    class_count = rfc_ctx->class_count;
+
     if( !rfm || !class_count )
     {
         return false;
     }
+
+    memset( rp, 0, sizeof(rfc_counts_t) * class_count );
 
     for( i = 0; i < class_count; i++ ) 
     {
@@ -2725,17 +2790,17 @@ bool RFC_damage( const void *ctx, rfc_value_t *damage, rfc_value_t *damage_resid
  * @brief      Calculate the damage from a range pair histogram
  *
  * @param      ctx             The rainflow context
- * @param[in]  rp              The range pair counts, may be NULL (Mind that
- *                             full_inc describes 1 cycle!)
- * @param[in]  Sa              The buffer for amplitudes respective rp, may be
- *                             NULL
  * @param[out] damage          The buffer for cumulated damage
+ * @param[in]  rp              The range pair counts to use instead of ctx rp, may be NULL (Mind that
+ *                             full_inc describes 1 cycle!), space for 1..class_count values must be preserved!
+ * @param[in]  Sa              The buffer for amplitudes respective rp, may be
+ *                             NULL, space for 1..class_count values must be preserved!
  * @param      rp_calc_method  The rp calculate method
  *                             (RFC_RP_DAMAGE_CALC_METHOD_*)
  *
  * @return     true on success
  */
-bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_value_t *Sa, double *damage, rfc_rp_damage_method_e rp_calc_method )
+bool RFC_damage_from_rp( const void *ctx, double *damage, const rfc_counts_t *rp, const rfc_value_t *Sa, rfc_rp_damage_method_e rp_calc_method )
 {
     const unsigned    from = 0;
           unsigned    class_count;
@@ -2754,12 +2819,12 @@ bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_valu
         return false;
     }
 
-    class_count = rfc_ctx->class_count;
-
     if( !rp )
     {
         rp = rfc_ctx->rp;
     }
+
+    class_count = rfc_ctx->class_count;
 
     if( !rp || !class_count )
     {
@@ -2821,7 +2886,7 @@ bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_valu
             if( Sa_j >= Sd && Sd > 0.0 ) continue;
 
             /**
-             *  The following lines of code doesn't reflect the original formula as in [6] chapter 3.2.9, formula 3.2-65.
+             *  The following lines of code reflect the original formulas as in [6] 3.2.11 and 3.2-59.
              *  This realization resolves his approach to use partial damages instead of particular cycles from the histogram.
              *  This procedure benefits from inserting an abstraction layer, which permits to use any representation of 
              *  a Woehler curve with a given fatigue strength limit providing a damage per cycle representation. 
@@ -2879,11 +2944,11 @@ bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_valu
 #if RFC_DAMAGE_FAST
         {
             rfc_ctx->damage_lut_inapt++;
-            ok = RFC_damage_from_rp( rfc_ctx, rp, Sa, damage, RFC_RP_DAMAGE_CALC_METHOD_DEFAULT );
+            ok = RFC_damage_from_rp( rfc_ctx, damage, rp, Sa, RFC_RP_DAMAGE_CALC_METHOD_DEFAULT );
             rfc_ctx->damage_lut_inapt--;
         }
 #else /*!RFC_DAMAGE_FAST*/
-        ok = RFC_damage_from_rp( rfc_ctx, rp, Sa, damage, RFC_RP_DAMAGE_CALC_METHOD_DEFAULT );
+        ok = RFC_damage_from_rp( rfc_ctx, damage, rp, Sa, RFC_RP_DAMAGE_CALC_METHOD_DEFAULT );
 #endif /*RFC_DAMAGE_FAST*/
 
         (void)RFC_wl_param_set( rfc_ctx, &wl );
@@ -2903,11 +2968,11 @@ bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_valu
 #if RFC_DAMAGE_FAST
         {
             rfc_ctx->damage_lut_inapt++;
-            ok = RFC_damage_from_rp( rfc_ctx, rp, Sa, damage, RFC_RP_DAMAGE_CALC_METHOD_DEFAULT );
+            ok = RFC_damage_from_rp( rfc_ctx, damage, rp, Sa, RFC_RP_DAMAGE_CALC_METHOD_DEFAULT );
             rfc_ctx->damage_lut_inapt--;
         }
 #else /*!RFC_DAMAGE_FAST*/
-        ok = RFC_damage_from_rp( rfc_ctx, rp, Sa, damage, RFC_RP_DAMAGE_CALC_METHOD_DEFAULT );
+        ok = RFC_damage_from_rp( rfc_ctx, damage, rp, Sa, RFC_RP_DAMAGE_CALC_METHOD_DEFAULT );
 #endif /*RFC_DAMAGE_FAST*/
 
         (void)RFC_wl_param_set( rfc_ctx, &wl );
@@ -2952,12 +3017,12 @@ bool RFC_damage_from_rp( const void *ctx, const rfc_counts_t *rp, const rfc_valu
  * @brief      Calculate the damage from rainflow matrix
  *
  * @param      ctx     The rainflow context
- * @param[in]  rfm     The input rainflow matrix (may be NULL), .full_inc represents one "cycle"!
  * @param[out] damage  The buffer for cumulated damage
+ * @param[in]  rfm     The input rainflow matrix to use instead of ctx rfm (may be NULL), .full_inc represents one "cycle"!
  *
  * @return     true on success
  */
-bool RFC_damage_from_rfm( const void *ctx, const rfc_counts_t *rfm, double *damage )
+bool RFC_damage_from_rfm( const void *ctx, double *damage, const rfc_counts_t *rfm )
 {
     unsigned    from, to;
     unsigned    class_count;
@@ -2975,12 +3040,12 @@ bool RFC_damage_from_rfm( const void *ctx, const rfc_counts_t *rfm, double *dama
         return false;
     }
 
-    class_count = rfc_ctx->class_count;
-
     if( !rfm )
     {
         rfm = rfc_ctx->rfm;
     }
+
+    class_count = rfc_ctx->class_count;
 
     if( !rfm || !class_count )
     {
@@ -4072,9 +4137,9 @@ bool autoresize( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
         {
             rfc_value_tuple_s *pt;
 
-            tp_get( rfc_ctx, i + 1, &pt );  /* tp_pos is bas 1 */
+            tp_get( rfc_ctx, i + 1, &pt );  /* tp_pos is base 1 */
             pt->cls = QUANTIZE( rfc_ctx, pt->value );
-            tp_set( rfc_ctx, i + 1, pt );  /* tp_pos is bas 1 */
+            tp_set( rfc_ctx, i + 1, pt );  /* tp_pos is base 1 */
         }
 #else /*!RFC_USE_DELEGATES*/
         rfc_ctx->tp[i].cls = QUANTIZE( rfc_ctx, rfc_ctx->tp[i].value );
