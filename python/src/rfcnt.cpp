@@ -158,10 +158,10 @@ int parse_rfc_kwargs( PyObject* kwargs, Py_ssize_t len, Rainflow *rf, Rainflow::
         switch( auto_resize )
         {
             case 0:
+                flags &= ~Rainflow::RFC_FLAGS_AUTORESIZE;
                 break;
 
             case 1:
-                flags &= ~Rainflow::RFC_FLAGS_AUTORESIZE;
                 flags |=  Rainflow::RFC_FLAGS_AUTORESIZE;
                 break;
 
