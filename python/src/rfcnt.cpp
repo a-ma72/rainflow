@@ -115,7 +115,7 @@ int parse_rfc_kwargs( PyObject* kwargs, Py_ssize_t len, Rainflow *rf, Rainflow::
             }
             else
             {
-                PyErr_Format( PyExc_RuntimeError, "Wrong key used in wl dict: %O", key );
+                PyErr_Format( PyExc_RuntimeError, "Wrong key used in wl dict: `%S`", key );
                 return 0;
             }
         }
