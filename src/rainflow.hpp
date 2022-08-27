@@ -645,14 +645,14 @@ bool RainflowT<T>::lc_from_rfm( rfc_counts_t *lc, rfc_value_t *level, const rfc_
 template< class T >
 bool RainflowT<T>::lc_from_residue( rfc_counts_t *lc, rfc_value_t *level, const rfc_value_tuple_s *residue, unsigned residue_cnt, rfc_flags_e flags ) const
 {
-    return RF::RFC_lc_from_residue( &m_ctx, (RF::rfc_counts_t *)lc, (RF::rfc_value_t *)level, (const RF::rfc_value_tuple_s *)residue, (unsigned)residue_cnt, (RF::rfc_flags_e) flags );
+    return RF::RFC_lc_from_residue_tuples( &m_ctx, (RF::rfc_counts_t *)lc, (RF::rfc_value_t *)level, (const RF::rfc_value_tuple_s *)residue, (unsigned)residue_cnt, (RF::rfc_flags_e) flags );
 }
 
 
 template< class T >
 bool RainflowT<T>::lc_from_residue( rfc_counts_t *lc, rfc_value_t *level, const rfc_value_t *residue, unsigned residue_cnt, rfc_flags_e flags ) const
 {
-    return RF::RFC_lc_from_residue2( &m_ctx, (RF::rfc_counts_t *)lc, (RF::rfc_value_t *)level, (const RF::rfc_value_t *)residue, (unsigned)residue_cnt, (RF::rfc_flags_e) flags );
+    return RF::RFC_lc_from_residue( &m_ctx, (RF::rfc_counts_t *)lc, (RF::rfc_value_t *)level, (const RF::rfc_value_t *)residue, (unsigned)residue_cnt, (RF::rfc_flags_e) flags );
 }
 
 
@@ -942,7 +942,7 @@ bool RainflowT<T>::lc_from_residue( rfc_counts_v &lc, rfc_value_v &level, const 
     lc.resize( m_ctx.class_count );
     level.resize( m_ctx.class_count );
 
-    return lc_from_residue( &lc[0], &level[0], residue, residue_cnt, flags );
+    return RF::lc_from_residue_tuples( (RF::rfc_counts_t*)&lc[0], (RF::rfc_value_t*)&level[0], (RF::rfc_value_tuple_s*)residue, residue_cnt, flags );
 }
 
 
@@ -956,7 +956,7 @@ bool RainflowT<T>::lc_from_residue( rfc_counts_v &lc, rfc_value_v &level, const 
 template< class T >
 bool RainflowT<T>::lc_from_residue( rfc_counts_v &lc, rfc_value_v &level, const rfc_value_t *residue, unsigned residue_cnt, rfc_flags_e flags ) const
 {
-    return RF::RFC_lc_from_residue2( (RF::rfc_counts_t*)&lc[0], (RF::rfc_value_t*)&level[0], (RF::rfc_value_t*)&residue[0], residue_cnt, flags );
+    return RF::RFC_lc_from_residue( (RF::rfc_counts_t*)&lc[0], (RF::rfc_value_t*)&level[0], (RF::rfc_value_t*)&residue[0], residue_cnt, flags );
 }
 
 

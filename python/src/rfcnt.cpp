@@ -326,7 +326,7 @@ int prepare_results( Rainflow *rf, Rainflow::rfc_res_method res_method, rfc_resi
     if( !rf->damage( &damage ) ) goto fail_rfc;
     PyDict_SetItemString( *ret, "damage", PyFloat_FromDouble( damage ) );
 
-    // Insert range counts
+    // Insert range pair counts
     len[0] = class_count;
     len[1] = 2;
     arr = (PyArrayObject*)PyArray_SimpleNew( 2, len, NPY_DOUBLE );

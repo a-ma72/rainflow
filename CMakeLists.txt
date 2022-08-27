@@ -11,7 +11,7 @@
 # cmake -G "Visual Studio 14 2015 Win64" ..
 
 
-cmake_minimum_required( VERSION 3.12 )
+cmake_minimum_required( VERSION 3.24 )
 set( CMAKE_VERBOSE_MAKEFILE OFF )
 set( CMAKE_BUILD_PARALLEL_LEVEL 12 )
 
@@ -94,10 +94,13 @@ endif()
 
 # MATLAB
 if( RFC_EXPORT_MEX )
-    set( MATLAB_FIND_DEBUG 1 )
-    set( MATLAB_ADDITIONAL_VERSIONS "R2017b=9.3" )
-    set( VERSION_MATLAB 9.3 CACHE STRING "The required Matlab installation (R2017b)"  )
     # find MATLAB
+    set( MATLAB_FIND_DEBUG 1 )
+    set( MATLAB_ADDITIONAL_VERSIONS "R2019b=9.7" )
+    set( VERSION_MATLAB 9 CACHE STRING "The required Matlab installation (at least R2015b)"  )
+    if( DEFINED ENV{Matlab_ROOT_DIR} )
+        set( Matlab_ROOT_DIR $ENV{Matlab_ROOT_DIR} )
+    endif()
     if( NOT Matlab_ROOT_DIR )
         set( Matlab_ROOT_DIR /appl/matlab/2017b )
     endif()

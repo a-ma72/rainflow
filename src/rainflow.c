@@ -2509,7 +2509,55 @@ bool RFC_lc_from_rfm( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, con
  *
  * @return     true on success
  */
-bool RFC_lc_from_residue( const void *ctx, rfc_counts_t* lc, rfc_value_t *level, const rfc_value_tuple_s *residue, unsigned residue_cnt, rfc_flags_e flags )
+bool RFC_lc_from_residue( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, const rfc_value_t* residue, unsigned residue_cnt, rfc_flags_e flags )
+{
+    rfc_value_tuple_s* residue_tuples;
+    unsigned i;
+    bool result;
+
+    RFC_CTX_CHECK_AND_ASSIGN
+
+    if( !residue || !residue_cnt )
+    {
+        return RFC_lc_from_residue_tuples( ctx, lc, level, NULL, 0, flags );
+    }
+
+    residue_tuples = (rfc_value_tuple_s*)CALLOC( residue_cnt, sizeof(rfc_value_tuple_s) );
+
+    if( !residue_tuples )
+    {
+        return false;
+    }
+
+    for( i = 0; i < residue_cnt; i++ )
+    {
+        residue_tuples[i].value = residue[i];
+        residue_tuples[i].cls   = QUANTIZE( rfc_ctx, residue[i] );
+        residue_tuples[i].pos   = 0;
+    }
+
+    result = RFC_lc_from_residue_tuples( ctx, lc, level, residue_tuples, residue_cnt, flags );
+
+    FREE( residue_tuples );
+
+    return result;
+}
+
+
+/**
+ * Calculate level crossing counts from rainflow matrix, write results to lc
+ * histogram buffer.
+ *
+ * @param      ctx          The rainflow context
+ * @param[out] lc           The buffer for LC histogram (counts), .full_inc represents one "count", space for 1..class_count values must be preserved!
+ * @param[out] level        The buffer for LC upper class borders (dropped if NULL, otherwise space for 1..class_count values must be preserved!)
+ * @param[in]  residue      The residue to use instead of ctx residue (may be NULL)
+ * @param[in]  residue_cnt  The length of the residue
+ * @param      flags        The flags
+ *
+ * @return     true on success
+ */
+bool RFC_lc_from_residue_tuples( const void *ctx, rfc_counts_t* lc, rfc_value_t *level, const rfc_value_tuple_s *residue, unsigned residue_cnt, rfc_flags_e flags )
 {
           unsigned           i;
           unsigned           class_count;
@@ -2589,54 +2637,6 @@ bool RFC_lc_from_residue( const void *ctx, rfc_counts_t* lc, rfc_value_t *level,
     }
 
     return true;
-}
-
-
-/**
- * Calculate level crossing counts from rainflow matrix, write results to lc
- * histogram buffer.
- *
- * @param      ctx          The rainflow context
- * @param[out] lc           The buffer for LC histogram (counts), .full_inc represents one "count", space for 1..class_count values must be preserved!
- * @param[out] level        The buffer for LC upper class borders (dropped if NULL, otherwise space for 1..class_count values must be preserved!)
- * @param[in]  residue      The residue to use instead of ctx residue (may be NULL)
- * @param[in]  residue_cnt  The length of the residue
- * @param      flags        The flags
- *
- * @return     true on success
- */
-bool RFC_lc_from_residue2( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, const rfc_value_t* residue, unsigned residue_cnt, rfc_flags_e flags )
-{
-    rfc_value_tuple_s* residue_tuples;
-    unsigned i;
-    bool result;
-
-    RFC_CTX_CHECK_AND_ASSIGN
-
-    if( !residue || !residue_cnt )
-    {
-        return RFC_lc_from_residue( ctx, lc, level, NULL, 0, flags );
-    }
-
-    residue_tuples = (rfc_value_tuple_s*)CALLOC( residue_cnt, sizeof(rfc_value_tuple_s) );
-
-    if( !residue_tuples )
-    {
-        return false;
-    }
-
-    for( i = 0; i < residue_cnt; i++ )
-    {
-        residue_tuples[i].value = residue[i];
-        residue_tuples[i].cls   = QUANTIZE( rfc_ctx, residue[i] );
-        residue_tuples[i].pos   = 0;
-    }
-
-    result = RFC_lc_from_residue( ctx, lc, level, residue_tuples, residue_cnt, flags );
-
-    FREE( residue_tuples );
-
-    return result;
 }
 
 

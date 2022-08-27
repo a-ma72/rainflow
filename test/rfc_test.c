@@ -267,7 +267,7 @@ TEST RFC_lc_test( rfc_ctx_s *ctx, bool cond )
     {
         if( RFC_lc_get( ctx, lc, level ) &&
             RFC_lc_from_rfm( ctx, lc_from_rfm, level_from_rfm, /*rfm*/ NULL, RFC_FLAGS_COUNT_LC ) &&
-            RFC_lc_from_residue( ctx, lc_from_res, level_from_res, RFC_FLAGS_COUNT_LC ) )
+            RFC_lc_from_residue( ctx, lc_from_res, level_from_res, /*residue*/ NULL, 0, RFC_FLAGS_COUNT_LC ) )
         {
             unsigned u;
             for( u = 0; u < ctx->class_count; u++ )
@@ -1485,14 +1485,14 @@ TEST RFC_long_series( int ccnt, int class_count_ar )
             /* Check damage value */
 #if !RFC_MINIMAL
             /* Damage must equal to damage calculated in postprocess */
-            ASSERT( RFC_damage_from_rp( &ctx, NULL /*rp*/, NULL /*Sa*/, &damage, RFC_RP_DAMAGE_CALC_METHOD_DEFAULT ) );
+            ASSERT( RFC_damage_from_rp( &ctx, &damage, NULL /*rp*/, NULL /*Sa*/, RFC_RP_DAMAGE_CALC_METHOD_DEFAULT ) );
 #if RFC_USE_HYSTERESIS_FILTER
             GREATEST_ASSERT_IN_RANGE( 1.14856e-07, damage, 0.00005e-08 );
 #else /*RFC_USE_HYSTERESIS_FILTER*/
             GREATEST_ASSERT_IN_RANGE( 1.14856e-07, damage, 0.00005e-08 );
 #endif /*RFC_USE_HYSTERESIS_FILTER*/
             damage = 0.0;
-            ASSERT( RFC_damage_from_rfm( &ctx, NULL /*rfm*/, &damage ) );
+            ASSERT( RFC_damage_from_rfm( &ctx, &damage, NULL /*rfm*/ ) );
 #if RFC_USE_HYSTERESIS_FILTER
             GREATEST_ASSERT_IN_RANGE( 1.14856e-07, damage, 0.00005e-08 );
 #else /*RFC_USE_HYSTERESIS_FILTER*/
@@ -2133,7 +2133,7 @@ TEST RFC_miner_consequent( void )
         ASSERT( RFC_wl_init_original( &ctx, SD, ND, k ) );
 
         ctx.full_inc = 1;
-        ASSERT( RFC_damage_from_rp( &ctx, Sa_counts, Sa, &D_mk, RFC_RP_DAMAGE_CALC_METHOD_CONSEQUENT /*rp_calc_type*/ ) );
+        ASSERT( RFC_damage_from_rp( &ctx, &D_mk, Sa_counts, Sa, RFC_RP_DAMAGE_CALC_METHOD_CONSEQUENT /*rp_calc_type*/ ) );
 
         /* A is the difference from variable-amplitude to constant-amplitude fatigue life for Sa_hat.
            (Sa_hat is the largest given Sa in histogram) */
@@ -2207,12 +2207,12 @@ TEST RFC_miner_consequent2( void )
 
     repeats = i;
 
-    ASSERT( RFC_damage_from_rp( &ctx, /* counts */ NULL, /* sa */ NULL, &D_orig, RFC_RP_DAMAGE_CALC_METHOD_DEFAULT ) );
-    ASSERT( RFC_damage_from_rp( &ctx, /* counts */ NULL, /* sa */ NULL, &D_elem, RFC_RP_DAMAGE_CALC_METHOD_ELEMENTAR ) );
+    ASSERT( RFC_damage_from_rp( &ctx, &D_orig, /* counts */ NULL, /* sa */ NULL, RFC_RP_DAMAGE_CALC_METHOD_DEFAULT ) );
+    ASSERT( RFC_damage_from_rp( &ctx, &D_elem, /* counts */ NULL, /* sa */ NULL, RFC_RP_DAMAGE_CALC_METHOD_ELEMENTAR ) );
     ctx.wl_k2 = k2;
-    ASSERT( RFC_damage_from_rp( &ctx, /* counts */ NULL, /* sa */ NULL, &D_mod,  RFC_RP_DAMAGE_CALC_METHOD_MODIFIED ) );
+    ASSERT( RFC_damage_from_rp( &ctx, &D_mod,  /* counts */ NULL, /* sa */ NULL, RFC_RP_DAMAGE_CALC_METHOD_MODIFIED ) );
     ctx.wl_k2 = k;
-    ASSERT( RFC_damage_from_rp( &ctx, /* counts */ NULL, /* sa */ NULL, &D_con,  RFC_RP_DAMAGE_CALC_METHOD_CONSEQUENT ) );
+    ASSERT( RFC_damage_from_rp( &ctx, &D_con,  /* counts */ NULL, /* sa */ NULL, RFC_RP_DAMAGE_CALC_METHOD_CONSEQUENT ) );
 
     ASSERT( fabs( D_con / ctx.internal.wl.D - 1 ) < 1e-3 );
 
