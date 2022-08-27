@@ -1,7 +1,7 @@
 from setuptools import setup, Extension
 from os import path
 
-version = (0, 4, 1)
+version = (0, 4,2)
 
 try:
     from numpy import get_include as get_numpy_include
@@ -25,7 +25,7 @@ def main():
         keywords='rainflow counting',
         author="Andreas Martin",
         license='BSD-2-Clause License',
-        url='http://github.com/AndreasMartin72/rainflow',
+        url='http://github.com/a-ma72/rainflow',
         setup_requires=['wheel'],
         install_requires=['numpy'],
         packages=["rfcnt", "rfcnt.tests"],

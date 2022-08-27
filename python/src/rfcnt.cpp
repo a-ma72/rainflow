@@ -77,7 +77,7 @@ int parse_rfc_kwargs( PyObject* kwargs, Py_ssize_t len, Rainflow *rf, Rainflow::
     Py_DECREF( empty );
 
     // Parameters of the SN curve, if defined
-    if( wl )
+    if( wl && wl != Py_None )
     {
         if( !PyDict_Check( wl ) )
         {
