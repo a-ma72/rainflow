@@ -42,30 +42,31 @@ def example_1():
     fig = plt.figure(figsize=(14, 10))
     gs = GridSpec(nrows=3, ncols=2, width_ratios=[1, 2])
     ax1 = fig.add_subplot(gs[0, 0])
-    sns.heatmap(res["rfm"], cmap="YlOrRd", ax=ax1)
+    sns.heatmap(res["rfm"].T, cmap="YlOrRd", ax=ax1)
     ax1.invert_yaxis()
     plt.grid(which="both")
     plt.xlabel("Class # (to)")
     plt.ylabel("Class # (from)")
     r = utils.rpplot_prepare(sa=res["rp"][:, 0] / 2, counts=res["rp"][:, 1])
     ax2 = fig.add_subplot(gs[0, 1])
-    sns.lineplot(
-        x=r["counts"].cumsum(),
-        y=r["sa"],
-        drawstyle='steps-pre', ci=None, ax=ax2)
+    # Stairs plot from right to left
+    ax2.plot(
+        r["counts"].cumsum(),
+        r["sa"],
+        ds="steps-post")
     plt.xscale("log")
-    plt.ylim(bottom=0, top=2000)
+    plt.ylim(bottom=0, top=2500)
     plt.xlim(left=0.9)
     plt.grid(which="both")
     plt.xlabel("N (log) [1]")
     plt.ylabel("$S_a$")
     ax3 = fig.add_subplot(gs[1, :])
-    sns.lineplot(x=np.arange(len(res["dh"])), y=res["dh"].cumsum(), ax=ax3)
+    ax3.plot(np.arange(len(res["dh"])), res["dh"].cumsum())
     plt.grid(which="both")
     plt.xlabel("Sample #")
     plt.ylabel("Damage (cumulative)")
     ax4 = fig.add_subplot(gs[2, :])
-    sns.lineplot(x=np.arange(len(data)), y=data, ax=ax4)
+    ax4.plot(np.arange(len(data)), data)
     plt.grid(which="both")
     plt.xlabel("Sample #")
     plt.ylabel("Value")

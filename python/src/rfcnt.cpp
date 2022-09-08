@@ -87,6 +87,7 @@ int parse_rfc_kwargs( PyObject* kwargs, Py_ssize_t len, Rainflow *rf, Rainflow::
 
         PyObject *key, *value;
         Py_ssize_t pos = 0;
+        bool wl_k2_set = false;
 
         // Iterate over keys
         while( PyDict_Next( wl, &pos, &key, &value ) )
@@ -112,6 +113,7 @@ int parse_rfc_kwargs( PyObject* kwargs, Py_ssize_t len, Rainflow *rf, Rainflow::
             else if( PyUnicode_CompareWithASCIIString( key, "k2" ) == 0 )
             {
                 wl_k2 = fabs( PyFloat_AsDouble( value ) );
+                wl_k2_set = true;
             }
             else
             {
@@ -120,9 +122,10 @@ int parse_rfc_kwargs( PyObject* kwargs, Py_ssize_t len, Rainflow *rf, Rainflow::
             }
         }
 
-        if( wl_k2 < 0 ) wl_k2 = wl_k;
-        if( hysteresis < 0 ) hysteresis = class_width;
+        if( !wl_k2_set ) wl_k2 = wl_k;
     }
+    
+    if( hysteresis < 0 ) hysteresis = class_width;
 
     if( !rf->init( class_count, class_width, class_offset, hysteresis, (Rainflow::rfc_flags_e)flags ) )
     {

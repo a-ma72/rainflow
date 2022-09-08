@@ -25,7 +25,7 @@ predefined functions.
     pip install {packagename}.tar.gz
 where _{packagename}_ is the current package release, for example:
 
-    pip install rfcnt-0.4.0.tar.gz
+    pip install rfcnt-0.4.3.tar.gz
 
 ### Test
 _rfcnt_ packages include some unit tests, which can be run:
@@ -42,7 +42,7 @@ For a quick introduction you can run and inspect a small example:
 ---
 ### References:
 [1] "Standard Practices for Cycle Counting in Fatigue Analysis."  
-    ASTM Standard E 1049, 1985 (2011). 
+    ASTM Standard E 1049, 1985 (2011).
     West Conshohocken, PA: ASTM International, 2011.  
 [2] "Rainflow - HCM / Ein Hysteresisschleifen-Zaehlalgorithmus auf werkstoffmechanischer Grundlage"  
     U.H. Clormann, T. Seeger  
