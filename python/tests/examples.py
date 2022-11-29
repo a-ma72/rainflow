@@ -42,7 +42,7 @@ def example_1():
     fig = plt.figure(figsize=(14, 10))
     gs = GridSpec(nrows=3, ncols=2, width_ratios=[1, 2])
     ax1 = fig.add_subplot(gs[0, 0])
-    sns.heatmap(res["rfm"].T, cmap="YlOrRd", ax=ax1)
+    sns.heatmap(res["rfm"], cmap="YlOrRd", ax=ax1)
     ax1.invert_yaxis()
     plt.grid(which="both")
     plt.xlabel("Class # (to)")
