@@ -1,6 +1,7 @@
-import numpy as np
-from rfcnt import rfcnt, utils # Rainflow module (ftc2)
 import os
+import numpy as np
+import matplotlib.ticker as ticker
+from rfcnt import rfcnt, utils # Rainflow module (ftc2)
 
 
 def __get_script_path():
@@ -12,9 +13,8 @@ def example_1():
         import pandas as pd
         import matplotlib.pyplot as plt
         from matplotlib.gridspec import GridSpec
-        import seaborn as sns
     except ImportError as err:
-        print("This example requires modules 'pandas', 'matplotlib' and 'seaborn!'")
+        print("This example requires modules pandas` and `matplotlib`!")
         raise err
 
     data = pd.read_csv(
@@ -41,12 +41,23 @@ def example_1():
 
     fig = plt.figure(figsize=(14, 10))
     gs = GridSpec(nrows=3, ncols=2, width_ratios=[1, 2])
+
+    # RF matrix
     ax1 = fig.add_subplot(gs[0, 0])
-    sns.heatmap(res["rfm"], cmap="YlOrRd", ax=ax1)
-    ax1.invert_yaxis()
+    im = ax1.imshow(res["rfm"], cmap="YlOrRd", aspect=0.7)
+    cb = plt.colorbar(im, ax=ax1, label="Counts")
+    cb.ax.tick_params(labelsize="x-small")
+    ax1.yaxis.set_major_locator(ticker.MultipleLocator(2))
+    ax1.xaxis.set_major_locator(ticker.MultipleLocator(2))
+    ax1.xaxis.set_ticks_position("top")
+    ax1.xaxis.set_label_position("top")
+    ax1.tick_params(axis="x", labelsize="x-small", labelrotation=90)
+    ax1.tick_params(axis="y", labelsize="x-small")
     plt.grid(which="both")
     plt.xlabel("Class # (to)")
     plt.ylabel("Class # (from)")
+
+    # Range pairs
     r = utils.rpplot_prepare(sa=res["rp"][:, 0] / 2, counts=res["rp"][:, 1])
     ax2 = fig.add_subplot(gs[0, 1])
     # Stairs plot from right to left
@@ -60,11 +71,15 @@ def example_1():
     plt.grid(which="both")
     plt.xlabel("N (log) [1]")
     plt.ylabel("$S_a$")
+
+    # Damage history
     ax3 = fig.add_subplot(gs[1, :])
     ax3.plot(np.arange(len(res["dh"])), res["dh"].cumsum())
     plt.grid(which="both")
     plt.xlabel("Sample #")
     plt.ylabel("Damage (cumulative)")
+
+    # Time series
     ax4 = fig.add_subplot(gs[2, :])
     ax4.plot(np.arange(len(data)), data)
     plt.grid(which="both")

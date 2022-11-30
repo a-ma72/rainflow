@@ -1626,15 +1626,15 @@ TEST RFC_res_repeated( void )
 /*
                                                            
     7.5 ___________________________________________________
-                      +               o                    
+                      +       o                            
     6.5 ___________________________________________________
                                                            
     5.5 ___________________________________________________
-              +               o                            
+              *                                            
     4.5 ___________________________________________________
                                                            
     3.5 ___________________________________________________
-                  +               o                        
+                  *                                        
     2.5 ___________________________________________________
           +               o                                
     1.5 ___________________________________________________
@@ -1650,7 +1650,7 @@ TEST RFC_res_repeated( void )
 
     damage_5_3 = pow( ( (5.0-3.0)/2 / ctx.wl_sx ), fabs(ctx.wl_k) ) / ctx.wl_nx;
     damage_7_2 = pow( ( (7.0-2.0)/2 / ctx.wl_sx ), fabs(ctx.wl_k) ) / ctx.wl_nx;
-    damage = damage_5_3 * 2 + damage_7_2;
+    damage = damage_5_3 + damage_7_2;
 
     if( RFC_init( &ctx, 10 /* class_count */, 1 /* class_width */, -0.5 /* class_offset */,
                         1 /* hysteresis */, RFC_FLAGS_DEFAULT ) )
@@ -1705,12 +1705,12 @@ TEST RFC_res_repeated( void )
     ASSERT( ctx.tp[3].pos == 4 && ctx.tp[3].adj_pos == 1 );
 #if RFC_DH_SUPPORT
     ASSERT(               ctx.tp[0].damage == 0.0 );
-    ASSERT_IN_RANGE( 1.0, ctx.tp[1].damage / (damage_5_3*2), 1e-10 );
+    ASSERT_IN_RANGE( 1.0, ctx.tp[1].damage / damage_5_3, 1e-10 );
     ASSERT(               ctx.tp[2].damage == 0.0 );
-    ASSERT_IN_RANGE( 1.0, ctx.tp[3].damage /  damage_7_2,    1e-10 );
+    ASSERT_IN_RANGE( 1.0, ctx.tp[3].damage / damage_7_2, 1e-10 );
 #endif /*RFC_DH_SUPPORT*/        
 #endif /*RFC_TP_SUPPORT*/
-    ASSERT_IN_RANGE( 1.0, ctx.damage / damage,               1e-10 );
+    ASSERT_IN_RANGE( 1.0, ctx.damage / damage,           1e-10 );
     ASSERT( RFC_deinit( &ctx ) );
 
     PASS();
