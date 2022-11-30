@@ -942,7 +942,7 @@ bool RainflowT<T>::lc_from_residue( rfc_counts_v &lc, rfc_value_v &level, const 
     lc.resize( m_ctx.class_count );
     level.resize( m_ctx.class_count );
 
-    return RF::lc_from_residue_tuples( (RF::rfc_counts_t*)&lc[0], (RF::rfc_value_t*)&level[0], (RF::rfc_value_tuple_s*)residue, residue_cnt, flags );
+    return RF::RFC_lc_from_residue_tuples( (RF::rfc_counts_t*)&lc[0], (RF::rfc_value_t*)&level[0], (RF::rfc_value_tuple_s*)residue, residue_cnt, flags );
 }
 
 

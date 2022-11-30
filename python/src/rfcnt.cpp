@@ -286,6 +286,38 @@ int do_rainflow( Rainflow *rf, npy_double *data, Py_ssize_t len, Rainflow::rfc_r
 
     residuum_raw = rfc_residuum_vec( residuum, residuum + residuum_len );
 
+    // (With regard to finalize_res_repeated() in rainflow.c, remove pending cycle)
+    if( residuum_raw.size() >= 4 )
+    {
+        size_t idx = residuum_raw.size() - 4;
+
+        unsigned A = residuum_raw[idx+0].cls;
+        unsigned B = residuum_raw[idx+1].cls;
+        unsigned C = residuum_raw[idx+2].cls;
+        unsigned D = residuum_raw[idx+3].cls;
+
+        if( B > C )
+        {
+            unsigned temp = B;
+            B = C;
+            C = temp;
+        }
+
+        if( A > D )
+        {
+            unsigned temp = A;
+            A = D;
+            D = temp;
+        }
+
+        /* Check for closed cycles [3] */
+        if( A <= B && C <= D )
+        {
+            // Remove points B and C
+            residuum_raw.erase(residuum_raw.begin() + 1, residuum_raw.begin() + 3);
+        }
+    }
+
     if( !rf->finalize( res_method ) ) goto fail;
 
     return 1;

@@ -4863,7 +4863,42 @@ bool finalize_res_repeated( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
             }
 
             rfc_ctx->internal.flags = flags;
-            /* Feed again with the copy, no new turning points are generated, since residue[].tp_pos */
+
+            /* 
+             * Feed again with the copy, no new turning points are generated, since residue[].tp_pos
+             * but last cycle might not be closed due to interim state of the last point.
+             * Remove that cycle before feeding with the residue again:
+             */
+            if( cnt >= 4 )
+            {
+                size_t idx = cnt - 4;
+
+                unsigned A = residue[idx+0].cls;
+                unsigned B = residue[idx+1].cls;
+                unsigned C = residue[idx+2].cls;
+                unsigned D = residue[idx+3].cls;
+
+                if( B > C )
+                {
+                    unsigned temp = B;
+                    B = C;
+                    C = temp;
+                }
+
+                if( A > D )
+                {
+                    unsigned temp = A;
+                    A = D;
+                    D = temp;
+                }
+
+                /* Check for closed cycles [3] */
+                if( A <= B && C <= D )
+                {
+                    residue[idx+1] = residue[idx+3];
+                    cnt -= 2;
+                }
+            }
 
 #if RFC_TP_SUPPORT
             do
@@ -5412,8 +5447,8 @@ rfc_value_tuple_s * feed_filter_pt( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s 
 {
     int                 slope;
     rfc_value_t         delta;
-    rfc_value_tuple_s  *new_tp    = NULL;
-    int                 do_append = 0;
+    rfc_value_tuple_s  *new_tp      = NULL;
+    bool                do_append   = false;
 
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state <= RFC_STATE_BUSY_INTERIM );
@@ -5487,7 +5522,7 @@ rfc_value_tuple_s * feed_filter_pt( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s 
 
                 /* pt is the new interim turning point */
                 rfc_ctx->state = RFC_STATE_BUSY_INTERIM;
-                do_append = 1;
+                do_append = true;
             }
         }
     }
@@ -5549,7 +5584,7 @@ rfc_value_tuple_s * feed_filter_pt( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s 
                 rfc_ctx->internal.slope = slope;
 
                 /* Handle new turning point */
-                do_append = 1;
+                do_append = true;
             }
             else
             {
