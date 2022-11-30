@@ -12,7 +12,7 @@ if __name__ == '__main__':
 
 """
 Jupyter Notebook:
-!pip install ./rfcnt-0.4.3.tar.gz
+!pip install ./rfcnt-0.4.4.tar.gz
 !pip install --upgrade matplotlib
 !python -m rfcnt.run_examples
 """

@@ -3,29 +3,59 @@ RAINFLOW
 |   coan-args-minimal.in          Input arguments file for coan invocation
 |   coan_invoke-minimal.bat       Invoke coan (cmd shell)
 |   coan_invoke-minimal.sh        Invoke coan (linux shell)
-|   config.h                      Configuration file (Rainflow)
-|   config.h.in                   Configuration file (Input for CMake)
 |   content.txt                   This file
 |   LICENSE                       License information
-|   rainflow.c                    Main routines
-|   rainflow.h                    Header file for rainflow.c
 |   README.MD                     Readme
 |
-+---MATLAB
-|   make.m                        Build rfc.m
-|   validate.m                    Examples an checks
++---python
+|   |   __init.py__               Init
+|   |   run_examples.py           Python script executes examples from .tests.examples
+|   |   run_tests.py              Python script for unit testing
+|   |   utils.py                  Utility module
+|   |   setup.py                  Setup (build, install, deploy)
+|   |   CMakeLists.txt            CMake makefile
+|   |   LICENSE                   License information
+|   |   MANIFEST.in               Manifest file
+|   |   README.md                 Readme
+|   |   pyproject.toml            TOML file for build requirements
+|   |   jupyter_screenshot.png    Output from .tests.examples.example_1()
+|   |   requirements.txt          Requirements of the rfcnt module
+|   |
+|   +---src
+|   |      rainflow.h             Header file for rainflow.c
+|   |      rainflow.hpp           Header file for C++ interface
+|   |      rainflow.c             Rainflow main routines
+|   |      rfcnt.cpp              Python module `rfcnt`
+|   |
+|   \---tests
+|          __init.py__            Init
+|          test_rfcnt.py          Unit Test
+|          examples.py            Examples
+|          long_series.csv        Time series for unit test and examples
+|
++---src
+|      rainflow.h                 Header file for rainflow.c
+|      rainflow.hpp               Header file for C++ interface
+|      rainflow.c                 Rainflow main routines
+|      config.h.in                Configuration file (Input file for CMake)
+|      config.h                   Configuration file (Rainflow)
+|   
++---matlab
+|      make.m                     Build rfc.m
+|      validate.m                 Examples an checks
 |
 +---tools
-|   where_to_get_coan.txt         Link
+|      where_to_get_coan.txt      Link
 |
 +---greatest
-|       greatest.h                3rd party tool for automatic testing of C-code
-|       LICENSE                   License information
-|       README.md                 Readme
+|      greatest.h                3rd party tool for automatic testing of C-code
+|      LICENSE                   License information
+|      README.md                 Readme
 |
 \---test
-        long_series.c             Long dataset for testing
-        long_series.csv           Long dataset for testing as CSV file
-        rfc_test.c                Main program (windows console application) for self-check, uses "greatest"
-        rfc_wrapper_advanced.cpp  Example using rainflow in CPP context applying an advanced wrapper
-        rfc_wrapper_simple.cpp    Example using rainflow in CPP context applying a simple wrapper
+       long_series.h             Header (defining long series data length)
+       long_series.c             Time series for tests
+       long_series.csv           Time series for tests as CSV file
+       rfc_test.c                Main program (windows console application) for comprehensive unit test, uses "greatest"
+       rfc_wrapper_simple.cpp    Example using rainflow in CPP context applying a simple wrapper
+       rfc_wrapper_advanced.cpp  Example using rainflow in CPP context applying an advanced wrapper
