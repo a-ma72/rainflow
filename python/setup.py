@@ -1,7 +1,7 @@
 from os import path
 from setuptools import setup, Extension
 
-version = (0, 4, 5)
+version = (0, 4, 5, ".post1")
 
 try:
     from numpy import __version__ as np_version
@@ -18,7 +18,7 @@ def main():
 
     setup(
         name="rfcnt",
-        version="%d.%d.%d" % version,
+        version="%d.%d.%d%s" % version,
         description="Python interface for rainflow counting",
         long_description=long_description,
         long_description_content_type='text/markdown',
