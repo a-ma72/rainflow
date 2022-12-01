@@ -1,4 +1,4 @@
-from rfcnt.tests import examples
+from .tests import examples
 
 
 def main():
@@ -8,11 +8,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-"""
-Jupyter Notebook:
-!pip install ./rfcnt-0.4.3.tar.gz
-!pip install --upgrade matplotlib
-!python -m rfcnt.run_examples
-"""

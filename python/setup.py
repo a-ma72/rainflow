@@ -1,41 +1,14 @@
-# Source distribution (./dist)
-# python setup.py build sdist
-# 
-# Binary distribution (./build)
-# python -m build -nwx
-# python setup.py bdist_wheel --plat-name=win-amd64
-# python setup.py bdist --formats=wininst
-# python setup.py bdist_wininst --title= --bitmap=
-# pip install --force-reinstall --no-deps package.tar
-
-# If build with mingw32 compiler (TDM-GCC64):
-# Comment out the get_msvcr() occurrences in PATHONPATH/Lib/distutils/cygwinccompiler.py
-# Create a file distutils.cfg in PYTHON_ROOT/Lib/distutils:
-# [build]
-# compiler=mingw32
-
-# PyPi
-# python3 -m pip install --upgrade build twine
-# python3 -m build
-# python3 -m twine upload --repository testpypi dist/*
-# pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple rfcnt==0.2.0
-# python3 -m twine upload --repository pypi dist/*
-
-
-# Install (Jupyter Notebook)
-# !export CFLAGS='-std=c++11' && pip install rfcnt
-
-from setuptools import setup, Extension
 from os import path
+from setuptools import setup, Extension
 
-version = (0, 4, 4)
+version = (0, 4, 5)
 
 try:
+    from numpy import __version__ as np_version
     from numpy import get_include as get_numpy_include
 except ImportError:
     def get_numpy_include():
         return "NUMPY_NOTFOUND"
-
 
 def main():
     this_directory = path.abspath(path.dirname(__file__))
@@ -58,7 +31,7 @@ def main():
         packages=["rfcnt", "rfcnt.tests"],
         package_dir={"rfcnt": "", "rfcnt.tests": "tests"},
         package_data={
-            "rfcnt": ["*.py",
+            "rfcnt": ["*.py", "_ext/*",
                       "requirements.txt", "README.md", "LICENSE"],
             "rfcnt.tests": ["*.py", "long_series.csv"]
         },
@@ -113,3 +86,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+    print("numpy: %s" % (np_version,))
+

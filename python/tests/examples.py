@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import matplotlib.ticker as ticker
-from rfcnt import rfcnt, utils # Rainflow module (ftc2)
+from .. import rfcnt, utils
 
 
 def __get_script_path():

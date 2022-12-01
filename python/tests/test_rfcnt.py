@@ -1,7 +1,7 @@
 import os
 import unittest
-from rfcnt import rfcnt
 import numpy as np
+from .. import rfcnt
 
 
 class TestRainflowCounting(unittest.TestCase):

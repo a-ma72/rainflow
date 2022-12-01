@@ -1,7 +1,7 @@
-from rfcnt.tests import test_rfcnt
-import unittest
 from io import StringIO
+import unittest
 from pprint import pprint
+from .tests import test_rfcnt
 
 
 def run():
@@ -17,11 +17,3 @@ def run():
 
 if __name__ == '__main__':
     run()
-
-
-"""
-Jupyter Notebook:
-!pip install ./rfcnt-0.4.3.tar.gz
-!pip install --upgrade matplotlib
-!python -m rfcnt.run_tests
-"""

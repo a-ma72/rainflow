@@ -65,7 +65,7 @@
  *     Scott, D.
  * []  "Werkstoffmechanik - Bauteile sicher beurteilen undWerkstoffe richtig einsetzen"; 
  *      Ralf Buergel, Hans Albert Richard, Andre Riemer; Springer FachmedienWiesbaden 2005, 2014
- * []  "Zaelverfahren und Lastannahme in der Betriebsfestigkeit";
+ * []  "Zaehlverfahren und Lastannahme in der Betriebsfestigkeit";
  *     Michael Koehler, Sven Jenne / Kurt Poetter, Harald Zenner; Springer-Verlag Berlin Heidelberg 2012
  *
  *
