@@ -22,10 +22,10 @@ To take the residue into account, you may implement a custom method or use some
 predefined functions.
  
 ### Install
-    pip install {packagename}.tar.gz
+    pip install {packagename}.tar.gz --no-build-isolation --no-deps
 where _{packagename}_ is the current package release, for example:
 
-    pip install rfcnt-0.4.5.tar.gz
+    pip install rfcnt-0.4.5.tar.gz --no-build-isolation --no-deps
 
 ### Test
 _rfcnt_ packages include some unit tests, which can be run:
