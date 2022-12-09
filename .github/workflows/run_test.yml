@@ -32,5 +32,6 @@ jobs:
         pip install . --no-build-isolation --no-deps
     - name: Test
       run: |
+        pip install pandas
         python -m rfcnt.run_tests
   
