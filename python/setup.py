@@ -1,7 +1,7 @@
 from os import path
 from setuptools import setup, Extension
 
-version = (0, 4, 5, ".post1")
+version = (0, 4, 5, ".post2")
 
 try:
     from numpy import __version__ as np_version
@@ -15,6 +15,26 @@ def main():
     long_description = ""
     with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
         long_description = f.read()
+
+    define_macros=[
+        ('NPY_NO_DEPRECATED_API',     'NPY_1_7_API_VERSION'),
+        ('RFC_HAVE_CONFIG_H',         '0'),
+        ('RFC_VERSION_MAJOR',         str(version[0])),
+        ('RFC_VERSION_MINOR',         str(version[1])),
+        ('RFC_USE_INTEGRAL_COUNTS',   '0'),
+        ('RFC_USE_HYSTERESIS_FILTER', '1'),
+        ('RFC_MINIMAL',               '0'),
+        ('RFC_TP_SUPPORT',            '1'),
+        ('RFC_HCM_SUPPORT',           '1'),
+        ('RFC_ASTM_SUPPORT',          '1'),
+        ('RFC_USE_DELEGATES',         '1'),
+        ('RFC_GLOBAL_EXTREMA',        '1'),
+        ('RFC_DAMAGE_FAST',           '1'),
+        ('RFC_DH_SUPPORT',            '1'),
+        ('RFC_AT_SUPPORT',            '1'),
+        ('RFC_AR_SUPPORT',            '1'),
+        ('RFC_DEBUG_FLAGS',           '0'),
+        ('RFC_EXPORT_MEX',            '0')]
 
     setup(
         name="rfcnt",
@@ -35,28 +55,12 @@ def main():
                       "requirements.txt", "README.md", "LICENSE"],
             "rfcnt.tests": ["*.py", "long_series.csv"]
         },
+        libraries = [("rainflow_c", {"sources": ["src/rainflow.c"],
+                                     "macros": define_macros})],
         ext_modules=[
             Extension(
-                "rfcnt.rfcnt", ["src/rfcnt.cpp", "src/rainflow.c"],
-                define_macros=[
-                    ('NPY_NO_DEPRECATED_API',     'NPY_1_7_API_VERSION'),
-                    ('RFC_HAVE_CONFIG_H',         '0'),
-                    ('RFC_VERSION_MAJOR',         str(version[0])),
-                    ('RFC_VERSION_MINOR',         str(version[1])),
-                    ('RFC_USE_INTEGRAL_COUNTS',   '0'),
-                    ('RFC_USE_HYSTERESIS_FILTER', '1'),
-                    ('RFC_MINIMAL',               '0'),
-                    ('RFC_TP_SUPPORT',            '1'),
-                    ('RFC_HCM_SUPPORT',           '1'),
-                    ('RFC_ASTM_SUPPORT',          '1'),
-                    ('RFC_USE_DELEGATES',         '1'),
-                    ('RFC_GLOBAL_EXTREMA',        '1'),
-                    ('RFC_DAMAGE_FAST',           '1'),
-                    ('RFC_DH_SUPPORT',            '1'),
-                    ('RFC_AT_SUPPORT',            '1'),
-                    ('RFC_AR_SUPPORT',            '1'),
-                    ('RFC_DEBUG_FLAGS',           '0'),
-                    ('RFC_EXPORT_MEX',            '0')],
+                "rfcnt.rfcnt", ["src/rfcnt.cpp"],
+                define_macros=define_macros,
                 include_dirs=['src', get_numpy_include()],
                 extra_compile_args=['-std=c++11'],
             )
