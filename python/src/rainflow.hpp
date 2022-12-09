@@ -43,7 +43,9 @@
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
-#include "rainflow.h"
+extern "C" {
+    #include "rainflow.h"
+}
 
 #pragma pack(push, 1)
 
