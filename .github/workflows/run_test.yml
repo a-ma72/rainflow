@@ -28,6 +28,7 @@ jobs:
         cd python
         pip install -r requirements.txt
         pip install . --no-build-isolation --no-deps
+        cd ..
     - name: Test
       run: |
         python -m rfcnt.run_tests
