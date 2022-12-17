@@ -1,7 +1,7 @@
 import os
 import unittest
 import numpy as np
-from .. import rfcnt
+from .. import rfc, ResidualMethod, SDMethod
 
 
 class TestRainflowCounting(unittest.TestCase):
@@ -16,7 +16,7 @@ class TestRainflowCounting(unittest.TestCase):
             class_width  = 1
             class_offset = 0
         else:
-            class_width  = (data.max() - data.min()) / (class_count - 1)
+            class_width  = data.ptp() / (class_count - 1)
             class_width  = np.ceil(class_width * 100) / 100
             class_offset = np.floor((data.min() - class_width / 2) * 1000) / 1000
 
@@ -30,13 +30,13 @@ class TestRainflowCounting(unittest.TestCase):
         class_width, \
          class_offset     =  self.class_param(x, class_count)
         hysteresis        =  class_width
-        enforce_margin    =  0  # First and last data point may be excluded in tp
-        use_HCM           =  0  # Use 4 point method, not HCM
-        use_ASTM          =  0  # Use 4 point method, not ASTM
-        residual_method   =  0  # No processing on residue
-        spread_damage     =  0  # No damage spreading
+        enforce_margin    =  False                # First and last data point may be excluded in tp
+        use_HCM           =  False                # Use 4 point method, not HCM
+        use_ASTM          =  False                # Use 4 point method, not ASTM
+        residual_method   =  ResidualMethod.NONE  # No processing on residue
+        spread_damage     =  SDMethod.NONE        # No damage spreading
 
-        res = rfcnt.rfc(
+        res = rfc(
             x, class_count=class_count,
             class_width=class_width,
             class_offset=class_offset,
@@ -58,13 +58,13 @@ class TestRainflowCounting(unittest.TestCase):
         class_width, \
          class_offset     =  self.class_param(x, class_count)
         hysteresis        =  class_width * 0.99
-        enforce_margin    =  0  # First and last data point may be excluded in tp
-        use_HCM           =  0  # Use 4 point method, not HCM
-        use_ASTM          =  0  # Use 4 point method, not ASTM
-        residual_method   =  0  # No processing on residue
-        spread_damage     =  0  # No damage spreading
+        enforce_margin    =  False                # First and last data point may be excluded in tp
+        use_HCM           =  False                # Use 4 point method, not HCM
+        use_ASTM          =  False                # Use 4 point method, not ASTM
+        residual_method   =  ResidualMethod.NONE  # No processing on residue
+        spread_damage     =  SDMethod.NONE        # No damage spreading
 
-        res = rfcnt.rfc(
+        res = rfc(
             x, class_count=class_count,
             class_width=class_width,
             class_offset=class_offset,
@@ -87,13 +87,13 @@ class TestRainflowCounting(unittest.TestCase):
         class_width, \
          class_offset     =  self.class_param(x, class_count)
         hysteresis        =  class_width * 0.99
-        enforce_margin    =  0  # First and last data point may be excluded in tp
-        use_HCM           =  0  # Use 4 point method, not HCM
-        use_ASTM          =  0  # Use 4 point method, not ASTM
-        residual_method   =  0  # No processing on residue
-        spread_damage     =  0  # No damage spreading
+        enforce_margin    =  False                # First and last data point may be excluded in tp
+        use_HCM           =  False                # Use 4 point method, not HCM
+        use_ASTM          =  False                # Use 4 point method, not ASTM
+        residual_method   =  ResidualMethod.NONE  # No processing on residue
+        spread_damage     =  SDMethod.NONE        # No damage spreading
 
-        res = rfcnt.rfc(
+        res = rfc(
             x, class_count=class_count,
             class_width=class_width,
             class_offset=class_offset,
@@ -117,13 +117,13 @@ class TestRainflowCounting(unittest.TestCase):
         class_width, \
          class_offset     =  self.class_param(x, class_count)
         hysteresis        =  class_width
-        enforce_margin    =  0  # First and last data point may be excluded in tp
-        use_HCM           =  0  # Use 4 point method, not HCM
-        use_ASTM          =  0  # Use 4 point method, not ASTM
-        residual_method   =  0  # No processing on residue
-        spread_damage     =  0  # No damage spreading
+        enforce_margin    =  False                # First and last data point may be excluded in tp
+        use_HCM           =  False                # Use 4 point method, not HCM
+        use_ASTM          =  False                # Use 4 point method, not ASTM
+        residual_method   =  ResidualMethod.NONE  # No processing on residue
+        spread_damage     =  SDMethod.NONE        # No damage spreading
 
-        res = rfcnt.rfc(
+        res = rfc(
             x, class_count=class_count,
             class_width=class_width,
             class_offset=class_offset,
@@ -156,14 +156,13 @@ class TestRainflowCounting(unittest.TestCase):
         x                 =  pd.read_csv(os.path.join(self.get_script_path(), "long_series.csv"), header=None)
         x                 =  x.to_numpy().squeeze()
         hysteresis        =  class_width
-        use_HCM           =  0
-        enforce_margin    =  1  # Enforce first and last data point included in tp
-        use_HCM           =  0  # Use 4 point method, not HCM
-        use_ASTM          =  0  # Use 4 point method, not ASTM
-        residual_method   =  0  # 0=RFC_RES_NONE, 7=RFC_RES_REPEATED
-        spread_damage     =  1  # 0=RFC_SD_HALF_23, 1=RFC_SD_RAMP_AMPLITUDE_23
+        enforce_margin    =  True                        # First and last data point may be excluded in tp
+        use_HCM           =  False                       # Use 4 point method, not HCM
+        use_ASTM          =  False                       # Use 4 point method, not ASTM
+        residual_method   =  ResidualMethod.NONE         # No processing on residue
+        spread_damage     =  SDMethod.RAMP_AMPLITUDE_23  # No damage spreading
 
-        res = rfcnt.rfc(
+        res = rfc(
             x, class_count=class_count,
             class_width=class_width,
             class_offset=class_offset,
@@ -178,9 +177,9 @@ class TestRainflowCounting(unittest.TestCase):
         # Without residuum: pd == 1.1486e-07
         self.assertTrue(np.absolute(res["tp"][:, 2].sum() / res["damage"] - 1) < 1e-10)
 
-        spread_damage = 8;  # 7=RFC_SD_TRANSIENT_23, 8=RFC_SD_TRANSIENT_23c
+        spread_damage = SDMethod.TRANSIENT_23c
 
-        res = rfcnt.rfc(
+        res = rfc(
             x, class_count=class_count,
             class_width=class_width,
             class_offset=class_offset,

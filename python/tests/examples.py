@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import matplotlib.ticker as ticker
-from .. import rfcnt, utils
+from .. import rfc, utils, ResidualMethod, SDMethod
 
 
 def __get_script_path():
@@ -22,21 +22,21 @@ def example_1():
     data = data.to_numpy().squeeze()
 
     class_count = 50
-    class_range = data.max() - data.min()
+    class_range = data.ptp()
     class_width = class_range / (class_count - 1)
     class_offset = data.min() - class_width / 2
 
-    res = rfcnt.rfc(
+    res = rfc(
         data, class_count=class_count,
         class_offset=class_offset,
         class_width=class_width,
         hysteresis=class_width,
-        use_HCM=0,
-        use_ASTM=0,
-        #spread_damage=0,   # RFC_SD_HALF_23
-        spread_damage=8,   # RFC_SD_TRANSIENT_23c
-        #residual_method=0, # RFC_RES_NONE
-        residual_method=7, # RFC_RES_REPEATED
+        use_HCM=False,
+        use_ASTM=False,
+        #spread_damage=SDMethod.HALF_23
+        spread_damage=SDMethod.TRANSIENT_23c,
+        #residual_method=ResidualMethod.NONE,
+        residual_method=ResidualMethod.REPEATED,
         wl={"sd": 1e3, "nd": 1e7, "k": 5})
 
     fig = plt.figure(figsize=(14, 10))

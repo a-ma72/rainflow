@@ -329,7 +329,7 @@ fail:
 
 // Prepare results
 static
-int prepare_results( Rainflow *rf, Rainflow::rfc_res_method res_method, rfc_residuum_vec &residuum_raw, PyObject **ret )
+int prepare_results( Rainflow *rf, Py_ssize_t data_len, Rainflow::rfc_res_method res_method, rfc_residuum_vec &residuum_raw, PyObject **ret )
 {
     const Rainflow::rfc_value_tuple_s *p_residue;
     Rainflow::rfc_counts_v ct;
@@ -452,7 +452,7 @@ int prepare_results( Rainflow *rf, Rainflow::rfc_res_method res_method, rfc_resi
 
     // Insert damage history
     if( !rf->dh_get( &dh, &dh_cnt ) ) goto fail_rfc;
-    len[0] = dh_cnt;
+    len[0] = data_len;
     len[1] = 0;
     arr = (PyArrayObject*)PyArray_SimpleNew( 1, len, NPY_DOUBLE );
     if( !arr ) goto fail_cont;
@@ -506,7 +506,7 @@ static PyObject* rfc( PyObject *self, PyObject *args, PyObject *kwargs )
             break;
         }
 
-        if( !prepare_results( &rf, res_method, residuum_raw, &ret ) )
+        if( !prepare_results( &rf, len, res_method, residuum_raw, &ret ) )
         {
             break;
         }
