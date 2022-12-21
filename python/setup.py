@@ -51,7 +51,7 @@ def main():
         packages=["rfcnt", "rfcnt.tests"],
         package_dir={"rfcnt": "", "rfcnt.tests": "tests"},
         package_data={
-            "rfcnt": ["*.py", "_ext/*",
+            "rfcnt": ["*.py*", "_ext/*",
                       "requirements.txt", "README.md", "LICENSE"],
             "rfcnt.tests": ["*.py", "long_series.csv"]
         },

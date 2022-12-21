@@ -57,19 +57,19 @@ int parse_rfc_kwargs( PyObject* kwargs, Py_ssize_t len, Rainflow *rf, Rainflow::
                   "hysteresis","residual_method", "enforce_margin", "auto_resize",
                   "use_HCM", "use_ASTM", "spread_damage", "lc_method", "wl", NULL};
 
-    if( !PyArg_ParseTupleAndKeywords( empty, kwargs, "d|iddiiiiiiiO", kw,
-                                      &class_width,
-                                      &class_count,
-                                      &class_offset,
-                                      &hysteresis,
-                                       res_method,
-                                      &enforce_margin,
-                                      &auto_resize,
-                                      &use_hcm,
-                                      &use_astm,
-                                      &spread_damage,
-                                      &lc_method,
-                                      &wl ) )
+    if( !PyArg_ParseTupleAndKeywords( empty, kwargs, "d|iddippppiiO", kw,
+                                      &class_width,     // d
+                                      &class_count,     // i
+                                      &class_offset,    // d
+                                      &hysteresis,      // d
+                                       res_method,      // i
+                                      &enforce_margin,  // p
+                                      &auto_resize,     // p
+                                      &use_hcm,         // p
+                                      &use_astm,        // p
+                                      &spread_damage,   // i
+                                      &lc_method,       // i
+                                      &wl ) )           // O
     {
         Py_DECREF( empty );
         return 0;

@@ -33,9 +33,9 @@ def example_1():
         hysteresis=class_width,
         use_HCM=False,
         use_ASTM=False,
-        #spread_damage=SDMethod.HALF_23
+        # spread_damage=SDMethod.HALF_23
         spread_damage=SDMethod.TRANSIENT_23c,
-        #residual_method=ResidualMethod.NONE,
+        # residual_method=ResidualMethod.NONE,
         residual_method=ResidualMethod.REPEATED,
         wl={"sd": 1e3, "nd": 1e7, "k": 5})
 

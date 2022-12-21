@@ -6,6 +6,6 @@ rainflow\.sublime-workspace
 /python/build
 /python/venv
 /python/dist
-/python/rfcnt*
 /python/MANIFEST
 /src/config.h
+python/rfcnt.egg-info/

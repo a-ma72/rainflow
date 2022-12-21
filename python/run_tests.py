@@ -1,6 +1,7 @@
-from io import StringIO
 import unittest
+from io import StringIO
 from pprint import pprint
+
 from .tests import test_rfcnt
 
 
