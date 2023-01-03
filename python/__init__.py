@@ -1,8 +1,4 @@
-import os
-import sys
 from enum import IntEnum
-from importlib.util import module_from_spec, spec_from_file_location
-from typing import Union
 
 
 class ResidualMethod(IntEnum):
@@ -36,16 +32,25 @@ class LCMethod(IntEnum):
     SLOPES_ALL = 3
 
 
-def _load_spec_extension_module():
-    """Select and load a suitable extension build"""
-    from numpy import __version__ as np__version__
-    from numpy import ndarray
+def _npy_version():
+    """Query numpy version.
+    (See <https://numpy.org/doc/stable/reference/generated/numpy.lib.NumpyVersion.html>)
+    """
+    from numpy import __version__ as version
     from numpy.lib import NumpyVersion
 
+    return NumpyVersion(version)
+
+
+def _load_spec_extension_module():
+    """Select and load a suitable extension build"""
+    import os, sys
+    from importlib.util import module_from_spec, spec_from_file_location
     EXT_DIR = "_ext"
 
-    # see `numpy/numpy/core/include/numpy/numpyconfig.h`
-    npy_version = NumpyVersion(np__version__)
+    assert sys.version_info >= (3, 9)
+
+    npy_version = _npy_version()
     if npy_version < '1.20.0':
         # API version 0x8
         infix = "npy_1_19_5"
@@ -59,11 +64,6 @@ def _load_spec_extension_module():
         # API version 0x10
         infix = "npy_1_23_5"
 
-    if npy_version >= "1.20.0":
-        from numpy.typing import ArrayLike
-    else:
-        ArrayLike = Union[list, ndarray]  # noqa F841
-
     modulename = [file for file in os.listdir(os.path.join(__path__[0], EXT_DIR)) if infix in file]
 
     if len(modulename) == 1:
@@ -74,7 +74,13 @@ def _load_spec_extension_module():
         del spec, module, npy_version, infix
     else:
         raise ImportError("No suitable build found for numpy %s!",
-                          np__version__)
+                          npy_version.vstring)
+
+
+if _npy_version() >= "1.20.0":
+    from numpy.typing import ArrayLike
+else:
+    from typing import Any as ArrayLike
 
 
 # Try to import the extension module, compiled from sources.

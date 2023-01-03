@@ -1,13 +1,14 @@
 from os import path
 from setuptools import setup, Extension
 
-version = (0, 4, 5, ".post2")
+version = (0, 4, 6)
 
 try:
     from numpy import __version__ as np_version
-    from numpy import get_include as get_numpy_include
+    from numpy import get_include as np_get_include
 except ImportError:
-    def get_numpy_include():
+    np_version = "NUMPY_NOTFOUND"
+    def np_get_include():
         return "NUMPY_NOTFOUND"
 
 def main():
@@ -38,7 +39,7 @@ def main():
 
     setup(
         name="rfcnt",
-        version="%d.%d.%d%s" % version,
+        version="%d.%d.%d" % version,
         description="Python interface for rainflow counting",
         long_description=long_description,
         long_description_content_type='text/markdown',
@@ -61,7 +62,7 @@ def main():
             Extension(
                 "rfcnt.rfcnt", ["src/rfcnt.cpp"],
                 define_macros=define_macros,
-                include_dirs=['src', get_numpy_include()],
+                include_dirs=['src', np_get_include()],
                 extra_compile_args=['-std=c++11'],
             )
         ],

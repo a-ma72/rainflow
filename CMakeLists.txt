@@ -1,5 +1,5 @@
 # CMakeLists for rainflow
-# 2022, Andreas Martin
+# 2023, Andreas Martin
 
 # First set Matlab_ROOT_DIR environment variable to your installed matlab path,
 # such as 'export Matlab_ROOT_DIR=/usr/local/MATLAB/R2017b'!
