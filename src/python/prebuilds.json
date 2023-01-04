@@ -1,0 +1,5 @@
+{
+     "1.19.3": {"capi": 13, "target": "rfcnt_npy_1_19_3_api_v13.cp39-win_amd64"}
+    ,"2.0.0": {"capi": 18, "target": "rfcnt_npy_2_0_0_api_v18.cp39-win_amd64"}
+    ,"1.19.3": {"capi":13, "target": "root"}
+}

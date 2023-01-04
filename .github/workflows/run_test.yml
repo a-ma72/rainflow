@@ -17,7 +17,12 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
         python-version: ["3.7", "3.8", "3.9", "3.10"]
-
+        exclude:  # Python < v3.8 does not support Apple Silicon ARM64.
+          - python-version: "3.7"
+            os: macos-latest
+        include:  # So run those legacy versions on Intel CPUs.
+          - python-version: "3.7"
+            os: macos-13
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
@@ -26,12 +31,23 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        cd python
+        cd src/python
         pip install wheel
         pip install -r requirements.txt
         pip install . --no-build-isolation --no-deps
-    - name: Test
+    - name: Run Python tests
       run: |
         pip install pandas
         python -m rfcnt.run_tests
-  
+    - name: Set up CMake
+      uses: lukka/get-cmake@latest
+    - name: Pull & update submodules recursively
+      run: |
+          git submodule update --init --recursive
+          git submodule update --recursive --remote
+    - name: Build an test rfc core
+      run: |
+        cmake -S . -B build -DRFC_EXPORT_PY=0 -DRFC_EXPORT_MEX=0 -DRFC_UNIT_TEST=1
+        cd build
+        cmake --build . --target rfc_test --config Release
+        ctest -C Release -V

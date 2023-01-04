@@ -50,8 +50,8 @@
 #define GREATEST_FPRINTF fprintf
 #define RFC_VALUE_TYPE   double
 
-#include "../src/rainflow.h"
-#include "../greatest/greatest.h"
+#include "rainflow.h"
+#include "greatest.h"
 #include <locale.h>
 #include <math.h>
 #include <float.h>
@@ -418,10 +418,10 @@ TEST RFC_tp_prune_test( int ccnt )
     ctx.tp_locked = 0;;
     ASSERT( RFC_tp_prune( &ctx, /*count*/ 100, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS | RFC_FLAGS_TPPRUNE_PRESERVE_RES ) );
 
-    ASSERT( ctx.tp_cnt == ccnt ? 107 : 100 );
+    ASSERT( ctx.tp_cnt == ( ccnt ? 105 : 100 ) );
     /* Should not change anything: */
     ASSERT( RFC_tp_prune( &ctx, /*count*/ 100, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS | RFC_FLAGS_TPPRUNE_PRESERVE_RES ) );
-    ASSERT( ctx.tp_cnt == ccnt ? 107 : 100 );
+    ASSERT( ctx.tp_cnt == ( ccnt ? 105 : 100 ) );
 
     ASSERT( RFC_tp_prune( &ctx, /*count*/ 0, /*flags*/ RFC_FLAGS_TPPRUNE_PRESERVE_POS | RFC_FLAGS_TPPRUNE_PRESERVE_RES ) );
     ASSERT( ctx.tp_cnt == ctx.residue_cnt );
@@ -585,7 +585,7 @@ TEST RFC_tp_refeed_test( int ccnt )
                 chunk_len = data_len - i;
             }
 
-            j_step = ++j_step % NUMEL(stepwidth);
+            j_step = (j_step + 1) % NUMEL(stepwidth);
 
             for( j = i; j < i + chunk_len; j++ )
             {
@@ -2488,4 +2488,6 @@ int main( int argc, char *argv[] )
     }
 
     strip_buffer( NULL );
+
+    return 1;
 }

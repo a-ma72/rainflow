@@ -1,0 +1,8 @@
+[build-system]
+requires = [
+    "setuptools>=42",
+    "wheel",
+    # "oldest-supported-numpy",  # for Numpy 1.x versions
+    # "numpy",                   # for actual Numpy version
+]
+build-backend = "setuptools.build_meta"

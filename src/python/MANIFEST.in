@@ -1,0 +1,6 @@
+include lib/config.h
+include lib/rainflow.c
+include lib/rainflow.h
+include lib/rainflow.hpp
+include src/rfcnt.cpp
+include LICENSE

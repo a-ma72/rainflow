@@ -1,0 +1,2 @@
+matplotlib>=3.2.2  # for tests and examples
+pandas  # for tests and examples
