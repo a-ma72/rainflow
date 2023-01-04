@@ -1,7 +1,8 @@
 from os import path
 from setuptools import setup, Extension
 
-version = (0, 4, 7)
+version = (0, 4, 7, "pre")
+version_str = "%d.%d.%d.%s" % version
 
 try:
     from numpy import __version__ as np_version
@@ -39,7 +40,7 @@ def main():
 
     setup(
         name="rfcnt",
-        version="%d.%d.%d" % version,
+        version=version_str,
         description="Python interface for rainflow counting",
         long_description=long_description,
         long_description_content_type='text/markdown',
