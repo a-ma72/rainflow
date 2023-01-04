@@ -1,7 +1,7 @@
 from os import path
 from setuptools import setup, Extension
 
-version = (0, 4, 6)
+version = (0, 4, 7)
 
 try:
     from numpy import __version__ as np_version
