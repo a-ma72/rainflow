@@ -6894,8 +6894,9 @@ bool spread_damage( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from,
 
                 if( pos > rfc_ctx->internal.pos )
                 {
-                    pos -= rfc_ctx->internal.pos;
-                    dh  -= rfc_ctx->internal.pos;
+                    pos        -= rfc_ctx->internal.pos;
+                    dh         -= rfc_ctx->internal.pos;
+                    dh_istream -= rfc_ctx->internal.pos;
                 }
 
                 if( pos > rfc_ctx->dh_cap )
