@@ -1,6 +1,10 @@
 #define PY_SSIZE_T_CLEAN
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <Python.h>
+// C ABI compatibility: https://stackoverflow.com/a/74296491/11492317
+// https://pypi.org/project/oldest-supported-numpy/
 #include <numpy/arrayobject.h>
+// #include "numpy_arrayobject.h"
 #include <vector>
 //#define RFC_MEM_ALLOC NULL
 #define RFC_TP_STORAGE std::vector<RF::rfc_value_tuple_s>
@@ -25,7 +29,7 @@ const char* rfc_err_str( int nr )
         case Rainflow::RFC_ERROR_DH_BAD_STREAM:      return "Input stream must be unique";
         case Rainflow::RFC_ERROR_DH:                 return "Error while damage history calculation/access";
         case Rainflow::RFC_ERROR_LUT:                return "Error while accessing look up tables";
-        case Rainflow::RFC_ERROR_DATA_OUT_OF_RANGE:  return "Input data leaves classrange";
+        case Rainflow::RFC_ERROR_DATA_OUT_OF_RANGE:  return "Input data leaves class range";
         default:                                     return "Unexpected error";
     }
 }
@@ -57,7 +61,7 @@ int parse_rfc_kwargs( PyObject* kwargs, Py_ssize_t len, Rainflow *rf, Rainflow::
                   "hysteresis","residual_method", "enforce_margin", "auto_resize",
                   "use_HCM", "use_ASTM", "spread_damage", "lc_method", "wl", NULL};
 
-    if( !PyArg_ParseTupleAndKeywords( empty, kwargs, "d|iddippppiiO", kw,
+    if( !PyArg_ParseTupleAndKeywords( empty, kwargs, "d|iddi$ppppiiO", kw,
                                       &class_width,     // d
                                       &class_count,     // i
                                       &class_offset,    // d
@@ -170,6 +174,21 @@ int parse_rfc_kwargs( PyObject* kwargs, Py_ssize_t len, Rainflow *rf, Rainflow::
 
             default:
                 PyErr_SetString( PyExc_RuntimeError, "Parameter 'auto_resize' must be 0 or 1!" );
+                return 0;
+        }
+
+        switch( enforce_margin )
+        {
+            case 0:
+                flags &= ~Rainflow::RFC_FLAGS_ENFORCE_MARGIN;
+                break;
+
+            case 1:
+                flags |=  Rainflow::RFC_FLAGS_ENFORCE_MARGIN;
+                break;
+
+            default:
+                PyErr_SetString( PyExc_RuntimeError, "Parameter 'enforce_margin' must be 0 or 1!" );
                 return 0;
         }
 
@@ -406,7 +425,7 @@ int prepare_results( Rainflow *rf, Py_ssize_t data_len, Rainflow::rfc_res_method
     Py_DECREF( arr );
 
     // Insert residue_raw
-    u = residuum_raw.size();
+    u = (unsigned int)residuum_raw.size();
     len[0] = u;
     len[1] = 0;
     arr = (PyArrayObject*)PyArray_SimpleNew( 1, len, NPY_DOUBLE );
@@ -534,9 +553,18 @@ static PyObject* rfc( PyObject *self, PyObject *args, PyObject *kwargs )
 }
 
 
+static PyObject* _numpy_api_version( PyObject *self )
+{
+    // Return the NumPy API version as a Python integer object
+    int numpy_api_version = NPY_API_VERSION;  // Make sure, that NPY_API_VERSION is integer type
+    return Py_BuildValue("i", numpy_api_version);
+}
+
+
 // Exported methods are collected in a table
 PyMethodDef method_table[] = {
     {"rfc", (PyCFunction) rfc, METH_VARARGS | METH_KEYWORDS, "Rainflow counting"},
+    {"_numpy_api_version", (PyCFunction) _numpy_api_version, METH_NOARGS, "NumPy API version"},
     {NULL, NULL, 0, NULL} // Sentinel value ending the table
 };
 

@@ -50,8 +50,8 @@
 #define GREATEST_FPRINTF fprintf
 #define RFC_VALUE_TYPE   double
 
-#include "../src/rainflow.h"
-#include "../greatest/greatest.h"
+#include "rainflow.h"
+#include "greatest.h"
 #include <locale.h>
 #include <math.h>
 #include <float.h>
@@ -2488,4 +2488,6 @@ int main( int argc, char *argv[] )
     }
 
     strip_buffer( NULL );
+
+    return 1;
 }

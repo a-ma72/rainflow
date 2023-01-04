@@ -1,7 +1,7 @@
 
 /* Using Rainflow C-Library in a C++ context */
 
-#include "../src/config.h"
+#include "config.h"
 
 // Check for correct configuration
 #if !RFC_MINIMAL            && \
@@ -17,8 +17,8 @@
 // "Cross-platform C++ Utility Library" [https://github.com/i42output/neolib]
 #define HAVE_NEOLIB 0
 
-#include "../src/rainflow.h"
-#include "../greatest/greatest.h"
+#include "rainflow.h"
+#include "greatest.h"
 
 #define NUMEL(x) (sizeof(x)/sizeof(*(x)))
 
@@ -56,7 +56,7 @@ namespace RFC_CPP_NAMESPACE
  * class Rainflow supporting external turning points storage 
  * with given type */
 #define RFC_TP_STORAGE RFC_CPP_NAMESPACE::tp_storage
-#include "../src/rainflow.hpp"
+#include "rainflow.hpp"
 
 
 
@@ -163,7 +163,7 @@ SUITE( RFC_WRAPPER_SUITE_ADVANCED )
 }
 
 #else
-#include "../greatest/greatest.h"
+#include "greatest.h"
 
 TEST wrapper_test_advanced( void )
 {

@@ -230,9 +230,9 @@ public:
         RFC_SD_NONE                             = RF::RFC_SD_NONE,                              /**< No spread damage calculation */
         RFC_SD_HALF_23                          = RF::RFC_SD_HALF_23,                           /**< Equally split damage between P2 and P3 */
         RFC_SD_RAMP_AMPLITUDE_23                = RF::RFC_SD_RAMP_AMPLITUDE_23,                 /**< Spread damage according to amplitude over points between P2 and P3 */
-        RFC_SD_RAMP_DAMAGE_23                   = RF::RFC_SD_RAMP_DAMAGE_23,                    /**< Spread damage linearly over points between P2 and P3 */
-        RFC_SD_RAMP_AMPLITUDE_24                = RF::RFC_SD_RAMP_AMPLITUDE_24,                 /**< Spread damage according to amplitude over points between P2 and P4 */  
-        RFC_SD_RAMP_DAMAGE_24                   = RF::RFC_SD_RAMP_DAMAGE_24,                    /**< Spread damage linearly over points between P2 and P4 */
+        RFC_SD_RAMP_DAMAGE_23                   = RF::RFC_SD_RAMP_DAMAGE_23,                    /**< Spread damage evenly over points between P2 and P3 */
+        RFC_SD_RAMP_AMPLITUDE_24                = RF::RFC_SD_RAMP_AMPLITUDE_24,                 /**< Spread damage exponentially according to amplitude impact over points between P2 and P4 */
+        RFC_SD_RAMP_DAMAGE_24                   = RF::RFC_SD_RAMP_DAMAGE_24,                    /**< Spread damage evenly over points between P2 and P4 */
         RFC_SD_FULL_P2                          = RF::RFC_SD_FULL_P2,                           /**< Assign damage to P2 */
         RFC_SD_FULL_P3                          = RF::RFC_SD_FULL_P3,                           /**< Assign damage to P3 */
         RFC_SD_TRANSIENT_23                     = RF::RFC_SD_TRANSIENT_23,                      /**< Spread damage transient according to amplitude over points between P2 and P3 */
