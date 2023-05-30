@@ -1,7 +1,8 @@
+import re
 from os import path
 from setuptools import setup, Extension
 
-version = (0, 4, 7, "pre")
+version = (0, 4, 7, "rc1")
 version_str = "%d.%d.%d.%s" % version
 
 try:
@@ -17,12 +18,21 @@ def main():
     long_description = ""
     with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
         long_description = f.read()
+    with open(path.join(this_directory, 'src', 'config.h_')) as f:
+        RFC_VERSION_MAJOR = RFC_VERSION_MINOR = None
+        for line in f:
+            if match := re.match(r".*#define\s+RFC_VERSION_(MAJOR|MINOR)\s+\"(\d+)\".*", line):
+                if match.group(1) == "MAJOR":
+                    RFC_VERSION_MAJOR = match.group(1)
+                else:
+                    RFC_VERSION_MINOR = match.group(2)
+        assert RFC_VERSION_MAJOR is not None and RFC_VERSION_MINOR is not None, "Can't locate version signature."
 
     define_macros=[
         ('NPY_NO_DEPRECATED_API',     'NPY_1_7_API_VERSION'),
         ('RFC_HAVE_CONFIG_H',         '0'),
-        ('RFC_VERSION_MAJOR',         str(version[0])),
-        ('RFC_VERSION_MINOR',         str(version[1])),
+        ('RFC_VERSION_MAJOR',         RFC_VERSION_MAJOR),
+        ('RFC_VERSION_MINOR',         RFC_VERSION_MINOR),
         ('RFC_USE_INTEGRAL_COUNTS',   '0'),
         ('RFC_USE_HYSTERESIS_FILTER', '1'),
         ('RFC_MINIMAL',               '0'),
@@ -36,7 +46,8 @@ def main():
         ('RFC_AT_SUPPORT',            '1'),
         ('RFC_AR_SUPPORT',            '1'),
         ('RFC_DEBUG_FLAGS',           '0'),
-        ('RFC_EXPORT_MEX',            '0')]
+        ('RFC_EXPORT_MEX',            '0'),
+        ('RFC_EXPORT_PY',             '0')]
 
     setup(
         name="rfcnt",

@@ -1,8 +1,8 @@
 
 /* Using Rainflow C-Library in a C++ context */
 
-#include "../src/rainflow.h"
-#include "../greatest/greatest.h"
+#include "rainflow.h"
+#include "greatest.h"
 
 
 /* Made extern "C", so that C-Code (rfc_test.c) can access this function (in a C++ module)

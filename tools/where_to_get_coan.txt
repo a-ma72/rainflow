@@ -1,1 +1,19 @@
+
 Get "coan" from http://coan2.sourceforge.net
+
+From the coan website:
+======================
+Coan is a software engineering tool for analysing preprocessor-based
+configurations of C or C++ source code. Its principal use is to simplify a
+body of source code by eliminating any parts that are redundant with respect
+to a specified configuration. Dead code removal is an application of this sort.
+
+Coan is most useful to developers of constantly evolving products with large
+code bases, where preprocessor definitions and #if-directives are used
+differentiate progressive releases or parallel variants of the product.
+In these settings the upkeep of the product's configuration tree can become
+difficult and the incidence of configuration-related defects can become costly.
+(The side-panels on these pages illustrate how preprocessor-encrusted
+production code can get.) Coan can largely automate the maintenance of
+preprocessor-based configurations and the investigation of
+configuration-related questions.

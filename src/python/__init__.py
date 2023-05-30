@@ -32,7 +32,7 @@ class LCMethod(IntEnum):
     SLOPES_ALL = 3
 
 
-def _npy_version():
+def _npy_version() -> "NumpyVersion":
     """Query numpy version.
     (See <https://numpy.org/doc/stable/reference/generated/numpy.lib.NumpyVersion.html>)
     """
@@ -42,13 +42,21 @@ def _npy_version():
     return NumpyVersion(version)
 
 
+def _npy_get_capi(npy_version: "NumpyVersion") -> int:
+    """Return the numpy C API VERSION."""
+    if npy_version < '1.20.0': return 0x08
+    elif npy_version < '1.22.0': return 0x0e
+    elif npy_version < '1.23.0': return 0x0f
+    else: return 0x10
+
+
 def _load_spec_extension_module():
     """Select and load a suitable extension build"""
     import os, sys
     from importlib.util import module_from_spec, spec_from_file_location
     EXT_DIR = "_ext"
 
-    assert sys.version_info >= (3, 9)
+    assert sys.version_info >= (3, 8), "Only Python >= 3.8 supported."
 
     npy_version = _npy_version()
     if npy_version < '1.20.0':
@@ -66,15 +74,17 @@ def _load_spec_extension_module():
 
     modulename = [file for file in os.listdir(os.path.join(__path__[0], EXT_DIR)) if infix in file]
 
+    module_loaded = False
     if len(modulename) == 1:
         spec = spec_from_file_location(".rfcnt", os.path.join(__path__[0], EXT_DIR, modulename[0]))
-        module = module_from_spec(spec)
-        sys.modules[__name__ + spec.name] = module
-        spec.loader.exec_module(module)
-        del spec, module, npy_version, infix
-    else:
-        raise ImportError("No suitable build found for numpy %s!",
-                          npy_version.vstring)
+        if spec:
+            module = module_from_spec(spec)
+            sys.modules[__name__ + spec.name] = module
+            spec.loader.exec_module(module)
+            del spec, module, npy_version, infix
+            module_loaded = True
+    if not module_loaded:
+        raise ImportError("No suitable build found for numpy {}!".format(npy_version.vstring))
 
 
 if _npy_version() >= "1.20.0":
@@ -84,15 +94,20 @@ else:
 
 
 # Try to import the extension module, compiled from sources.
-# When this module is installed from a wheel, there are multiple 
+# When this module is installed from a wheel, there are multiple
 # versions depending on the version of numpy installed.
 # In latter case, the suitable version will be loaded and
 # finally imported.
 try:
     from . import rfcnt
-except ImportError:
-    _load_spec_extension_module()
-    from . import rfcnt
+except (ImportError, RuntimeError):
+    import os
+    if os.name == "nt":
+        _load_spec_extension_module()
+        from . import rfcnt
+        print("Success: Loaded another suitable prebuilt instead.")
+    else:
+        raise
 # For backward compatibility supporting rfcnt.rfc() and rfcnt.rfcnt.rfc()
 rfc = rfcnt.rfc
 from . import tests, utils  # noqa F402

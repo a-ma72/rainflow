@@ -1,4 +1,5 @@
 #define PY_SSIZE_T_CLEAN
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <Python.h>
 #include <numpy/arrayobject.h>
 #include <vector>
@@ -421,7 +422,7 @@ int prepare_results( Rainflow *rf, Py_ssize_t data_len, Rainflow::rfc_res_method
     Py_DECREF( arr );
 
     // Insert residue_raw
-    u = residuum_raw.size();
+    u = (unsigned int)residuum_raw.size();
     len[0] = u;
     len[1] = 0;
     arr = (PyArrayObject*)PyArray_SimpleNew( 1, len, NPY_DOUBLE );

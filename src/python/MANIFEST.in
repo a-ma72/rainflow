@@ -1,3 +1,4 @@
+include src/config.h_
 include src/rainflow.c
 include src/rainflow.h
 include src/rainflow.hpp

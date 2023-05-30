@@ -109,6 +109,8 @@
 #include "config.h"  /* Configuration */
 #endif
 
+#define RFC_CORE_VERSION "0.8"
+
 #ifndef ON
 #define ON (1)
 #endif /*ON*/

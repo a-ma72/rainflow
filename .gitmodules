@@ -1,3 +1,3 @@
-[submodule "greatest"]
-	path = greatest
+[submodule "src/3rd_party/greatest"]
+	path = src/3rd_party/greatest
 	url = https://github.com/silentbicycle/greatest.git
