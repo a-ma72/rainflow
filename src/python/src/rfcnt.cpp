@@ -1,6 +1,8 @@
 #define PY_SSIZE_T_CLEAN
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <Python.h>
+// C ABI compatibility: https://stackoverflow.com/a/74296491/11492317
+// https://pypi.org/project/oldest-supported-numpy/
 #include <numpy/arrayobject.h>
 #include <vector>
 //#define RFC_MEM_ALLOC NULL

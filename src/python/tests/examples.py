@@ -1,6 +1,5 @@
 import os
 import numpy as np
-import matplotlib.ticker as ticker
 from .. import rfc, utils, ResidualMethod, SDMethod
 
 
@@ -9,6 +8,7 @@ def __get_script_path():
 
 
 def example_1():
+    import matplotlib.ticker as ticker
     try:
         import pandas as pd
         import matplotlib.pyplot as plt

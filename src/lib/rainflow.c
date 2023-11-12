@@ -1843,6 +1843,7 @@ bool RFC_rfm_get( const void *ctx, rfc_rfm_item_s **buffer, unsigned *count )
     rfc_counts_t       *rfm_it;
     rfc_rfm_item_s     *item;
 
+
     RFC_CTX_CHECK_AND_ASSIGN
 
     if( !buffer || !count )
@@ -1858,6 +1859,7 @@ bool RFC_rfm_get( const void *ctx, rfc_rfm_item_s **buffer, unsigned *count )
     class_count = rfc_ctx->class_count;
 
     rfm_it = rfc_ctx->rfm;
+
 
     if( !rfm_it || !class_count )
     {
@@ -2491,7 +2493,8 @@ bool RFC_lc_from_residue( const void *ctx, rfc_counts_t *lc, rfc_value_t *level,
         return RFC_lc_from_residue_tuples( ctx, lc, level, NULL, 0, flags );
     }
 
-    residue_tuples = (rfc_value_tuple_s*)CALLOC( residue_cnt, sizeof(rfc_value_tuple_s) );
+    residue_tuples = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( NULL, rfc_ctx->residue_cap,
+                                                             sizeof(rfc_value_tuple_s), RFC_MEM_AIM_RESIDUE );
 
     if( !residue_tuples )
     {
@@ -2507,7 +2510,7 @@ bool RFC_lc_from_residue( const void *ctx, rfc_counts_t *lc, rfc_value_t *level,
 
     result = RFC_lc_from_residue_tuples( ctx, lc, level, residue_tuples, residue_cnt, flags );
 
-    FREE( residue_tuples );
+    rfc_ctx->mem_alloc( residue_tuples, 0, 0, RFC_MEM_AIM_RESIDUE);
 
     return result;
 }

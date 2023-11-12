@@ -17,5 +17,5 @@
   #define RFC_AT_SUPPORT             ON
   #define RFC_AR_SUPPORT             ON
   #define RFC_DEBUG_FLAGS            OFF
-  #define RFC_EXPORT_MEX             0
+  #define RFC_EXPORT_MEX             ON
 #endif /*RFC_VERSION_MAJOR*/

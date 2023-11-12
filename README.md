@@ -87,7 +87,7 @@ or use the option to configure the build tree:
 To build a Python package (wheel) you don't need cmake. Use packages `setuptools`, `wheel` and `build` instead:
 
     cd src/python
-    pip install numpy==1.23.5 setuptools build wheel
+    pip install setuptools build wheel oldest-supported-numpy
     python -mbuild -nw
 
 #### Run examples
@@ -110,7 +110,8 @@ Currently, two options are offered to perform a unit test:
 
     Then invoke the unit test:
 
-        build/test/rfc_test
+        build/test/Release/rfc_test      # Linux
+        build\test\Release\rfc_test.exe  # Windows
 
     or
 

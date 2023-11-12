@@ -1,4 +1,5 @@
 from enum import IntEnum
+from .version import __version__
 
 
 class ResidualMethod(IntEnum):
@@ -72,6 +73,7 @@ def _load_spec_extension_module():
         # API version 0x10
         infix = "npy_1_23_5"
 
+    infix += ".cp{0}{1}".format(*sys.version_info)
     modulename = [file for file in os.listdir(os.path.join(__path__[0], EXT_DIR)) if infix in file]
 
     module_loaded = False
@@ -80,9 +82,12 @@ def _load_spec_extension_module():
         if spec:
             module = module_from_spec(spec)
             sys.modules[__name__ + spec.name] = module
-            spec.loader.exec_module(module)
+            try:
+                spec.loader.exec_module(module)
+                module_loaded = True
+            except:
+                pass
             del spec, module, npy_version, infix
-            module_loaded = True
     if not module_loaded:
         raise ImportError("No suitable build found for numpy {}!".format(npy_version.vstring))
 

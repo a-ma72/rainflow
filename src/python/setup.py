@@ -2,10 +2,9 @@ import re
 from os import path
 from setuptools import setup, Extension
 
-version = (0, 4, 7, "rc1")
-version_str = "%d.%d.%d.%s" % version
 
 try:
+    # Check if numpy is installed
     from numpy import __version__ as np_version
     from numpy import get_include as np_get_include
 except ImportError:
@@ -13,12 +12,13 @@ except ImportError:
     def np_get_include():
         return "NUMPY_NOTFOUND"
 
+
 def main():
     this_directory = path.abspath(path.dirname(__file__))
     long_description = ""
     with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
         long_description = f.read()
-    with open(path.join(this_directory, 'src', 'config.h_')) as f:
+    with open(path.join(this_directory, '..', 'lib', 'config.h')) as f:
         RFC_VERSION_MAJOR = RFC_VERSION_MINOR = None
         for line in f:
             if match := re.match(r".*#define\s+RFC_VERSION_(MAJOR|MINOR)\s+\"(\d+)\".*", line):
@@ -26,9 +26,17 @@ def main():
                     RFC_VERSION_MAJOR = match.group(1)
                 else:
                     RFC_VERSION_MINOR = match.group(2)
-        assert RFC_VERSION_MAJOR is not None and RFC_VERSION_MINOR is not None, "Can't locate version signature."
+        assert RFC_VERSION_MAJOR is not None and RFC_VERSION_MINOR is not None, \
+            "Can't locate version signature."
+    ver_ns = {}
+    with open(path.join(this_directory, "version.py")) as f:
+        exec(f.read(), ver_ns)
+    _version = ver_ns["_version"]
+    __version__ = ver_ns["__version__"]
+    __author__ = ver_ns["__author__"]
+    del ver_ns, f
 
-    define_macros=[
+    define_macros = [
         ('NPY_NO_DEPRECATED_API',     'NPY_1_7_API_VERSION'),
         ('RFC_HAVE_CONFIG_H',         '0'),
         ('RFC_VERSION_MAJOR',         RFC_VERSION_MAJOR),
@@ -51,12 +59,12 @@ def main():
 
     setup(
         name="rfcnt",
-        version=version_str,
+        version=__version__,
         description="Python interface for rainflow counting",
         long_description=long_description,
         long_description_content_type='text/markdown',
         keywords='rainflow counting',
-        author="Andreas Martin",
+        author=__author__,
         license='BSD-2-Clause License',
         url='http://github.com/a-ma72/rainflow',
         setup_requires=['wheel'],
@@ -68,13 +76,13 @@ def main():
                       "requirements.txt", "README.md", "LICENSE"],
             "rfcnt.tests": ["*.py", "long_series.csv"]
         },
-        libraries = [("rainflow_c", {"sources": ["src/rainflow.c"],
+        libraries = [("rainflow_c", {"sources": ["../lib/rainflow.c"],
                                      "macros": define_macros})],
         ext_modules=[
             Extension(
                 "rfcnt.rfcnt", ["src/rfcnt.cpp"],
                 define_macros=define_macros,
-                include_dirs=['src', np_get_include()],
+                include_dirs=['src', '../lib', np_get_include()],
                 extra_compile_args=['-std=c++11'],
             )
         ],
