@@ -3681,6 +3681,45 @@ bool RFC_wl_param_get( const void *ctx, rfc_wl_param_s *wl_param )
 
     return true;
 }
+
+
+
+/**
+ * @brief      Get Woehler curve parameters for predamaged specimen (residual strength)
+ *
+ * @param      ctx       The rainflow context
+ * @param[out] wl_param  The Woehler curve parameters
+ *
+ * @return     true on success
+ */
+bool RFC_wl_param_get_impaired( const void *ctx, rfc_wl_param_s *wl_param )
+{
+    RFC_CTX_CHECK_AND_ASSIGN
+
+    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
+    {
+        return false;
+    }
+
+    if( !wl_param                        ||
+         rfc_ctx->state < RFC_STATE_INIT )
+    {
+        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
+    }
+
+    wl_param->sx            = rfc_ctx->internal.wl.sx;
+    wl_param->nx            = rfc_ctx->internal.wl.nx;
+    wl_param->k             = rfc_ctx->internal.wl.k;
+    wl_param->q             = rfc_ctx->internal.wl.q;
+    wl_param->sd            = rfc_ctx->internal.wl.sd;
+    wl_param->nd            = rfc_ctx->internal.wl.nd;
+    wl_param->q2            = rfc_ctx->internal.wl.q2;
+    wl_param->k2            = rfc_ctx->internal.wl.k2;
+    wl_param->omission      = rfc_ctx->internal.wl.omission;
+    wl_param->D             = rfc_ctx->internal.wl.D;
+
+    return true;
+}
 #endif /*!RFC_MINIMAL*/
 
 

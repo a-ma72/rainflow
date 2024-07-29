@@ -371,6 +371,7 @@ public:
     bool            at_init                 ( double M, double Sm_rig, double R_rig, bool R_pinned );
     bool            at_transform            ( double Sa, double Sm, double &Sa_transformed ) const;
     bool            wl_param_get            ( rfc_wl_param_s &wl_param ) const;
+    bool            wl_param_get_impaired   ( rfc_wl_param_s &wl_param ) const;
 
     /* TP storage access */
     inline const
@@ -1025,6 +1026,13 @@ template< class T >
 bool RainflowT<T>::wl_param_get( rfc_wl_param_s &wl_param ) const
 {
     return RF::RFC_wl_param_get( &m_ctx, &wl_param );
+}
+
+
+template< class T >
+bool RainflowT<T>::wl_param_get_impaired( rfc_wl_param_s &wl_param ) const
+{
+    return RF::RFC_wl_param_get_impaired( &m_ctx, &wl_param );
 }
 
 

@@ -493,6 +493,7 @@ bool        RFC_wl_calc_sa              ( const void *ctx, double s0, double n0,
 bool        RFC_wl_calc_n               ( const void *ctx, double s0, double n0, double k, double  sa, double *n );
 bool        RFC_wl_param_set            (       void *ctx, const rfc_wl_param_s * );
 bool        RFC_wl_param_get            ( const void *ctx, rfc_wl_param_s * );
+bool        RFC_wl_param_get_impaired   ( const void *ctx, rfc_wl_param_s * );
 bool        RFC_class_param_set         (       void *ctx, const rfc_class_param_s * );
 bool        RFC_class_param_get         ( const void *ctx, rfc_class_param_s * );
 bool        RFC_class_number            ( const void *ctx, rfc_value_t value, unsigned *class_number );

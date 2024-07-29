@@ -571,6 +571,22 @@ int prepare_results( Rainflow *rf, Py_ssize_t data_len, Rainflow::rfc_res_method
     PyDict_SetItemString( *ret, "dh", (PyObject*)arr );
     Py_DECREF( arr );
 
+    // WL impaired
+    if( !rf->wl_param_get_impaired( wl ) ) goto fail_rfc;
+    obj = PyDict_New();
+    if( !obj ) goto fail_rfc;
+    PyDict_SetItemString( obj, "sx", PyFloat_FromDouble( wl.sx ) );
+    PyDict_SetItemString( obj, "nx", PyFloat_FromDouble( wl.nx ) );
+    PyDict_SetItemString( obj, "sd", PyFloat_FromDouble( wl.sd ) );
+    PyDict_SetItemString( obj, "nd", PyFloat_FromDouble( wl.nd ) );
+    PyDict_SetItemString( obj, "k", PyFloat_FromDouble( wl.k ) );
+    PyDict_SetItemString( obj, "k2", PyFloat_FromDouble( wl.k2 ) );
+    PyDict_SetItemString( obj, "q", PyFloat_FromDouble( wl.q ) );
+    PyDict_SetItemString( obj, "q2", PyFloat_FromDouble( wl.q2 ) );
+    PyDict_SetItemString( obj, "omission", PyFloat_FromDouble( wl.omission ) );
+    PyDict_SetItemString( obj, "D", PyFloat_FromDouble( wl.D ) );
+    PyDict_SetItemString( *ret, "wl_miner_consequent", obj );
+
     return 1;
 
 fail:
@@ -647,12 +663,127 @@ PyObject* rfc( PyObject *self, PyObject *args, PyObject *kwargs )
 }
 
 
+static
+PyObject* damage_from_rp( PyObject *self, PyObject *args, PyObject *kwargs )
+{
+    PyObject                    *Py_Sa, *Py_counts,
+                                *Py_wl = nullptr;
+    PyArrayObject               *arr = nullptr;
+    double                      *buffer;
+    Py_ssize_t                  size;
+    unsigned int                class_count = 0;
+    Rainflow::rfc_double_v      vec_sa;
+    Rainflow::rfc_counts_v      vec_counts;
+    std::vector<npy_intp>       vec_sorted_indices;
+    Rainflow::rfc_wl_param_s    wl = {0};
+    enum Rainflow::rfc_rp_damage_method damage_method = Rainflow::RFC_RP_DAMAGE_CALC_METHOD_DEFAULT;
+    const char* kw[] = { "Sa", "counts",
+                         "wl",
+                         "method",
+                         nullptr};
+
+    if( !PyArg_ParseTupleAndKeywords( args, kwargs, "OO|$Oi:damage_from_rp", (char**)kw,
+                                      &Py_Sa, &Py_counts, &Py_wl, &damage_method ) )
+    {
+        return nullptr;
+    }
+
+    if( damage_method < 0 || damage_method > 3 )
+    {
+        PyErr_SetString(PyExc_ValueError, "´damage_method` must be in range 0 to 3.");
+        return nullptr;
+    }
+
+    wl.sx = 1e3;
+    wl.nx = 1e7;
+    wl.k = wl.k2 = 5;
+    if( Py_wl )
+    {
+        if( !get_dict_wl( Py_wl, "wl", wl ) ) return nullptr;
+    }
+
+    if(convert_to_numpy_array(Py_Sa, &arr, &buffer, &size) )
+    {
+        PyObject *sorted_indices = PyArray_ArgSort( arr, 0, NPY_QUICKSORT );
+        if( !sorted_indices || (PyObject*)sorted_indices == Py_None )
+        {
+            PyErr_SetString( PyExc_RuntimeError, "Error while sorting `Sa`." );
+        }
+        else
+        {
+            npy_intp* sorted_indices_data = (npy_intp*) PyArray_DATA( (PyArrayObject*)sorted_indices );
+            vec_sorted_indices.assign( sorted_indices_data, sorted_indices_data + size );
+            for( auto i : vec_sorted_indices )
+            {
+                vec_sa.push_back( buffer[i] );
+            }
+        }
+        Py_XDECREF( arr );
+        Py_XDECREF( sorted_indices );
+    }
+    else
+    {
+        PyErr_SetString( PyExc_ValueError, "Unable to convert input array `Sa`.");
+        Py_XDECREF( arr );
+        return nullptr;
+    }
+
+    if(convert_to_numpy_array(Py_counts, &arr, &buffer, &size) )
+    {
+        if( vec_sa.size() != (size_t)size )
+        {
+            PyErr_SetString( PyExc_ValueError, "`Sa` and `counts` must be of same size." );
+        }
+        else {
+            double value;
+            class_count = size;
+            for (auto i: vec_sorted_indices)
+            {
+                value = buffer[i];
+                if (value < 0)
+                {
+                    PyErr_SetString(PyExc_ValueError, "Negative values in `counts`.");
+                    break;
+                }
+                vec_counts.push_back( (Rainflow::rfc_counts_t)(value + 0.5) );
+            }
+            Py_XDECREF(arr);
+        }
+    }
+    else
+    {
+        PyErr_SetString( PyExc_ValueError, "Unable to convert input array `Sa`.");
+        Py_XDECREF( arr );
+    }
+
+    if( PyErr_Occurred() )
+    {
+        return nullptr;
+    }
+
+    do {
+        Rainflow rf;
+        double damage;
+
+        if( !rf.init( class_count, 1, 0, 0 ) ) break;
+        if( !rf.wl_init_any( &wl ) ) break;
+        if( !rf.damage_from_rp( damage, vec_counts, vec_sa, damage_method ) ) break;
+
+        rf.deinit();
+        return Py_BuildValue( "f", damage );
+    } while(0);
+
+    PyErr_SetString( PyExc_RuntimeError, "Error while calculation.");
+    return nullptr;
+}
+
 
 // Exported methods are collected in a table
 PyMethodDef method_table[] = {
-    {"rfc", (PyCFunction) rfc, METH_VARARGS | METH_KEYWORDS, "Rainflow counting"},
     {"_numpy_api_version", (PyCFunction) _numpy_api_version, METH_NOARGS, "NumPy API version"},
-    {nullptr, nullptr, 0, nullptr} // Sentinel value ending the table
+    {"rfc", (PyCFunction) rfc, METH_VARARGS | METH_KEYWORDS, "Rainflow counting"},
+    {"damage_from_rp", (PyCFunction) damage_from_rp, METH_VARARGS | METH_KEYWORDS, "Damage accumulation from range pair counting."},
+    {nullptr, nullptr, 0,                                                       nullptr} // Sentinel value ending the table
 };
 
 
