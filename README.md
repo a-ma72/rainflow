@@ -25,23 +25,23 @@ predefined functions.
 
 ### Features of this package
  1. Modular architecture in two layers:
-    a) Module _rainflow.c_ (with _rainflow.h_) holds all necessary functions for rainflow counting and histogram extraction. You may select multiple optional features at compile time:
-    `RFC_MINIMAL`: To use core functions for rainflow counting only (for porting to µControllers for example).
-    `RFC_TP_SUPPORT`: Turning point storage.
-    `RFC_HCM_SUPPORT`: HCM algorithm (Clormann/Seeger).
-    `RFC_ASTM_SUPPORT`: ASTM E 1049 (2011) algorithm.
-    `RFC_AT_SUPPORT`: User defined amplitude transformation (Haigh diagram).
-    `RFC_DH_SUPPORT`:  Damage history storage.
-    `RFC_USE_DELEGATES`: Delegates for various core functions to implement user defined behavior.
-    `RFC_GLOBAL_EXTREMA`:  Store global data extrema.
-    `RFC_DAMAGE_FAST`: Using lookup tables for damage and amplitude transformation.
-    `RFC_EXPORT_MEX`: Export a mexFunction() to use the rainflow counting in MATLAB (R).
-    `RFC_EXPORT_PY`: Export a Python extension to use the rainflow counting in Python.
-    `RFC_UNIT_TEST`: Build an executable for unit testing.
-    Using _COAN_ [[http://coan2.sourceforge.net/]] for example, you can tidy up the code from unwanted features.</br>
-    (The minimal version of this package is created using _COAN_ with option `RFC_MINMAL`set.)
-    b) C++ wrapper _rainflow.hpp_ encapsulates functions from rainflow.h in a namespace and offers a template class _Rainflow_ for object oriented access and inheritance.
-    This class also offers container class based turning point storage.
+    - Module _rainflow.c_ (with _rainflow.h_) holds all necessary functions for rainflow counting and histogram extraction. You may select multiple optional features at compile time:
+    `RFC_MINIMAL`: To use core functions for rainflow counting only (for porting to µControllers for example).  
+    `RFC_TP_SUPPORT`: Turning point storage.  
+    `RFC_HCM_SUPPORT`: HCM algorithm (Clormann/Seeger).  
+    `RFC_ASTM_SUPPORT`: ASTM E 1049 (2011) algorithm.  
+    `RFC_AT_SUPPORT`: User defined amplitude transformation (Haigh diagram).  
+    `RFC_DH_SUPPORT`:  Damage history storage.  
+    `RFC_USE_DELEGATES`: Delegates for various core functions to implement user defined behavior.  
+    `RFC_GLOBAL_EXTREMA`:  Store global data extrema.  
+    `RFC_DAMAGE_FAST`: Using lookup tables for damage and amplitude transformation.  
+    `RFC_EXPORT_MEX`: Export a mexFunction() to use the rainflow counting in MATLAB (R).  
+    `RFC_EXPORT_PY`: Export a Python extension to use the rainflow counting in Python.  
+    `RFC_UNIT_TEST`: Build an executable for unit testing.  
+    Using _COAN_ [[http://coan2.sourceforge.net/]] for example, you can tidy up the code from unwanted features.  
+    (The minimal version of this package is created using _COAN_ with option `RFC_MINMAL`set.)  
+    b) C++ wrapper _rainflow.hpp_ encapsulates functions from rainflow.h in a namespace and offers a template class _Rainflow_ for object oriented access and inheritance.  
+    This class also offers container class based turning point storage.  
  2. Streamable: You're able to count your data at once, as data packages or sample-wise.
  3. Class width fit to your needs. Dynamically increase class width, when needed. (Needs turning point storage.)
  4. Four point counting method, optionally HCM counting method (Clormann/Seeger).
@@ -72,7 +72,7 @@ Building makefiles from sources root folder in a shell:
 If you intend to use a special MATLAB(R) installation to build the project
 just set an environment variable `Matlab_ROOT_DIR` such as
 
-    export Matlab_ROOT_DIR=/usr/local/MATLAB/R2017b
+    export Matlab_ROOT_DIR=/usr/local/MATLAB/R2019b
 or use the option to configure the build tree:
 
     cmake -S. -Bbuild -DMatlab_ROOT_DIR=/usr/local/MATLAB/R2017b -G "Visual Studio 16 2019"
