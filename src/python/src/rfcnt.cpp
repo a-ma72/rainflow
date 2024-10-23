@@ -205,9 +205,9 @@ int parse_rfc_kwargs( PyObject* kwargs, Py_ssize_t len, Rainflow *rf, Rainflow::
 {
     PyObject   *empty           =  PyTuple_New(0);
     int         class_count     =  100;
-    double      class_width     = -1;  // -1 = "calculated"
+    double      class_width     =  1;  // will be overwritten by required argument
     double      class_offset    =  0;
-    double      hysteresis      = -1;  // -1 = "calculated"
+    double      hysteresis      = -1;  // -1 => "use class_width as hysteresis"
     int         enforce_margin  =  1;  // true
     int         use_hcm         =  0;  // false
     int         use_astm        =  0;  // false

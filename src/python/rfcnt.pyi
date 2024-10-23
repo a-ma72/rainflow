@@ -5,8 +5,9 @@ from . import ArrayLike, LCMethod, ResidualMethod, SDMethod, RPDamageCalcMethod
 
 def rfc(
         data: ArrayLike,
+        class_width: float,
+        *,
         class_count: Optional[int] = 100,
-        class_width: Optional[float] = None,
         class_offset: Optional[float] = None,
         hysteresis: Optional[float] = None,
         residual_method: Optional[Union[int, ResidualMethod]] = ResidualMethod.REPEATED,
