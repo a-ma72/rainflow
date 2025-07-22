@@ -17,10 +17,12 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
         python-version: ["3.7", "3.8", "3.9", "3.10"]
-        exclude:  # Python < v3.8 does not support Apple Silicon ARM64.
-          - python-version: "3.7"
+        exclude:  
+          - python-version: "3.7"  # Python < v3.8 does not support Apple Silicon ARM64.
             os: macos-latest
-        include:  # So run those legacy versions on Intel CPUs.
+          - python-version: "3.7"  # Skip 3.7 on Ubuntu as requested
+            os: ubuntu-latest
+        include:  # Run those macos legacy versions on Intel CPUs.
           - python-version: "3.7"
             os: macos-13
     steps:
