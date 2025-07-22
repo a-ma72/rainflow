@@ -254,7 +254,7 @@ static
 bool get_dict_wl( PyObject *Py_wl, const char *name, Rainflow::rfc_wl_param_s &wl, bool *extended_def = nullptr )
 {
     /* if( Py_IsNone( Py_wl ) ) */
-    if( Py_wl == Py_NONE )
+    if( Py_wl == Py_None )
     {
         return true;
     }
