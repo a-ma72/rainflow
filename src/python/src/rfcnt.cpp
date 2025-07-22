@@ -253,7 +253,8 @@ bool get_dict_item_double( PyObject *dict, const char* name, double &value, doub
 static
 bool get_dict_wl( PyObject *Py_wl, const char *name, Rainflow::rfc_wl_param_s &wl, bool *extended_def = nullptr )
 {
-    if( Py_IsNone( Py_wl ) )
+    /* if( Py_IsNone( Py_wl ) ) */
+    if( Py_wl == Py_NONE )
     {
         return true;
     }
@@ -1102,7 +1103,7 @@ PyObject* damage_from_rp( PyObject *self, PyObject *args, PyObject *kwargs )
             PyErr_SetString( PyExc_ValueError, "`Sa` and `counts` must be of same size." );
         }
         else {
-            class_count = size;
+            class_count = (unsigned int)size;
             for( auto i: vec_sorted_indices )
             {
                 if( buffer[i] < 0 )
