@@ -1,5 +1,7 @@
 # Function wrapper for Python
 
+# Don't forget to setup `PREBUILD_NUMPY_VERSIONS` in this file!
+
 # Regular build
 # =============
 #[[
@@ -51,7 +53,7 @@ set (Python3_FIND_VIRTUALENV "FIRST")
 project(rfcnt LANGUAGES C CXX)
 # Project name
 
-
+# Set prebuild versions depending on Python version:
 if (WIN32)
     set(PREBUILD_NUMPY_VERSIONS 1.23.2  2.0.0)  # Python 3.11
     # set(PREBUILD_NUMPY_VERSIONS 1.19.3  2.0.0)  # Python 3.9

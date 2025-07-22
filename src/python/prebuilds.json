@@ -1,5 +1,5 @@
 {
-     "2.0.0": {"capi": 18, "target": "rfcnt_npy_2_0_0_api_v18.cp311-win_amd64"}
-    ,"1.23.2": {"capi": 16, "target": "rfcnt_npy_1_23_2_api_v16.cp311-win_amd64"}
+     "1.23.2": {"capi": 16, "target": "rfcnt_npy_1_23_2_api_v16.cp311-win_amd64"}
+    ,"2.0.0": {"capi": 18, "target": "rfcnt_npy_2_0_0_api_v18.cp311-win_amd64"}
     ,"1.23.2": {"capi":16, "target": "root"}
 }
