@@ -1,5 +1,5 @@
 # CMakeLists for project "rainflow"
-# 2023, Andreas Martin
+# 2025, Andreas Martin
 
 # See `README.md` for build and installation hints.
 

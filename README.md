@@ -25,7 +25,7 @@ predefined functions.
 
 ### Features of this package
  1. Modular architecture in two layers:  
-    - Module _rainflow.c_ (with _rainflow.h_) holds all necessary functions for rainflow counting and histogram extraction. You may select multiple optional features at compile time:  
+    a) Module _rainflow.c_ (with _rainflow.h_) holds all necessary functions for rainflow counting and histogram extraction. You may select multiple optional features at compile time:
     `RFC_MINIMAL`: To use core functions for rainflow counting only (for porting to µControllers for example).  
     `RFC_TP_SUPPORT`: Turning point storage.  
     `RFC_HCM_SUPPORT`: HCM algorithm (Clormann/Seeger).  
@@ -38,16 +38,16 @@ predefined functions.
     `RFC_EXPORT_MEX`: Export a mexFunction() to use the rainflow counting in MATLAB (R).  
     `RFC_EXPORT_PY`: Export a Python extension to use the rainflow counting in Python.  
     `RFC_UNIT_TEST`: Build an executable for unit testing.  
-    Using _COAN_ [[http://coan2.sourceforge.net/]] for example, you can tidy up the code from unwanted features.  
+    Using _COAN_ [[http://coan2.sourceforge.net/]] for example, you can tidy up the code from unwanted features.</br>
     (The minimal version of this package is created using _COAN_ with option `RFC_MINMAL`set.)  
-    - C++ wrapper _rainflow.hpp_ encapsulates functions from rainflow.h in a namespace and offers a template class _Rainflow_ for object oriented access and inheritance.  
+    b) C++ wrapper _rainflow.hpp_ encapsulates functions from rainflow.h in a namespace and offers a template class _Rainflow_ for object oriented access and inheritance.
     This class also offers container class based turning point storage.  
  2. Streamable: You're able to count your data at once, as data packages or sample-wise.  
  3. Class width fit to your needs. Dynamically increase class width, when needed. (Needs turning point storage.)  
  4. Four point counting method, optionally HCM counting method (Clormann/Seeger).  
  5. Woehler curve with up to two slopes, fatigue limit and omission.  
- 6. Miners rule for damage accumulation (elementary, original, modified and consequent).  
- 7. In-time damage indicator (Miners' consequent rule).  
+ 6. Miners rule for damage accumulation (elementary, original, modified and consistent).
+ 7. In-time damage indicator (consistent Miner's rule).
  8. In-time histograms: rainflow matrix, level crossing and range pair counting.  
  9. Turning points with hysteresis filtering. Turning points involved in a closed hysteresis are marked as pairs, with its partial assigned damage. (Compact history)  
  10. Look-up tables for damage calculation and amplitude transformation.  
@@ -59,7 +59,7 @@ predefined functions.
      - Second run
      - HCM
  14. Various function pointers to implement user defined behavior.
- 15. Conversions supporting RFM->LC, RFM->RP, RFM->Damage and RP->Damage (original, elementar, modifiziert, konsequent).
+ 15. Conversions supporting RFM->LC, RFM->RP, RFM->Damage and RP->Damage (original, elementar, modified, consistent).
 
 
 ## Build from sources

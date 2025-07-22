@@ -4,7 +4,7 @@ from . import ArrayLike
 
 def rpplot_prepare(sa: ArrayLike, counts: ArrayLike):
     """
-    Prepare data for rainflow plot by sorting and formatting the input arrays.
+    Prepare data for range pair plot by sorting the input arrays.
 
     Parameters
     ----------
@@ -16,17 +16,22 @@ def rpplot_prepare(sa: ArrayLike, counts: ArrayLike):
     Returns
     -------
     dict
-        A dictionary with keys "sa" and "counts", containing the sorted and formatted data.
+        A dictionary with keys "sa" and "counts", containing the sorted and formatted data,
+        and "sa_max" with the maximum value that "sa" contains.
     """
-    # Convert inputs to flattened arrays
     sa = np.asarray(sa).flatten()
     counts = np.asarray(counts).flatten()
 
-    # Stack and sort data in descending order by stress amplitude
-    x = np.vstack((sa, counts)).T
-    x = x[np.argsort(-x[:, 0])]
+    # Filter out elements with non-zero counts
+    mask = counts > 0
+    sa, counts = sa[mask], counts[mask]
+    sa_max = np.nan
+    if np.any(mask):
+        # Sort descending by stress amplitude
+        i = np.argsort(-sa)
+        sa, counts = sa[i], counts[i]
 
-    # Add leading and trailing points
-    x = np.vstack(((x[0, 0], 0), x, (0, 0.01)))
+        # First stress amplitude is the maximum
+        sa_max = sa[0]
 
-    return {"sa": x[:, 0], "counts": x[:, 1]}
+    return {"sa": sa, "counts": counts, "sa_max": sa_max}

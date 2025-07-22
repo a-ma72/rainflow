@@ -1,3 +1,33 @@
+# Source distribution (./dist)
+# python setup.py build sdist
+# 
+# Binary distribution (./build)
+# python -m build -nwx
+# python setup.py bdist_wheel --plat-name=win-amd64
+# python setup.py bdist --formats=wininst
+# python setup.py bdist_wininst --title= --bitmap=
+# pip install --force-reinstall --no-deps --no-build-isolation package.tar
+# python setup.py build_clib -f
+# python setup.py build_ext -fi  # Build pyd modules for folder `_ext`
+# python -mbuild -n
+
+# If build with mingw32 compiler (TDM-GCC64):
+# Comment out the get_msvcr() occurrences in PATHONPATH/Lib/distutils/cygwinccompiler.py
+# Create a file distutils.cfg in PYTHON_ROOT/Lib/distutils:
+# [build]
+# compiler=mingw32
+
+# PyPi
+# python3 -m pip install --upgrade build twine
+# python3 -m build
+# python3 -m twine upload --repository testpypi dist/*
+# pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple rfcnt==0.2.0
+# python3 -m twine upload --repository pypi dist/*
+
+
+# Install (Jupyter Notebook)
+# !export CFLAGS='-std=c++11' && pip install rfcnt
+
 import re
 from os import path
 from setuptools import setup, Extension
@@ -95,7 +125,7 @@ def main():
             'Intended Audience :: Education',
             'Intended Audience :: Information Technology',
             'Intended Audience :: Science/Research',
-            'License :: OSI Approved :: BSD License',
+            'License :: BSD License',
             'Natural Language :: English',
             'Operating System :: MacOS :: MacOS X',
             'Operating System :: Microsoft :: Windows',

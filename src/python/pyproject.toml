@@ -2,7 +2,8 @@
 requires = [
     "setuptools>=42",
     "wheel",
+    # For target "build_wheel_isolated" enable one numpy package:
     # "oldest-supported-numpy",  # for Numpy 1.x versions
-    # "numpy",                   # for actual Numpy version
+    "numpy==2.0",              # for Numpy 2.x versions
 ]
 build-backend = "setuptools.build_meta"
