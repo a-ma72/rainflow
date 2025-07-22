@@ -16,14 +16,14 @@
  *      /_/ |_/_/  |_/___/_/ |_/_/   /_____/\____/ |__/|__/
  *
  *    Rainflow Counting Algorithm (4-point-method), C99 compliant
- * 
- * 
+ *
+ *
  * "Rainflow Counting" consists of four main steps:
  *    1. Hysteresis Filtering
  *    2. Peak-Valley Filtering
  *    3. Discretization
  *    4. Four Point Counting Method:
- *    
+ *
  *                     * D
  *                    / \       Closed, if min(B,C) >= min(A,D) && max(B,C) <= max(A,D)
  *             B *<--/          Slope B-C is counted and removed from residue
@@ -32,15 +32,15 @@
  *          \ /
  *           * A
  *
- * These steps are fully documented in standards such as 
+ * These steps are fully documented in standards such as
  * ASTM E1049 "Standard Practices for Cycle Counting in Fatigue Analysis" [1].
  * This implementation uses the 4-point algorithm mentioned in [3,4] and the 3-point HCM method proposed in [2].
  * To take the residue into account, you may implement a custom method or use some
  * predefined functions.
- * 
+ *
  * References:
  * [1] "Standard Practices for Cycle Counting in Fatigue Analysis."
- *     ASTM Standard E 1049, 1985 (2011). 
+ *     ASTM Standard E 1049, 1985 (2011).
  *     West Conshohocken, PA: ASTM International, 2011.
  * [2] "Rainflow - HCM / Ein Hysteresisschleifen-Zaehlalgorithmus auf werkstoffmechanischer Grundlage"
  *     U.H. Clormann, T. Seeger
@@ -48,7 +48,7 @@
  * [3] "Zaehlverfahren zur Bildung von Kollektiven und Matrizen aus Zeitfunktionen"
  *     FVA-Richtlinie, 2010.
  *     [https://fva-net.de/fileadmin/content/Richtlinien/FVA-Richtlinie_Zaehlverfahren_2010.pdf]
- * [4] Siemens Product Lifecycle Management Software Inc., 2018. 
+ * [4] Siemens Product Lifecycle Management Software Inc., 2018.
  *     [https://community.plm.automation.siemens.com/t5/Testing-Knowledge-Base/Rainflow-Counting/ta-p/383093]
  * [5] "Review and application of Rainflow residue processing techniques for accurate fatigue damage estimation"
  *     G.Marsh;
@@ -63,7 +63,7 @@
  *     Brokate, M.; Dressler, K.; Krejci, P.
  * []  "Multivariate Density Estimation: Theory, Practice and Visualization". New York, Chichester, Wiley & Sons, 1992
  *     Scott, D.
- * []  "Werkstoffmechanik - Bauteile sicher beurteilen undWerkstoffe richtig einsetzen"; 
+ * []  "Werkstoffmechanik - Bauteile sicher beurteilen undWerkstoffe richtig einsetzen";
  *      Ralf Buergel, Hans Albert Richard, Andre Riemer; Springer FachmedienWiesbaden 2005, 2014
  * []  "Zaehlverfahren und Lastannahme in der Betriebsfestigkeit";
  *     Michael Koehler, Sven Jenne / Kurt Poetter, Harald Zenner; Springer-Verlag Berlin Heidelberg 2012
@@ -71,20 +71,20 @@
  *
  *================================================================================
  * BSD 2-Clause License
- * 
- * Copyright (c) 2023, Andras Martin
+ *
+ * Copyright (c) 2025, Andras Martin
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * * Redistributions of source code must retain the above copyright notice, this
  *   list of conditions and the following disclaimer.
- * 
+ *
  * * Redistributions in binary form must reproduce the above copyright notice,
  *   this list of conditions and the following disclaimer in the documentation
  *   and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -267,7 +267,7 @@ enum rfc_flags
     RFC_FLAGS_COUNT_LC_DN           =  1 << 5,                      /**< Count into level crossing (only falling slopes) */
     RFC_FLAGS_COUNT_LC              =  RFC_FLAGS_COUNT_LC_UP        /**< Count into level crossing (all slopes) */
                                     |  RFC_FLAGS_COUNT_LC_DN,
-    RFC_FLAGS_COUNT_MK              =  1 << 6,                      /**< Live damage counter (Miner consequent) */
+    RFC_FLAGS_COUNT_MK              =  1 << 6,                      /**< Live damage counter (consistent Miner's rule) */
     RFC_FLAGS_ENFORCE_MARGIN        =  1 << 7,                      /**< Enforce first and last data point are turning points */
 #endif /*!RFC_MINIMAL*/
     RFC_FLAGS_COUNT_ALL             =  RFC_FLAGS_COUNT_RFM          /**< Count all */
@@ -309,7 +309,7 @@ enum rfc_rp_damage_method
     RFC_RP_DAMAGE_CALC_METHOD_DEFAULT     = 0,
     RFC_RP_DAMAGE_CALC_METHOD_ELEMENTAR   = 1,
     RFC_RP_DAMAGE_CALC_METHOD_MODIFIED    = 2,
-    RFC_RP_DAMAGE_CALC_METHOD_CONSEQUENT  = 3,
+    RFC_RP_DAMAGE_CALC_METHOD_CONSISTENT  = 3,
 };
 
 enum rfc_lc_count_method
@@ -446,7 +446,7 @@ typedef     struct      rfc_rfm_item            rfc_rfm_item_s;             /** 
 typedef     void *   ( *rfc_mem_alloc_fcn_t )   ( void *, size_t num, size_t size, int aim );     /** Memory allocation functor */
 
 /* Core functions */
-bool        RFC_init                    (       void *ctx, unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
+bool        RFC_init                    (       void *ctx, unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset,
                                                            rfc_value_t hysteresis, rfc_flags_e flags );
 rfc_state_e RFC_state_get               ( const void *ctx );
 rfc_error_e RFC_error_get               ( const void *ctx );
@@ -493,6 +493,7 @@ bool        RFC_wl_calc_sa              ( const void *ctx, double s0, double n0,
 bool        RFC_wl_calc_n               ( const void *ctx, double s0, double n0, double k, double  sa, double *n );
 bool        RFC_wl_param_set            (       void *ctx, const rfc_wl_param_s * );
 bool        RFC_wl_param_get            ( const void *ctx, rfc_wl_param_s * );
+bool        RFC_wl_param_get_impaired   ( const void *ctx, rfc_wl_param_s * );
 bool        RFC_class_param_set         (       void *ctx, const rfc_class_param_s * );
 bool        RFC_class_param_get         ( const void *ctx, rfc_class_param_s * );
 bool        RFC_class_number            ( const void *ctx, rfc_value_t value, unsigned *class_number );
@@ -521,7 +522,7 @@ bool        RFC_dh_get                  ( const void *ctx, const double **dh, si
 #endif /*RFC_DH_SUPPORT*/
 
 #if RFC_AT_SUPPORT
-bool        RFC_at_init                 (       void *ctx, const double *Sa, const double *Sm, unsigned count, 
+bool        RFC_at_init                 (       void *ctx, const double *Sa, const double *Sm, unsigned count,
                                                            double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
 bool        RFC_at_transform            ( const void *ctx, double Sa, double Sm, double *Sa_transformed );
 #endif /*RFC_AT_SUPPORT*/
@@ -566,7 +567,7 @@ struct rfc_value_tuple
     rfc_value_t                         avrg;                       /**< Average value of two paired turning points */
 #if RFC_DH_SUPPORT
     double                              damage;                     /**< Damage accumulated to this turning point */
-#endif /*RFC_DH_SUPPORT*/    
+#endif /*RFC_DH_SUPPORT*/
 #endif /*RFC_TP_SUPPORT*/
 };
 
@@ -580,7 +581,7 @@ struct rfc_class_param
 
 /**
  *   Woehler models
- *  
+ *
  *                                \   (S0,N0,k, any point on slope k)
  *                                 \ /
  *                                  o
@@ -594,18 +595,18 @@ struct rfc_class_param
  *                                          \    .             (SD,ND)
  *                                           \         .      /
  *                                            \              o------------------------------ (Miner original)
- *                                             \                   . 
- *                                              \                        . 
- *                                               \                             . 
- *                                                \                                  . 
- *                                                 \                                       . (No fatigue strength) 
+ *                                             \                   .
+ *                                              \                        .
+ *                                               \                             .
+ *                                                \                                  .
+ *                                                 \                                       . (No fatigue strength)
  *                                                  (Miner elementar, k2==k)
- *  
+ *
  *  ______________________________________________________________________________________ (Omission level)
- *  
+ *
  *  s0^|k|  * n0 = sx^|k|  * nx     --->  ln(s0)*|k|  + ln(n0) = ln(sx)*|k|  + ln(nx)
  *  sd^|k2| * nd = sx^|k2| * nx     --->  ln(sd)*|k2| + ln(nd) = ln(sx)*|k2| + ln(nx)
- *  
+ *
  *     ln(s0)*|k| + ln(n0) - ln(sd)*|k2|       - ln(nd)                          = ln(sx)*|k| - ln(sx)*|k2|
  *     ln(s0)*|k| + ln(n0) - ln(sd)*|k2|       - ln(nd)                          = ln(sx)*(|k|-|k2|)
  *   ( ln(s0)*|k| + ln(n0) - ln(sd)*|k2|       - ln(nd) ) / (|k|-|k2|)           = ln(sx)
@@ -621,8 +622,8 @@ struct rfc_wl_param
     double                              nx;                         /**< Junction point between k and k2 */
     double                              k2;                         /**< Woehler slope between wl_sx and wl_sd, always negative */
     double                              omission;                   /**< Omission level threshold, smaller amplitudes get discarded */
-    double                              q;                          /**< Parameter q based on k for "Miner consequent" approach, always positive */
-    double                              q2;                         /**< Parameter q based on k2 for "Miner consequent" approach, always positive */
+    double                              q;                          /**< Parameter q based on k for "Miner consistent" approach, always positive */
+    double                              q2;                         /**< Parameter q based on k2 for "Miner consistent" approach, always positive */
     double                              D;                          /**< If D > 0, parameters define Woehler curve for impaired part */
 };
 
@@ -678,8 +679,8 @@ struct rfc_ctx
     double                              wl_nd;                      /**< Cycles according to wl_sd */
     double                              wl_k2;                      /**< Woehler gradient between wl_sx and wl_sd */
     double                              wl_omission;                /**< Omission level threshold, smaller amplitudes get discarded */
-    double                              wl_q;                       /**< Parameter q based on k for "Miner consequent" approach, always positive */
-    double                              wl_q2;                      /**< Parameter q based on k2 for "Miner consequent" approach, always positive */
+    double                              wl_q;                       /**< Parameter q based on k for "Miner consistent" approach, always positive */
+    double                              wl_q2;                      /**< Parameter q based on k2 for "Miner consistent" approach, always positive */
 #endif /*!RFC_MINIMAL*/
 
 #if RFC_USE_DELEGATES
@@ -703,7 +704,7 @@ struct rfc_ctx
     rfc_debug_vfprintf_fcn_t            debug_vfprintf_fcn;         /**< Debug vfprintf() function */
 #endif /*RFC_DEBUG_FLAGS*/
 #endif /*RFC_USE_DELEGATES*/
-    
+
     /* Residue */
     rfc_value_tuple_s                  *residue;                    /**< Buffer for residue */
     size_t                              residue_cap;                /**< Buffer capacity in number of elements (max. 2*class_count) */
@@ -754,7 +755,7 @@ struct rfc_ctx
         double                          Sm_rig;
         double                          R_rig;
         bool                            R_pinned;
-    }                                   
+    }
                                         at;
 #endif /*RFC_AT_SUPPORT*/
 

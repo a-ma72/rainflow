@@ -1,5 +1,5 @@
 # CMakeLists for project "rainflow"
-# 2023, Andreas Martin
+# 2025, Andreas Martin
 
 # See `README.md` for build and installation hints.
 
@@ -11,7 +11,7 @@ endif ()
 cmake_policy(SET CMP0091 NEW)  # MSVC runtime library flags are selected by an abstraction.
 
 # Project name and version
-project(rainflow VERSION 4.7 LANGUAGES NONE)
+project(rainflow VERSION 0.5.0 LANGUAGES NONE)
 
 # C++11
 enable_language(C)
@@ -79,6 +79,7 @@ endif ()
 
 set(RFC_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(RFC_VERSION_MINOR ${PROJECT_VERSION_MINOR})
+set(RFC_VERSION_PATCH ${PROJECT_VERSION_PATCH})
 
 # Save options in configuration file
 configure_file(${CMAKE_CURRENT_LIST_DIR}/src/lib/config.h.in ${CMAKE_CURRENT_LIST_DIR}/src/lib/config.h)

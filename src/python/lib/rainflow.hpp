@@ -91,7 +91,7 @@ void * rfc_mem_alloc_default( void *ptr, size_t num, size_t size, int aim )
 
 /* Support external turning point storage
  *
- * RFC_TP_STORAGE defines the storage container for turning points 
+ * RFC_TP_STORAGE defines the storage container for turning points
  */
 #ifdef RFC_TP_STORAGE
 
@@ -134,7 +134,7 @@ public:
     /* Flags */
     enum rfc_flags
     {
-        RFC_FLAGS_DEFAULT                       = RF::RFC_FLAGS_DEFAULT,                         
+        RFC_FLAGS_DEFAULT                       = RF::RFC_FLAGS_DEFAULT,
         RFC_FLAGS_COUNT_RFM                     = RF::RFC_FLAGS_COUNT_RFM,                      /**< Count into rainflow matrix */
         RFC_FLAGS_COUNT_DAMAGE                  = RF::RFC_FLAGS_COUNT_DAMAGE,                   /**< Count damage */
         RFC_FLAGS_COUNT_DH                      = RF::RFC_FLAGS_COUNT_DH,                       /**< Spread damage */
@@ -142,7 +142,7 @@ public:
         RFC_FLAGS_COUNT_LC_UP                   = RF::RFC_FLAGS_COUNT_LC_UP,                    /**< Count into level crossing (only rising slopes) */
         RFC_FLAGS_COUNT_LC_DN                   = RF::RFC_FLAGS_COUNT_LC_DN,                    /**< Count into level crossing (only falling slopes) */
         RFC_FLAGS_COUNT_LC                      = RF::RFC_FLAGS_COUNT_LC,                       /**< Count into level crossing (all slopes) */
-        RFC_FLAGS_COUNT_MK                      = RF::RFC_FLAGS_COUNT_MK,                       /**< Live damage counter (Miner consequent) */
+        RFC_FLAGS_COUNT_MK                      = RF::RFC_FLAGS_COUNT_MK,                       /**< Live damage counter (consistent Miner's rule) */
         RFC_FLAGS_ENFORCE_MARGIN                = RF::RFC_FLAGS_ENFORCE_MARGIN,                 /**< Enforce first and last data point are turning points */
         RFC_FLAGS_COUNT_ALL                     = RF::RFC_FLAGS_COUNT_ALL,                      /**< Count all */
         RFC_FLAGS_TPPRUNE_PRESERVE_POS          = RF::RFC_FLAGS_TPPRUNE_PRESERVE_POS,           /**< Preserve stream position information on pruning */
@@ -165,7 +165,7 @@ public:
         RFC_RP_DAMAGE_CALC_METHOD_DEFAULT       = RF::RFC_RP_DAMAGE_CALC_METHOD_DEFAULT,        /**< Use Woehler parameters from rfc_ctx */
         RFC_RP_DAMAGE_CALC_METHOD_ELEMENTAR     = RF::RFC_RP_DAMAGE_CALC_METHOD_ELEMENTAR,      /**< Use Woehler parameters from rfc_ctx, but as Miner elementar */
         RFC_RP_DAMAGE_CALC_METHOD_MODIFIED      = RF::RFC_RP_DAMAGE_CALC_METHOD_MODIFIED,       /**< Use Woehler parameters from rfc_ctx, but as Miner modified */
-        RFC_RP_DAMAGE_CALC_METHOD_CONSEQUENT    = RF::RFC_RP_DAMAGE_CALC_METHOD_CONSEQUENT,     /**< Use Woehler parameters from rfc_ctx, but as Miner consequent */
+        RFC_RP_DAMAGE_CALC_METHOD_CONSISTENT    = RF::RFC_RP_DAMAGE_CALC_METHOD_CONSISTENT,     /**< Use Woehler parameters from rfc_ctx, but as Miner consistent */
     };
 
 
@@ -280,7 +280,7 @@ public:
     typedef     void *   ( *rfc_mem_alloc_fcn_t )   ( void *, size_t num, size_t size, rfc_mem_aim_e aim );     /** Memory allocation functor */
 
     /* Core function wrapper */
-    bool            init                    ( unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
+    bool            init                    ( unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset,
                                               rfc_value_t hysteresis, rfc_flags_e flags = RFC_FLAGS_DEFAULT );
     rfc_state_e     state_get               () const { return (rfc_state_e)RF::RFC_state_get( &ctx_get() ); }
     rfc_error_e     error_get               () const { return (rfc_error_e)RF::RFC_error_get( &ctx_get() ); }
@@ -295,7 +295,7 @@ public:
     bool            feed_scaled             ( const rfc_value_t* data, size_t count, double factor );
     bool            feed_tuple              ( rfc_value_tuple_s *data, size_t count );
     bool            finalize                ( rfc_res_method_e residual_method = RFC_RES_IGNORE );
-    /* Functions on rainflow matrix */           
+    /* Functions on rainflow matrix */
     bool            rfm_make_symmetric      ();
     bool            rfm_non_zeros           ( unsigned *count ) const;
     bool            rfm_get                 ( rfc_rfm_item_s **buffer, unsigned *count ) const;
@@ -306,7 +306,7 @@ public:
     bool            rfm_damage              ( unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage ) const;
     bool            rfm_check               () const;
     bool            rfm_refeed              ( rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param );
-/* Functions on histograms */           
+/* Functions on histograms */
     bool            lc_get                  ( rfc_counts_t *lc, rfc_value_t *level ) const;
     bool            lc_from_rfm             ( rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags ) const;
     bool            lc_from_residue         ( rfc_counts_t *lc, rfc_value_t *level, const rfc_value_tuple_s* residue, unsigned residue_cnt, rfc_flags_e flags ) const;
@@ -333,7 +333,7 @@ public:
     bool            dh_init                 ( rfc_sd_method_e method, double *dh, size_t dh_cap, bool is_static );
     bool            dh_get                  ( const double **dh, size_t *count ) const;
     /* Amplitude transformation*/
-    bool            at_init                 ( const double *Sa, const double *Sm, unsigned count, 
+    bool            at_init                 ( const double *Sa, const double *Sm, unsigned count,
                                               double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
     bool            at_transform            ( double Sa, double Sm, double *Sa_transformed ) const;
     /* Flags */
@@ -366,11 +366,12 @@ public:
     bool            rp_get                  ( rfc_counts_v &rp, rfc_value_v &Sa ) const;
     bool            rp_from_rfm             ( rfc_counts_v &rp, rfc_value_v &Sa, const rfc_counts_t *rfm ) const;
     bool            damage_from_rp          ( double &damage, const rfc_counts_v &counts, const rfc_value_v &Sa, rfc_rp_damage_method_e rp_calc_type ) const;
-    bool            at_init                 ( const rfc_double_v &Sa, const rfc_double_v &Sm, 
+    bool            at_init                 ( const rfc_double_v &Sa, const rfc_double_v &Sm,
                                               double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric );
     bool            at_init                 ( double M, double Sm_rig, double R_rig, bool R_pinned );
     bool            at_transform            ( double Sa, double Sm, double &Sa_transformed ) const;
     bool            wl_param_get            ( rfc_wl_param_s &wl_param ) const;
+    bool            wl_param_get_impaired   ( rfc_wl_param_s &wl_param ) const;
 
     /* TP storage access */
     inline const
@@ -389,15 +390,15 @@ public:
     bool            tp_get                  ( size_t tp_pos, rfc_value_tuple_s **tp );
     bool            tp_inc_damage           ( size_t tp_pos, double damage );
 
-    
+
     /* dtor */     ~RainflowT               () { deinit(); }
     /* ctor */      RainflowT               ()                                                   // Std ctor
-    { 
+    {
         rfc_ctx_s nil = { sizeof( rfc_ctx_s ) };
 
         m_ctx = nil;
         m_ctx.mem_alloc = RFC_MEM_ALLOC;  // wrapper calls class method mem_alloc per default
-    } 
+    }
     /* ctor */      RainflowT               ( rfc_ctx_s&& other ) { ctx_assign( other ); }   // Move ctor
     RainflowT&      operator=               ( rfc_ctx_s&& other ) { ctx_assign( other ); }   // Move assignment
 
@@ -406,25 +407,25 @@ public:
     rfc_ctx_s&      ctx_get                 () const { return m_ctx; }
     rfc_ctx_s&      ctx_get                 ()       { return m_ctx; }
     void            ctx_assign              ( rfc_ctx_s& ctx )
-    { 
-        if( ctx.internal.obj != this ) 
-        { 
+    {
+        if( ctx.internal.obj != this )
+        {
             rfc_ctx_s nil = { sizeof( RF::rfc_ctx_s ) };
 
-            (void)deinit(); 
+            (void)deinit();
             m_ctx = ctx;
             m_ctx.internal.obj = this;  // Take ownership and custody
-            ctx = nil; 
-        } 
+            ctx = nil;
+        }
     }
     void            ctx_assign              ( rfc_ctx_s&& ctx )  // Move assignment
-    { 
-        if( ctx.internal.obj != this ) 
-        { 
-            (void)deinit(); 
+    {
+        if( ctx.internal.obj != this )
+        {
+            (void)deinit();
             m_ctx = ctx;
             m_ctx.internal.obj = this;  // Take ownership and custody
-        } 
+        }
     }
 
     /* Memory allocator */
@@ -447,7 +448,7 @@ protected:
 
 
 template< class T >
-bool RainflowT<T>::init( unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
+bool RainflowT<T>::init( unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset,
                          rfc_value_t hysteresis, rfc_flags_e flags )
 {
     bool ok;
@@ -736,7 +737,7 @@ template< class T >
 bool RainflowT<T>::tp_prune( size_t count, rfc_flags_e flags )
 {
     bool ok;
-    
+
     ok = RF::RFC_tp_prune( &m_ctx, count, (RF::rfc_flags_e) flags );
 
     m_tp.resize( m_ctx.tp_cnt );
@@ -899,7 +900,7 @@ bool RainflowT<T>::rfm_get( rfc_rfm_item_v &buffer ) const
         ok     = true;
     }
     else
-    { 
+    {
         ok = false;
     }
 
@@ -995,7 +996,7 @@ bool RainflowT<T>::damage_from_rp( double &damage, const rfc_counts_v &counts, c
 
 
 template< class T >
-bool RainflowT<T>::at_init( const rfc_double_v &Sa, const rfc_double_v &Sm, 
+bool RainflowT<T>::at_init( const rfc_double_v &Sa, const rfc_double_v &Sm,
                             double M, double Sm_rig, double R_rig, bool R_pinned, bool symmetric )
 {
     if( Sa.size() != Sm.size() )
@@ -1028,6 +1029,13 @@ bool RainflowT<T>::wl_param_get( rfc_wl_param_s &wl_param ) const
 }
 
 
+template< class T >
+bool RainflowT<T>::wl_param_get_impaired( rfc_wl_param_s &wl_param ) const
+{
+    return RF::RFC_wl_param_get_impaired( &m_ctx, &wl_param );
+}
+
+
 /* Delegates */
 template< class T >
 bool RainflowT<T>::tp_set( size_t tp_pos, rfc_value_tuple_s *tp )
@@ -1056,8 +1064,8 @@ bool RainflowT<T>::tp_set( size_t tp_pos, rfc_value_tuple_s *tp )
 #if RFC_DEBUG_FLAGS
         if( m_ctx.internal.debug_flags & RF::RFC_FLAGS_LOG_WRITE_TP )
         {
-            RFC_debug_fprintf( &m_ctx, stdout, 
-                               "Alter tp #%lu (%g[%lu] @ %lu)\n", 
+            RFC_debug_fprintf( &m_ctx, stdout,
+                               "Alter tp #%lu (%g[%lu] @ %lu)\n",
                                tp_pos, tp->value, tp->cls, tp->pos );
         }
 #endif /*RFC_DEBUG_FLAGS*/
@@ -1072,8 +1080,8 @@ bool RainflowT<T>::tp_set( size_t tp_pos, rfc_value_tuple_s *tp )
 #if RFC_DEBUG_FLAGS
             if( m_ctx.internal.debug_flags & RF::RFC_FLAGS_LOG_WRITE_TP )
             {
-                RFC_debug_fprintf( &m_ctx, stdout, 
-                                   "Alter (unchanged) tp #%lu (%g[%lu] @ %lu)\n", 
+                RFC_debug_fprintf( &m_ctx, stdout,
+                                   "Alter (unchanged) tp #%lu (%g[%lu] @ %lu)\n",
                                    tp->pos, tp->value, tp->cls, tp->pos );
             }
 #endif /*RFC_DEBUG_FLAGS*/
@@ -1087,7 +1095,7 @@ bool RainflowT<T>::tp_set( size_t tp_pos, rfc_value_tuple_s *tp )
 
             /* Append tp at the tail */
             tp->tp_pos = 0;
-            
+
             if( tp_pos > m_tp.size() )
             {
                 m_tp.push_back( *tp );
@@ -1103,8 +1111,8 @@ bool RainflowT<T>::tp_set( size_t tp_pos, rfc_value_tuple_s *tp )
 #if RFC_DEBUG_FLAGS
             if( m_ctx.internal.debug_flags & RF::RFC_FLAGS_LOG_WRITE_TP )
             {
-                RF::RFC_debug_fprintf( &m_ctx, stdout, 
-                                       "Append tp #%lu (%g[%lu] @ %lu)\n", 
+                RF::RFC_debug_fprintf( &m_ctx, stdout,
+                                       "Append tp #%lu (%g[%lu] @ %lu)\n",
                                        tp->tp_pos, tp->value, tp->cls, tp->pos );
             }
 #endif /*RFC_DEBUG_FLAGS*/
@@ -1132,8 +1140,8 @@ bool RainflowT<T>::tp_get( size_t tp_pos, rfc_value_tuple_s **tp )
 #if RFC_DEBUG_FLAGS
     if( m_ctx.internal.debug_flags & RF::RFC_FLAGS_LOG_READ_TP )
     {
-        RF::RFC_debug_fprintf( &m_ctx, stdout, 
-                               "Read tp #%lu (%g[%lu] @ %lu)\n", 
+        RF::RFC_debug_fprintf( &m_ctx, stdout,
+                               "Read tp #%lu (%g[%lu] @ %lu)\n",
                                tp_pos, m_tp[tp_pos-1].value, m_tp[tp_pos-1].cls, m_tp[tp_pos-1].pos );
     }
 #endif /*RFC_DEBUG_FLAGS*/
@@ -1179,7 +1187,7 @@ void* RainflowT<T>::mem_alloc( void *ptr, size_t num, size_t size, rfc_mem_aim_e
 #ifdef RFC_TP_STORAGE
 
 /* Define a Rainflow class with delegates for external turning point storage.
-   Templates and namespaces use name mangling, which is not supported 
+   Templates and namespaces use name mangling, which is not supported
    for extern "C" linkage. */
 
 
@@ -1189,24 +1197,24 @@ extern "C"
     static
     bool rfc_storage_tp_set( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s *tp )
     {
-        return ctx && 
-               ctx->internal.obj && 
+        return ctx &&
+               ctx->internal.obj &&
                static_cast<Rainflow*>(ctx->internal.obj)->tp_set( tp_pos, tp );
     }
 
     static
     bool rfc_storage_tp_get( RF::rfc_ctx_s* ctx, size_t tp_pos, RF::rfc_value_tuple_s **tp )
     {
-        return ctx && 
-               ctx->internal.obj && 
+        return ctx &&
+               ctx->internal.obj &&
                static_cast<Rainflow*>(ctx->internal.obj)->tp_get( tp_pos, tp );
     }
 
-    static 
+    static
     bool rfc_storage_tp_inc_damage( RF::rfc_ctx_s *ctx, size_t tp_pos, double damage )
     {
-        return ctx && 
-               ctx->internal.obj && 
+        return ctx &&
+               ctx->internal.obj &&
                static_cast<Rainflow*>(ctx->internal.obj)->tp_inc_damage( tp_pos, damage );
     }
 }

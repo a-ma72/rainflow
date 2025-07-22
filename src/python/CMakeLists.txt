@@ -53,7 +53,8 @@ project(rfcnt LANGUAGES C CXX)
 
 
 if (WIN32)
-    set(PREBUILD_NUMPY_VERSIONS 1.19.3  2.0.0)
+    set(PREBUILD_NUMPY_VERSIONS 1.23.2  2.0.0)  # Python 3.11
+    # set(PREBUILD_NUMPY_VERSIONS 1.19.3  2.0.0)  # Python 3.9
 else ()
     set(PREBUILD_NUMPY_VERSIONS)
 endif ()

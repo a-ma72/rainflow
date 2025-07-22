@@ -17,23 +17,23 @@
  *
  *    Rainflow Counting Algorithm (4-point-method), C99 compliant
  *    Test suite
- * 
+ *
  *================================================================================
  * BSD 2-Clause License
- * 
- * Copyright (c) 2023, Andras Martin
+ *
+ * Copyright (c) 2025, Andras Martin
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * * Redistributions of source code must retain the above copyright notice, this
  *   list of conditions and the following disclaimer.
- * 
+ *
  * * Redistributions in binary form must reproduce the above copyright notice,
  *   this list of conditions and the following disclaimer in the documentation
  *   and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -73,7 +73,7 @@ struct buffer
 
 typedef struct mem_chunk
 {
-    size_t             size, 
+    size_t             size,
                        count;
     struct  mem_chunk *next;
     RFC_VALUE_TYPE     data[1];
@@ -99,7 +99,7 @@ mem_chunk* new_chunk( size_t size )
     return chunk;
 }
 
-static 
+static
 struct buffer* add_buffer( void* ptr )
 {
     struct buffer *new_buffer = (struct buffer*)calloc( 1, sizeof( struct buffer ) );
@@ -212,8 +212,8 @@ void export_tp( const char *filename, rfc_value_tuple_s* data, size_t count )
         while( count-- )
         {
             //fprintf(fid, "%g\t%lu\t%lu\t%lu\t%g\n", data->value, data->class, data->tp_pos, data->pos, data->damage);
-            fprintf( fid, "%g\t%d\t%llu\t%llu\n", 
-                          data->value, data->cls, 
+            fprintf( fid, "%g\t%d\t%llu\t%llu\n",
+                          data->value, data->cls,
                          (long long unsigned int)data->tp_pos, (long long unsigned int)data->pos );
             data++;
         }
@@ -235,7 +235,7 @@ rfc_counts_t rfm_peek( rfc_ctx_s *rfc_ctx, int from, int to )
 #else /*!RFC_MINIMAL*/
     from = (int)( ( (double)from - rfc_ctx->class_offset ) / rfc_ctx->class_width );
     to   = (int)( ( (double)to   - rfc_ctx->class_offset ) / rfc_ctx->class_width );
-    
+
     return rfc_ctx->rfm[ from * rfc_ctx->class_count + to ];
 #endif /*!RFC_MINIMAL*/
 }
@@ -476,8 +476,8 @@ bool RFC_tp_refeed_test_export( const char* filename, const rfc_ctx_s *lhs, cons
     {
         if( i < lhs->tp_cnt )
         {
-            fprintf( fid, "%d\t%g\t%u\t%d\t%d\t%g\t%g", 
-                     (int) i, 
+            fprintf( fid, "%d\t%g\t%u\t%d\t%d\t%g\t%g",
+                     (int) i,
                   (double) lhs->tp[i].value,
                 (unsigned) lhs->tp[i].cls,
                      (int) lhs->tp[i].pos,
@@ -497,8 +497,8 @@ bool RFC_tp_refeed_test_export( const char* filename, const rfc_ctx_s *lhs, cons
 
         if( i < rhs->tp_cnt )
         {
-            fprintf( fid, "%d\t%g\t%u\t%d\t%d\t%g\t%g", 
-                     (int) i, 
+            fprintf( fid, "%d\t%g\t%u\t%d\t%d\t%g\t%g",
+                     (int) i,
                   (double) rhs->tp[i].value,
                 (unsigned) rhs->tp[i].cls,
                      (int) rhs->tp[i].pos,
@@ -721,7 +721,7 @@ TEST RFC_tp_refeed_test( int ccnt )
 TEST RFC_test_turning_points( int ccnt )
 {
     rfc_value_tuple_s tp[10];
-    
+
     if( ccnt ) ccnt = 10;
 
     /*******************************************/
@@ -1265,7 +1265,7 @@ TEST RFC_long_series( int ccnt, int class_count_ar )
             }
         }
     }
-    else        
+    else
     {
         mem_chunk *chunk;
         const
@@ -1405,7 +1405,7 @@ TEST RFC_long_series( int ccnt, int class_count_ar )
 #if RFC_TP_SUPPORT
     ASSERT( RFC_tp_init( &ctx, tp, NUMEL(tp), /* is_static */ true ) );
 #endif /*RFC_TP_SUPPORT*/
-    
+
     if( mem_chain )
     {
         mem_chunk *it = mem_chain;
@@ -1463,7 +1463,7 @@ TEST RFC_long_series( int ccnt, int class_count_ar )
         fprintf( file, "\n" );
         fclose( file );
     }
-    
+
     if( do_result_check && class_count )
     {
         do
@@ -1624,19 +1624,19 @@ TEST RFC_res_DIN45667( void )
 TEST RFC_res_repeated( void )
 {
 /*
-                                                           
+
     7.5 ___________________________________________________
-                      +       o                            
+                      +       o
     6.5 ___________________________________________________
-                                                           
+
     5.5 ___________________________________________________
-              *                                            
+              *
     4.5 ___________________________________________________
-                                                           
+
     3.5 ___________________________________________________
-                  *                                        
+                  *
     2.5 ___________________________________________________
-          +               o                                
+          +               o
     1.5 ___________________________________________________
 
 */
@@ -1663,7 +1663,7 @@ TEST RFC_res_repeated( void )
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT
         ASSERT( RFC_dh_init( &ctx, RFC_SD_FULL_P2, /*dh*/ NULL, /*dh_cap*/ 0, /*is_static*/ true ) );
-#endif /*RFC_DH_SUPPORT*/        
+#endif /*RFC_DH_SUPPORT*/
         ASSERT( RFC_feed( &ctx, data, NUMEL(data) ) );
     }
     else FAIL();
@@ -1680,7 +1680,7 @@ TEST RFC_res_repeated( void )
     ASSERT( ctx.tp[0].damage == 0.0 );
     ASSERT( ctx.tp[1].damage == 0.0 );
     ASSERT( ctx.tp[2].damage == 0.0 );
-#endif /*RFC_DH_SUPPORT*/        
+#endif /*RFC_DH_SUPPORT*/
     ASSERT( ctx.residue[0].tp_pos == 1 );
     ASSERT( ctx.residue[1].tp_pos == 2 );
     ASSERT( ctx.residue[2].tp_pos == 3 );
@@ -1708,7 +1708,7 @@ TEST RFC_res_repeated( void )
     ASSERT_IN_RANGE( 1.0, ctx.tp[1].damage / damage_5_3, 1e-10 );
     ASSERT(               ctx.tp[2].damage == 0.0 );
     ASSERT_IN_RANGE( 1.0, ctx.tp[3].damage / damage_7_2, 1e-10 );
-#endif /*RFC_DH_SUPPORT*/        
+#endif /*RFC_DH_SUPPORT*/
 #endif /*RFC_TP_SUPPORT*/
     ASSERT_IN_RANGE( 1.0, ctx.damage / damage,           1e-10 );
     ASSERT( RFC_deinit( &ctx ) );
@@ -1719,19 +1719,19 @@ TEST RFC_res_repeated( void )
 TEST RFC_res_fullcycles( void )
 {
 /*
-                                                           
+
     7.5 ___________________________________________________
-                      +                                    
+                      +
     6.5 ___________________________________________________
-                                                           
+
     5.5 ___________________________________________________
-              +                                            
+              +
     4.5 ___________________________________________________
-                                                           
+
     3.5 ___________________________________________________
-                  +                                        
+                  +
     2.5 ___________________________________________________
-          +                                                
+          +
     1.5 ___________________________________________________
 
 */
@@ -1754,7 +1754,7 @@ TEST RFC_res_fullcycles( void )
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT
         ASSERT( RFC_dh_init( &ctx, RFC_SD_HALF_23, /*dh*/ NULL, /*dh_cap*/ 0, /*is_static*/ true ) );
-#endif /*RFC_DH_SUPPORT*/        
+#endif /*RFC_DH_SUPPORT*/
         ASSERT( RFC_feed( &ctx, data, NUMEL(data) ) );
     }
     else FAIL();
@@ -1775,7 +1775,7 @@ TEST RFC_res_fullcycles( void )
     ASSERT( ctx.tp[0].damage == 0.0 );
     ASSERT( ctx.tp[1].damage == 0.0 );
     ASSERT( ctx.tp[2].damage == 0.0 );
-#endif /*RFC_DH_SUPPORT*/        
+#endif /*RFC_DH_SUPPORT*/
     ASSERT( ctx.residue[0].tp_pos == 1 );
     ASSERT( ctx.residue[1].tp_pos == 2 );
     ASSERT( ctx.residue[2].tp_pos == 3 );
@@ -1795,7 +1795,7 @@ TEST RFC_res_fullcycles( void )
     ASSERT_IN_RANGE( 1.0, ctx.tp[1].damage / ( damage_5_3/2 ), 1e-10 );
     ASSERT_IN_RANGE( 1.0, ctx.tp[2].damage / ( damage_5_3/2 ), 1e-10 );
     ASSERT_IN_RANGE( 1.0, ctx.tp[3].damage / ( damage_7_2/2 ), 1e-10 );
-#endif /*RFC_DH_SUPPORT*/        
+#endif /*RFC_DH_SUPPORT*/
 #endif /*RFC_TP_SUPPORT*/
     damage = damage_7_2 + damage_5_3;
     ASSERT_IN_RANGE( 1.0, ctx.damage / damage,                 1e-10 );
@@ -1809,17 +1809,17 @@ TEST RFC_res_halfcycles( void )
     /*
 
     7.5 ___________________________________________________
-                      +                                    
+                      +
     6.5 ___________________________________________________
-                                                           
+
     5.5 ___________________________________________________
-              +                                            
+              +
     4.5 ___________________________________________________
-                                                           
+
     3.5 ___________________________________________________
-                  +                                        
+                  +
     2.5 ___________________________________________________
-          +                                                
+          +
     1.5 ___________________________________________________
 
     */
@@ -1842,7 +1842,7 @@ TEST RFC_res_halfcycles( void )
 #endif /*RFC_TP_SUPPORT*/
 #if RFC_DH_SUPPORT
         ASSERT( RFC_dh_init( &ctx, RFC_SD_HALF_23, /*dh*/ NULL, /*dh_cap*/ 0, /*is_static*/ true ) );
-#endif /*RFC_DH_SUPPORT*/        
+#endif /*RFC_DH_SUPPORT*/
         ASSERT( RFC_feed( &ctx, data, NUMEL(data) ) );
     }
     else FAIL();
@@ -1863,7 +1863,7 @@ TEST RFC_res_halfcycles( void )
     ASSERT( ctx.tp[0].damage == 0.0 );
     ASSERT( ctx.tp[1].damage == 0.0 );
     ASSERT( ctx.tp[2].damage == 0.0 );
-#endif /*RFC_DH_SUPPORT*/        
+#endif /*RFC_DH_SUPPORT*/
     ASSERT( ctx.residue[0].tp_pos == 1 );
     ASSERT( ctx.residue[1].tp_pos == 2 );
     ASSERT( ctx.residue[2].tp_pos == 3 );
@@ -1883,7 +1883,7 @@ TEST RFC_res_halfcycles( void )
     ASSERT_IN_RANGE( 1.0, ctx.tp[1].damage / ( damage_5_3_half   ), 1e-10 );  /* From regular counting */
     ASSERT_IN_RANGE( 1.0, ctx.tp[2].damage / ( damage_5_3_half   ), 1e-10 );  /* From regular counting */
     ASSERT_IN_RANGE( 1.0, ctx.tp[3].damage / ( damage_7_2_half/2 ), 1e-10 );  /* From residue */
-#endif /*RFC_DH_SUPPORT*/        
+#endif /*RFC_DH_SUPPORT*/
 #endif /*RFC_TP_SUPPORT*/
     damage = damage_7_2_half + damage_5_3_half * 2;
     ASSERT_IN_RANGE( 1.0, ctx.damage / damage,                      1e-10 );
@@ -1920,7 +1920,7 @@ TEST RFC_at_test( void )
         ok = true;
 
         ASSERT(
-        RFC_at_init( &ctx, NULL /* Sa */, NULL /* Sm */, 0 /* count */, 0.3 /* M */, 
+        RFC_at_init( &ctx, NULL /* Sa */, NULL /* Sm */, 0 /* count */, 0.3 /* M */,
                            0.0 /* Sm_rig */, -1.0 /* R_rig */, true /* R_pinned */, false /* symmetric */ )
         );
 
@@ -1953,7 +1953,7 @@ TEST RFC_at_test( void )
         GREATEST_ASSERT_IN_RANGE( 5.6208425, at_transform( &ctx,  3.0 /*Sa*/,  100.0 /*Sm*/ ), 1e-5  /*tol*/ );  /* R ~ 0.942   */
 
         ASSERT(
-        RFC_at_init( &ctx, NULL /* Sa */, NULL /* Sm */, 0 /* count */, 0.3 /* M */, 
+        RFC_at_init( &ctx, NULL /* Sa */, NULL /* Sm */, 0 /* count */, 0.3 /* M */,
                            0.0 /* Sm_rig */, -1.0 /* R_rig */, true /* R_pinned */, true /* symmetric */ )
         );
 
@@ -1993,7 +1993,7 @@ TEST RFC_at_test( void )
         }
 
         ASSERT(
-        RFC_at_init( &ctx, Sa /* Sa */, Sm /* Sm */, 5 /* count */, 0.3 /* M */, 
+        RFC_at_init( &ctx, Sa /* Sa */, Sm /* Sm */, 5 /* count */, 0.3 /* M */,
                            0.0 /* Sm_rig */, -1.0 /* R_rig */, true /* R_pinned */, false /* symmetric */ )
         );
 
@@ -2011,7 +2011,7 @@ TEST RFC_at_test( void )
 
 
         ASSERT(
-        RFC_at_init( &ctx, NULL /* Sa */, NULL /* Sm */, 0 /* count */, 0.3 /* M */, 
+        RFC_at_init( &ctx, NULL /* Sa */, NULL /* Sm */, 0 /* count */, 0.3 /* M */,
                            50.0 /* Sm_rig */, 0.0 /* R_rig */, false /* R_pinned */, false /* symmetric */ )
         );
 
@@ -2085,7 +2085,7 @@ TEST RFC_wl_math( void )
 
 
 #if !RFC_MINIMAL
-TEST RFC_miner_consequent( void )
+TEST RFC_miner_consistent( void )
 {
     /* Data from [6] table 3.2-6 */
     /* =================================================================================================================== */
@@ -2094,7 +2094,7 @@ TEST RFC_miner_consequent( void )
     rfc_counts_t    Sa_counts[]     = { 0,      605000,  280000,  92000,  20000,  2720,   280,    16,     2 };
     /* Various representations for the histogram defined above */
     double          Sa_hat[]        = { 100, 105, 110, 115, 125, 150, 175, 200, 250, 300, 350, 400, 500, 600, 700, 800 };
-    double          A_expected[]    = { 89199.590, 24445.830, 14414.850, 6980.954, 2089.658, 556.181, 253.551, 219.482, 
+    double          A_expected[]    = { 89199.590, 24445.830, 14414.850, 6980.954, 2089.658, 556.181, 253.551, 219.482,
                                         152.775, 144.658, 133.296, 129.536, 129.245, 128.810, 128.205, 127.398 };
     /* Woehler curve */
     const double SD = 100.0;
@@ -2133,7 +2133,7 @@ TEST RFC_miner_consequent( void )
         ASSERT( RFC_wl_init_original( &ctx, SD, ND, k ) );
 
         ctx.full_inc = 1;
-        ASSERT( RFC_damage_from_rp( &ctx, &D_mk, Sa_counts, Sa, RFC_RP_DAMAGE_CALC_METHOD_CONSEQUENT /*rp_calc_type*/ ) );
+        ASSERT( RFC_damage_from_rp( &ctx, &D_mk, Sa_counts, Sa, RFC_RP_DAMAGE_CALC_METHOD_CONSISTENT /*rp_calc_type*/ ) );
 
         /* A is the difference from variable-amplitude to constant-amplitude fatigue life for Sa_hat.
            (Sa_hat is the largest given Sa in histogram) */
@@ -2147,7 +2147,7 @@ TEST RFC_miner_consequent( void )
     PASS();
 }
 
-TEST RFC_miner_consequent2( void )
+TEST RFC_miner_consistent2( void )
 {
     RFC_VALUE_TYPE      data[DATA_LEN];
     size_t              data_len;
@@ -2212,7 +2212,7 @@ TEST RFC_miner_consequent2( void )
     ctx.wl_k2 = k2;
     ASSERT( RFC_damage_from_rp( &ctx, &D_mod,  /* counts */ NULL, /* sa */ NULL, RFC_RP_DAMAGE_CALC_METHOD_MODIFIED ) );
     ctx.wl_k2 = k;
-    ASSERT( RFC_damage_from_rp( &ctx, &D_con,  /* counts */ NULL, /* sa */ NULL, RFC_RP_DAMAGE_CALC_METHOD_CONSEQUENT ) );
+    ASSERT( RFC_damage_from_rp( &ctx, &D_con,  /* counts */ NULL, /* sa */ NULL, RFC_RP_DAMAGE_CALC_METHOD_CONSISTENT ) );
 
     ASSERT( fabs( D_con / ctx.internal.wl.D - 1 ) < 1e-3 );
 
@@ -2231,7 +2231,7 @@ TEST RFC_miner_consequent2( void )
 
         setlocale( LC_ALL, "" );
 
-        file = fopen( "miner_consequent_results.txt", "wt" );
+        file = fopen( "miner_consistent_results.txt", "wt" );
         ASSERT( file );
         fprintf( file, "Class parameters:\n" );
         fprintf( file, "Class count: \t%d\n", (int)ctx.class_count );
@@ -2249,7 +2249,7 @@ TEST RFC_miner_consequent2( void )
         fprintf( file, "Miner original: \t%g\n", D_orig );
         fprintf( file, "Miner elementary: \t%g\n", D_elem );
         fprintf( file, "Miner modified: \t%g\n", D_mod );
-        fprintf( file, "Miner consequent: \t%g\n", D_con );
+        fprintf( file, "Miner consistent: \t%g\n", D_con );
         fprintf( file, "Miner live: \t%g\n", ctx.internal.wl.D );
         fprintf( file, "\nRepeats: \t%lu\n", (unsigned long)repeats );
         fprintf( file, "\nRP Histogram:\n" );
@@ -2394,7 +2394,7 @@ SUITE( RFC_TEST_SUITE )
 
     /* Inspect rainflow ctx */
     RUN_TEST( RFC_ctx_inspect );
-    
+
     /* Test rainflow counting */
     RUN_TEST1( RFC_empty, 0 );
     RUN_TEST1( RFC_cycle_up, 0 );
@@ -2418,9 +2418,9 @@ SUITE( RFC_TEST_SUITE )
     RUN_TEST( RFC_res_fullcycles );
     RUN_TEST( RFC_res_halfcycles );
     RUN_TEST( RFC_wl_math );
-    /* "Miner consequent" approach */
-    RUN_TEST( RFC_miner_consequent );
-    RUN_TEST( RFC_miner_consequent2 );
+    /* "consistent Miner's rule" approach */
+    RUN_TEST( RFC_miner_consistent );
+    RUN_TEST( RFC_miner_consistent2 );
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
     /* Test turning points */

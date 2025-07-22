@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-import os.path
+import os
 import warnings
 from collections import namedtuple
 from enum import IntEnum
@@ -120,13 +120,13 @@ class RPDamageCalcMethod(IntEnum):
     MINER_MODIFIED : int
         Use SN curve type "Miner modified".
         (Takes slope `k2` into account.)
-    MINER_CONSEQUENT : int
-        Accumulate according to "Miner consequent".
+    MINER_CONSISTENT : int
+        Accumulate according to "Miner consistent".
     """
     DEFAULT = 0             # Use SN curve params as they are set.
     MINER_ELEMENTAR = 1     # Use SN curve type "Miner elementary".
     MINER_MODIFIED = 2      # Use SN curve type "Miner modified".
-    MINER_CONSEQUENT = 3    # Accumulate according to "Miner consequent".
+    MINER_CONSISTENT = 3    # Accumulate according to "consistent Miner's rule".
 
 
 def _get_spec_extension_prebuild():
@@ -143,7 +143,7 @@ def _get_spec_extension_prebuild():
 
         # Determine the directory of the current script
         package_directory = os.path.dirname(__file__)
-        
+
         # Try to locate suitable prebuilt modules.
         prebuilds = None
         if os.path.exists(os.path.join(package_directory, "_ext")):
@@ -199,7 +199,7 @@ if _prebuild:
 from . import rfcnt  # noqa 402
 
 # For backward compatibility, supporting both rfcnt.rfc() and rfcnt.rfcnt.rfc()
-rfc = rfcnt.rfc
+from .rfcnt import rfc, damage_from_rp  # noqa 402
 
 # from . import tests, utils  # noqa F402
-del annotations, NumpyVersion, namedtuple, os, json, version, warnings
+del _get_spec_extension_prebuild, annotations, NumpyVersion, namedtuple, os, json, warnings

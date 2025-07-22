@@ -4,6 +4,12 @@
 # The function takes one argument:
 # - out_var: The variable name to store the detected NumPy C API version.
 
+
+if (POLICY CMP0177)
+  cmake_policy(SET CMP0177 OLD)
+endif()
+
+
 function(numpy_get_capi_version  out_var)
     # Initialize the output variable with "NOTFOUND".
     set(${out_var} "NOTFOUND")
