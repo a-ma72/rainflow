@@ -5,6 +5,7 @@
   #define RFC_VERSION_MAJOR         "${RFC_VERSION_MAJOR}"
   #define RFC_VERSION_MINOR         "${RFC_VERSION_MINOR}"
   #define RFC_VERSION_PATCH         "${RFC_VERSION_PATCH}"
+  #define RFC_VERSION_POSTFIX       "${RFC_VERSION_POSTFIX}"
   #define RFC_USE_INTEGRAL_COUNTS    ${RFC_USE_INTEGRAL_COUNTS}
   #define RFC_USE_HYSTERESIS_FILTER  ${RFC_USE_HYSTERESIS_FILTER}
   #define RFC_MINIMAL                ${RFC_MINIMAL}
@@ -19,4 +20,6 @@
   #define RFC_AR_SUPPORT             ${RFC_AR_SUPPORT}
   #define RFC_DEBUG_FLAGS            ${RFC_DEBUG_FLAGS}
   #define RFC_EXPORT_MEX             ${RFC_EXPORT_MEX}
+  #define RFC_EXPORT_PY              ${RFC_EXPORT_PY}
+  #define RFC_VALUE_TYPE             ${RFC_VALUE_TYPE}
 #endif /*RFC_VERSION_MAJOR*/

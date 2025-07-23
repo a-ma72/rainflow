@@ -1,11 +1,38 @@
 RAINFLOW
 |   CMakeLists.txt                Makefile (CMake)
-|   coan-args-minimal.in          Input arguments file for coan invocation
+|   coan-args-minimal.in          Input arguments file for coan invocation (minimal build)
 |   coan_invoke-minimal.bat       Invoke coan (cmd shell)
 |   coan_invoke-minimal.sh        Invoke coan (linux shell)
 |   content.txt                   This file
 |   LICENSE                       License information
-|   README.MD                     Readme
+|   README.rst                    Readme
+|
++---.github
+|   \---workflows
+|       |   build-wheels.yml      Build/test wheels + sdist via cibuildwheel, publish to PyPI on tags
+|       \   tests.yml             Install + test matrix (Windows/macOS/Linux x Python 3.9-3.14)
+|
++---docs
+|   |   conf.py                  Sphinx configuration (version read from root CMakeLists.txt)
+|   |   index.rst                Documentation index (generated from index.rst.in)
+|   |   index.rst.in             Template for index.rst (CMake configure_file, |version| substitution)
+|   |   algorithm.rst            Core algorithm explanation
+|   |   astm_method.rst          ASTM E 1049 vs. 4-point method
+|   |   cpp_wrapper.rst          C++ wrapper guide
+|   |   damage_history.rst       Damage tracking over time
+|   |   delegates.rst            Custom callbacks and extensibility
+|   |   examples.rst             Practical code examples
+|   |   features.rst             Feature descriptions and compile-time options
+|   |   installation.rst         Build instructions for all platforms (generated from installation.rst.in)
+|   |   installation.rst.in      Template for installation.rst
+|   |   level_crossing.rst       Level-crossing histograms: DIN 45667 vs FVA
+|   |   minimal_build.rst        RFC_MINIMAL for embedded systems
+|   |   references.rst           Bibliography and citations (generated from references.rst.in)
+|   |   references.rst.in        Template for references.rst
+|   |   residue_methods.rst      Residue handling methods
+|   |   spread_damage.rst        Damage spreading methods
+|   |   tp_prune.rst             Memory management with RFC_tp_prune()
+|   \   turning_points.rst       Turning point storage and management
 |
 +---src
 |   |
@@ -13,7 +40,7 @@ RAINFLOW
 |   |
 |   +---3rd_party
 |   |   +---greatest              A testing system for C, contained in 1 header file.
-|   |   \---unifdef               A tool remove preprocessor conditionals from code.
+|   |   \---unifdef               A tool to remove preprocessor conditionals from code.
 |   |
 |   +---lib
 |   |   |   CMakeLists.txt        Makefile (CMake)
@@ -35,30 +62,37 @@ RAINFLOW
 |   +---matlab
 |   |   |   CMakeLists.txt        Makefile (CMake)
 |   |   |   rfc.c                 MATLAB(R) wrapper module `rfc`
-|   |   |   make.m            Build rfc.m
-|   |   \   validate.m        Examples an checks
+|   |   |   make.m                Build rfc.m
+|   |   \   validate.m            Examples an checks
 |   |
-|   +---python
-|       |   __init.py__               Init
+|   \---python
+|       |   __init__.py               Init
 |       |   CMakeLists.txt            Makefile (CMake)
 |       |   LICENSE                   License information
 |       |   MANIFEST.in               Manifest file (input file)
 |       |   pyproject.toml            TOML file for build requirements
-|       |   README.md                 Readme
+|       |   README.rst                Readme (Sphinx-facing)
 |       |   requirements.txt          Requirements of the rfcnt module
-|       |   rfcnt.pyi                 rfcnt interface file
+|       |   rfcnt.pyi                 rfcnt interface file (kept in sync with docstrings/ via tools/sync_docstrings.py)
 |       |   run_examples.py           Python script executes examples from .tests.examples
 |       |   run_tests.py              Python script for unit testing
-|       |   setup.py                  Setup (build, install, deploy)
+|       |   setup.py                  Setup (build, install, deploy); runs sync_docstrings() before every build
 |       |   utils.py                  Utility module
-|       |   version.py                Version file
+|       |   version.py                Version file (generated from version.py.in)
+|       |   version.py.in             Template for version.py (CMake configure_file / generate_version.cmake)
 |       |
 |       +---_ext
-|       |   \   <prebuilds>           Prebuild extensions for various numpy versions
+|       |                             (currently empty; the old multi-NumPy-ABI prebuilds matrix
+|       |                              that used to populate this was removed upstream)
 |       |
 |       +---cmake
+|       |   |   generate_version.cmake          Regenerates version.py from version.py.in at build time
 |       |   |   numpy_get_include.py            Python script returning NumPy include directories
-|       |   \   rfcnt_target_functions.cmake    Some helper functions for create build targets
+|       |   \   rfcnt_target_functions.cmake    Helper functions to create the rfcnt build target (incl. pybind11 wiring)
+|       |
+|       +---docstrings
+|       |   |   rfc.txt                       Docstring source for rfc(), single source of truth
+|       |   \   damage_from_rp.txt            Docstring source for damage_from_rp()
 |       |
 |       +---lib
 |       |   |   rainflow.h            (Generated) copies of /src/lib
@@ -67,20 +101,27 @@ RAINFLOW
 |       |   \   rainflow.c            ...
 |       |
 |       +---notebooks
-|       |   |   example_damage_history.ipynb    Example showing damage growth over time
-|       |   |   example_damage_history.png      Output from example_damage_history.ipynb
-|       |   \   jupyter_screenshot.png          Output from .tests.examples.example_1()
+|       |   |   example.xcf                            GIMP source image for the notebook screenshots
+|       |   |   example_damage_history.ipynb           Example showing damage growth over time
+|       |   |   example_damage_history.png             Output from example_damage_history.ipynb
+|       |   |   example_miner_verifications.ipynb      Example verifying Miner's rule / SN-curve consistency
+|       |   \   jupyter_screenshot.png                 Output from .tests.examples.example_1()
 |       |
 |       +---src
-|       |   |   numpy_arrayobject.h   Include file generated by `numpy_get_include.py`
-|       |   \   rfcnt.cpp             Python wrapper module `rfcnt`
+|       |   |   docstrings_generated.hpp     Generated from docstrings/*.txt by tools/sync_docstrings.py -- do not hand-edit
+|       |   |   numpy_arrayobject.h          (Generated by numpy_get_include.py at build time; gitignored, not tracked)
+|       |   \   rfcnt.cpp                    Python wrapper module `rfcnt` (pybind11)
 |       |
-|       \---tests
-|           |   __init.py__           Init
-|           |   test_rfcnt.py         Unit Test
-|           |   examples.py           Examples
-|           |   long_series.csv       Time series for unit test and examples
-|           \   test_rfcnt.py         Demonstrator and test (Python)
+|       +---tests
+|       |   |   __init__.py           Init
+|       |   |   test_rfcnt.py         Unit Test
+|       |   |   test_rfcnt_npz.py     Unit test for the .npz-based fixture below
+|       |   |   examples.py           Examples
+|       |   |   long_series.csv       Time series for unit test and examples
+|       |   \   rfcnt_example.npz     Example data fixture (NumPy .npz)
+|       |
+|       \---tools
+|           \   sync_docstrings.py    Regenerates src/docstrings_generated.hpp and rfcnt.pyi from docstrings/*.txt
 |
 +---test
 |   |   CMakeLists.txt            Makefile (CMake)

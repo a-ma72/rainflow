@@ -1,0 +1,104 @@
+name: build-wheels
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: 1
+  PIP_NO_COMPILE: 1
+
+jobs:
+  build_wheels:
+    name: wheels • ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v4.2.0
+        with:
+          package-dir: src/python
+          extras: uv
+        env:
+          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*"
+          # `pp*` was a no-op (PyPy is not in `enable`) and made cibuildwheel
+          # 4.x emit an "Invalid skip selector" warning on every run.
+          CIBW_SKIP: "*-musllinux*"
+          # uv resolves and installs the isolated build environment an order
+          # of magnitude faster than venv+pip. extras: uv provides the
+          # external uv binary on Windows/macOS (Linux images already ship it).
+          CIBW_BUILD_FRONTEND: "build[uv]"
+          # manylinux2014's GCC 10.2.1 is too old to build numpy>=2.0 from
+          # source (needs GCC>=10.3), which pip falls back to on manylinux2014
+          # since numpy no longer ships prebuilt wheels for that image.
+          CIBW_MANYLINUX_X86_64_IMAGE: "manylinux_2_28"
+          # ubuntu-latest also builds i686 (32-bit) by default; numpy/pandas
+          # ship no 32-bit wheels at all, so it always fails trying to build
+          # numpy from source there (and manylinux_2_28 has no i686 image to
+          # fall back on). Same reasoning as CIBW_ARCHS_MACOS/_WINDOWS below.
+          CIBW_ARCHS_LINUX: "x86_64"
+          CIBW_ARCHS_MACOS: "x86_64 arm64"
+          # Pinned defensively: on GitLab's Windows SaaS runner, cibuildwheel
+          # also picked up win32 (32-bit) by default and testing it failed,
+          # since current pandas has no 32-bit wheel. windows-latest here
+          # only ever reports native AMD64 so this likely never bites, but
+          # keep both workflows' behavior explicit and consistent.
+          CIBW_ARCHS_WINDOWS: "AMD64"
+          CIBW_TEST_COMMAND: "python -m rfcnt.run_tests"
+          CIBW_TEST_REQUIRES: "pandas"
+          # The wheels differ only in the CPython ABI they link against, and
+          # the test workflow already runs the full suite on every interpreter.
+          # Verifying the packaged artifact on the oldest and newest supported
+          # ABI is what these tests add.
+          CIBW_TEST_SKIP: "cp310-* cp311-* cp312-* cp313-*"
+          # PIP_NO_COMPILE is set globally, but cibuildwheel builds in isolated
+          # environments (and, on Linux, inside a container), so it has to be
+          # handed over explicitly.
+          CIBW_ENVIRONMENT: "PIP_NO_COMPILE=1"
+          CIBW_TEST_ENVIRONMENT: "PIP_NO_COMPILE=1"
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: wheels-${{ matrix.os }}
+          path: wheelhouse/*.whl
+
+  build_sdist:
+    name: sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - run: pipx run build --sdist src/python --outdir dist
+      - uses: actions/upload-artifact@v6
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  publish:
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    environment: pypi        # required reviewer on this environment pauses the job here
+    permissions:
+      id-token: write        # trusted publishing, no API token needed
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List distributions to be published
+        run: ls -la dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1

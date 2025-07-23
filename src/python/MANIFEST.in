@@ -3,4 +3,5 @@ include lib/rainflow.c
 include lib/rainflow.h
 include lib/rainflow.hpp
 include src/rfcnt.cpp
+include src/docstrings_generated.hpp
 include LICENSE

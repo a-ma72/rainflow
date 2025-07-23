@@ -1,22 +1,34 @@
-import os
+"""Examples for rainflow cycle counting and data visualization.
+
+This module provides example functions demonstrating how to perform rainflow cycle counting,
+visualize results, and handle time series data using the rainflow package.
+"""
+
+import logging
+from pathlib import Path
+
 import numpy as np
-from .. import ResidualMethod, SDMethod, rfc, utils, ArrayLike
+
+from .. import ArrayLike, ResidualMethod, SDMethod, rfc, utils
+
+logger = logging.getLogger(__name__)
 
 
 def _get_script_path() -> str:
-    """
-    Get the directory path of the current script.
+    """Get the directory path of the current script.
 
     Returns
     -------
     str
         The directory path where the current script is located.
+
     """
-    return os.path.dirname(os.path.abspath(__file__))
+    return str(Path(__file__).parent)
 
 
 def example_1():
-    """
+    """Rainflow cycle counting and data visualization.
+
     Example function to demonstrate rainflow cycle counting and data visualization.
 
     This function reads a time series data from a CSV file, performs rainflow cycle counting,
@@ -27,18 +39,19 @@ def example_1():
     ------
     ImportError
         If the required modules 'pandas' and 'matplotlib' are not installed.
+
     """
     try:
         import matplotlib.pyplot as plt
         import matplotlib.ticker as ticker
         import pandas as pd
         from matplotlib.gridspec import GridSpec
-    except ImportError as err:
-        print("This example requires modules 'pandas' and 'matplotlib'!")
-        raise err
+    except ImportError:
+        logger.warning("This example requires modules 'pandas' and 'matplotlib'!")
+        raise
 
     # Load data from CSV
-    data = pd.read_csv(os.path.join(_get_script_path(), "long_series.csv"), header=None)
+    data = pd.read_csv(Path(_get_script_path()) / "long_series.csv", header=None)
     data = data.to_numpy().squeeze()
 
     # Set parameters for rainflow counting

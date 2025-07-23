@@ -1,21 +1,26 @@
 # CMakeLists for project "rainflow"
-# 2025, Andreas Martin
+# 2026, Andreas Martin
 
-# See `README.md` for build and installation hints.
+# See `README.rst` for build and installation hints.
 
 cmake_minimum_required(VERSION 3.16)
-cmake_policy(SET CMP0048 NEW)  # The project() command manages VERSION variables.
+if (POLICY CMP0048)
+    cmake_policy(SET CMP0048 NEW)  # The project() command manages VERSION variables.
+endif ()
 if (POLICY CMP0076)
     cmake_policy(SET CMP0076 NEW)  # The target_sources() command converts relative paths to absolute.
 endif ()
-cmake_policy(SET CMP0091 NEW)  # MSVC runtime library flags are selected by an abstraction.
+if (POLICY CMP0091)
+    cmake_policy(SET CMP0091 NEW)  # MSVC runtime library flags are selected by an abstraction.
+endif ()
+
 
 # Project name and version
-project(rainflow VERSION 0.5.0 LANGUAGES NONE)
+project(rainflow VERSION 0.6.1 LANGUAGES C CXX)
+# PEP 440 postfix, no leading dot: "rc1" -> 0.6.1rc1. Empty for a final release.
+set(RFC_VERSION_POSTFIX_PRESET "rc0")
 
 # C++11
-enable_language(C)
-enable_language(CXX)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
@@ -26,8 +31,8 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "")
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
 endif ()
 
-if (CMAKE_BUILD_TYPE MATCHES Debug)
-    message(STATUS "Rainflow: Debug build")
+if (CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo")
+    message(STATUS "Rainflow: Adding debug flags for build type ${CMAKE_BUILD_TYPE}")
     add_definitions(-DDEBUG -D_DEBUG)
 endif ()
 
@@ -38,9 +43,6 @@ if (MSVC)
     # versions of certain C functions but this is difficult to do
     # in platform-independent code.
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-    add_compile_options(-Od)  # No optimization
-elseif (GNUC)
-    add_compile_options(-O0)  # No optimization
 endif ()
 
 # Math library
@@ -66,31 +68,76 @@ if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     option(RFC_DAMAGE_FAST "Enables fast damage calculation (per look-up table)" ON)
     option(RFC_DEBUG_FLAGS "Enables flags for detailed examination" OFF)
     option(RFC_EXPORT_MEX "Export a function wrapper for MATLAB(R)" ON)
-    option(RFC_EXPORT_PY "Export a function wrapper for Python)" ON)
+    option(RFC_EXPORT_PY "Export a function wrapper for Python" ON)
     option(RFC_UNIT_TEST "Generate rainflow testing program for unit test" ON)
     set(RFC_VALUE_TYPE double CACHE STRING "Value type of input data to be processed")
     set(RFC_PYTHON_VERSION "3.9" CACHE STRING "Expected Python version")
     set(RFC_NUMPY_VERSION "" CACHE STRING "NumPy version to link to")
 else ()
     message(STATUS "Build ${PROJECT_NAME} as subsequent project")
-    set(RFC_EXPORT_MEX OFF)
-    set(RFC_EXPORT_PY OFF)
+    set(RFC_EXPORT_MEX OFF CACHE BOOL "" FORCE)
+    set(RFC_EXPORT_PY OFF CACHE BOOL "" FORCE)
 endif ()
 
 set(RFC_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(RFC_VERSION_MINOR ${PROJECT_VERSION_MINOR})
 set(RFC_VERSION_PATCH ${PROJECT_VERSION_PATCH})
+set(RFC_VERSION_POSTFIX "${RFC_VERSION_POSTFIX_PRESET}" CACHE STRING "Optional version postfix, e.g. 'rc1', '.dev1', '.post1'")
+set(RFC_VERSION "${RFC_VERSION_MAJOR}.${RFC_VERSION_MINOR}.${RFC_VERSION_PATCH}${RFC_VERSION_POSTFIX}")
 
 # Save options in configuration file
 configure_file(${CMAKE_CURRENT_LIST_DIR}/src/lib/config.h.in ${CMAKE_CURRENT_LIST_DIR}/src/lib/config.h)
+
+# Generate Python version file and documentation from templates
+configure_file(${CMAKE_CURRENT_LIST_DIR}/src/python/version.py.in     ${CMAKE_CURRENT_LIST_DIR}/src/python/version.py)
+configure_file(${CMAKE_CURRENT_LIST_DIR}/README.rst.in               ${CMAKE_CURRENT_LIST_DIR}/README.rst             @ONLY)
+configure_file(${CMAKE_CURRENT_LIST_DIR}/docs/index.rst.in           ${CMAKE_CURRENT_LIST_DIR}/docs/index.rst        @ONLY)
+configure_file(${CMAKE_CURRENT_LIST_DIR}/docs/installation.rst.in    ${CMAKE_CURRENT_LIST_DIR}/docs/installation.rst  @ONLY)
+configure_file(${CMAKE_CURRENT_LIST_DIR}/docs/references.rst.in      ${CMAKE_CURRENT_LIST_DIR}/docs/references.rst   @ONLY)
 
 # Targets
 add_subdirectory(src)
 
 # Unit tests
-if (${RFC_UNIT_TEST})
+if (RFC_UNIT_TEST)
     enable_testing()
     include(CTest)
     add_subdirectory(test)  # EXCLUDE_FROM_ALL)
+    add_subdirectory(src/embedded)
     add_test(NAME rfc_unit_test COMMAND rfc_test)
 endif ()
+
+
+#[[
+  CMake Structure
+
+  rainflow/
+  ├── CMakeLists.txt              (root: project config, options, compiler flags)
+  ├── src/
+  │   ├── CMakeLists.txt          (orchestrates lib, matlab, python subdirs)
+  │   ├── lib/CMakeLists.txt      (rfc_core static library)
+  │   ├── embedded/CMakeLists.txt (RF_* host tests, when RFC_UNIT_TEST)
+  │   ├── matlab/CMakeLists.txt   (MATLAB MEX wrapper)
+  │   └── python/
+  │       ├── CMakeLists.txt      (Python rfcnt extension module)
+  │       └── cmake/rfcnt_target_functions.cmake  (helper functions)
+  ├── test/CMakeLists.txt         (rfc_test unit test executable)
+  ├── sf/CMakeLists.txt           (legacy build, v0.2)
+  └── minimal/CMakeLists.txt      (legacy build, v0.2)
+
+  Key Targets
+  ┌──────────┬───────────────────┬─────────────────────────────────────────────────┐
+  │  Target  │       Type        │                   Description                   │
+  ├──────────┼───────────────────┼─────────────────────────────────────────────────┤
+  │ rfc_core │ Static library    │ Core rainflow counting library (C)              │
+  ├──────────┼───────────────────┼─────────────────────────────────────────────────┤
+  │ rfc_test │ Executable        │ Unit tests (C/C++), links rfc_core + greatest   │
+  ├──────────┼───────────────────┼─────────────────────────────────────────────────┤
+  │ rfc_mex  │ MEX file          │ MATLAB wrapper (conditional on RFC_EXPORT_MEX)  │
+  ├──────────┼───────────────────┼─────────────────────────────────────────────────┤
+  │ rfcnt    │ Shared lib (.pyd) │ Python extension (conditional on RFC_EXPORT_PY) │
+  ├──────────┴───────────────────┼─────────────────────────────────────────────────┤
+  │ rf_embedded_test /           │ RF_* host tests (src/embedded)                  │
+  | rf_embedded_flush_test       │                                                 │ 
+  └──────────────────────────────┴─────────────────────────────────────────────────┘
+#]]
