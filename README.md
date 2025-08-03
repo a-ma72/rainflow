@@ -25,7 +25,7 @@ predefined functions.
 
 ### Features of this package
  1. Modular architecture in two layers:  
-    a) Module _rainflow.c_ (with _rainflow.h_) holds all necessary functions for rainflow counting and histogram extraction. You may select multiple optional features at compile time:
+    a) Module _rainflow.c_ (with _rainflow.h_) holds all necessary functions for rainflow counting and histogram extraction. You may select multiple optional features at compile time:  
        `RFC_MINIMAL`: To use core functions for rainflow counting only (for porting to µControllers for example).  
        `RFC_TP_SUPPORT`: Turning point storage.  
        `RFC_HCM_SUPPORT`: HCM algorithm (Clormann/Seeger).  
