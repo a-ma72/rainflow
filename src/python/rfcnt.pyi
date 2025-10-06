@@ -161,8 +161,6 @@ def rfc(
                 Miner's consistent rule.
 
 """
-
-
 def damage_from_rp(
         Sa: ArrayLike,
         counts: ArrayLike,

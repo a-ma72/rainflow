@@ -72,7 +72,7 @@
  *================================================================================
  * BSD 2-Clause License
  * 
- * Copyright (c) 2023, Andras Martin
+ * Copyright (c) 2025, Andras Martin
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without

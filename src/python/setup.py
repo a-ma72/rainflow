@@ -1,6 +1,6 @@
 # Source distribution (./dist)
 # python setup.py build sdist
-# 
+#
 # Binary distribution (./build)
 # python -m build -nwx
 # python setup.py bdist_wheel --plat-name=win-amd64
@@ -22,7 +22,7 @@
 # python3 -m build
 # python3 -m twine upload --repository testpypi dist/*
 # pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple rfcnt==0.2.0
-# python3 -m twine upload --repository pypi dist/*
+# python3 -m twine upload --repository pypi dist/rfcnt-0.5.0rc1*
 
 
 # Install (Jupyter Notebook)

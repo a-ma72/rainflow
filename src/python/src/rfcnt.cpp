@@ -810,7 +810,7 @@ int prepare_results( Rainflow *rf, Py_ssize_t data_len, Rainflow::rfc_res_method
 
     // Insert turning points
     len[0] = rf->tp_storage().size();
-    len[1] = 3;
+    len[1] = 4;
     arr = (PyArrayObject*)PyArray_SimpleNew( 2, len, NPY_DOUBLE );
     if( !arr ) goto fail_cont;
     PyArray_FILLWBYTE( arr, 0 );
@@ -819,6 +819,7 @@ int prepare_results( Rainflow *rf, Py_ssize_t data_len, Rainflow::rfc_res_method
         *(double*)PyArray_GETPTR2( arr, i, 0 ) = (double)rf->tp_storage()[i].pos;
         *(double*)PyArray_GETPTR2( arr, i, 1 ) = (double)rf->tp_storage()[i].value;
         *(double*)PyArray_GETPTR2( arr, i, 2 ) = (double)rf->tp_storage()[i].damage;
+        *(double*)PyArray_GETPTR2( arr, i, 3 ) = (double)rf->tp_storage()[i].adj_pos;
     }
     PyDict_SetItemString( *ret, "tp", (PyObject*)arr );
     Py_DECREF( arr );
