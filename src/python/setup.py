@@ -22,7 +22,7 @@
 # python3 -m build
 # python3 -m twine upload --repository testpypi dist/*
 # pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple rfcnt==0.2.0
-# python3 -m twine upload --repository pypi dist/rfcnt-0.5.0rc1*
+# python3 -m twine upload --repository pypi dist/rfcnt-0.5.1rc1*
 
 
 # Install (Jupyter Notebook)
@@ -125,7 +125,6 @@ def main():
             'Intended Audience :: Education',
             'Intended Audience :: Information Technology',
             'Intended Audience :: Science/Research',
-            'License :: OSI Approved :: BSD License',
             'Natural Language :: English',
             'Operating System :: MacOS :: MacOS X',
             'Operating System :: Microsoft :: Windows',
