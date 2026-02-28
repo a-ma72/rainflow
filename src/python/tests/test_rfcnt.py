@@ -5,8 +5,9 @@ cycle counting algorithm, including tests for empty series, single cycles,
 small samples, and long data series.
 """
 
-# ruff: noqa: S101
+from __future__ import annotations
 
+# ruff: noqa: S101
 import logging
 import unittest
 from pathlib import Path

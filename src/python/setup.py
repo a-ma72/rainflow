@@ -28,6 +28,8 @@
 # Install (Jupyter Notebook)
 # !export CFLAGS='-std=c++11' && pip install rfcnt
 
+from __future__ import annotations
+
 import logging
 import re
 from pathlib import Path
@@ -65,8 +67,9 @@ class build_ext(_build_ext):  # noqa: N801
                 ext.extra_compile_args += [
                     "-Wno-unused-variable",
                     "-Wno-unused-function",
+                    "-Wno-unused-but-set-variable",  # Clang (Xcode 13+) / GCC
                 ]
-        # For GCC/MinGW, inject language-standard flags into the
+        # For GCC/Clang/MinGW, inject language-standard flags into the
         # compiler command lists so they apply to the right language.
         if ct in ("unix", "mingw32"):
             for flag, attr in (
