@@ -47,53 +47,54 @@ except ImportError:
         """Return a placeholder string indicating that NumPy is not installed."""
         return "NUMPY_NOTFOUND"
 
-class build_ext(_build_ext):  # noqa: N801
-    """Custom build_ext that applies per-file/per-language compiler flags."""
 
-    def build_extension(self, ext: Extension) -> None:
+class build_ext(_build_ext):
+    """Custom build_ext that filters flags per-file basis."""
+
+    def build_extensions(self) -> None:
+        # 1. Define the flags globally for the extension
         ct = self.compiler.compiler_type
-        
-        # Original logic: modify the extension object before building
-        for i, src in enumerate(ext.sources):
-            # Check file extension to determine flags
-            is_cpp = src.endswith((".cpp", ".cc", ".cxx"))
-            
+        for ext in self.extensions:
             if ct == "msvc":
-                if is_cpp:
-                    ext.extra_compile_args.append("/std:c++14")
                 ext.extra_compile_args.extend([
-                    "/wd4100", "/wd4101", "/wd4189", "/wd4505"
+                    "/std:c++14", "/wd4100", "/wd4101", "/wd4189", "/wd4505"
                 ])
             elif ct in ("unix", "mingw32"):
-                # Use -Wno-... to SUPPRESS warnings
                 ext.extra_compile_args.extend([
                     "-Wno-unused-variable",
                     "-Wno-unused-function",
                     "-Wno-unused-but-set-variable",
                     "-Wno-switch",
                     "-Wno-unused-value",
+                    # We add BOTH here; our monkey patch below will strip the wrong one
+                    "-std=c++11",
+                    "-std=c99",
                 ])
-                
-                # IMPORTANT: Only add -std=c99 to .c files and -std=c++11 to .cpp files
-                # Note: On many Clang versions, we skip adding -std=c99 to the global 
-                # extra_compile_args if C++ files are present. 
-                # Better: Use the compiler's ability to handle this by file type.
-                if is_cpp and "-std=c++11" not in ext.extra_compile_args:
-                    ext.extra_compile_args.append("-std=c++11")
-                elif not is_cpp and "-std=c99" not in ext.extra_compile_args:
-                    # To avoid the Clang error, we only add this if the extension 
-                    # is purely C, OR we rely on the fact that modern Clang 
-                    # defaults to a compatible C standard. 
-                    # If you MUST have c99 for the .c file:
-                    ext.extra_compile_args.append("-std=c99")
 
-        # If Clang is still complaining because of the mix, we remove -std=c99 
-        # and let the compiler use its default, which is usually newer/compatible.
-        if ct in ("unix", "mingw32") and any(s.endswith(".cpp") for s in ext.sources):
-            if "-std=c99" in ext.extra_compile_args:
-                ext.extra_compile_args.remove("-std=c99")
+        # 2. Monkey-patch the compiler to filter flags based on the source file
+        original_compile = self.compiler._compile
 
-        super().build_extension(ext)
+        def filtered_compile(obj, src, ext, cc_args, extra_postargs, pp_opts):
+            # Copy the list so we don't modify the original for the next file
+            postargs = list(extra_postargs)
+            
+            is_cpp = src.endswith((".cpp", ".cc", ".cxx"))
+            
+            if is_cpp:
+                # Remove C-only flags from C++ compilation
+                if "-std=c99" in postargs:
+                    postargs.remove("-std=c99")
+            else:
+                # Remove C++-only flags from C compilation
+                if "-std=c++11" in postargs:
+                    postargs.remove("-std=c++11")
+                if "/std:c++14" in postargs:
+                    postargs.remove("/std:c++14")
+
+            return original_compile(obj, src, ext, cc_args, postargs, pp_opts)
+
+        self.compiler._compile = filtered_compile
+        super().build_extensions()
 
 
 def parse_version_file(version_file_path: Path) -> tuple[str, str, str]:
