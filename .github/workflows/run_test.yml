@@ -32,8 +32,12 @@ jobs:
     - name: Install dependencies
       run: |
         cd src/python
-        pip install wheel
+        # Upgrade pip and install build tools first
+        python -m pip install --upgrade pip
+        pip install setuptools>=61.0 wheel
+        # Install requirements
         pip install -r requirements.txt
+        # Install the package locally
         pip install . --no-build-isolation --no-deps
     - name: Run Python tests
       run: |
