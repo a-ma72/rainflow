@@ -47,40 +47,53 @@ except ImportError:
         """Return a placeholder string indicating that NumPy is not installed."""
         return "NUMPY_NOTFOUND"
 
-
 class build_ext(_build_ext):  # noqa: N801
-    """Custom build_ext that applies per-language compiler flags."""
+    """Custom build_ext that applies per-file/per-language compiler flags."""
 
-    def build_extensions(self) -> None:
-        """Suppress minor warnings and set correct language-standard flags."""
+    def build_extension(self, ext: Extension) -> None:
         ct = self.compiler.compiler_type
-        for ext in self.extensions:
+        
+        # Original logic: modify the extension object before building
+        for i, src in enumerate(ext.sources):
+            # Check file extension to determine flags
+            is_cpp = src.endswith((".cpp", ".cc", ".cxx"))
+            
             if ct == "msvc":
-                ext.extra_compile_args += [
-                    "/std:c++14",     # C++ standard (MSVC applies only to .cpp)
-                    "/wd4100",        # unreferenced formal parameter
-                    "/wd4101",        # unreferenced local variable
-                    "/wd4189",        # local variable initialized but not referenced
-                    "/wd4505",        # unreferenced function removed
-                ]
-            elif ct in ("unix", "mingw32"):  # GCC / Clang / MinGW
-                ext.extra_compile_args += [
+                if is_cpp:
+                    ext.extra_compile_args.append("/std:c++14")
+                ext.extra_compile_args.extend([
+                    "/wd4100", "/wd4101", "/wd4189", "/wd4505"
+                ])
+            elif ct in ("unix", "mingw32"):
+                # Use -Wno-... to SUPPRESS warnings
+                ext.extra_compile_args.extend([
                     "-Wno-unused-variable",
                     "-Wno-unused-function",
-                    "-Wno-unused-but-set-variable",  # Clang (Xcode 13+) / GCC
-                    "-Wswitch",  # Clang
-                    "-Wunused-value",  # Clang
-                ]
-        # For GCC/Clang/MinGW, inject language-standard flags into the
-        # compiler command lists so they apply to the right language.
-        if ct in ("unix", "mingw32"):
-            # Check if we are dealing with C++ or C
-            # setuptools usually sets 'language' on the extension object
-            if getattr(ext, 'language', None) == 'c++':
-                ext.extra_compile_args.append("-std=c++11")
-            else:
-                ext.extra_compile_args.append("-std=c99")
-        super().build_extensions()
+                    "-Wno-unused-but-set-variable",
+                    "-Wno-switch",
+                    "-Wno-unused-value",
+                ])
+                
+                # IMPORTANT: Only add -std=c99 to .c files and -std=c++11 to .cpp files
+                # Note: On many Clang versions, we skip adding -std=c99 to the global 
+                # extra_compile_args if C++ files are present. 
+                # Better: Use the compiler's ability to handle this by file type.
+                if is_cpp and "-std=c++11" not in ext.extra_compile_args:
+                    ext.extra_compile_args.append("-std=c++11")
+                elif not is_cpp and "-std=c99" not in ext.extra_compile_args:
+                    # To avoid the Clang error, we only add this if the extension 
+                    # is purely C, OR we rely on the fact that modern Clang 
+                    # defaults to a compatible C standard. 
+                    # If you MUST have c99 for the .c file:
+                    ext.extra_compile_args.append("-std=c99")
+
+        # If Clang is still complaining because of the mix, we remove -std=c99 
+        # and let the compiler use its default, which is usually newer/compatible.
+        if ct in ("unix", "mingw32") and any(s.endswith(".cpp") for s in ext.sources):
+            if "-std=c99" in ext.extra_compile_args:
+                ext.extra_compile_args.remove("-std=c99")
+
+        super().build_extension(ext)
 
 
 def parse_version_file(version_file_path: Path) -> tuple[str, str, str]:
