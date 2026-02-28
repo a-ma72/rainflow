@@ -26,7 +26,14 @@ def run() -> unittest.result.TestResult:
     """
     stream = StringIO()
     runner = unittest.TextTestRunner(stream=stream)
-    test_result = runner.run(unittest.makeSuite(test_rfcnt.TestRainflowCounting))
+    
+    # FIX for Python 3.13: unittest.makeSuite was removed.
+    # This replacement is backward compatible with Python 3.7+.
+    loader = unittest.TestLoader()
+    suite = loader.loadTestsFromTestCase(test_rfcnt.TestRainflowCounting)
+    
+    test_result = runner.run(suite)
+    
     logger.info("Tests run %d", test_result.testsRun)
     logger.info("Errors %s", test_result.errors)
     logger.info("Failures: %s", test_result.failures)
@@ -41,12 +48,3 @@ if __name__ == "__main__":
         sys.exit(0)
     else:
         sys.exit(1)
-
-
-
-"""
-Jupyter Notebook:
-!pip install ./rfcnt-0.4.7.tar.gz
-!pip install -U matplotlib
-!python -m rfcnt.run_tests
-"""
