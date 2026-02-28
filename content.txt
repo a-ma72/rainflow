@@ -5,7 +5,7 @@ RAINFLOW
 |   coan_invoke-minimal.sh        Invoke coan (linux shell)
 |   content.txt                   This file
 |   LICENSE                       License information
-|   README.MD                     Readme
+|   README.rst                    Readme
 |
 +---src
 |   |
@@ -44,7 +44,7 @@ RAINFLOW
 |       |   LICENSE                   License information
 |       |   MANIFEST.in               Manifest file (input file)
 |       |   pyproject.toml            TOML file for build requirements
-|       |   README.md                 Readme
+|       |   README.rst                Readme
 |       |   requirements.txt          Requirements of the rfcnt module
 |       |   rfcnt.pyi                 rfcnt interface file
 |       |   run_examples.py           Python script executes examples from .tests.examples

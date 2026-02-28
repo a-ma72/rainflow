@@ -1,10 +1,15 @@
+"""Utility functions for rainflow analysis.
+
+This module provides helper functions for preparing data, such as for range pair plots.
+"""
+
 import numpy as np
+
 from . import ArrayLike
 
 
-def rpplot_prepare(sa: ArrayLike, counts: ArrayLike):
-    """
-    Prepare data for range pair plot by sorting the input arrays.
+def rpplot_prepare(sa: ArrayLike, counts: ArrayLike) -> dict:
+    """Prepare data for range pair plot by sorting the input arrays.
 
     Parameters
     ----------
@@ -18,6 +23,7 @@ def rpplot_prepare(sa: ArrayLike, counts: ArrayLike):
     dict
         A dictionary with keys "sa" and "counts", containing the sorted and formatted data,
         and "sa_max" with the maximum value that "sa" contains.
+
     """
     sa = np.asarray(sa).flatten()
     counts = np.asarray(counts).flatten()

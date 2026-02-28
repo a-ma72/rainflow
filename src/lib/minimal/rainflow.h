@@ -16,14 +16,14 @@
  *      /_/ |_/_/  |_/___/_/ |_/_/   /_____/\____/ |__/|__/
  *
  *    Rainflow Counting Algorithm (4-point-method), C99 compliant
- * 
- * 
+ *
+ *
  * "Rainflow Counting" consists of four main steps:
  *    1. Hysteresis Filtering
  *    2. Peak-Valley Filtering
  *    3. Discretization
  *    4. Four Point Counting Method:
- *    
+ *
  *                     * D
  *                    / \       Closed, if min(B,C) >= min(A,D) && max(B,C) <= max(A,D)
  *             B *<--/          Slope B-C is counted and removed from residue
@@ -32,15 +32,15 @@
  *          \ /
  *           * A
  *
- * These steps are fully documented in standards such as 
+ * These steps are fully documented in standards such as
  * ASTM E1049 "Standard Practices for Cycle Counting in Fatigue Analysis" [1].
  * This implementation uses the 4-point algorithm mentioned in [3,4] and the 3-point HCM method proposed in [2].
  * To take the residue into account, you may implement a custom method or use some
  * predefined functions.
- * 
+ *
  * References:
  * [1] "Standard Practices for Cycle Counting in Fatigue Analysis."
- *     ASTM Standard E 1049, 1985 (2011). 
+ *     ASTM Standard E 1049, 1985 (2011).
  *     West Conshohocken, PA: ASTM International, 2011.
  * [2] "Rainflow - HCM / Ein Hysteresisschleifen-Zaehlalgorithmus auf werkstoffmechanischer Grundlage"
  *     U.H. Clormann, T. Seeger
@@ -48,7 +48,7 @@
  * [3] "Zaehlverfahren zur Bildung von Kollektiven und Matrizen aus Zeitfunktionen"
  *     FVA-Richtlinie, 2010.
  *     [https://fva-net.de/fileadmin/content/Richtlinien/FVA-Richtlinie_Zaehlverfahren_2010.pdf]
- * [4] Siemens Product Lifecycle Management Software Inc., 2018. 
+ * [4] Siemens Product Lifecycle Management Software Inc., 2018.
  *     [https://community.plm.automation.siemens.com/t5/Testing-Knowledge-Base/Rainflow-Counting/ta-p/383093]
  * [5] "Review and application of Rainflow residue processing techniques for accurate fatigue damage estimation"
  *     G.Marsh;
@@ -63,7 +63,7 @@
  *     Brokate, M.; Dressler, K.; Krejci, P.
  * []  "Multivariate Density Estimation: Theory, Practice and Visualization". New York, Chichester, Wiley & Sons, 1992
  *     Scott, D.
- * []  "Werkstoffmechanik - Bauteile sicher beurteilen undWerkstoffe richtig einsetzen"; 
+ * []  "Werkstoffmechanik - Bauteile sicher beurteilen undWerkstoffe richtig einsetzen";
  *      Ralf Buergel, Hans Albert Richard, Andre Riemer; Springer FachmedienWiesbaden 2005, 2014
  * []  "Zaehlverfahren und Lastannahme in der Betriebsfestigkeit";
  *     Michael Koehler, Sven Jenne / Kurt Poetter, Harald Zenner; Springer-Verlag Berlin Heidelberg 2012
@@ -71,20 +71,20 @@
  *
  *================================================================================
  * BSD 2-Clause License
- * 
- * Copyright (c) 2025, Andras Martin
+ *
+ * Copyright (c) 2026, Andras Martin
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * * Redistributions of source code must retain the above copyright notice, this
  *   list of conditions and the following disclaimer.
- * 
+ *
  * * Redistributions in binary form must reproduce the above copyright notice,
  *   this list of conditions and the following disclaimer in the documentation
  *   and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -96,6 +96,50 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *================================================================================
+ */
+
+/**
+ * @file rainflow.h
+ * @brief Rainflow Counting Algorithm - Public API
+ *
+ * IMPORTANT THREAD-SAFETY INFORMATION:
+ * =====================================
+ * This library is NOT thread-safe. All functions in this API are designed
+ * for single-threaded use only. If you need to use rainflow counting from
+ * multiple threads, you MUST implement your own synchronization:
+ *
+ * - Each thread should have its own rfc_ctx_s instance
+ * - Do NOT share a single rfc_ctx_s between threads
+ * - Do NOT call any RFC_* functions on the same context from multiple threads
+ * - If sharing data between threads, use proper locking (mutexes, etc.)
+ *
+ * The library performs non-atomic read-modify-write operations on context
+ * state and does not use any internal synchronization primitives.
+ *
+ * Example of SAFE multi-threaded usage:
+ * @code
+ *     // Thread 1
+ *     rfc_ctx_s ctx1;
+ *     RFC_init(&ctx1, ...);
+ *     RFC_feed(&ctx1, data1, ...);
+ *
+ *     // Thread 2 (separate context)
+ *     rfc_ctx_s ctx2;
+ *     RFC_init(&ctx2, ...);
+ *     RFC_feed(&ctx2, data2, ...);
+ * @endcode
+ *
+ * Example of UNSAFE multi-threaded usage (DO NOT DO THIS):
+ * @code
+ *     rfc_ctx_s shared_ctx;
+ *     RFC_init(&shared_ctx, ...);
+ *
+ *     // Thread 1
+ *     RFC_feed(&shared_ctx, data1, ...);  // RACE CONDITION!
+ *
+ *     // Thread 2
+ *     RFC_feed(&shared_ctx, data2, ...);  // RACE CONDITION!
+ * @endcode
  */
 
 #ifndef RAINFLOW_H
@@ -258,7 +302,7 @@ typedef     enum        rfc_res_method          rfc_res_method_e;           /** 
 typedef     void *   ( *rfc_mem_alloc_fcn_t )   ( void *, size_t num, size_t size, int aim );     /** Memory allocation functor */
 
 /* Core functions */
-bool        RFC_init                    (       void *ctx, unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
+bool        RFC_init                    (       void *ctx, unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset,
                                                            rfc_value_t hysteresis, rfc_flags_e flags );
 rfc_state_e RFC_state_get               ( const void *ctx );
 rfc_error_e RFC_error_get               ( const void *ctx );

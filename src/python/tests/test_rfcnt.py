@@ -1,27 +1,45 @@
-import os
+"""Unit tests for the rainflow cycle counting implementation.
+
+This module contains test cases for verifying the correctness of the rainflow
+cycle counting algorithm, including tests for empty series, single cycles,
+small samples, and long data series.
+"""
+
+# ruff: noqa: S101
+
+import logging
 import unittest
+from pathlib import Path
 
 import numpy as np
 
-from .. import rfc, ResidualMethod, SDMethod
+from .. import ResidualMethod, SDMethod, rfc
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class TestRainflowCounting(unittest.TestCase):
+    """Unit tests for the rainflow cycle counting implementation.
+
+    This class contains test cases for verifying the correctness of the rainflow
+    cycle counting algorithm, including tests for empty series, single cycles,
+    small samples, and long data series.
+    """
 
     def get_script_path(self) -> str:
-        """
-        Get the directory path of the current script.
+        """Get the directory path of the current script.
 
         Returns
         -------
         str
             The directory path where the current script is located.
-        """
-        return os.path.dirname(os.path.abspath(__file__))
 
-    def class_param(self, data: np.ndarray, class_count: int):
         """
-        Calculate class parameters for rainflow cycle counting.
+        return Path(__file__).parent
+
+    def class_param(self, data: np.ndarray, class_count: int) -> tuple[float, float]:
+        """Calculate class parameters for rainflow cycle counting.
 
         This method computes the class width and class offset based on the input data
         and the specified number of classes. If the input data is empty, default values
@@ -43,8 +61,11 @@ class TestRainflowCounting(unittest.TestCase):
         ------
         AssertionError
             If `class_count` is not greater than 1.
+
         """
-        assert class_count > 1, "class_count must be greater than 1"
+        if class_count <= 1:
+            msg = "class_count must be greater than 1"
+            raise ValueError(msg)
 
         if len(data) == 0:
             class_width = 1  # Default class width when data is empty
@@ -56,9 +77,8 @@ class TestRainflowCounting(unittest.TestCase):
 
         return class_width, class_offset
 
-    def test_empty_series(self):
-        """
-        Test the rainflow cycle counting method with an empty data series.
+    def test_empty_series(self) -> None:
+        """Test the rainflow cycle counting method with an empty data series.
 
         This test verifies that the rainflow cycle counting method handles an empty
         data series correctly, producing an empty rainflow matrix and no residuals.
@@ -75,6 +95,7 @@ class TestRainflowCounting(unittest.TestCase):
         ------
         AssertionError
             If the resulting rainflow matrix sum is not 0 or if residuals are present.
+
         """
         class_count = 100  # Number of classes
         x = np.array([])  # Empty data array
@@ -102,17 +123,16 @@ class TestRainflowCounting(unittest.TestCase):
             enforce_margin=enforce_margin,
             use_HCM=use_HCM,
             use_ASTM=use_ASTM,
-            spread_damage=spread_damage
+            spread_damage=spread_damage,
         )
 
         # Assert that the rainflow matrix sum is 0
-        self.assertEqual(res["rfm"].sum(), 0)
+        assert res["rfm"].sum() == 0
         # Assert that there are no residuals
-        self.assertEqual(len(res["res"]), 0)
+        assert len(res["res"]) == 0
 
-    def test_single_cycle_up(self):
-        """
-        Test the rainflow cycle counting method with a single upward cycle.
+    def test_single_cycle_up(self) -> None:
+        """Test the rainflow cycle counting method with a single upward cycle.
 
         This test verifies that the rainflow cycle counting method correctly identifies
         a single cycle in a small dataset. The test checks that the rainflow matrix
@@ -130,6 +150,7 @@ class TestRainflowCounting(unittest.TestCase):
         ------
         AssertionError
             If the resulting rainflow matrix or residuals do not match the expected values.
+
         """
         class_count = 4  # Number of classes
         x = np.array([1, 3, 2, 4])  # Data array representing a single cycle
@@ -157,19 +178,18 @@ class TestRainflowCounting(unittest.TestCase):
             enforce_margin=enforce_margin,
             use_HCM=use_HCM,
             use_ASTM=use_ASTM,
-            spread_damage=spread_damage
+            spread_damage=spread_damage,
         )
 
         # Assert that the rainflow matrix sum is 1
-        self.assertEqual(res["rfm"].sum(), 1)
+        assert res["rfm"].sum() == 1
         # Assert that the specific entry in the rainflow matrix is 1
-        self.assertEqual(res["rfm"][3 - 1, 2 - 1], 1)
+        assert res["rfm"][3 - 1, 2 - 1] == 1
         # Assert that the residuals match the expected values
-        self.assertTrue((res["res"].flatten() == [1, 4]).all())
+        assert (res["res"].flatten() == [1, 4]).all()
 
-    def test_one_cycle_down(self):
-        """
-        Test the rainflow cycle counting method with a single downward cycle.
+    def test_one_cycle_down(self) -> None:
+        """Test the rainflow cycle counting method with a single downward cycle.
 
         This test verifies that the rainflow cycle counting method correctly identifies
         a single cycle in a small dataset with a downward trend. The test checks that the
@@ -187,6 +207,7 @@ class TestRainflowCounting(unittest.TestCase):
         ------
         AssertionError
             If the resulting rainflow matrix or residuals do not match the expected values.
+
         """
         class_count = 4  # Number of classes
         x = np.array([4, 2, 3, 1])  # Data array representing a single cycle with a downward trend
@@ -214,19 +235,18 @@ class TestRainflowCounting(unittest.TestCase):
             enforce_margin=enforce_margin,
             use_HCM=use_HCM,
             use_ASTM=use_ASTM,
-            spread_damage=spread_damage
+            spread_damage=spread_damage,
         )
 
         # Assert that the rainflow matrix sum is 1
-        self.assertEqual(res["rfm"].sum(), 1)
+        assert res["rfm"].sum() == 1
         # Assert that the specific entry in the rainflow matrix is 1
-        self.assertEqual(res["rfm"][2 - 1, 3 - 1], 1)
+        assert res["rfm"][2 - 1, 3 - 1] == 1
         # Assert that the residuals match the expected values
-        self.assertTrue((res["res"].flatten() == [4, 1]).all())
+        assert (res["res"].flatten() == [4, 1]).all()
 
-    def test_small_sample(self):
-        """
-        Test the rainflow cycle counting method with a small sample dataset.
+    def test_small_sample(self) -> None:
+        """Test the rainflow cycle counting method with a small sample dataset.
 
         This test verifies that the rainflow cycle counting method correctly identifies
         cycles in a small dataset. The test checks that the rainflow matrix and residuals
@@ -244,6 +264,7 @@ class TestRainflowCounting(unittest.TestCase):
         ------
         AssertionError
             If the resulting rainflow matrix or residuals do not match the expected values.
+
         """
         class_count = 6  # Number of classes
         x = np.array([2, 5, 3, 6, 2, 4, 1, 6, 1,
@@ -272,24 +293,23 @@ class TestRainflowCounting(unittest.TestCase):
             enforce_margin=enforce_margin,
             use_HCM=use_HCM,
             use_ASTM=use_ASTM,
-            spread_damage=spread_damage
+            spread_damage=spread_damage,
         )
 
         # Assert that the rainflow matrix sum is 7
-        self.assertEqual(res["rfm"].sum(), 7)
+        assert res["rfm"].sum() == 7
         # Assert that specific entries in the rainflow matrix are correct
-        self.assertEqual(res["rfm"][5 - 1, 3 - 1], 2)
-        self.assertEqual(res["rfm"][6 - 1, 3 - 1], 1)
-        self.assertEqual(res["rfm"][1 - 1, 4 - 1], 1)
-        self.assertEqual(res["rfm"][2 - 1, 4 - 1], 1)
-        self.assertEqual(res["rfm"][1 - 1, 6 - 1], 2)
+        assert res["rfm"][5 - 1, 3 - 1] == 2
+        assert res["rfm"][6 - 1, 3 - 1] == 1
+        assert res["rfm"][1 - 1, 4 - 1] == 1
+        assert res["rfm"][2 - 1, 4 - 1] == 1
+        assert res["rfm"][1 - 1, 6 - 1] == 2
 
         # Assert that the residuals match the expected values
-        self.assertTrue((res["res"].flatten() == [2, 6, 1, 5, 2]).all())
+        assert (res["res"].flatten() == [2, 6, 1, 5, 2]).all()
 
-    def test_long_series(self):
-        """
-        Test the rainflow cycle counting method with a long data series.
+    def test_long_series(self) -> None:
+        """Test the rainflow cycle counting method with a long data series.
 
         This test verifies that the rainflow cycle counting method correctly processes
         a long dataset read from a CSV file. The test checks the computed damage, rainflow
@@ -309,19 +329,20 @@ class TestRainflowCounting(unittest.TestCase):
             If the required module 'pandas' is not installed.
         AssertionError
             If the resulting damage, rainflow matrix, or residuals do not match the expected values.
+
         """
         try:
             import pandas as pd
-        except ImportError as err:
-            print("This test requires module 'pandas'!")
-            raise err
+        except ImportError:
+            logger.exception("This test requires module 'pandas'!")
+            raise
 
         class_count = 100  # Number of classes
         class_offset = -2025  # Class offset
         class_width = 50  # Class width
 
         # Read the data from CSV
-        x = pd.read_csv(os.path.join(self.get_script_path(), "long_series.csv"), header=None)
+        x = pd.read_csv(Path(self.get_script_path()) / "long_series.csv", header=None)
         x = x.to_numpy().squeeze()  # Convert to numpy array and squeeze
 
         hysteresis = class_width  # Hysteresis width
@@ -341,12 +362,12 @@ class TestRainflowCounting(unittest.TestCase):
             enforce_margin=enforce_margin,
             use_HCM=use_HCM,
             use_ASTM=use_ASTM,
-            spread_damage=spread_damage
+            spread_damage=spread_damage,
         )
 
         # With residuum:    pd == 9.8934e-06 (repeated)
         # Without residuum: pd == 1.1486e-07
-        self.assertTrue(np.absolute(res["tp"][:, 2].sum() / res["damage"] - 1) < 1e-10)
+        assert np.absolute(res["tp"][:, 2].sum() / res["damage"] - 1) < 1e-10
 
         # Change spread damage method
         spread_damage = SDMethod.TRANSIENT_23c
@@ -361,19 +382,20 @@ class TestRainflowCounting(unittest.TestCase):
             enforce_margin=enforce_margin,
             use_HCM=use_HCM,
             use_ASTM=use_ASTM,
-            spread_damage=spread_damage
+            spread_damage=spread_damage,
         )
 
-        self.assertEqual("%.4e" % res["damage"], "1.1486e-07")
-        self.assertEqual(res["rfm"].sum(), 640)
-        self.assertEqual(len(res["res"]), 10)
+        assert "{:.4e}".format(res["damage"]) == "1.1486e-07"
+        assert res["rfm"].sum() == 640
+        assert len(res["res"]) == 10
 
         test = np.absolute(res["res"].flatten() - [
             0, 142, -609, 2950, -2000,
-            2159, 1894, 2101, 1991, 2061
+            2159, 1894, 2101, 1991, 2061,
         ])
-        self.assertTrue(test.sum() < 1e-3)
+        assert test.sum() < 1e-3
 
 
-def run():
+def run() -> None:
+    """Run all unit tests in this module."""
     unittest.main()

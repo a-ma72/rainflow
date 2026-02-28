@@ -1,7 +1,5 @@
 # Function wrapper for Python
 
-# Don't forget to setup `PREBUILD_NUMPY_VERSIONS` in this file!
-
 # Regular build
 # =============
 #[[
@@ -53,18 +51,6 @@ set (Python3_FIND_VIRTUALENV "FIRST")
 project(rfcnt LANGUAGES C CXX)
 # Project name
 
-# Set prebuild versions depending on Python version:
-if (WIN32)
-    set(PREBUILD_NUMPY_VERSIONS 1.23.2  2.0.0)  # Python 3.11
-    # set(PREBUILD_NUMPY_VERSIONS 1.19.3  2.0.0)  # Python 3.9
-else ()
-    set(PREBUILD_NUMPY_VERSIONS)
-endif ()
-# Define NumPy versions used as prebuilds (used for MS Windows only), specifiers like ~=1.19.0 allowed.
-
-# set (RFC_NUMPY_VERSION "1.23.5")
-# NumPy version for the main module is defined per `RFC_NUMPY_VERSION`
-
 if (UNIX)
     set(PATH_SEP ":")
     set(PYTHON_PLATFORM "linux_x86_64")
@@ -102,7 +88,7 @@ else ()
     # Find the Python3 interpreter first.
 
     execute_process(
-            COMMAND "${Python3_EXECUTABLE}" -m venv ${CMAKE_CURRENT_SOURCE_DIR}/venv
+        COMMAND "${Python3_EXECUTABLE}" -m venv ${CMAKE_CURRENT_SOURCE_DIR}/venv
     )
     # Create a new virtual environment in the source directory.
 
@@ -116,27 +102,19 @@ else ()
     # Preliminary redirect to the just created environment
 
     execute_process(
-            COMMAND "${Python3_EXECUTABLE}" -m pip install -U pip setuptools wheel build
+        COMMAND "${Python3_EXECUTABLE}" -m pip install -U pip setuptools wheel build
     )
     # Install necessary Python packages in the virtual environment.
 
-    if (RFC_NUMPY_VERSION)
-        numpy_pip_arg(PIP_ARG ${RFC_NUMPY_VERSION})
-        execute_process(
-                COMMAND "${Python3_EXECUTABLE}" -m pip install ${PIP_ARG}
-        )
-        # Install a specific version of NumPy if RFC_NUMPY_VERSION is defined.
-    else ()
-        execute_process(
-                COMMAND "${Python3_EXECUTABLE}" -m pip install oldest-supported-numpy
-        )
-        # Otherwise, install the oldest supported version of NumPy.
-    endif ()
+    execute_process(
+        COMMAND "${Python3_EXECUTABLE}" -m pip install "numpy>=2.0"
+    )
+    # Install NumPy 2.x for building with NPY_TARGET_VERSION backward compatibility.
 
     execute_process(
-            COMMAND "${Python3_EXECUTABLE}" -c "import numpy; print(numpy.get_include(), end='')"
-            OUTPUT_VARIABLE Python3_NumPy_INCLUDE_DIR
-            RESULT_VARIABLE Python3_NumPy_NOTFOUND
+        COMMAND "${Python3_EXECUTABLE}" -c "import numpy; print(numpy.get_include(), end='')"
+        OUTPUT_VARIABLE Python3_NumPy_INCLUDE_DIR
+        RESULT_VARIABLE Python3_NumPy_NOTFOUND
     )
     # Get the include directory for NumPy.
 
@@ -149,219 +127,114 @@ endif ()
 find_package(Python3 ${RFC_PYTHON_VERSION} COMPONENTS Development Interpreter Numpy)
 # Find the Python3 package with the specified version and required components.
 
+# Fallback: get Python include dirs if find_package failed
+if (NOT Python3_INCLUDE_DIRS)
+    execute_process(
+        COMMAND "${Python3_EXECUTABLE}" -c "import sysconfig; print(sysconfig.get_path('include'), end='')"
+        OUTPUT_VARIABLE Python3_INCLUDE_DIRS
+    )
+    string(STRIP "${Python3_INCLUDE_DIRS}" Python3_INCLUDE_DIRS)
+    message(STATUS "[Python] Include dirs (fallback): ${Python3_INCLUDE_DIRS}")
+endif ()
+
 # Ensure NumPy is installed, with the NumPy C API to build rfcnt
-if (NOT Python3_NumPy_FOUND)
+if (NOT Python3_NumPy_FOUND OR NOT Python3_NumPy_INCLUDE_DIRS)
     message(STATUS "[Python] Didn't find NumPy, trying alternative search...")
     execute_process(
-            COMMAND "${Python3_EXECUTABLE}" ${CMAKE_CURRENT_SOURCE_DIR}/cmake/numpy_get_include.py
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
-            OUTPUT_VARIABLE Python3_NumPy_INCLUDE_DIRS
-            RESULT_VARIABLE Python3_NumPy_NOTFOUND
+        COMMAND "${Python3_EXECUTABLE}" -c "import numpy; print(numpy.get_include(), end='')"
+        OUTPUT_VARIABLE Python3_NumPy_INCLUDE_DIRS
+        RESULT_VARIABLE Python3_NumPy_NOTFOUND
     )
-    # Try to find NumPy include directories using a Python script if the initial search fails.
+    # Try to find NumPy include directories using a direct Python command if find_package fails.
 
     if (Python3_NumPy_NOTFOUND)
         message(FATAL_ERROR "[Python] NumPy headers not found")
     else ()
-        message(STATUS "[Python] NumPy found.")
+        string(STRIP "${Python3_NumPy_INCLUDE_DIRS}" Python3_NumPy_INCLUDE_DIRS)
+        message(STATUS "[Python] NumPy found (fallback): ${Python3_NumPy_INCLUDE_DIRS}")
     endif ()
 endif ()
 
 # Get the active NumPy version and directories
 execute_process(
-        COMMAND "${Python3_EXECUTABLE}" -c "import numpy; print(numpy.__version__, end='')"
-        OUTPUT_VARIABLE Python3_NumPy_VERSION
-        RESULT_VARIABLE Python3_NumPy_NOTFOUND
+    COMMAND "${Python3_EXECUTABLE}" -c "import numpy; print(numpy.__version__, end='')"
+    OUTPUT_VARIABLE Python3_NumPy_VERSION
+    RESULT_VARIABLE Python3_NumPy_NOTFOUND
 )
 # Retrieve the version of the installed NumPy package.
-
-numpy_get_capi_version(Python3_NumPy_CAPI)
 
 message(STATUS "[Python] Executable: ${Python3_EXECUTABLE}")
 message(STATUS "[Python] Include dirs: ${Python3_INCLUDE_DIRS}")
 message(STATUS "[Python] Library: ${Python3_LIBRARIES}")
 message(STATUS "[Python] NumPy include dirs: ${Python3_NumPy_INCLUDE_DIRS}")
 message(STATUS "[Python] NumPy version: ${Python3_NumPy_VERSION}")
-message(STATUS "[Python] NumPy API version: ${Python3_NumPy_CAPI}")
 # Output status messages with details about the Python3 and NumPy setup.
 
 
-# ======================================== Collect NumPy include directories ==========================================
-# Unfortunately, CMake does not provide a way to change the compilers include directories at build time.
-# Therefore all packages must be installed at configure time in order to find out the directories to pass them
-# to compiler options.
-message(STATUS "Collect NumPy include directories")
-# Output a status message indicating the start of collecting NumPy include directories.
-
-file(REMOVE "prebuilds.json")
-if (EXISTS "prebuilds.json")
-    message(FATAL_ERROR "Could not delete 'prebuilds.json'")
-endif ()
-set(PREBUILDS_JSON "")
-set(JSON_SEP " ")
-
-set(NUMPY_VERSIONS_LIST ${PREBUILD_NUMPY_VERSIONS})
-# Collect numpy versions needed into NUMPY_VERSIONS_LIST
-
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/_ext)
-# Ensure directory for prebuilds
-
-# Initialize the list of NumPy versions with the given PREBUILD_NUMPY_VERSIONS.
-set(NUMPY_INCLUDE_DIRECTORIES)
-# Initialize an empty list to store the NumPy include directories.
-
-list(APPEND NUMPY_VERSIONS_LIST oldest-supported-numpy ${RFC_NUMPY_VERSION})
-# Append the "oldest-supported-numpy" and RFC_NUMPY_VERSION to the list of NumPy versions.
-
-foreach (NUMPY_VERSION ${NUMPY_VERSIONS_LIST})
-    # Loop through each NumPy version in the list.
-
-    numpy_pip_arg(PIP_ARG ${NUMPY_VERSION})
-
-    execute_process(
-            COMMAND "${Python3_EXECUTABLE}" -mpip uninstall -y oldest-supported-numpy numpy
-    )
-    # Uninstall any existing NumPy versions to ensure a clean installation.
-
-    execute_process(
-            COMMAND "${Python3_EXECUTABLE}" -mpip install ${PIP_ARG}
-            COMMAND_ECHO STDOUT
-    )
-    # Install the specified version of NumPy.
-
-    execute_process(
-            COMMAND "${Python3_EXECUTABLE}" ${CMAKE_CURRENT_SOURCE_DIR}/cmake/numpy_get_include.py
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
-            OUTPUT_VARIABLE Python3_NumPy_INCLUDE_DIR
-            RESULT_VARIABLE Python3_NumPy_NOTFOUND
-    )
-    # Run a Python script to get the include directory for NumPy and store it in Python3_NumPy_INCLUDE_DIR.
-
-    if (Python3_NumPy_NOTFOUND)
-        message(FATAL_ERROR "NumPy not found")
-        # If the include directory was not found, output an error message and terminate the process.
-    endif ()
-
-    # Get the active NumPy version and directories
-    execute_process(
-            COMMAND "${Python3_EXECUTABLE}" -c "import numpy; print(numpy.__version__, end='')"
-            OUTPUT_VARIABLE Python3_NumPy_VERSION
-    )
-    # Retrieve the version of the installed NumPy package.
-
-    numpy_get_capi_version(NUMPY_CAPI_VERSION)
-    prebuild_target_name(PREBUILD_TARGET ${Python3_NumPy_VERSION} ${NUMPY_CAPI_VERSION})
-    string(JSON VERSION_EXISTS ERROR_VARIABLE ERROR_MSG GET "{${PREBUILDS_JSON}}" "${Python3_NumPy_VERSION}")
-    if (ERROR_MSG)
-        string(APPEND PREBUILDS_JSON "    ${JSON_SEP}\"${Python3_NumPy_VERSION}\": {\"capi\": ${NUMPY_CAPI_VERSION}, \"target\": \"${PREBUILD_TARGET}\"}\n")
-        set(JSON_SEP ",")
-        list(APPEND NUMPY_INCLUDE_DIRECTORIES  ${Python3_NumPy_INCLUDE_DIR})
-    endif ()
-    # Append the found include directory to the list of NumPy include directories.
-endforeach ()
-
-string(APPEND PREBUILDS_JSON "    ${JSON_SEP}\"${Python3_NumPy_VERSION}\": {\"capi\":${NUMPY_CAPI_VERSION}, \"target\": \"root\"}\n")
-file(WRITE "prebuilds.json" "{\n${PREBUILDS_JSON}}")
-file(READ "prebuilds.json" PREBUILDS_JSON)
-list(REMOVE_DUPLICATES NUMPY_INCLUDE_DIRECTORIES)
-# Remove duplicate entries from the list of NumPy include directories.
+# ============================================= Copy core sources and build ============================================
 
 execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E copy
-            "${CMAKE_CURRENT_SOURCE_DIR}/../lib/rainflow.c"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../lib/rainflow.h"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../lib/rainflow.hpp"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../lib/config.h"
-            "${CMAKE_CURRENT_SOURCE_DIR}/lib"
+    COMMAND "${CMAKE_COMMAND}" -E copy
+        "${CMAKE_CURRENT_SOURCE_DIR}/../lib/rainflow.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../lib/rainflow.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../lib/rainflow.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../lib/config.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/lib"
 )
 # Copy rainflow core sources
 
+# Set rfc_core_SOURCE_DIR so rfcnt_target_functions.cmake can find the headers
+set(rfc_core_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib")
 
-# ========================================= Create main module and prebuilds ==========================================
+
+# ========================================= Create main module =========================================================
 
 # Add main module with the current installed numpy version.
-rfcnt_library("${Python3_NumPy_VERSION}" ""  "${PROJECT_NAME}"  "."  rfcnt_module)
-
-# Add prebuilds for different NumPy packages
-set(RFCNT_PREBUILD_TARGETS rfcnt_module)
-# Initialize an empty list to store prebuild targets.
-# The list is used as a target dependency for consecutive targets to ensure build order and
-# prevent conflicts when concurrent processes would update the virtual environment.
-
-string(JSON PREBUILDS_COUNT LENGTH ${PREBUILDS_JSON})
-foreach (nr RANGE 1 ${PREBUILDS_COUNT})
-    # Loop through each version of NumPy in the list of PREBUILD_NUMPY_VERSIONS.
-
-    math (EXPR member_id "${nr} - 1")
-    string(JSON VERSION_STRING MEMBER ${PREBUILDS_JSON} ${member_id})
-    string(JSON PREBUILD_NAME GET ${PREBUILDS_JSON} ${VERSION_STRING} "target")
-
-    if (NOT ${PREBUILD_NAME} STREQUAL "root")
-        message(STATUS ${PREBUILD_NAME})
-        # Output a status message with the prebuild name.
-
-        set(RFCNT_PREBUILD_TARGET target_${PREBUILD_NAME})
-        # Define the prebuild target name based on the prebuild name.
-
-        if (NOT TARGET ${RFCNT_PREBUILD_TARGET})
-            # Check if the target does not already exist.
-
-            rfcnt_library(${VERSION_STRING} "${RFCNT_PREBUILD_TARGETS}"  ${PREBUILD_NAME}  _ext  ${RFCNT_PREBUILD_TARGET})
-            # Call the rfcnt_library function to create the library target with the specified details.
-
-            list(APPEND RFCNT_PREBUILD_TARGETS ${RFCNT_PREBUILD_TARGET})
-            # Append the new prebuild target to the list of prebuild targets.
-        endif ()
-    endif ()
-endforeach ()
+rfcnt_library("${PROJECT_NAME}"  "."  rfcnt_module)
 
 
 add_custom_target(
-        rfcnt_prebuilds
-        DEPENDS ${RFCNT_PREBUILD_TARGETS}
-        COMMENT "Build rfcnt prebuilds"
+    rfcnt
+    DEPENDS rfcnt_module
+    COMMENT "Build rfcnt module"
 )
-# Custom target for prebuilds, preserve the build order.
+# Custom target for main module.
 
+
+if(CMAKE_GENERATOR MATCHES "MinGW Makefiles")
+    set(RFCNT_BUILD_COMPILER_SETTING --config-setting="--build-option=build_ext" --config-setting="--build-option=--compiler=mingw32")
+else()
+    set(RFCNT_BUILD_COMPILER_SETTING "")
+endif()
 
 add_custom_target(
-        rfcnt
-        DEPENDS rfcnt_prebuilds rfcnt_module
-        COMMENT "Build rfcnt modules"
+    build_wheel_isolated
+    COMMAND "${CMAKE_COMMAND}" -E remove -f $<TARGET_FILE:rfcnt_module>
+    COMMAND "${Python3_EXECUTABLE}" -m build --no-isolation --wheel
+        ${RFCNT_BUILD_COMPILER_SETTING}
+        --outdir "${CMAKE_CURRENT_SOURCE_DIR}/dist"
+    DEPENDS rfcnt_module
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    COMMENT "Build rfcnt wheel (PEP 517)"
 )
-# Custom target for main module and prebuilds.
+# Custom target for creating wheel via PEP 517 build frontend.
 
 
 add_custom_target(
-        build_wheel_isolated
-        COMMAND "${CMAKE_COMMAND}" -E remove -f $<TARGET_FILE:rfcnt_module>
-        COMMAND "${Python3_EXECUTABLE}" -mbuild
-        DEPENDS rfcnt
-        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-        COMMENT "Build rfcnt wheel (needs a Numpy package defined in pyproject.toml!)"
+    build_wheel
+    COMMAND "${Python3_EXECUTABLE}" -mbuild --no-isolation
+    DEPENDS rfcnt_module
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    COMMENT "Build rfcnt wheel"
 )
-# Custom target for creating sdist and wheel from sdist for rfcnt with setuptools (prebuilds by CMake).
+# Custom target for creating wheel with main module.
 
 
 add_custom_target(
-        build_wheel
-        COMMAND "${Python3_EXECUTABLE}" -m pip uninstall -y numpy
-        COMMAND "${Python3_EXECUTABLE}" -m pip install oldest-supported-numpy
-        COMMAND "${Python3_EXECUTABLE}" -mbuild --no-isolation
-        DEPENDS rfcnt
-        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-        COMMENT "Build rfcnt wheel"
-)
-# Custom target for creating wheel with main module and prebuilds created by CMake.
-
-
-add_custom_target(
-        clean_all
-        COMMAND "${CMAKE_COMMAND}" -E remove_directory "${CMAKE_CURRENT_SOURCE_DIR}/build"
-        COMMAND "${CMAKE_COMMAND}" -E remove_directory "${CMAKE_CURRENT_SOURCE_DIR}/dist"
-        COMMAND "${CMAKE_COMMAND}" -E remove_directory "${CMAKE_CURRENT_SOURCE_DIR}/rfcnt.egg-info"
-        COMMAND "${CMAKE_COMMAND}" -E remove_directory "${CMAKE_CURRENT_SOURCE_DIR}/venv"
-        COMMAND "${CMAKE_COMMAND}" -E remove_directory "${CMAKE_CURRENT_SOURCE_DIR}/_ext"
-        COMMAND "${CMAKE_COMMAND}" -E remove "${CMAKE_CURRENT_SOURCE_DIR}/prebuilds.json"
+    clean_all
+    COMMAND "${CMAKE_COMMAND}" -E remove_directory "${CMAKE_CURRENT_SOURCE_DIR}/build"
+    COMMAND "${CMAKE_COMMAND}" -E remove_directory "${CMAKE_CURRENT_SOURCE_DIR}/dist"
+    COMMAND "${CMAKE_COMMAND}" -E remove_directory "${CMAKE_CURRENT_SOURCE_DIR}/rfcnt.egg-info"
+    COMMAND "${CMAKE_COMMAND}" -E remove_directory "${CMAKE_CURRENT_SOURCE_DIR}/venv"
 )
 # Custom target for cleanup directories.

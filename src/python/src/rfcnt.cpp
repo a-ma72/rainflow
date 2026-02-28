@@ -1,8 +1,7 @@
 #define PY_SSIZE_T_CLEAN
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#define NPY_TARGET_VERSION NPY_1_19_API_VERSION
 #include <Python.h>
-// C ABI compatibility: https://stackoverflow.com/a/74296491/11492317
-// https://pypi.org/project/oldest-supported-numpy/
 #include <numpy/arrayobject.h>
 // #include "numpy_arrayobject.h"
 #include <vector>
@@ -91,6 +90,9 @@ bool convert_to_numpy_array(PyObject* input_series_arg, PyArrayObject **arr_data
     if( arr_nd != 1 )
     {
         PyErr_SetString( PyExc_RuntimeError, "Data must have only one dimension!" );
+        // FIX: Cleanup arr_data on error path to prevent reference leak
+        Py_DECREF( *arr_data );
+        *arr_data = nullptr;
         return false;
     }
 
@@ -98,6 +100,10 @@ bool convert_to_numpy_array(PyObject* input_series_arg, PyArrayObject **arr_data
     if( r < 0 )
     {
         PyErr_SetString( PyExc_RuntimeError, "Could not convert input to C array" );
+        // FIX: Cleanup arr_data on error path to prevent reference leak
+        Py_DECREF( *arr_data );
+        *arr_data = nullptr;
+        *data = nullptr;
         return false;
     }
 
@@ -255,7 +261,6 @@ bool get_dict_item_double( PyObject *dict, const char* name, double &value, doub
 static
 bool get_dict_wl( PyObject *Py_wl, const char *name, Rainflow::rfc_wl_param_s &wl, bool *extended_def = nullptr )
 {
-    /* if( Py_IsNone( Py_wl ) ) */
     if( Py_wl == Py_None )
     {
         return true;
@@ -438,6 +443,12 @@ static
 int parse_rfc_kwargs( PyObject* kwargs, Py_ssize_t len, Rainflow *rf, Rainflow::rfc_res_method *res_method )
 {
     PyObject   *empty           =  PyTuple_New(0);
+    // FIX: Check if PyTuple_New() succeeded
+    if( !empty )
+    {
+        PyErr_SetString( PyExc_MemoryError, "Failed to create empty tuple" );
+        return 0;
+    }
     int         class_count     =  100;
     double      class_width     =  1;  // will be overwritten by required argument
     double      class_offset    =  0;
@@ -777,7 +788,10 @@ int prepare_results( Rainflow *rf, Py_ssize_t data_len, Rainflow::rfc_res_method
 
     // Insert damage value
     if( !rf->damage( &damage ) ) goto fail_rfc;
-    PyDict_SetItemString( *ret, "damage", PyFloat_FromDouble( damage ) );
+    obj = PyFloat_FromDouble( damage );
+    if( !obj ) goto fail_cont;
+    PyDict_SetItemString( *ret, "damage", obj );
+    Py_DECREF( obj );
 
     // Insert range pair counts
     len[0] = class_count;
@@ -887,17 +901,30 @@ int prepare_results( Rainflow *rf, Py_ssize_t data_len, Rainflow::rfc_res_method
     if( !rf->wl_param_get_impaired( wl ) ) goto fail_rfc;
     obj = PyDict_New();
     if( !obj ) goto fail_rfc;
-    PyDict_SetItemString( obj, "sx", PyFloat_FromDouble( wl.sx ) );
-    PyDict_SetItemString( obj, "nx", PyFloat_FromDouble( wl.nx ) );
-    PyDict_SetItemString( obj, "sd", PyFloat_FromDouble( wl.sd ) );
-    PyDict_SetItemString( obj, "nd", PyFloat_FromDouble( wl.nd ) );
-    PyDict_SetItemString( obj, "k", PyFloat_FromDouble( wl.k ) );
-    PyDict_SetItemString( obj, "k2", PyFloat_FromDouble( wl.k2 ) );
-    PyDict_SetItemString( obj, "q", PyFloat_FromDouble( wl.q ) );
-    PyDict_SetItemString( obj, "q2", PyFloat_FromDouble( wl.q2 ) );
-    PyDict_SetItemString( obj, "omission", PyFloat_FromDouble( wl.omission ) );
-    PyDict_SetItemString( obj, "D", PyFloat_FromDouble( wl.D ) );
+
+    // Create temporary objects and clean up references
+    PyObject *temp;
+    #define SET_DICT_ITEM_DOUBLE(dict, key, value) \
+        temp = PyFloat_FromDouble( value ); \
+        if( !temp ) { Py_DECREF(obj); goto fail_cont; } \
+        PyDict_SetItemString( dict, key, temp ); \
+        Py_DECREF( temp );
+
+    SET_DICT_ITEM_DOUBLE( obj, "sx", wl.sx )
+    SET_DICT_ITEM_DOUBLE( obj, "nx", wl.nx )
+    SET_DICT_ITEM_DOUBLE( obj, "sd", wl.sd )
+    SET_DICT_ITEM_DOUBLE( obj, "nd", wl.nd )
+    SET_DICT_ITEM_DOUBLE( obj, "k", wl.k )
+    SET_DICT_ITEM_DOUBLE( obj, "k2", wl.k2 )
+    SET_DICT_ITEM_DOUBLE( obj, "q", wl.q )
+    SET_DICT_ITEM_DOUBLE( obj, "q2", wl.q2 )
+    SET_DICT_ITEM_DOUBLE( obj, "omission", wl.omission )
+    SET_DICT_ITEM_DOUBLE( obj, "D", wl.D )
+
+    #undef SET_DICT_ITEM_DOUBLE
+
     PyDict_SetItemString( *ret, "wl_miner_consistent", obj );
+    Py_DECREF( obj );
 
     return 1;
 
@@ -993,10 +1020,17 @@ PyObject* rfc( PyObject *self, PyObject *args, PyObject *kwargs )
 
     rf.deinit();
 
+    // FIX: PyArray_Free handles both the data and the array object cleanup
+    // Do NOT call Py_DECREF after PyArray_Free, as it would cause double-free
     if( arr_data && data )
     {
-        Py_DECREF( arr_data );
         PyArray_Free( (PyObject*)arr_data, (void*)data );
+    }
+    else if( arr_data )
+    {
+        // If data is NULL but arr_data is not, we didn't call PyArray_AsCArray
+        // so we need to decrement the reference
+        Py_DECREF( arr_data );
     }
 
     return ret;
@@ -1088,14 +1122,29 @@ PyObject* damage_from_rp( PyObject *self, PyObject *args, PyObject *kwargs )
             {
                 vec_sa.push_back( buffer[i] );
             }
+            Py_XDECREF( sorted_indices );
         }
-        Py_XDECREF( arr );
-        Py_XDECREF( sorted_indices );
+        // FIX: Use PyArray_Free to properly cleanup after PyArray_AsCArray
+        if( buffer )
+        {
+            PyArray_Free( (PyObject*)arr, (void*)buffer );
+        }
+        else
+        {
+            Py_XDECREF( arr );
+        }
     }
     else
     {
         PyErr_SetString( PyExc_ValueError, "Unable to convert input array `Sa`.");
-        Py_XDECREF( arr );
+        if( arr && buffer )
+        {
+            PyArray_Free( (PyObject*)arr, (void*)buffer );
+        }
+        else
+        {
+            Py_XDECREF( arr );
+        }
         return nullptr;
     }
 
@@ -1116,13 +1165,28 @@ PyObject* damage_from_rp( PyObject *self, PyObject *args, PyObject *kwargs )
                 }
                 vec_counts.push_back( (Rainflow::rfc_counts_t)buffer[i] );
             }
-            Py_XDECREF(arr);
+        }
+        // FIX: Use PyArray_Free to properly cleanup after PyArray_AsCArray
+        if( buffer )
+        {
+            PyArray_Free( (PyObject*)arr, (void*)buffer );
+        }
+        else
+        {
+            Py_XDECREF( arr );
         }
     }
     else
     {
-        PyErr_SetString( PyExc_ValueError, "Unable to convert input array `Sa`.");
-        Py_XDECREF( arr );
+        PyErr_SetString( PyExc_ValueError, "Unable to convert input array `counts`.");
+        if( arr && buffer )
+        {
+            PyArray_Free( (PyObject*)arr, (void*)buffer );
+        }
+        else
+        {
+            Py_XDECREF( arr );
+        }
     }
 
     if( PyErr_Occurred() )
@@ -1187,7 +1251,12 @@ PyModuleDef mymath_module = {
  */
 PyMODINIT_FUNC PyInit_rfcnt( void ) {
     PyObject* mod = PyModule_Create( &mymath_module );
-    // Initialize numpy
+    if( !mod )
+    {
+        return nullptr;
+    }
+    // FIX: Check if NumPy import succeeded
+    // Initialize numpy - import_array() is a macro that returns on error
     import_array();
     return mod;
 }
