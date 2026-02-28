@@ -34,12 +34,11 @@ jobs:
         PIP_DISABLE_PIP_VERSION_CHECK: 1
       run: |
         cd src/python
-        # Upgrade pip and install build tools first
-        python -m pip install --upgrade pip
-        pip install setuptools>=61.0 wheel
-        # Install requirements
+        # We use 'python -m pip' to ensure we target the correct environment
+        python -m pip install --upgrade pip --quiet
+        python -m pip install setuptools wheel
+        
         pip install -r requirements.txt
-        # Install the package locally
         pip install . --no-build-isolation --no-deps
     - name: Run Python tests
       run: |
