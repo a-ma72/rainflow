@@ -16,14 +16,14 @@
  *      /_/ |_/_/  |_/___/_/ |_/_/   /_____/\____/ |__/|__/
  *
  *    Rainflow Counting Algorithm (4-point-method), C99 compliant
- * 
- * 
+ *
+ *
  * "Rainflow Counting" consists of four main steps:
  *    1. Hysteresis Filtering
  *    2. Peak-Valley Filtering
  *    3. Discretization
  *    4. Four Point Counting Method:
- *    
+ *
  *                     * D
  *                    / \       Closed, if min(B,C) >= min(A,D) && max(B,C) <= max(A,D)
  *             B *<--/          Slope B-C is counted and removed from residue
@@ -32,15 +32,15 @@
  *          \ /
  *           * A
  *
- * These steps are fully documented in standards such as 
+ * These steps are fully documented in standards such as
  * ASTM E1049 "Standard Practices for Cycle Counting in Fatigue Analysis" [1].
  * This implementation uses the 4-point algorithm mentioned in [3,4] and the 3-point HCM method proposed in [2].
  * To take the residue into account, you may implement a custom method or use some
  * predefined functions.
- * 
+ *
  * References:
  * [1] "Standard Practices for Cycle Counting in Fatigue Analysis."
- *     ASTM Standard E 1049, 1985 (2011). 
+ *     ASTM Standard E 1049, 1985 (2011).
  *     West Conshohocken, PA: ASTM International, 2011.
  * [2] "Rainflow - HCM / Ein Hysteresisschleifen-Zaehlalgorithmus auf werkstoffmechanischer Grundlage"
  *     U.H. Clormann, T. Seeger
@@ -48,7 +48,7 @@
  * [3] "Zaehlverfahren zur Bildung von Kollektiven und Matrizen aus Zeitfunktionen"
  *     FVA-Richtlinie, 2010.
  *     [https://fva-net.de/fileadmin/content/Richtlinien/FVA-Richtlinie_Zaehlverfahren_2010.pdf]
- * [4] Siemens Product Lifecycle Management Software Inc., 2018. 
+ * [4] Siemens Product Lifecycle Management Software Inc., 2018.
  *     [https://community.plm.automation.siemens.com/t5/Testing-Knowledge-Base/Rainflow-Counting/ta-p/383093]
  * [5] "Review and application of Rainflow residue processing techniques for accurate fatigue damage estimation"
  *     G.Marsh;
@@ -63,7 +63,7 @@
  *     Brokate, M.; Dressler, K.; Krejci, P.
  * []  "Multivariate Density Estimation: Theory, Practice and Visualization". New York, Chichester, Wiley & Sons, 1992
  *     Scott, D.
- * []  "Werkstoffmechanik - Bauteile sicher beurteilen undWerkstoffe richtig einsetzen"; 
+ * []  "Werkstoffmechanik - Bauteile sicher beurteilen undWerkstoffe richtig einsetzen";
  *      Ralf Buergel, Hans Albert Richard, Andre Riemer; Springer FachmedienWiesbaden 2005, 2014
  * []  "Zaehlverfahren und Lastannahme in der Betriebsfestigkeit";
  *     Michael Koehler, Sven Jenne / Kurt Poetter, Harald Zenner; Springer-Verlag Berlin Heidelberg 2012
@@ -71,20 +71,20 @@
  *
  *================================================================================
  * BSD 2-Clause License
- * 
- * Copyright (c) 2025, Andras Martin
+ *
+ * Copyright (c) 2026, Andras Martin
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * * Redistributions of source code must retain the above copyright notice, this
  *   list of conditions and the following disclaimer.
- * 
+ *
  * * Redistributions in binary form must reproduce the above copyright notice,
  *   this list of conditions and the following disclaimer in the documentation
  *   and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -110,6 +110,7 @@
 #include <stdlib.h>  /* calloc(), free(), abs() */
 #include <string.h>  /* memset() */
 #include <float.h>   /* DBL_MAX */
+#include <stdio.h>
 
 static char* __rfc_core_version__ = RFC_CORE_VERSION;
 
@@ -144,12 +145,110 @@ static bool                 error_raise                     (       rfc_ctx_s *,
 static rfc_value_t          value_delta                     (       rfc_ctx_s *, const rfc_value_tuple_s* pt_from, const rfc_value_tuple_s* pt_to, int *sign_ptr );
 
 
-#define QUANTIZE( r, v )    ( (r)->class_count ? (unsigned)( ((v) - (r)->class_offset) / (r)->class_width ) : 0 )
+#define QUANTIZE( r, v )    ( (r)->class_count && (v) >= (r)->class_offset ? \
+                              ( ((v) - (r)->class_offset) / (r)->class_width >= (double)UINT_MAX ? UINT_MAX : \
+                                (unsigned)( ((v) - (r)->class_offset) / (r)->class_width ) ) : 0 )
 #define AMPLITUDE( r, i )   ( (r)->class_count ? ( (double)(r)->class_width * (i) / 2 ) : 0.0 )
 #define CLASS_MEAN( r, c )  ( (r)->class_count ? ( (double)(r)->class_width * (0.5 + (c)) + (r)->class_offset ) : 0.0 )
 #define CLASS_UPPER( r, c ) ( (r)->class_count ? ( (double)(r)->class_width * (1.0 + (c)) + (r)->class_offset ) : 0.0 )
 #define NUMEL( x )          ( sizeof(x) / sizeof(*(x)) )
 #define MAT_OFFS( i, j )    ( (i) * class_count + (j) )
+
+
+/*
+ * Overflow-safe arithmetic helpers for memory allocation
+ * These functions detect integer overflow before it occurs, preventing
+ * potential buffer overflows and memory corruption.
+ */
+
+/**
+ * @brief      Safely calculate new capacity with overflow detection
+ *
+ * @param      current_size  The current size/position that needs to fit
+ * @param[out] new_cap       Pointer to store the calculated new capacity
+ *
+ * @return     true if calculation succeeded, false if overflow would occur
+ *
+ * @note       Formula: new_cap = 1024 * (current_size / 640 + 1)
+ *             This provides ~60% growth + 1024 bytes minimum
+ */
+static
+bool safe_calc_capacity( size_t current_size, size_t *new_cap )
+{
+    /* Check for division overflow first */
+    if( current_size > SIZE_MAX - 640 )
+    {
+        return false;  /* current_size too large */
+    }
+
+    /* Calculate (current_size / 640 + 1) */
+    size_t factor = current_size / 640 + 1;
+
+    /* Check for multiplication overflow: factor * 1024 */
+    if( factor > SIZE_MAX / 1024 )
+    {
+        return false;  /* Multiplication would overflow */
+    }
+
+    *new_cap = factor * 1024;
+
+    /* Sanity check: new capacity should be larger than current size */
+    if( *new_cap < current_size )
+    {
+        return false;  /* Result is too small, likely overflow occurred */
+    }
+
+    return true;
+}
+
+/**
+ * @brief      Safely add two size_t values with overflow detection
+ *
+ * @param      a       First operand
+ * @param      b       Second operand
+ * @param[out] result  Pointer to store the sum
+ *
+ * @return     true if addition succeeded, false if overflow would occur
+ */
+static
+bool safe_add_size( size_t a, size_t b, size_t *result )
+{
+    if( a > SIZE_MAX - b )
+    {
+        return false;  /* Addition would overflow */
+    }
+
+    *result = a + b;
+    return true;
+}
+
+/**
+ * @brief      Safely multiply two size_t values with overflow detection
+ *
+ * @param      a       First operand
+ * @param      b       Second operand
+ * @param[out] result  Pointer to store the product
+ *
+ * @return     true if multiplication succeeded, false if overflow would occur
+ */
+static
+bool safe_mul_size( size_t a, size_t b, size_t *result )
+{
+    if( a == 0 || b == 0 )
+    {
+        *result = 0;
+        return true;
+    }
+
+    if( a > SIZE_MAX / b )
+    {
+        return false;  /* Multiplication would overflow */
+    }
+
+    *result = a * b;
+    return true;
+}
+
 
 #define RFC_CTX_CHECK_AND_ASSIGN                                                    \
     rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;                                           \
@@ -168,12 +267,12 @@ static rfc_value_t          value_delta                     (       rfc_ctx_s *,
  * @param      class_count   The class count
  * @param      class_width   The class width
  * @param      class_offset  The class offset
- * @param      hysteresis    The hysteresis 
+ * @param      hysteresis    The hysteresis
  * @param      flags         The flags
  *
  * @return     true on success
  */
-bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset, 
+bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_value_t class_offset,
                           rfc_value_t hysteresis, rfc_flags_e flags )
 {
     rfc_value_tuple_s  nil     = { 0.0 };  /* All other members are zero-initialized, see ISO/IEC 9899:TC3, 6.7.8 (21) */
@@ -187,7 +286,7 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
     /* Flags */
     if( flags == RFC_FLAGS_DEFAULT )
     {
-        flags                               = RFC_FLAGS_COUNT_RFM            | 
+        flags                               = RFC_FLAGS_COUNT_RFM            |
                                               RFC_FLAGS_COUNT_DAMAGE;
     }
     rfc_ctx->internal.flags                 = flags;
@@ -226,7 +325,7 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
     {
         rfc_ctx->mem_alloc = mem_alloc;
     }
-    
+
     /* Residue */
     rfc_ctx->internal.residue_cap           = NUMEL( rfc_ctx->internal.residue );
     rfc_ctx->residue_cnt                    = 0;
@@ -240,7 +339,7 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
     }
     else
     {
-        rfc_ctx->residue                    = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( NULL, rfc_ctx->residue_cap, 
+        rfc_ctx->residue                    = (rfc_value_tuple_s*)rfc_ctx->mem_alloc( NULL, rfc_ctx->residue_cap,
                                                                                       sizeof(rfc_value_tuple_s), RFC_MEM_AIM_RESIDUE );
         rfc_ctx->internal.res_static        = false;
     }
@@ -252,12 +351,13 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
         if( ok && ( flags & RFC_FLAGS_COUNT_RFM ) )
         {
             /* Non-sparse storages (optional, may be NULL) */
-            rfc_ctx->rfm                    = (rfc_counts_t*)rfc_ctx->mem_alloc( NULL, class_count * class_count, 
+            rfc_ctx->rfm                    = (rfc_counts_t*)rfc_ctx->mem_alloc( NULL, class_count * class_count,
                                                                                  sizeof(rfc_counts_t), RFC_MEM_AIM_MATRIX );
             if( !rfc_ctx->rfm ) ok = false;
         }
         if( !ok )
         {
+            rfc_ctx->state = RFC_STATE_INIT;
             RFC_deinit( rfc_ctx );
             return error_raise( rfc_ctx, RFC_ERROR_INVARG );
         }
@@ -288,12 +388,12 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
 rfc_state_e RFC_state_get( const void *ctx )
 {
     /* RFC_CTX_CHECK_AND_ASSIGN */
-    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;                                           
-                                                                                    
-    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )                         
-    {                                                                               
-        return error_raise( rfc_ctx, RFC_ERROR_INVARG );                            
-    }                                                                               
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
+    {
+        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
+    }
 
     return rfc_ctx->state;
 }
@@ -308,7 +408,12 @@ rfc_state_e RFC_state_get( const void *ctx )
  */
 rfc_error_e RFC_error_get( const void *ctx )
 {
-    RFC_CTX_CHECK_AND_ASSIGN
+    rfc_ctx_s *rfc_ctx = (rfc_ctx_s*)ctx;
+
+    if( !rfc_ctx || rfc_ctx->version != sizeof(rfc_ctx_s) )
+    {
+        return RFC_ERROR_INVARG;
+    }
 
     return rfc_ctx->error;
 }
@@ -400,7 +505,7 @@ bool RFC_deinit( void *ctx )
     rfc_ctx->residue_cnt                = 0;
 
     rfc_ctx->rfm                        = NULL;
-    
+
     rfc_ctx->internal.slope             = 0;
     rfc_ctx->internal.extrema[0]        = nil;  /* local minimum */
     rfc_ctx->internal.extrema[1]        = nil;  /* local maximum */
@@ -447,7 +552,7 @@ bool RFC_feed( void *ctx, const rfc_value_t * data, size_t data_count )
         {
             return error_raise( rfc_ctx, RFC_ERROR_DATA_OUT_OF_RANGE );
         }
-        
+
         if( !feed_once( rfc_ctx, &tp, rfc_ctx->internal.flags ) )
         {
             return false;
@@ -471,7 +576,7 @@ bool RFC_finalize( void *ctx, rfc_res_method_e residual_method )
     double damage;
     bool ok;
     RFC_CTX_CHECK_AND_ASSIGN
-    
+
     if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state >= RFC_STATE_FINISHED )
     {
         return false;
@@ -661,14 +766,14 @@ static
 void residue_remove_item( rfc_ctx_s *rfc_ctx, size_t index, size_t count )
 {
     size_t  from = index + count,
-            to   = index, 
+            to   = index,
             end;
 
     assert( rfc_ctx );
     assert( rfc_ctx->state >= RFC_STATE_INIT && rfc_ctx->state < RFC_STATE_FINISHED );
     assert( rfc_ctx->residue && index + count <= rfc_ctx->residue_cnt );
 
-    end = (int)rfc_ctx->residue_cnt;
+    end = rfc_ctx->residue_cnt;
 
     /* Example
                          |cnt(5)
@@ -723,11 +828,11 @@ bool damage_calc_amplitude( rfc_ctx_s *rfc_ctx, double Sa, double *damage )
             /* D = exp(      0 -log(ND)  + (log(Sa)-log(SD)) * ABS(k) ) */
 
             /* If D is integer format count:
-             * 
+             *
              * D_integer = (double)(int)range ^ ABS(k)  // where range is 0..class_count-1
-             * 
+             *
              * D = D_integer_sum * exp( log( ND * 2*SD/class_width ) * -ABS(k) )
-             * 
+             *
              */
 
             /* Constants for the Woehler curve */
@@ -745,7 +850,7 @@ bool damage_calc_amplitude( rfc_ctx_s *rfc_ctx, double Sa, double *damage )
         }
 
         *damage = D;
-        
+
     } while(0);
 
     return true;
@@ -829,7 +934,7 @@ rfc_value_tuple_s * feed_filter_pt( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s 
         if( rfc_ctx->state == RFC_STATE_INIT )
         {
             /* Very first point, initialize local min-max search */
-            rfc_ctx->internal.extrema[0] = 
+            rfc_ctx->internal.extrema[0] =
             rfc_ctx->internal.extrema[1] = *pt;
             rfc_ctx->state               =  RFC_STATE_BUSY;
         }
@@ -861,8 +966,8 @@ rfc_value_tuple_s * feed_filter_pt( rfc_ctx_s *rfc_ctx, const rfc_value_tuple_s 
             if( is_falling_slope >= 0 && delta > rfc_ctx->hysteresis )
             {
                 /* Criteria met, new turning point found.
-                 * Emit maximum on falling slope as first interim turning point, 
-                 * minimum as second then (and vice versa) 
+                 * Emit maximum on falling slope as first interim turning point,
+                 * minimum as second then (and vice versa)
                  * 1st point: internal.extrema[ is_falling_slope]
                  * 2nd point: internal.extrema[!is_falling_slope]  ==> which is *pt also
                  */
@@ -1040,7 +1145,7 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
     class_to = to->cls;
 
     if( class_to >= rfc_ctx->class_count ) class_to = rfc_ctx->class_count - 1;
-    
+
     /* class_from and class_to are base 0 now */
 
     /* Do several counts, according to "flags" */
@@ -1076,7 +1181,7 @@ void cycle_process_counts( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s *from, rfc_valu
              *    | # # # # # #<-(6x6-1)
              */
             size_t idx = rfc_ctx->class_count * class_from + class_to;
-            
+
             assert( rfc_ctx->rfm[idx] <= RFC_COUNTS_LIMIT );
             rfc_ctx->rfm[idx] += rfc_ctx->curr_inc;
         }

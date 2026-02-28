@@ -1,62 +1,54 @@
 from typing import Optional, Union
 
-from . import ArrayLike, LCMethod, ResidualMethod, SDMethod, RPDamageCalcMethod
-
+from . import ArrayLike, LCMethod, ResidualMethod, RPDamageCalcMethod, SDMethod
 
 def rfc(
-        data: ArrayLike,
-        class_width: float,
-        *,
-        class_count: Optional[int] = 100,
-        class_offset: Optional[float] = None,
-        hysteresis: Optional[float] = None,
-        residual_method: Optional[Union[int, ResidualMethod]] = ResidualMethod.REPEATED,
-        spread_damage: Optional[Union[int, SDMethod]] = SDMethod.TRANSIENT_23c,
-        lc_method: Optional[Union[int, LCMethod]] = LCMethod.SLOPES_UP,
-        use_HCM: Optional[Union[int, bool]] = 0,
-        use_ASTM: Optional[Union[int, bool]] = 0,
-        enforce_margin: Optional[Union[int, bool]] = 0,
-        auto_resize: Optional[Union[int, bool]] = 0,
-        wl: Optional[dict] = None
+    data: ArrayLike,
+    class_width: float,
+    *,
+    class_count: Optional[int] = 100,
+    class_offset: Optional[float] = None,
+    hysteresis: Optional[float] = None,
+    residual_method: Optional[Union[int, ResidualMethod]] = ResidualMethod.REPEATED,
+    spread_damage: Optional[Union[int, SDMethod]] = SDMethod.TRANSIENT_23c,
+    lc_method: Optional[Union[int, LCMethod]] = LCMethod.SLOPES_UP,
+    use_HCM: Optional[Union[int, bool]] = 0,
+    use_ASTM: Optional[Union[int, bool]] = 0,
+    enforce_margin: Optional[Union[int, bool]] = 0,
+    auto_resize: Optional[Union[int, bool]] = 0,
+    wl: Optional[dict] = None,
 ) -> tuple:
-    """Rainflow counting.
+    r"""Rainflow counting.
 
     Parameters
     ----------
     data : ArrayLike
         The input timeseries.
-    class_count : int | None = 100
+    class_count : Optional[int] = 100
         The number of bins for counting.
         The range of the input series will be spread evenly over all classes (bins).
-    class_offset : float | None = 0
+    class_offset : Optional[float] = 0
         The lower bound of the first bin. If offset and width are set manually,
         take into account that `np.max(data) < class_offset + class_count * class_width`.
         Counting fails otherwise, if `auto_resize` is not set to True.
-    class_width : float | None = 1
+    class_width : Optional[float] = 1
         The evenly width of each bin.
         If offset and width are set manually, take into account that
         `np.max(data) < class_offset + class_count * class_width`.
         Counting fails otherwise, if `auto_resize` is not set to True.
-    hysteresis : float | None = class_width
+    hysteresis : Optional[float] = class_width
         The width of the hysteresis filter (also called "Rueckstellbreite" in german).
-    res_method : int | None = 7
-        How to deal with the residuum (non closed cycles).
-
-        - 0-3 = Ignore
-        - 4 = Related to ASTM, count as half cycles
-        - 5 = Count half cycles as full cycles
-        - 6 = Clormann/Seeger method
-        - 7 = Repeat residue and count closed cycles
-        - 8 = Count residue according to range pair in DIN-45667
-    enforce_margin : bool | int | None = True
+    residual_method : Optional[Union[int, ResidualMethod]] = ResidualMethod.REPEATED
+        How to deal with the residuum (non closed cycles), see ResidualMethod enum for options.
+    use_HCM : Optional[Union[int, bool]] = 0
+        Whether to use the HCM (Clormann/Seeger) counting method.
+    use_ASTM : Optional[Union[int, bool]] = 0
+        Whether to use the ASTM counting method.
+    enforce_margin : Optional[Union[bool, int]] = True
         Ensuring first and last turning point match to the input timeseries, disregarding hysteresis filtering.
-    auto_resize : bool | int | None = False
+    auto_resize : Optional[Union[bool, int]] = False
         Expand the class range, if value range exceeds while counting. The width of the bins are kept.
-    use_hcm : bool | int | None = False
-        Use HCM (Clormann/Seeger) counting method.
-    use_astm : bool | int | None = False
-        Use ASTM counting method.
-    spread_damage : int | None = 8
+    spread_damage : Optional[int] = 8
         How to distribute damage over turning points::
 
                           * (P4)
@@ -74,12 +66,12 @@ def rfc(
         - 6 = Full damage assigned to P3
         - 7 = Damages transient distributed over P2 to P3
         - 8 = Damages transient distributed over P2 to P3c
-    lc_method : int | None = 0
+    lc_method : Optional[int] = 0
         How to count level crossings.
         - 0 = rising slopes only
         - 1 = falling slopes only
         - 2 = rising and falling slopes
-    wl: dict | None = dict(sx=1000, nx=1e7, sd=0, nd=np.inf, k=5, k2=k)
+    wl: Optional[dict] = dict(sx=1000, nx=1e7, sd=0, nd=np.inf, k=5, k2=k)
         Definition of the SN-curve.
 
         * `sx` : float
@@ -160,15 +152,16 @@ def rfc(
                 (Pseudo) damage value according to the SN-curve and
                 Miner's consistent rule.
 
-"""
+    """
+
 def damage_from_rp(
         Sa: ArrayLike,
         counts: ArrayLike,
         *,
         wl: Optional[dict] = None,
-        method: Optional[RPDamageCalcMethod] = 0
+        method: Optional[RPDamageCalcMethod] = 0,
 ) -> float:
-    """Calculate damage value from range pair histogram.
+    r"""Calculate damage value from range pair histogram.
 
     Parameters
     ----------
@@ -176,7 +169,7 @@ def damage_from_rp(
         Amplitude vector.
     counts : ArrayLike
         Cycle counts vector.
-    wl: dict | None = dict(sx=1000, nx=1e7, sd=0, nd=np.inf, k=5, k2=k)
+    wl: Optional[dict] = dict(sx=1000, nx=1e7, sd=0, nd=np.inf, k=5, k2=k)
         Definition of the SN-curve.
 
         * `sx` : float
@@ -193,7 +186,7 @@ def damage_from_rp(
             The slope of the SN-curve for sa < sx.
         * `omission` : float
             The omission value. Values where sa < omission are ignored.
-    method : int | None = 0
+    method : Optional[int] = 0
         Method for damage calculation.
 
         - 0 = Default (by given `wl`)
@@ -205,4 +198,5 @@ def damage_from_rp(
     -------
     damage : float
         (Pseudo) damage value.
-"""
+
+    """

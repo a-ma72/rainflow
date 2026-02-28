@@ -21,7 +21,7 @@
  *================================================================================
  * BSD 2-Clause License
  *
- * Copyright (c) 2025, Andras Martin
+ * Copyright (c) 2026, Andras Martin
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -2320,6 +2320,505 @@ TEST RFC_miner_consistent2( void )
 #endif /*!RFC_MINIMAL*/
 
 
+#if RFC_DH_SUPPORT
+TEST RFC_dh_init_reinit( void )
+{
+    rfc_ctx_s my_ctx = {0};
+    my_ctx.version = sizeof(rfc_ctx_s);
+    if( RFC_init( &my_ctx, 10, 1, 0, 1, RFC_FLAGS_DEFAULT ) )
+    {
+        ASSERT( RFC_dh_init( &my_ctx, RFC_SD_FULL_P2, NULL, 100, false ) );
+
+        /* Attempt to re-initialize should fail with RFC_ERROR_INVARG */
+        ASSERT( !RFC_dh_init( &my_ctx, RFC_SD_FULL_P2, NULL, 100, false ) );
+        ASSERT_EQ( my_ctx.error, RFC_ERROR_INVARG );
+
+        ASSERT( RFC_deinit( &my_ctx ) );
+    }
+    else FAIL();
+    PASS();
+}
+#endif
+
+#if RFC_TP_SUPPORT
+TEST RFC_tp_prune_residue_handling( void )
+{
+    rfc_ctx_s my_ctx = {0};
+    my_ctx.version = sizeof(rfc_ctx_s);
+    rfc_value_tuple_s tp[5];
+
+    if( RFC_init( &my_ctx, 100, 1, 0, 1, RFC_FLAGS_DEFAULT ) &&
+        RFC_tp_init( &my_ctx, tp, 5, true ) )
+    {
+        /* Manually setup TPs */
+        my_ctx.tp_cnt = 3;
+        my_ctx.tp[0].pos = 10; my_ctx.tp[0].value = 1;
+        my_ctx.tp[1].pos = 20; my_ctx.tp[1].value = 2; /* Target */
+        my_ctx.tp[2].pos = 30; my_ctx.tp[2].value = 3;
+
+        /* Manually setup Residue */
+        my_ctx.residue_cnt = 1;
+        my_ctx.residue[0].pos = 20;
+        my_ctx.residue[0].tp_pos = 2; /* Refers to tp[1] (1-based index) */
+        my_ctx.residue[0].value = 2;
+
+        /* Prune 2 points (tp[0], tp[1]).
+           tp[2] is normally kept.
+           tp[1] is referenced by residue, so should be kept if PRESERVE_RES. */
+
+        ASSERT( RFC_tp_prune( &my_ctx, 1, RFC_FLAGS_TPPRUNE_PRESERVE_POS | RFC_FLAGS_TPPRUNE_PRESERVE_RES ) );
+
+        ASSERT_EQ( my_ctx.tp_cnt, 2 );
+        ASSERT_EQ( my_ctx.tp[0].value, 2 ); /* Old tp[1] */
+        ASSERT_EQ( my_ctx.tp[1].value, 3 ); /* Old tp[2] */
+
+        /* PRESERVE_POS is set, so positions should be unchanged */
+        ASSERT_EQ( my_ctx.tp[0].pos, 20 );
+        ASSERT_EQ( my_ctx.tp[1].pos, 30 );
+        ASSERT_EQ( my_ctx.residue[0].tp_pos, 1 ); /* Refers to new tp[0] */
+
+
+        /* Test 2: !PRESERVE_POS (Shift origin) */
+        /* Reset */
+        my_ctx.tp_cnt = 3;
+        my_ctx.tp[0].pos = 10; my_ctx.tp[0].value = 1;
+        my_ctx.tp[1].pos = 20; my_ctx.tp[1].value = 2; /* Target */
+        my_ctx.tp[2].pos = 30; my_ctx.tp[2].value = 3;
+
+        my_ctx.residue_cnt = 1;
+        my_ctx.residue[0].pos = 20;
+        my_ctx.residue[0].tp_pos = 2; /* Refers to tp[1] */
+        my_ctx.residue[0].value = 2;
+
+        ASSERT( RFC_tp_prune( &my_ctx, 1, RFC_FLAGS_TPPRUNE_PRESERVE_RES ) ); /* !PRESERVE_POS */
+
+        ASSERT_EQ( my_ctx.tp_cnt, 2 );
+        /* Offset should be based on first preserved point (tp[1] at 20).
+           pos_offset = 20 - 1 = 19.
+           tp[1].pos -> 20 - 19 = 1.
+           tp[2].pos -> 30 - 19 = 11. */
+
+        ASSERT_EQ( my_ctx.tp[0].pos, 1 );
+        ASSERT_EQ( my_ctx.tp[1].pos, 11 );
+        ASSERT_EQ( my_ctx.residue[0].pos, 1 );
+        ASSERT_EQ( my_ctx.residue[0].tp_pos, 1 );
+
+        ASSERT( RFC_deinit( &my_ctx ) );
+    }
+    else FAIL();
+
+    PASS();
+}
+#endif
+
+#if !RFC_MINIMAL
+TEST RFC_rfm_get_set_test( void )
+{
+    rfc_ctx_s my_ctx = {0};
+    my_ctx.version = sizeof(rfc_ctx_s);
+    unsigned class_count = 10;
+
+    if( RFC_init( &my_ctx, class_count, 1, 0, 1, RFC_FLAGS_DEFAULT ) )
+    {
+        rfc_rfm_item_s *items = NULL;
+        unsigned count = 0;
+        rfc_rfm_item_s set_items[2];
+        unsigned i;
+        rfc_counts_t check_val;
+
+        set_items[0].from = 1;
+        set_items[0].to = 2;
+        set_items[0].counts = 5.0;
+
+        set_items[1].from = 3;
+        set_items[1].to = 4;
+        set_items[1].counts = 10.0;
+
+        ASSERT( RFC_rfm_set( &my_ctx, set_items, 2, false ) );
+        ASSERT( RFC_rfm_peek( &my_ctx, 1.5, 2.5, &check_val ) );
+        ASSERT_EQ( check_val, 5.0 );
+
+        set_items[0].counts = 2.0;
+        set_items[1].counts = 3.0;
+        ASSERT( RFC_rfm_set( &my_ctx, set_items, 2, true ) );
+        ASSERT( RFC_rfm_peek( &my_ctx, 1.5, 2.5, &check_val ) );
+        ASSERT_EQ( check_val, 7.0 );
+
+        ASSERT( RFC_rfm_get( &my_ctx, &items, &count ) );
+        ASSERT_EQ( count, 2 );
+        free( items );
+        ASSERT( RFC_deinit( &my_ctx ) );
+    }
+    else FAIL();
+    PASS();
+}
+
+TEST RFC_rfm_peek_poke_test( void )
+{
+    rfc_ctx_s my_ctx = {0};
+    my_ctx.version = sizeof(rfc_ctx_s);
+    if( RFC_init( &my_ctx, 10, 1, 0, 1, RFC_FLAGS_DEFAULT ) )
+    {
+        rfc_counts_t count;
+        ASSERT( RFC_rfm_peek( &my_ctx, 1.5, 2.5, &count ) );
+        ASSERT_EQ( count, 0.0 );
+        ASSERT( RFC_rfm_poke( &my_ctx, 1.5, 2.5, 5.0, false ) );
+        ASSERT( RFC_rfm_peek( &my_ctx, 1.5, 2.5, &count ) );
+        ASSERT_EQ( count, 5.0 );
+        ASSERT( RFC_deinit( &my_ctx ) );
+    }
+    else FAIL();
+    PASS();
+}
+
+TEST RFC_rfm_sum_damage_test( void )
+{
+    rfc_ctx_s my_ctx = {0};
+    my_ctx.version = sizeof(rfc_ctx_s);
+    if( RFC_init( &my_ctx, 10, 1, 0, 1, RFC_FLAGS_DEFAULT ) )
+    {
+        rfc_counts_t count;
+        double damage;
+        ASSERT( RFC_wl_init_original( &my_ctx, 0.1, 1000.0, -5.0 ) );
+        ASSERT( RFC_rfm_poke( &my_ctx, 1.5, 2.5, 10.0, false ) );
+        ASSERT( RFC_rfm_sum( &my_ctx, 0, 9, 0, 9, &count ) );
+        ASSERT_EQ( count, 10.0 );
+        ASSERT( RFC_rfm_damage( &my_ctx, 1, 1, 2, 2, &damage ) );
+        GREATEST_ASSERT_IN_RANGE( 31.25, damage, 1e-10 );
+        ASSERT( RFC_deinit( &my_ctx ) );
+    }
+    else FAIL();
+    PASS();
+}
+
+TEST RFC_rfm_check_refeed_test( void )
+{
+    rfc_ctx_s my_ctx = {0};
+    my_ctx.version = sizeof(rfc_ctx_s);
+    if( RFC_init( &my_ctx, 10, 1, 0, 1, RFC_FLAGS_DEFAULT ) )
+    {
+        rfc_class_param_s new_param;
+        rfc_counts_t count;
+        ASSERT( RFC_rfm_check( &my_ctx ) );
+        ASSERT( RFC_rfm_poke( &my_ctx, 1.5, 3.5, 10.0, false ) );
+        new_param.count = 10;
+        new_param.width = 2.0;
+        new_param.offset = 0.0;
+        ASSERT( RFC_rfm_refeed( &my_ctx, 2.0, &new_param ) );
+        ASSERT( RFC_rfm_peek( &my_ctx, 1.0, 3.0, &count ) );
+        ASSERT_EQ( count, 10.0 );
+        ASSERT( RFC_deinit( &my_ctx ) );
+    }
+    else FAIL();
+    PASS();
+}
+
+TEST RFC_lc_functions_test( void )
+{
+    rfc_ctx_s my_ctx = {0};
+    my_ctx.version = sizeof(rfc_ctx_s);
+    if( RFC_init( &my_ctx, 4, 1.0, 0.5, 1.0, RFC_FLAGS_DEFAULT | RFC_FLAGS_COUNT_LC ) )
+    {
+        rfc_counts_t lc[4];
+        RFC_VALUE_TYPE data[] = { 1.0, 4.0, 1.0 };
+        ASSERT( RFC_feed( &my_ctx, data, 3 ) );
+        ASSERT( RFC_finalize( &my_ctx, RFC_RES_NONE ) );
+        ASSERT( RFC_lc_get( &my_ctx, lc, NULL ) );
+        ASSERT_EQ( lc[0], 2.0 );
+        ASSERT( RFC_deinit( &my_ctx ) );
+    }
+    else FAIL();
+    PASS();
+}
+
+TEST RFC_rp_functions_test( void )
+{
+    rfc_ctx_s my_ctx = {0};
+    my_ctx.version = sizeof(rfc_ctx_s);
+    if( RFC_init( &my_ctx, 10, 1.0, 0.0, 1.0, RFC_FLAGS_DEFAULT | RFC_FLAGS_COUNT_RP ) )
+    {
+        rfc_counts_t rp[10];
+        RFC_rfm_poke( &my_ctx, 1.5, 2.5, 10.0, false );
+        ASSERT( RFC_rp_from_rfm( &my_ctx, rp, NULL, NULL ) );
+        ASSERT_EQ( rp[1], 10.0 );
+        ASSERT( RFC_deinit( &my_ctx ) );
+    }
+    else FAIL();
+    PASS();
+}
+#endif
+
+#if RFC_TP_SUPPORT
+TEST RFC_tp_init_clear_test( void )
+{
+    rfc_ctx_s my_ctx = {0};
+    my_ctx.version = sizeof(rfc_ctx_s);
+    if( RFC_init( &my_ctx, 10, 1, 0, 1, RFC_FLAGS_DEFAULT ) )
+    {
+        /* 1. Test RFC_tp_init with dynamic allocation */
+        ASSERT( RFC_tp_init( &my_ctx, NULL, 100, false ) );
+        ASSERT( my_ctx.tp != NULL );
+        ASSERT_EQ( my_ctx.tp_cap, 100 );
+        ASSERT_EQ( my_ctx.tp_cnt, 0 );
+        ASSERT( !my_ctx.internal.tp_static );
+
+        /* 2. Test RFC_tp_clear */
+        /* Fill some TPs and Residue */
+        RFC_VALUE_TYPE data[] = { 1, 5, 2, 6 };
+        if ( !RFC_feed( &my_ctx, data, 4 ) )
+        {
+            printf("RFC_feed failed with error: %d\n", my_ctx.error);
+            FAIL();
+        }
+        ASSERT_EQ( my_ctx.tp_cnt, 3 );
+        ASSERT( my_ctx.residue_cnt > 0 );
+        ASSERT( my_ctx.residue[0].tp_pos != 0 );
+
+        ASSERT( RFC_clear_counts( &my_ctx ) );
+        ASSERT_EQ( my_ctx.tp_cnt, 0 );
+        /* Residue should still have data, but no TP references */
+        ASSERT( my_ctx.residue_cnt == 0 ); /* RFC_clear_counts clears residue too */
+
+        /* 3. Attempt to re-init should fail (rfc_ctx->tp is already set) */
+        ASSERT( !RFC_tp_init( &my_ctx, NULL, 100, false ) );
+        ASSERT_EQ( my_ctx.error, RFC_ERROR_INVARG );
+
+        ASSERT( RFC_deinit( &my_ctx ) );
+    }
+    else FAIL();
+
+    PASS();
+}
+
+TEST RFC_tp_autoprune_test( void )
+{
+    rfc_ctx_s my_ctx = {0};
+    my_ctx.version = sizeof(rfc_ctx_s);
+    /* class_count = 10, width = 1, offset = 0. Valid values: [0, 10) */
+    if( RFC_init( &my_ctx, 10, 1, 0, 1, RFC_FLAGS_DEFAULT ) &&
+        RFC_tp_init( &my_ctx, NULL, 100, false ) )
+    {
+        /* Enable autoprune: when cnt > 10, prune to 5 */
+        ASSERT( RFC_tp_init_autoprune( &my_ctx, true, 5, 10 ) );
+
+        /* Feed 11 turning points. Use values 1 and 9 (both in range [0, 10)) */
+        RFC_VALUE_TYPE data[] = { 1, 9, 1, 9, 1, 9, 1, 9, 1, 9, 1 };
+        if ( !RFC_feed( &my_ctx, data, 11 ) )
+        {
+            printf("RFC_feed failed with error: %d\n", my_ctx.error);
+            FAIL();
+        }
+
+        /* Verification: tp_cnt should be reduced from 11 */
+        ASSERT( my_ctx.tp_cnt <= 10 );
+        ASSERT( my_ctx.tp_cnt >= 5 );
+
+        ASSERT( RFC_deinit( &my_ctx ) );
+    }
+    else FAIL();
+
+    PASS();
+}
+#endif
+
+TEST RFC_res_get_test( void )
+{
+    rfc_ctx_s my_ctx = {0};
+    my_ctx.version = sizeof(rfc_ctx_s);
+    if( RFC_init( &my_ctx, 10, 1.0, 0.0, 1.0, RFC_FLAGS_DEFAULT ) )
+    {
+        const rfc_value_tuple_s *residue = NULL;
+        unsigned count = 0;
+
+        /* Feed data: 1 -> 5 -> 2 */
+        RFC_VALUE_TYPE data[] = { 1.0, 5.0, 2.0 };
+        ASSERT( RFC_feed( &my_ctx, data, 3 ) );
+
+        /* 1. Test RFC_res_get before finalize */
+        ASSERT( RFC_res_get( &my_ctx, &residue, &count ) );
+        ASSERT_EQ( count, 3 );
+        ASSERT( residue != NULL );
+        ASSERT_EQ( residue[0].value, 1.0 );
+        ASSERT_EQ( residue[1].value, 5.0 );
+        ASSERT_EQ( residue[2].value, 2.0 );
+
+        /* 2. Test after finalize (RES_NONE) */
+        ASSERT( RFC_finalize( &my_ctx, RFC_RES_NONE ) );
+        ASSERT( RFC_res_get( &my_ctx, &residue, &count ) );
+        ASSERT_EQ( count, 3 );
+
+        ASSERT( RFC_deinit( &my_ctx ) );
+    }
+    else FAIL();
+
+    PASS();
+}
+
+#if RFC_DH_SUPPORT
+TEST RFC_dh_get_test( void )
+{
+    rfc_ctx_s my_ctx = {0};
+    my_ctx.version = sizeof(rfc_ctx_s);
+
+    /*
+       Initialize with 10 classes.
+       Note: RFC_FLAGS_DEFAULT includes RFC_FLAGS_COUNT_DH.
+    */
+    if( RFC_init( &my_ctx, 10, 1.0, 0.0, 1.0, RFC_FLAGS_DEFAULT ) )
+    {
+        const double *dh = NULL;
+        size_t count = 0;
+
+        /* 1. Initialize TP storage (needed for some damage spreading methods) */
+        ASSERT( RFC_tp_init( &my_ctx, NULL, 100, false ) );
+
+        /* 2. Initialize DH storage with capacity 100 */
+        ASSERT( RFC_dh_init( &my_ctx, RFC_SD_FULL_P2, NULL, 100, false ) );
+
+        /* Initial check: count should be 0 */
+        ASSERT( RFC_dh_get( &my_ctx, &dh, &count ) );
+        ASSERT_EQ( count, 0 );
+        ASSERT( dh == my_ctx.dh );
+
+        /* 3. Feed 5 points. All should be in valid range [0, 10) */
+        RFC_VALUE_TYPE data[] = { 1.0, 5.0, 2.0, 8.0, 3.0 };
+        if ( !RFC_feed( &my_ctx, data, 5 ) )
+        {
+            printf("RFC_feed failed with error: %d\n", my_ctx.error);
+            FAIL();
+        }
+
+        /* 4. Check DH count. Should be 5 because feed_once_dh updates it to pt->pos */
+        ASSERT( RFC_dh_get( &my_ctx, &dh, &count ) );
+        ASSERT_EQ( count, 5 );
+        ASSERT( dh != NULL );
+
+        ASSERT( RFC_deinit( &my_ctx ) );
+    }
+    else FAIL();
+
+    PASS();
+}
+#endif
+
+#if RFC_AT_SUPPORT
+TEST RFC_at_functions_test( void )
+{
+    rfc_ctx_s my_ctx = {0};
+    my_ctx.version = sizeof(rfc_ctx_s);
+
+    if( RFC_init( &my_ctx, 10, 1.0, 0.0, 1.0, RFC_FLAGS_DEFAULT ) )
+    {
+        double Sa_trans;
+
+        /* 1. Test RFC_at_init with invalid M */
+        ASSERT( !RFC_at_init( &my_ctx, NULL, NULL, 0, -0.1 /* M */, 0, 0, false, false ) );
+        ASSERT_EQ( my_ctx.error, RFC_ERROR_INVARG );
+
+        /* Reset context for next tests */
+        ASSERT( RFC_deinit( &my_ctx ) );
+        ASSERT( RFC_init( &my_ctx, 10, 1.0, 0.0, 1.0, RFC_FLAGS_DEFAULT ) );
+
+        /* 2. Test RFC_at_transform with no reference curve (Identity) */
+        ASSERT( RFC_at_transform( &my_ctx, 10.0, 5.0, &Sa_trans ) );
+        ASSERT_EQ( Sa_trans, 10.0 );
+
+        /* 3. Test RFC_at_transform with Sa == 0 */
+        /* Initialize AT with standard FKM (M=0.3) */
+        ASSERT( RFC_at_init( &my_ctx, NULL, NULL, 0, 0.3, 0, 0, false, false ) );
+        ASSERT( RFC_at_transform( &my_ctx, 0.0, 5.0, &Sa_trans ) );
+        ASSERT_EQ( Sa_trans, 0.0 );
+
+        /* 4. Test RFC_at_init with user defined curve */
+        /* Reset again to be clean */
+        ASSERT( RFC_deinit( &my_ctx ) );
+        ASSERT( RFC_init( &my_ctx, 10, 1.0, 0.0, 1.0, RFC_FLAGS_DEFAULT ) );
+
+        double Sa_ref[] = { 1.0, 2.0 };
+        double Sm_ref[] = { 0.0, 1.0 };
+        ASSERT( RFC_at_init( &my_ctx, Sa_ref, Sm_ref, 2, 0.3, 0, 0, false, false ) );
+        ASSERT_EQ( my_ctx.at.count, 2 );
+        ASSERT( my_ctx.at.Sa == Sa_ref );
+
+        /* 5. Test invalid curve (Sa <= 0) */
+        /* State should still be INIT after successful at_init?
+           Yes, at_init doesn't change state if it was INIT. */
+        double Sa_bad[] = { 0.0, 2.0 };
+        /* We need to re-init context to clear at.Sa since at_init check for existing one might happen?
+           Actually at_init allows multiple calls if state is INIT. */
+
+        /* But wait, if it fails, it sets state to ERROR. */
+        ASSERT( !RFC_at_init( &my_ctx, Sa_bad, Sm_ref, 2, 0.3, 0, 0, false, false ) );
+        ASSERT_EQ( my_ctx.error, RFC_ERROR_INVARG );
+
+        ASSERT( RFC_deinit( &my_ctx ) );
+    }
+    else FAIL();
+
+    PASS();
+}
+#endif
+
+#if RFC_USE_DELEGATES
+/* Custom delegate for damage calculation */
+static bool custom_damage_calc( rfc_ctx_s *ctx, unsigned from_class, unsigned to_class, double *damage, double *Sa_ret )
+{
+    /* Always return a fixed damage value for testing */
+    *damage = 123.456;
+    if( Sa_ret ) *Sa_ret = 1.0;
+    return true;
+}
+
+/* Custom delegate for amplitude transformation */
+static bool custom_at_transform( rfc_ctx_s *ctx, double Sa, double Sm, double *Sa_transformed )
+{
+    /* Just double the amplitude */
+    *Sa_transformed = Sa * 2.0;
+    return true;
+}
+
+TEST RFC_delegates_test( void )
+{
+    rfc_ctx_s my_ctx = {0};
+    my_ctx.version = sizeof(rfc_ctx_s);
+
+    if( RFC_init( &my_ctx, 10, 1.0, 0.0, 1.0, RFC_FLAGS_DEFAULT ) )
+    {
+        double damage;
+        double Sa_trans;
+
+        /* 1. Test Damage Calculation Delegate */
+        /* Set custom delegate */
+        my_ctx.damage_calc_fcn = custom_damage_calc;
+
+        /* Disable fast damage lookup to ensure delegate is called */
+#if RFC_DAMAGE_FAST
+        my_ctx.damage_lut_inapt = 1;
+#endif
+
+        ASSERT( RFC_rfm_poke( &my_ctx, 0.5, 1.5, 1.0, false ) ); /* Class 0->1 */
+
+        ASSERT( RFC_rfm_damage( &my_ctx, 0, 0, 1, 1, &damage ) );
+        /* Expected: 123.456 * 1.0 count = 123.456 */
+        GREATEST_ASSERT_IN_RANGE( 123.456, damage, 1e-10 );
+
+
+        /* 2. Test Amplitude Transformation Delegate */
+#if RFC_AT_SUPPORT
+        my_ctx.at_transform_fcn = custom_at_transform;
+
+        ASSERT( RFC_at_transform( &my_ctx, 10.0, 0.0, &Sa_trans ) );
+        ASSERT_EQ( Sa_trans, 20.0 );
+#endif
+
+        ASSERT( RFC_deinit( &my_ctx ) );
+    }
+    else FAIL();
+
+    PASS();
+}
+#endif
+
 TEST RFC_ctx_inspect( void )
 {
     fprintf( stdout, "\n %20s\t%lu", "version",             (unsigned long)offsetof( rfc_ctx_s, version ) );
@@ -2394,6 +2893,7 @@ SUITE( RFC_TEST_SUITE )
 
     /* Inspect rainflow ctx */
     RUN_TEST( RFC_ctx_inspect );
+    RUN_TEST( RFC_res_get_test );
 
     /* Test rainflow counting */
     RUN_TEST1( RFC_empty, 0 );
@@ -2421,6 +2921,15 @@ SUITE( RFC_TEST_SUITE )
     /* "consistent Miner's rule" approach */
     RUN_TEST( RFC_miner_consistent );
     RUN_TEST( RFC_miner_consistent2 );
+    /* Matrix Access */
+    RUN_TEST( RFC_rfm_get_set_test );
+    RUN_TEST( RFC_rfm_peek_poke_test );
+    RUN_TEST( RFC_rfm_sum_damage_test );
+    RUN_TEST( RFC_rfm_check_refeed_test );
+    /* Level Crossing */
+    RUN_TEST( RFC_lc_functions_test );
+    /* Range Pair */
+    RUN_TEST( RFC_rp_functions_test );
 #endif /*!RFC_MINIMAL*/
 #if RFC_TP_SUPPORT
     /* Test turning points */
@@ -2430,12 +2939,22 @@ SUITE( RFC_TEST_SUITE )
     RUN_TEST1( RFC_test_turning_points, 1 );
     RUN_TEST1( RFC_tp_prune_test, 1 );
     RUN_TEST1( RFC_tp_refeed_test, 1 );
-
+    RUN_TEST( RFC_tp_prune_residue_handling );
+    RUN_TEST( RFC_tp_init_clear_test );
+    RUN_TEST( RFC_tp_autoprune_test );
 #endif /*RFC_TP_SUPPORT*/
+#if RFC_DH_SUPPORT
+    RUN_TEST( RFC_dh_init_reinit );
+    RUN_TEST( RFC_dh_get_test );
+#endif
 #if RFC_AT_SUPPORT
     /* Test amplitude transformation */
     RUN_TEST( RFC_at_test );
+    RUN_TEST( RFC_at_functions_test );
 #endif /*RFC_AT_SUPPORT*/
+#if RFC_USE_DELEGATES
+    RUN_TEST( RFC_delegates_test );
+#endif
 }
 
 /* Add definitions that need to be in the test runner's main file. */
