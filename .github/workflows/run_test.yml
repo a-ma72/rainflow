@@ -13,6 +13,8 @@ permissions:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    env:
+      PIP_DISABLE_PIP_VERSION_CHECK: 1  # This silences the notice globally
     strategy:
       fail-fast: false
       matrix:
@@ -30,8 +32,6 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
-      env:
-        PIP_DISABLE_PIP_VERSION_CHECK: 1
       run: |
         cd src/python
         # We use 'python -m pip' to ensure we target the correct environment
