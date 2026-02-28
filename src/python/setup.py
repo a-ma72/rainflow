@@ -68,17 +68,18 @@ class build_ext(_build_ext):  # noqa: N801
                     "-Wno-unused-variable",
                     "-Wno-unused-function",
                     "-Wno-unused-but-set-variable",  # Clang (Xcode 13+) / GCC
+                    "-Wswitch",  # Clang
+                    "-Wunused-value",  # Clang
                 ]
         # For GCC/Clang/MinGW, inject language-standard flags into the
         # compiler command lists so they apply to the right language.
         if ct in ("unix", "mingw32"):
-            for flag, attr in (
-                ("-std=c99", "compiler_so"),
-                ("-std=c++11", "compiler_cxx"),
-            ):
-                cmd = getattr(self.compiler, attr, None)
-                if cmd is not None and flag not in cmd:
-                    cmd.append(flag)
+            # Check if we are dealing with C++ or C
+            # setuptools usually sets 'language' on the extension object
+            if getattr(ext, 'language', None) == 'c++':
+                ext.extra_compile_args.append("-std=c++11")
+            else:
+                ext.extra_compile_args.append("-std=c99")
         super().build_extensions()
 
 
