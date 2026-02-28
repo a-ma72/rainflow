@@ -30,6 +30,8 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
+      env:
+        PIP_DISABLE_PIP_VERSION_CHECK: 1
       run: |
         cd src/python
         # Upgrade pip and install build tools first
