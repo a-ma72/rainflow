@@ -50,18 +50,32 @@ class build_ext(_build_ext):  # noqa: N801
     """Custom build_ext that applies per-language compiler flags."""
 
     def build_extensions(self) -> None:
-        """Suppress minor warnings and ensure correct std flags per language."""
-        if self.compiler.compiler_type in ("unix", "mingw32"):  # GCC / MinGW
-            # C compiler: add -std=c99, suppress harmless warnings
-            c_flags = ["-std=c99", "-Wno-unused-variable", "-Wno-unused-function"]
-            for flag in c_flags:
-                if flag not in self.compiler.compiler_so:
-                    self.compiler.compiler_so.append(flag)
-            # C++ compiler: add -std=c++11
-            cxx_flags = ["-std=c++11", "-Wno-unused-variable", "-Wno-unused-function"]
-            for flag in cxx_flags:
-                if flag not in self.compiler.compiler_cxx:
-                    self.compiler.compiler_cxx.append(flag)
+        """Suppress minor warnings and set correct language-standard flags."""
+        ct = self.compiler.compiler_type
+        for ext in self.extensions:
+            if ct == "msvc":
+                ext.extra_compile_args += [
+                    "/std:c++14",     # C++ standard (MSVC applies only to .cpp)
+                    "/wd4100",        # unreferenced formal parameter
+                    "/wd4101",        # unreferenced local variable
+                    "/wd4189",        # local variable initialized but not referenced
+                    "/wd4505",        # unreferenced function removed
+                ]
+            elif ct in ("unix", "mingw32"):  # GCC / Clang / MinGW
+                ext.extra_compile_args += [
+                    "-Wno-unused-variable",
+                    "-Wno-unused-function",
+                ]
+        # For GCC/MinGW, inject language-standard flags into the
+        # compiler command lists so they apply to the right language.
+        if ct in ("unix", "mingw32"):
+            for flag, attr in (
+                ("-std=c99", "compiler_so"),
+                ("-std=c++11", "compiler_cxx"),
+            ):
+                cmd = getattr(self.compiler, attr, None)
+                if cmd is not None and flag not in cmd:
+                    cmd.append(flag)
         super().build_extensions()
 
 
