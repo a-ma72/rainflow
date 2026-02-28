@@ -5,7 +5,24 @@ RAINFLOW
 |   coan_invoke-minimal.sh        Invoke coan (linux shell)
 |   content.txt                   This file
 |   LICENSE                       License information
-|   README.MD                     Readme
+|   README.rst                    Readme
+|
++---docs
+|   |   index.rst                Documentation index
+|   |   algorithm.rst            Core algorithm explanation
+|   |   astm_method.rst          ASTM E 1049 vs. 4-point method
+|   |   cpp_wrapper.rst          C++ wrapper guide
+|   |   damage_history.rst       Damage tracking over time
+|   |   delegates.rst            Custom callbacks and extensibility
+|   |   examples.rst             Practical code examples
+|   |   features.rst             Feature descriptions and compile-time options
+|   |   installation.rst         Build instructions for all platforms
+|   |   minimal_build.rst        RFC_MINIMAL for embedded systems
+|   |   references.rst           Bibliography and citations
+|   |   residue_methods.rst      Residue handling methods
+|   |   spread_damage.rst        Damage spreading methods
+|   |   tp_prune.rst             Memory management with RFC_tp_prune()
+|   \   turning_points.rst       Turning point storage and management
 |
 +---src
 |   |
@@ -13,7 +30,7 @@ RAINFLOW
 |   |
 |   +---3rd_party
 |   |   +---greatest              A testing system for C, contained in 1 header file.
-|   |   \---unifdef               A tool remove preprocessor conditionals from code.
+|   |   \---unifdef               A tool to remove preprocessor conditionals from code.
 |   |
 |   +---lib
 |   |   |   CMakeLists.txt        Makefile (CMake)
@@ -35,16 +52,16 @@ RAINFLOW
 |   +---matlab
 |   |   |   CMakeLists.txt        Makefile (CMake)
 |   |   |   rfc.c                 MATLAB(R) wrapper module `rfc`
-|   |   |   make.m            Build rfc.m
-|   |   \   validate.m        Examples an checks
+|   |   |   make.m                Build rfc.m
+|   |   \   validate.m            Examples an checks
 |   |
 |   +---python
-|       |   __init.py__               Init
+|       |   __init__.py               Init
 |       |   CMakeLists.txt            Makefile (CMake)
 |       |   LICENSE                   License information
 |       |   MANIFEST.in               Manifest file (input file)
 |       |   pyproject.toml            TOML file for build requirements
-|       |   README.md                 Readme
+|       |   README.rst                Readme
 |       |   requirements.txt          Requirements of the rfcnt module
 |       |   rfcnt.pyi                 rfcnt interface file
 |       |   run_examples.py           Python script executes examples from .tests.examples
@@ -76,11 +93,10 @@ RAINFLOW
 |       |   \   rfcnt.cpp             Python wrapper module `rfcnt`
 |       |
 |       \---tests
-|           |   __init.py__           Init
+|           |   __init__.py           Init
 |           |   test_rfcnt.py         Unit Test
 |           |   examples.py           Examples
-|           |   long_series.csv       Time series for unit test and examples
-|           \   test_rfcnt.py         Demonstrator and test (Python)
+|           \   long_series.csv       Time series for unit test and examples
 |
 +---test
 |   |   CMakeLists.txt            Makefile (CMake)

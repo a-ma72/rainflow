@@ -19,4 +19,6 @@
   #define RFC_AR_SUPPORT             ${RFC_AR_SUPPORT}
   #define RFC_DEBUG_FLAGS            ${RFC_DEBUG_FLAGS}
   #define RFC_EXPORT_MEX             ${RFC_EXPORT_MEX}
+  #define RFC_EXPORT_PY              ${RFC_EXPORT_PY}
+  #define RFC_VALUE_TYPE             ${RFC_VALUE_TYPE}
 #endif /*RFC_VERSION_MAJOR*/
