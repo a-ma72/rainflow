@@ -72,7 +72,7 @@
  *================================================================================
  * BSD 2-Clause License
  *
- * Copyright (c) 2025, Andras Martin
+ * Copyright (c) 2026, Andras Martin
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -96,6 +96,50 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *================================================================================
+ */
+
+/**
+ * @file rainflow.h
+ * @brief Rainflow Counting Algorithm - Public API
+ *
+ * IMPORTANT THREAD-SAFETY INFORMATION:
+ * =====================================
+ * This library is NOT thread-safe. All functions in this API are designed
+ * for single-threaded use only. If you need to use rainflow counting from
+ * multiple threads, you MUST implement your own synchronization:
+ *
+ * - Each thread should have its own rfc_ctx_s instance
+ * - Do NOT share a single rfc_ctx_s between threads
+ * - Do NOT call any RFC_* functions on the same context from multiple threads
+ * - If sharing data between threads, use proper locking (mutexes, etc.)
+ *
+ * The library performs non-atomic read-modify-write operations on context
+ * state and does not use any internal synchronization primitives.
+ *
+ * Example of SAFE multi-threaded usage:
+ * @code
+ *     // Thread 1
+ *     rfc_ctx_s ctx1;
+ *     RFC_init(&ctx1, ...);
+ *     RFC_feed(&ctx1, data1, ...);
+ *
+ *     // Thread 2 (separate context)
+ *     rfc_ctx_s ctx2;
+ *     RFC_init(&ctx2, ...);
+ *     RFC_feed(&ctx2, data2, ...);
+ * @endcode
+ *
+ * Example of UNSAFE multi-threaded usage (DO NOT DO THIS):
+ * @code
+ *     rfc_ctx_s shared_ctx;
+ *     RFC_init(&shared_ctx, ...);
+ *
+ *     // Thread 1
+ *     RFC_feed(&shared_ctx, data1, ...);  // RACE CONDITION!
+ *
+ *     // Thread 2
+ *     RFC_feed(&shared_ctx, data2, ...);  // RACE CONDITION!
+ * @endcode
  */
 
 #ifndef RAINFLOW_H
@@ -290,6 +334,12 @@ enum rfc_flags
 #endif /*RFC_AR_SUPPORT*/
 };
 
+/* Flag stacks */
+enum rfc_flag_stack
+{
+    RFC_FLAG_STACK_MAIN             = 0,                            /**< Main flags */
+    RFC_FLAG_STACK_DEBUG            = 1,                            /**< Debug flags */
+};
 
 enum rfc_debug_flags
 {

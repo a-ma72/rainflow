@@ -13,19 +13,18 @@ permissions:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    env:
+      PIP_DISABLE_PIP_VERSION_CHECK: 1  # This silences the notice globally
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
-        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
         exclude:  
           - python-version: "3.7"  # Python < v3.8 does not support Apple Silicon ARM64.
             os: macos-latest
           - python-version: "3.7"  # Skip 3.7 on Ubuntu as requested
             os: ubuntu-latest
-        include:  # Run those macos legacy versions on Intel CPUs.
-          - python-version: "3.7"
-            os: macos-13
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
@@ -35,7 +34,10 @@ jobs:
     - name: Install dependencies
       run: |
         cd src/python
-        pip install wheel
+        # We use 'python -m pip' to ensure we target the correct environment
+        python -m pip install --upgrade pip --quiet
+        python -m pip install setuptools wheel
+        
         pip install -r requirements.txt
         pip install . --no-build-isolation --no-deps
     - name: Run Python tests
