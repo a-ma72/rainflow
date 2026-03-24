@@ -174,6 +174,21 @@ else()
     set(RFCNT_BUILD_COMPILER_SETTING "")
 endif()
 
+# Regenerate version.py at build time so RFC_VERSION_POSTFIX changes take effect
+# without requiring an explicit CMake re-configure step.
+add_custom_target(
+    generate_version_py
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRFC_VERSION_MAJOR=${RFC_VERSION_MAJOR}"
+        "-DRFC_VERSION_MINOR=${RFC_VERSION_MINOR}"
+        "-DRFC_VERSION_PATCH=${RFC_VERSION_PATCH}"
+        "-DRFC_VERSION_POSTFIX=${RFC_VERSION_POSTFIX}"
+        "-Dinput=${CMAKE_CURRENT_SOURCE_DIR}/version.py.in"
+        "-Doutput=${CMAKE_CURRENT_SOURCE_DIR}/version.py"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/generate_version.cmake"
+    COMMENT "Generating version.py (${RFC_VERSION_MAJOR}.${RFC_VERSION_MINOR}.${RFC_VERSION_PATCH}${RFC_VERSION_POSTFIX})"
+)
+
 add_custom_target(
     build_wheel_isolated
     COMMAND "${CMAKE_COMMAND}" -E remove -f $<TARGET_FILE:rfcnt_module>
@@ -184,6 +199,7 @@ add_custom_target(
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     COMMENT "Build rfcnt wheel (PEP 517)"
 )
+add_dependencies(build_wheel_isolated generate_version_py)
 # Custom target for creating wheel via PEP 517 build frontend.
 
 
