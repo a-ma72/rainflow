@@ -5,6 +5,7 @@
   #define RFC_VERSION_MAJOR         "0"
   #define RFC_VERSION_MINOR         "5"
   #define RFC_VERSION_PATCH         "2"
+  #define RFC_VERSION_POSTFIX       ""
   #define RFC_USE_INTEGRAL_COUNTS    OFF
   #define RFC_USE_HYSTERESIS_FILTER  ON
   #define RFC_MINIMAL                OFF

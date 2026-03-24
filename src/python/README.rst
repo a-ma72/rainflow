@@ -44,15 +44,11 @@ Installation
 
 **Build and Install:**
 
-.. code-block:: bash
-
     cmake -S. -Bbuild -DRFC_EXPORT_PY=1
     cmake --build build --target build_wheel_isolated --config Release
     pip install dist/rfcnt-*.whl
 
 Or install from source:
-
-.. code-block:: bash
 
     pip install . --no-build-isolation --no-deps
 
@@ -61,8 +57,6 @@ See docs/installation.rst for MATLAB integration.
 
 Quick Start
 -----------
-
-.. code-block:: python
 
     import numpy as np
     import rfcnt
@@ -82,8 +76,6 @@ Advanced Usage
 - Integrate with real-time or embedded systems (RFC_MINIMAL)
 
 Example:
-
-.. code-block:: python
 
     result = rfcnt.rfc(
         data,
@@ -106,8 +98,11 @@ References
 ----------
 
 [1] ASTM E 1049, "Standard Practices for Cycle Counting in Fatigue Analysis", ASTM International, 2011.
+
 [2] U.H. Clormann, T. Seeger, "Rainflow - HCM / Ein Hysteresisschleifen-Zaehlalgorithmus...", TU Darmstadt, 1985.
+
 [3] FVA-Richtlinie, 2010. https://fva-net.de/fileadmin/content/Richtlinien/FVA-Richtlinie_Zaehlverfahren_2010.pdf
+
 [4] Siemens PLM, "Rainflow Counting", 2018. https://community.plm.automation.siemens.com/t5/Testing-Knowledge-Base/Rainflow-Counting/ta-p/383093
 
 For a full bibliography, see docs/references.rst.

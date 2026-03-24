@@ -80,13 +80,17 @@ endif ()
 set(RFC_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(RFC_VERSION_MINOR ${PROJECT_VERSION_MINOR})
 set(RFC_VERSION_PATCH ${PROJECT_VERSION_PATCH})
-set(RFC_VERSION_POSTFIX "" CACHE STRING "Optional version postfix, e.g. 'rc1', 'beta', '.post1'")
+set(RFC_VERSION_POSTFIX "" CACHE STRING "Optional version postfix, e.g. 'rc1', '.dev1', '.post1'")
+set(RFC_VERSION "${RFC_VERSION_MAJOR}.${RFC_VERSION_MINOR}.${RFC_VERSION_PATCH}${RFC_VERSION_POSTFIX}")
 
 # Save options in configuration file
 configure_file(${CMAKE_CURRENT_LIST_DIR}/src/lib/config.h.in ${CMAKE_CURRENT_LIST_DIR}/src/lib/config.h)
 
-# Generate Python version file
-configure_file(${CMAKE_CURRENT_LIST_DIR}/src/python/version.py.in ${CMAKE_CURRENT_LIST_DIR}/src/python/version.py)
+# Generate Python version file and documentation from templates
+configure_file(${CMAKE_CURRENT_LIST_DIR}/src/python/version.py.in     ${CMAKE_CURRENT_LIST_DIR}/src/python/version.py)
+configure_file(${CMAKE_CURRENT_LIST_DIR}/docs/index.rst.in           ${CMAKE_CURRENT_LIST_DIR}/docs/index.rst        @ONLY)
+configure_file(${CMAKE_CURRENT_LIST_DIR}/docs/installation.rst.in    ${CMAKE_CURRENT_LIST_DIR}/docs/installation.rst  @ONLY)
+configure_file(${CMAKE_CURRENT_LIST_DIR}/docs/references.rst.in      ${CMAKE_CURRENT_LIST_DIR}/docs/references.rst   @ONLY)
 
 # Targets
 add_subdirectory(src)
