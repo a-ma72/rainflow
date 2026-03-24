@@ -1,6 +1,7 @@
-=============================================
 Rainflow Counting Algorithm (C99 compliant)
-=============================================
+===========================================
+
+.. |version| replace:: 0.5.2
 
 .. image:: https://github.com/a-ma72/rainflow/actions/workflows/run_test.yml/badge.svg
    :target: https://github.com/a-ma72/rainflow/actions/workflows/run_test.yml
@@ -11,10 +12,10 @@ the 4-point method for fatigue analysis. This library is C99 compliant
 and provides bindings for Python and MATLAB.
 
 Quick Start
-===========
+-----------
 
 Python
-------
+~~~~~~
 
 Install from PyPI:
 
@@ -39,7 +40,7 @@ Basic usage:
    print(f"Cycles: {result['rp']}")
 
 C/C++
------
+~~~~~
 
 .. code-block:: c
 
@@ -57,7 +58,7 @@ C/C++
    RFC_deinit(&ctx);
 
 Key Features
-============
+------------
 
 - **Modular architecture** - Select features at compile time
 - **Multiple counting methods** - 4-point, HCM (Clormann/Seeger), ASTM
@@ -68,14 +69,14 @@ Key Features
 - **Standards compliant** - ASTM E 1049, DIN 45667, FKM guidelines
 
 Documentation
-=============
+-------------
 
 .. contents:: Table of Contents
    :depth: 2
    :local:
 
 Detailed Documentation
-----------------------
+~~~~~~~~~~~~~~~~~~~~~~
 
 Explore the full documentation in the ``docs/`` folder:
 
@@ -133,21 +134,21 @@ Advanced Topics:
    Bibliography and citations for standards, publications, and resources.
 
 Quick Links
------------
+~~~~~~~~~~~
 
 - `GitHub Repository <https://github.com/a-ma72/rainflow>`_
 - `Issue Tracker <https://github.com/a-ma72/rainflow/issues>`_
 - `Releases <https://github.com/a-ma72/rainflow/releases>`_
 
 What is Rainflow Counting?
-===========================
+---------------------------
 
 Rainflow Counting is a standardized method for analyzing fatigue in materials
 subjected to variable amplitude loading. The algorithm extracts discrete
 load cycles from complex time-varying stress-strain histories.
 
 The Four-Point Method
-----------------------
+~~~~~~~~~~~~~~~~~~~~~~
 
 The core algorithm examines sequences of four consecutive turning points
 (A, B, C, D) to identify closed cycles::
@@ -169,10 +170,10 @@ When closed, the cycle B-C is:
 See `docs/algorithm.rst <docs/algorithm.rst>`_ for detailed explanation.
 
 Installation
-============
+------------
 
 Build from Sources
-------------------
+~~~~~~~~~~~~~~~~~~
 
 Using CMake (all platforms):
 
@@ -189,7 +190,7 @@ Or on Linux/macOS:
    make -C build
 
 Python Wheel
-------------
+~~~~~~~~~~~~
 
 Build a Python wheel package:
 
@@ -203,12 +204,12 @@ For detailed build instructions, including MATLAB integration and custom
 feature selection, see `docs/installation.rst <docs/installation.rst>`_.
 
 Testing
-=======
+-------
 
 Run the unit tests to verify your installation:
 
 C/C++ Tests
------------
+~~~~~~~~~~~
 
 .. code-block:: bash
 
@@ -224,23 +225,23 @@ Or use CTest:
    ctest -C Release
 
 Python Tests
-------------
+~~~~~~~~~~~~
 
 .. code-block:: bash
 
    python -m rfcnt.run_tests
 
 Run Examples
-------------
+~~~~~~~~~~~~
 
 .. code-block:: bash
 
    python -m rfcnt.run_examples
 
 Current Status
-==============
+--------------
 
-- **Version**: 0.5.2
+- **Version**: |version|
 - **C Standard**: C99 compliant
 - **Test Status**: |tests|
 - **Languages**: C, C++, Python, MATLAB
@@ -250,7 +251,7 @@ Current Status
    :target: https://github.com/a-ma72/rainflow/actions/workflows/run_test.yml
 
 Applications
-============
+------------
 
 This library is suitable for:
 
@@ -261,7 +262,7 @@ This library is suitable for:
 - **Real-time monitoring** in embedded systems
 
 Standards Compliance
-====================
+--------------------
 
 The implementation follows these standards:
 
@@ -274,10 +275,10 @@ The implementation follows these standards:
 See `docs/references.rst <docs/references.rst>`_ for full bibliography.
 
 Architecture
-============
+------------
 
 Modular Design
---------------
+~~~~~~~~~~~~~~
 
 The package uses a two-layer architecture:
 
@@ -295,7 +296,7 @@ The package uses a two-layer architecture:
    - MATLAB MEX interface for use in MATLAB/Simulink
 
 Feature Flags
--------------
+~~~~~~~~~~~~~
 
 Customize the build with compile-time flags:
 
@@ -309,7 +310,7 @@ Customize the build with compile-time flags:
 See `docs/features.rst <docs/features.rst>`_ for complete list.
 
 Contributing
-============
+------------
 
 Contributions are welcome! Please:
 
@@ -322,12 +323,12 @@ Contributions are welcome! Please:
 Report issues at: https://github.com/a-ma72/rainflow/issues
 
 License
-=======
+-------
 
 See the LICENSE file in the repository for licensing information.
 
 Citation
-========
+--------
 
 If you use this software in your research, please cite:
 
@@ -338,18 +339,18 @@ If you use this software in your research, please cite:
      title = {Rainflow Counting Algorithm},
      year = {2026},
      url = {https://github.com/a-ma72/rainflow},
-     version = {0.5.2}
+     version = {|version|}
    }
 
 Acknowledgments
-===============
+---------------
 
 This implementation is based on the work described in the references
 section. Special thanks to the authors of ASTM E 1049 and the HCM method
 (Clormann/Seeger).
 
 Contact
-=======
+-------
 
 For questions, suggestions, or collaboration:
 
@@ -384,3 +385,4 @@ For questions, suggestions, or collaboration:
 Start exploring with `docs/index.rst <docs/index.rst>`_ for organized navigation,
 `docs/algorithm.rst <docs/algorithm.rst>`_ for algorithm details, or jump
 directly to `docs/examples.rst <docs/examples.rst>`_ for practical usage.
+
