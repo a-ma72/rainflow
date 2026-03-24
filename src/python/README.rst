@@ -1,13 +1,14 @@
 Rainflow Python Package (rfcnt)
-*******************************
+===============================
 
 Summary
-=======
+-------
 
 The **rfcnt** package provides a high-performance, standards-compliant implementation of the rainflow counting algorithm for fatigue analysis, with bindings for Python, C/C++, and MATLAB. It supports the 4-point method (DIN 45667), the ASTM E 1049 3-point method, HCM (Clormann/Seeger), and advanced residue handling. This README summarizes the package for users and developers. For full documentation, see the `/docs` folder.
 
 Features
-========
+--------
+
 - Fast C core with Python and MATLAB wrappers
 - 4-point, HCM, and ASTM counting methods
 - Flexible residue processing (DIN, ASTM, repeated, ignore, HCM)
@@ -17,7 +18,8 @@ Features
 - Unit tests and real-world examples
 
 Algorithm Overview
-==================
+------------------
+
 Rainflow counting extracts closed cycles from load histories in four main steps:
 
 1. **Hysteresis Filtering**: Removes small oscillations below a threshold
@@ -32,7 +34,7 @@ A cycle B-C is closed if:
 Closed cycles are counted and removed; residue is handled per user choice.
 
 Installation
-============
+------------
 
 **Prerequisites:**
 - Python 3.6+
@@ -58,7 +60,7 @@ Or install from source:
 See docs/installation.rst for MATLAB integration.
 
 Quick Start
-===========
+-----------
 
 .. code-block:: python
 
@@ -71,7 +73,7 @@ Quick Start
     print("Range pairs:\n", result['rp'])
 
 Advanced Usage
-==============
+--------------
 
 - Use Wöhler curve parameters for fatigue life prediction
 - Select counting method: `use_HCM`, `use_ASTM`
@@ -92,7 +94,7 @@ Example:
     )
 
 Documentation
-=============
+-------------
 
 - Algorithm details: docs/algorithm.rst
 - Features: docs/features.rst
@@ -101,7 +103,7 @@ Documentation
 - References: docs/references.rst
 
 References
-==========
+----------
 
 [1] ASTM E 1049, "Standard Practices for Cycle Counting in Fatigue Analysis", ASTM International, 2011.
 [2] U.H. Clormann, T. Seeger, "Rainflow - HCM / Ein Hysteresisschleifen-Zaehlalgorithmus...", TU Darmstadt, 1985.
@@ -111,9 +113,12 @@ References
 For a full bibliography, see docs/references.rst.
 
 License
-=======
+-------
+
 See LICENSE file.
 
 Contact
-=======
+-------
+
 For questions, bug reports, or contributions, see the project repository or contact the maintainer.
+

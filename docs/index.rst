@@ -219,4 +219,4 @@ See the main repository for license information.
 ---
 
 **Last Updated:** 2026-03-22
-**Documentation Version:** 0.5.2
+**Documentation Version:** |version|

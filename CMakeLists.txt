@@ -80,9 +80,13 @@ endif ()
 set(RFC_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(RFC_VERSION_MINOR ${PROJECT_VERSION_MINOR})
 set(RFC_VERSION_PATCH ${PROJECT_VERSION_PATCH})
+set(RFC_VERSION_POSTFIX "" CACHE STRING "Optional version postfix, e.g. 'rc1', 'beta', '.post1'")
 
 # Save options in configuration file
 configure_file(${CMAKE_CURRENT_LIST_DIR}/src/lib/config.h.in ${CMAKE_CURRENT_LIST_DIR}/src/lib/config.h)
+
+# Generate Python version file
+configure_file(${CMAKE_CURRENT_LIST_DIR}/src/python/version.py.in ${CMAKE_CURRENT_LIST_DIR}/src/python/version.py)
 
 # Targets
 add_subdirectory(src)

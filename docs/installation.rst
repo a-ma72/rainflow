@@ -139,7 +139,7 @@ Install directly from a GitHub release:
 
 .. code-block:: bash
 
-   pip install https://github.com/a-ma72/rainflow/releases/download/rfcnt-0.5.2/rfcnt-0.5.2.tar.gz
+   pip install https://github.com/a-ma72/rainflow/releases/download/rfcnt-|version|/rfcnt-|version|.tar.gz
 
 Or from the repository:
 
@@ -154,7 +154,7 @@ To use in Google Colab notebooks:
 
 .. code-block:: python
 
-   !pip install --no-build-isolation --no-deps https://github.com/a-ma72/rainflow/releases/download/rfcnt-0.5.2/rfcnt-0.5.2.tar.gz
+   !pip install --no-build-isolation --no-deps https://github.com/a-ma72/rainflow/releases/download/rfcnt-|version|/rfcnt-|version|.tar.gz
 
    import rfcnt
    rfcnt.tests.examples.example_1()
