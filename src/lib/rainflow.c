@@ -207,9 +207,13 @@ static bool                 error_raise                     (       rfc_ctx_s *,
 static rfc_value_t          value_delta                     (       rfc_ctx_s *, const rfc_value_tuple_s* pt_from, const rfc_value_tuple_s* pt_to, int *sign_ptr );
 
 
-#define QUANTIZE( r, v )    ( (r)->class_count && (v) >= (r)->class_offset ? \
-                              ( ((v) - (r)->class_offset) / (r)->class_width >= (double)UINT_MAX ? UINT_MAX : \
-                                (unsigned)( ((v) - (r)->class_offset) / (r)->class_width ) ) : 0 )
+static inline unsigned QUANTIZE( const rfc_ctx_s *r, rfc_value_t v )
+{
+    double q;
+    if( !r->class_count || v < r->class_offset ) return 0;
+    q = ( v - r->class_offset ) / r->class_width;
+    return ( q >= (double)UINT_MAX ) ? UINT_MAX : (unsigned)q;
+}
 #define AMPLITUDE( r, i )   ( (r)->class_count ? ( (double)(r)->class_width * (i) / 2 ) : 0.0 )
 #define CLASS_MEAN( r, c )  ( (r)->class_count ? ( (double)(r)->class_width * (0.5 + (c)) + (r)->class_offset ) : 0.0 )
 #define CLASS_UPPER( r, c ) ( (r)->class_count ? ( (double)(r)->class_width * (1.0 + (c)) + (r)->class_offset ) : 0.0 )

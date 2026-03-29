@@ -29,8 +29,8 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "")
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
 endif ()
 
-if (CMAKE_BUILD_TYPE MATCHES Debug)
-    message(STATUS "Rainflow: Debug build")
+if (CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo")
+    message(STATUS "Rainflow: Adding debug flags for build type ${CMAKE_BUILD_TYPE}")
     add_definitions(-DDEBUG -D_DEBUG)
 endif ()
 
