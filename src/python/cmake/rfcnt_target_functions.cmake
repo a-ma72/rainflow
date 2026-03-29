@@ -89,11 +89,23 @@ function (rfcnt_library  OUTPUT_NAME  OUTPUT_DIRECTORY  rfcnt_target)
         # Windows python modules have suffix ".pyd"
 
         if (OUTPUT_DIRECTORY)
+            # Set per-config output dirs so multi-config generators (VS, Xcode) don't
+            # append a config subfolder (Debug/, Release/, …). Without these, the .pyd
+            # lands in e.g. src/python/Debug/ and Python can't find it.
+            set(_out_dir "${CMAKE_CURRENT_SOURCE_DIR}/${OUTPUT_DIRECTORY}")
             set_target_properties(
                     ${rfcnt_target}
                     PROPERTIES
-                    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${OUTPUT_DIRECTORY}  # Output directory
-                    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${OUTPUT_DIRECTORY}  # Output directory
+                    RUNTIME_OUTPUT_DIRECTORY                 "${_out_dir}"
+                    RUNTIME_OUTPUT_DIRECTORY_DEBUG           "${_out_dir}"
+                    RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO  "${_out_dir}"
+                    RUNTIME_OUTPUT_DIRECTORY_RELEASE         "${_out_dir}"
+                    RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL      "${_out_dir}"
+                    LIBRARY_OUTPUT_DIRECTORY                 "${_out_dir}"
+                    LIBRARY_OUTPUT_DIRECTORY_DEBUG           "${_out_dir}"
+                    LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO  "${_out_dir}"
+                    LIBRARY_OUTPUT_DIRECTORY_RELEASE         "${_out_dir}"
+                    LIBRARY_OUTPUT_DIRECTORY_MINSIZEREL      "${_out_dir}"
             )
             install(
                     TARGETS ${rfcnt_target}

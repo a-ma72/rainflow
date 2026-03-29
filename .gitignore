@@ -8,8 +8,7 @@ src/python/venv/
 src/python/dist/
 src/python/numpy/
 src/python/MANIFEST
-cmake-build-debug/
-cmake-build-release/
+cmake-build*
 rfcnt.egg-info
 .idea/
 .vscode/
