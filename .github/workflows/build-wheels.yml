@@ -32,6 +32,11 @@ jobs:
           # source (needs GCC>=10.3), which pip falls back to on manylinux2014
           # since numpy no longer ships prebuilt wheels for that image.
           CIBW_MANYLINUX_X86_64_IMAGE: "manylinux_2_28"
+          # ubuntu-latest also builds i686 (32-bit) by default; numpy/pandas
+          # ship no 32-bit wheels at all, so it always fails trying to build
+          # numpy from source there (and manylinux_2_28 has no i686 image to
+          # fall back on). Same reasoning as CIBW_ARCHS_MACOS/_WINDOWS below.
+          CIBW_ARCHS_LINUX: "x86_64"
           CIBW_ARCHS_MACOS: "x86_64 arm64"
           # Pinned defensively: on GitLab's Windows SaaS runner, cibuildwheel
           # also picked up win32 (32-bit) by default and testing it failed,
