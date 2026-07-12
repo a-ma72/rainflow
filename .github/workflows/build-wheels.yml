@@ -28,6 +28,10 @@ jobs:
         env:
           CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*"
           CIBW_SKIP: "*-musllinux* pp*"
+          # manylinux2014's GCC 10.2.1 is too old to build numpy>=2.0 from
+          # source (needs GCC>=10.3), which pip falls back to on manylinux2014
+          # since numpy no longer ships prebuilt wheels for that image.
+          CIBW_MANYLINUX_X86_64_IMAGE: "manylinux_2_28"
           CIBW_ARCHS_MACOS: "x86_64 arm64"
           # Pinned defensively: on GitLab's Windows SaaS runner, cibuildwheel
           # also picked up win32 (32-bit) by default and testing it failed,
