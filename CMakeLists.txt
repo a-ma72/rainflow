@@ -16,7 +16,7 @@ endif ()
 
 
 # Project name and version
-project(rainflow VERSION 0.5.2 LANGUAGES C CXX)
+project(rainflow VERSION 0.5.3 LANGUAGES C CXX)
 
 # C++11
 set(CMAKE_CXX_STANDARD 11)
@@ -88,6 +88,7 @@ configure_file(${CMAKE_CURRENT_LIST_DIR}/src/lib/config.h.in ${CMAKE_CURRENT_LIS
 
 # Generate Python version file and documentation from templates
 configure_file(${CMAKE_CURRENT_LIST_DIR}/src/python/version.py.in     ${CMAKE_CURRENT_LIST_DIR}/src/python/version.py)
+configure_file(${CMAKE_CURRENT_LIST_DIR}/README.rst.in               ${CMAKE_CURRENT_LIST_DIR}/README.rst             @ONLY)
 configure_file(${CMAKE_CURRENT_LIST_DIR}/docs/index.rst.in           ${CMAKE_CURRENT_LIST_DIR}/docs/index.rst        @ONLY)
 configure_file(${CMAKE_CURRENT_LIST_DIR}/docs/installation.rst.in    ${CMAKE_CURRENT_LIST_DIR}/docs/installation.rst  @ONLY)
 configure_file(${CMAKE_CURRENT_LIST_DIR}/docs/references.rst.in      ${CMAKE_CURRENT_LIST_DIR}/docs/references.rst   @ONLY)

@@ -1,0 +1,39 @@
+Calculate damage value from range pair histogram.
+
+    Parameters
+    ----------
+    Sa : ArrayLike
+        Amplitude vector.
+    counts : ArrayLike
+        Cycle counts vector.
+    wl: Optional[dict] = dict(sx=1000, nx=1e7, sd=0, nd=np.inf, k=5, k2=k)
+        Definition of the SN-curve.
+
+        * `sx` : float
+            SN-curve knee between `k` and `k2`.
+        * `nx` : float
+            Cycle count at `sx`.
+        * `sd` : float
+            The fatigue strength (SN-curve).
+        * `nd` : float
+            Cycle count at `sd`.
+        * `k` : float
+            The slope of the SN-curve for sa >= sx.
+        * `k2` : float
+            The slope of the SN-curve for sa < sx.
+        * `omission` : float
+            The omission value. Values where sa < omission are ignored.
+    method : Optional[int] = 0
+        Method for damage calculation.
+
+        - 0 = Default (by given `wl`)
+        - 1 = Miner elementar
+        - 2 = Miner modified
+        - 3 = Miner consistent
+
+    Returns
+    -------
+    damage : float
+        (Pseudo) damage value.
+
+    

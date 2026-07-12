@@ -17,9 +17,11 @@ function (rfcnt_library  OUTPUT_NAME  OUTPUT_DIRECTORY  rfcnt_target)
                 ${Python3_INCLUDE_DIRS}
                 ${rfc_core_SOURCE_DIR}
                 ${Python3_NumPy_INCLUDE_DIRS}
+                ${PYBIND11_INCLUDE_DIR}
         )
         # Set the include directories for the target, including Python3 include directories,
-        # source directory for rfc_core, and NumPy include directories.
+        # source directory for rfc_core, NumPy include directories, and pybind11 headers
+        # (rfcnt.cpp is a pybind11 extension module).
 
         set(
                 RFCNT_SOURCES
@@ -34,11 +36,34 @@ function (rfcnt_library  OUTPUT_NAME  OUTPUT_DIRECTORY  rfcnt_target)
         add_library(${rfcnt_target} SHARED ${RFCNT_SOURCES})
         # Create a shared library target with the specified source files.
 
+        set_target_properties(
+                ${rfcnt_target}
+                PROPERTIES
+                CXX_STANDARD 17
+                CXX_STANDARD_REQUIRED ON
+                CXX_EXTENSIONS OFF
+        )
+        # rfcnt.cpp is a pybind11 module and needs std::optional / structured bindings
+        # (C++17); this only affects the .cpp source, rainflow.c keeps its own default
+        # C standard.
+
         target_link_libraries(${rfcnt_target} PRIVATE ${Python3_LIBRARIES})
         # Link the Python3 libraries to the target.
 
+        set_target_properties(
+                ${rfcnt_target}
+                PROPERTIES
+                PREFIX ""
+        )
+        # Python imports extension modules by their exact file name (no "lib" prefix).
+        # CMake's default SHARED-library prefix is already "" on MSVC, but on Unix-like
+        # platforms (including MinGW, which follows Unix conventions) it defaults to
+        # "lib", which would produce "librfcnt.so"/"librfcnt.dylib" instead of
+        # "rfcnt.so"/"rfcnt.dylib" -- so this must be cleared unconditionally, not just
+        # for MinGW.
+
         if (MINGW)
-            # If using MinGW, set specific link options and properties to address compatibility issues.
+            # If using MinGW, set specific link options to address compatibility issues.
             # See: https://github.com/cython/cython/issues/3213
             target_link_options(
                     ${rfcnt_target}
@@ -47,11 +72,6 @@ function (rfcnt_library  OUTPUT_NAME  OUTPUT_DIRECTORY  rfcnt_target)
                     -static-libstdc++
                     -Wl,-Bstatic,--whole-archive
                     -lwinpthread
-            )
-            set_target_properties(
-                    ${rfcnt_target}
-                    PROPERTIES
-                    PREFIX ""
             )
         endif ()
 
@@ -76,8 +96,12 @@ function (rfcnt_library  OUTPUT_NAME  OUTPUT_DIRECTORY  rfcnt_target)
                 RFC_EXPORT_MEX=0
                 RFC_EXPORT_PY
                 RFC_UNIT_TEST
+                NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
+                NPY_TARGET_VERSION=NPY_1_19_API_VERSION
         )
         # Define preprocessor macros for the target, configuring various options for the rainflow counting library.
+        # NPY_NO_DEPRECATED_API/NPY_TARGET_VERSION matter for rfcnt.cpp, which pulls in NumPy's
+        # C API transitively via <pybind11/numpy.h>; harmless no-ops for the plain-C rainflow.c.
 
         if (WIN32)
             set_target_properties(

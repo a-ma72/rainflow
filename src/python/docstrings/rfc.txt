@@ -1,24 +1,4 @@
-from typing import Optional, Union
-
-from . import ArrayLike, LCMethod, ResidualMethod, RPDamageCalcMethod, SDMethod
-
-def rfc(
-    data: ArrayLike,
-    class_width: float,
-    *,
-    class_count: Optional[int] = 100,
-    class_offset: Optional[float] = None,
-    hysteresis: Optional[float] = None,
-    residual_method: Optional[Union[int, ResidualMethod]] = ResidualMethod.REPEATED,
-    spread_damage: Optional[Union[int, SDMethod]] = SDMethod.TRANSIENT_23c,
-    lc_method: Optional[Union[int, LCMethod]] = LCMethod.SLOPES_UP,
-    use_HCM: Optional[Union[int, bool]] = 0,
-    use_ASTM: Optional[Union[int, bool]] = 0,
-    enforce_margin: Optional[Union[int, bool]] = 1,
-    auto_resize: Optional[Union[int, bool]] = 0,
-    wl: Optional[dict] = None,
-) -> dict:
-    r"""Rainflow counting.
+Rainflow counting.
 
     Parameters
     ----------
@@ -154,51 +134,4 @@ def rfc(
                 (Pseudo) damage value according to the SN-curve and
                 Miner's consistent rule.
 
-    """
-
-def damage_from_rp(
-        Sa: ArrayLike,
-        counts: ArrayLike,
-        *,
-        wl: Optional[dict] = None,
-        method: Optional[RPDamageCalcMethod] = 0,
-) -> float:
-    r"""Calculate damage value from range pair histogram.
-
-    Parameters
-    ----------
-    Sa : ArrayLike
-        Amplitude vector.
-    counts : ArrayLike
-        Cycle counts vector.
-    wl: Optional[dict] = dict(sx=1000, nx=1e7, sd=0, nd=np.inf, k=5, k2=k)
-        Definition of the SN-curve.
-
-        * `sx` : float
-            SN-curve knee between `k` and `k2`.
-        * `nx` : float
-            Cycle count at `sx`.
-        * `sd` : float
-            The fatigue strength (SN-curve).
-        * `nd` : float
-            Cycle count at `sd`.
-        * `k` : float
-            The slope of the SN-curve for sa >= sx.
-        * `k2` : float
-            The slope of the SN-curve for sa < sx.
-        * `omission` : float
-            The omission value. Values where sa < omission are ignored.
-    method : Optional[int] = 0
-        Method for damage calculation.
-
-        - 0 = Default (by given `wl`)
-        - 1 = Miner elementar
-        - 2 = Miner modified
-        - 3 = Miner consistent
-
-    Returns
-    -------
-    damage : float
-        (Pseudo) damage value.
-
-    """
+    

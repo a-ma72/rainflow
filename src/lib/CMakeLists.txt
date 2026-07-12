@@ -1,5 +1,7 @@
 # Rainflow core library
 
+project(rfc_core LANGUAGES C)
+
 add_library(rfc_core STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/rainflow.c
     ${CMAKE_CURRENT_SOURCE_DIR}/rainflow.h

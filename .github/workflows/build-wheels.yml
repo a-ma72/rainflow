@@ -1,0 +1,74 @@
+name: build-wheels
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build_wheels:
+    name: wheels • ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.21
+        with:
+          package-dir: src/python
+        env:
+          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*"
+          CIBW_SKIP: "*-musllinux* pp*"
+          CIBW_ARCHS_MACOS: "x86_64 arm64"
+          # Pinned defensively: on GitLab's Windows SaaS runner, cibuildwheel
+          # also picked up win32 (32-bit) by default and testing it failed,
+          # since current pandas has no 32-bit wheel. windows-latest here
+          # only ever reports native AMD64 so this likely never bites, but
+          # keep both workflows' behavior explicit and consistent.
+          CIBW_ARCHS_WINDOWS: "AMD64"
+          CIBW_TEST_COMMAND: "python -m rfcnt.run_tests"
+          CIBW_TEST_REQUIRES: "pandas"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}
+          path: wheelhouse/*.whl
+
+  build_sdist:
+    name: sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - run: pipx run build --sdist src/python --outdir dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  publish:
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    environment: pypi        # required reviewer on this environment pauses the job here
+    permissions:
+      id-token: write        # trusted publishing, no API token needed
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List distributions to be published
+        run: ls -la dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
