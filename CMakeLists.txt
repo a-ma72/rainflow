@@ -80,7 +80,7 @@ endif ()
 set(RFC_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(RFC_VERSION_MINOR ${PROJECT_VERSION_MINOR})
 set(RFC_VERSION_PATCH ${PROJECT_VERSION_PATCH})
-set(RFC_VERSION_POSTFIX "" CACHE STRING "Optional version postfix, e.g. 'rc1', '.dev1', '.post1'")
+set(RFC_VERSION_POSTFIX "rc1" CACHE STRING "Optional version postfix, e.g. 'rc1', '.dev1', '.post1'")
 set(RFC_VERSION "${RFC_VERSION_MAJOR}.${RFC_VERSION_MINOR}.${RFC_VERSION_PATCH}${RFC_VERSION_POSTFIX}")
 
 # Save options in configuration file
