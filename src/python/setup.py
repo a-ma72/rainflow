@@ -33,8 +33,12 @@ class build_ext(_build_ext):
         ct = self.compiler.compiler_type
         for ext in self.extensions:
             if ct == "msvc":
+                # Pybind11 on MSVC can encounter CRT/runtime conflicts when
+                # another extension (for example pandas/pyarrow) has already
+                # loaded a dynamic C++ runtime. This mirrors the static-linking
+                # workaround described in pybind11 issue #466.
                 ext.extra_compile_args.extend([
-                    "/std:c++17", "/wd4100", "/wd4101", "/wd4189", "/wd4505"
+                    "/std:c++17", "/wd4100", "/wd4101", "/wd4189", "/wd4505", "/MT"
                 ])
             elif ct in ("unix", "mingw32"):
                 ext.extra_compile_args.extend([

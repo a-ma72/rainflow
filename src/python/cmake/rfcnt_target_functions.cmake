@@ -108,9 +108,18 @@ function (rfcnt_library  OUTPUT_NAME  OUTPUT_DIRECTORY  rfcnt_target)
                     ${rfcnt_target}
                     PROPERTIES
                     SUFFIX ".pyd"
+                    POSITION_INDEPENDENT_CODE TRUE
+            )
+            target_compile_options(
+                    ${rfcnt_target}
+                    PRIVATE
+                    /MT
             )
         endif ()
         # Windows python modules have suffix ".pyd"
+        # Use static CRT on Windows for this pybind11 module to avoid the
+        # runtime mismatch that can occur after pandas/pyarrow load a dynamic
+        # MSVC runtime (pybind11 issue #466).
 
         if (OUTPUT_DIRECTORY)
             # Set per-config output dirs so multi-config generators (VS, Xcode) don't

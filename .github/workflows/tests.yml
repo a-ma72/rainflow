@@ -1,15 +1,12 @@
 name: tests
-
 on:
   push:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -40,10 +37,29 @@ jobs:
         
         pip install -r requirements.txt
         pip install . --no-build-isolation --no-deps
+    - name: Verify static CRT linkage (Windows only)
+      if: runner.os == 'Windows'
+      run: |
+        cd src/python
+        pip install pefile
+        python tools/check_static_crt.py
     - name: Run Python tests
       run: |
         pip install pandas
         python -m rfcnt.run_tests
+    - name: Verify stub matches compiled module
+      # Only meaningful on interpreters where the extension actually builds
+      # (numpy>=2.0, used by the extension, doesn't ship for 3.7/3.8).
+      if: ${{ !contains(fromJSON('["3.7", "3.8"]'), matrix.python-version) }}
+      run: |
+        cd src/python
+        pip install mypy
+        python -m mypy.stubtest rfcnt --ignore-missing-stub
+    - name: Verify docstrings are in sync
+      if: ${{ !contains(fromJSON('["3.7", "3.8"]'), matrix.python-version) }}
+      run: |
+        cd src/python
+        python tools/sync_docstrings.py --check
     - name: Set up CMake
       uses: lukka/get-cmake@latest
     - name: Pull & update submodules recursively
