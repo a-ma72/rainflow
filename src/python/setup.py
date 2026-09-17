@@ -43,6 +43,7 @@ class build_ext(_build_ext):
                     "-Wno-unused-but-set-variable",
                     "-Wno-switch",
                     "-Wno-unused-value",
+                    "-DNDEBUG",
                     # We add BOTH here; our monkey patch below will strip the wrong one
                     "-std=c++17",
                     "-std=c99",
@@ -170,9 +171,10 @@ def main() -> None:
         packages=["rfcnt", "rfcnt.tests"],
         package_dir={"rfcnt": "", "rfcnt.tests": "tests"},
         package_data={
-            "rfcnt": ["*.py*", "requirements.txt", "README.rst", "LICENSE"],
+            "rfcnt": ["*.py", "*.pyi", "requirements.txt", "README.rst", "LICENSE"],
             "rfcnt.tests": ["*.py", "long_series.csv"],
         },
+        exclude_package_data={"rfcnt": ["version.py.in"]},
         cmdclass={"build_ext": build_ext},
         ext_modules=[
             Extension(

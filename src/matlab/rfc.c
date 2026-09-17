@@ -19,7 +19,7 @@ static void * mem_alloc( void *ptr, size_t num, size_t size, int aim );
 "    re = Residue\n"\
 "    rm = Rainflow matrix (from/to)\n"\
 "    rp = Range pair counts\n"\
-"    lc = Level crossings\n"\
+"    lc = Level crossings (DIN 45667 both slopes by default)\n"\
 "    tp = Turning points\n"\
 "    dh = Damage history\n"\
 "\n"\
@@ -383,17 +383,26 @@ void mexRainflow( int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[] )
                 }
             }
 
-            /* Level crossing */
+            /* Level crossing (DIN 45667 both slopes by default; RFC_lc_get
+             * applies FVA conversion if lc_count_method is FVA) */
             if( nlhs > 4 && rfc_ctx.lc )
             {
                 mxArray* lc = mxCreateDoubleMatrix( class_count, 1, mxREAL );
                 if( lc )
                 {
+                    rfc_counts_t *lc_buf = (rfc_counts_t *)CALLOC( class_count, sizeof(rfc_counts_t) );
                     double *ptr = mxGetPr(lc);
                     size_t i;
-                    for( i = 0; i < class_count; i++ )
+                    if( lc_buf && RFC_lc_get( &rfc_ctx, lc_buf, NULL ) )
                     {
-                        *ptr++ = (double)rfc_ctx.lc[i];
+                        for( i = 0; i < class_count; i++ )
+                        {
+                            *ptr++ = (double)lc_buf[i];
+                        }
+                    }
+                    if( lc_buf )
+                    {
+                        FREE( lc_buf );
                     }
                     plhs[4] = lc;
                 }

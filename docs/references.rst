@@ -166,6 +166,27 @@ release downloads.
 Related Standards and Guidelines
 ================================
 
+DIN 45667 — Klassierverfahren für das Erfassen regelloser Schwingungen
+----------------------------------------------------------------------
+
+DIN 45667, "Classification methods for evaluation of random vibrations."
+
+Defines KGÜZ (level crossing) with **one static global counting direction**
+for every class bound (positive-going, negative-going, or both), independent
+of the algebraic sign of the signal. Implemented as ``SLOPES_UP`` /
+``SLOPES_DOWN`` / ``SLOPES_ALL``. This is not ``RFC_RES_RP_DIN45667``
+(range-pair residue) and not ``LCMethod.DIN45667`` (a compatibility alias
+of FVA). See `level_crossing.rst <level_crossing.rst>`_.
+
+FVA Merkblatt — load spectra for rotating drivetrain components
+---------------------------------------------------------------
+
+FVA-Richtlinie (2010), cited as [3]_ above.
+
+KGÜZ with a **sign-dependent** direction from a zero-load baseline:
+positive-going crossings for class bounds ``u >= 0``, negative-going for
+``u < 0``. Implemented as ``LCMethod.FVA`` / ``RFC_LC_COUNT_METHOD_FVA``.
+
 FKM Guideline
 -------------
 
@@ -188,7 +209,7 @@ If you use this software in your research, please cite:
      title = {Rainflow Counting Algorithm},
      year = {2026},
      url = {https://github.com/a-ma72/rainflow},
-     version = {0.5.3}
+     version = {0.6.1rc0}
    }
 
 Contributing

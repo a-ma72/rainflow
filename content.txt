@@ -25,6 +25,7 @@ RAINFLOW
 |   |   features.rst             Feature descriptions and compile-time options
 |   |   installation.rst         Build instructions for all platforms (generated from installation.rst.in)
 |   |   installation.rst.in      Template for installation.rst
+|   |   level_crossing.rst       Level-crossing histograms: DIN 45667 vs FVA
 |   |   minimal_build.rst        RFC_MINIMAL for embedded systems
 |   |   references.rst           Bibliography and citations (generated from references.rst.in)
 |   |   references.rst.in        Template for references.rst
@@ -100,9 +101,11 @@ RAINFLOW
 |       |   \   rainflow.c            ...
 |       |
 |       +---notebooks
-|       |   |   example_damage_history.ipynb    Example showing damage growth over time
-|       |   |   example_damage_history.png      Output from example_damage_history.ipynb
-|       |   \   jupyter_screenshot.png          Output from .tests.examples.example_1()
+|       |   |   example.xcf                            GIMP source image for the notebook screenshots
+|       |   |   example_damage_history.ipynb           Example showing damage growth over time
+|       |   |   example_damage_history.png             Output from example_damage_history.ipynb
+|       |   |   example_miner_verifications.ipynb      Example verifying Miner's rule / SN-curve consistency
+|       |   \   jupyter_screenshot.png                 Output from .tests.examples.example_1()
 |       |
 |       +---src
 |       |   |   docstrings_generated.hpp     Generated from docstrings/*.txt by tools/sync_docstrings.py -- do not hand-edit
@@ -112,8 +115,10 @@ RAINFLOW
 |       +---tests
 |       |   |   __init__.py           Init
 |       |   |   test_rfcnt.py         Unit Test
+|       |   |   test_rfcnt_npz.py     Unit test for the .npz-based fixture below
 |       |   |   examples.py           Examples
-|       |   \   long_series.csv       Time series for unit test and examples
+|       |   |   long_series.csv       Time series for unit test and examples
+|       |   \   rfcnt_example.npz     Example data fixture (NumPy .npz)
 |       |
 |       \---tools
 |           \   sync_docstrings.py    Regenerates src/docstrings_generated.hpp and rfcnt.pyi from docstrings/*.txt

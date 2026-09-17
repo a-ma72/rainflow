@@ -393,6 +393,24 @@ Damage Calculation
                      Rainflow::RFC_RP_DAMAGE_CALC_METHOD_DEFAULT);
    std::cout << "Damage from RP: " << damage_from_rp << std::endl;
 
+Amplitude Transformation
+------------------------
+
+Mean-stress correction (Haigh diagram) via ``at_init`` / ``at_transform``
+(requires ``RFC_AT_SUPPORT``):
+
+.. code-block:: cpp
+
+   Rainflow::Rainflow rf;
+   rf.init(100, 1.0);
+
+   // FKM diagram, transform onto R = -1
+   rf.at_init(/*M*/ 0.3, /*Sm_rig*/ 0.0, /*R_rig*/ -1.0, /*R_pinned*/ true);
+
+   double Sa_eq = 0.0;
+   rf.at_transform(/*Sa*/ 3.0, /*Sm*/ 1.0, Sa_eq);
+   std::cout << "Sa_eq = " << Sa_eq << std::endl;  // 3.3
+
 Damage History
 --------------
 

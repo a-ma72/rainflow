@@ -137,7 +137,7 @@ Installing from GitHub
 
 Install directly from a GitHub release::
 
-   pip install https://github.com/a-ma72/rainflow/releases/download/rfcnt-0.5.3/rfcnt-0.5.3.tar.gz
+   pip install https://github.com/a-ma72/rainflow/releases/download/rfcnt-0.6.1rc0/rfcnt-0.6.1rc0.tar.gz
 
 Or from the repository:
 
@@ -150,7 +150,7 @@ Google Colaboratory
 
 To use in Google Colab notebooks::
 
-   !pip install --no-build-isolation --no-deps https://github.com/a-ma72/rainflow/releases/download/rfcnt-0.5.3/rfcnt-0.5.3.tar.gz
+   !pip install --no-build-isolation --no-deps https://github.com/a-ma72/rainflow/releases/download/rfcnt-0.6.1rc0/rfcnt-0.6.1rc0.tar.gz
 
    import rfcnt
    rfcnt.tests.examples.example_1()
@@ -231,6 +231,10 @@ minimal version:
    coan source -DRFC_MINIMAL src/lib/rainflow.c > rainflow_minimal.c
 
 .. _COAN: http://coan2.sourceforge.net/
+
+For targets **without an FPU**, use the standalone engine in
+``src/embedded/`` instead of ``RFC_MINIMAL``. See
+`embedded.rst <embedded.rst>`_.
 
 Custom Feature Selection
 =========================

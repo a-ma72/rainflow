@@ -7,6 +7,11 @@ Overview
 
 ``RFC_MINIMAL`` is a compile-time configuration that produces a minimal-footprint version of the rainflow library, specifically designed for embedded systems, microcontrollers, and resource-constrained environments. It strips away advanced features to minimize code size and memory usage while preserving core rainflow counting functionality.
 
+This is still the full ``RFC_*`` API (``RFC_init``, ``RFC_feed``, …) with
+features compiled out. For a **separate** fixed-point engine with no FPU
+and no heap (``RF_Init``, ``RF_ProcessSample``, …), see
+`embedded.rst <embedded.rst>`_. Do not confuse the two.
+
 What is RFC_MINIMAL?
 ====================
 
@@ -726,6 +731,7 @@ Measure actual RAM usage on target:
 See Also
 ========
 
+- `embedded.rst <embedded.rst>`_ - Standalone fixed-point ``RF_*`` engine (not this page)
 - `features.rst <features.rst>`_ - All compile-time feature flags
 - `installation.rst <installation.rst>`_ - Build system configuration
 - `delegates.rst <delegates.rst>`_ - Why delegates are disabled in RFC_MINIMAL

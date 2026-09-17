@@ -29,7 +29,9 @@ def parse_expected_version() -> tuple[str, str, str, str, str]:
         sys.exit("check_version_sync: could not parse project(VERSION ...) from CMakeLists.txt")
     major, minor, patch = m.group(1), m.group(2), m.group(3)
 
-    m = re.search(r'set\s*\(\s*RFC_VERSION_POSTFIX\s+"([^"]*)"', text)
+    m = re.search(r'set\s*\(\s*RFC_VERSION_POSTFIX_PRESET\s+"([^"]*)"', text)
+    if not m:
+        m = re.search(r'set\s*\(\s*RFC_VERSION_POSTFIX\s+"([^"]*)"', text)
     postfix = m.group(1) if m else ""
 
     full = f"{major}.{minor}.{patch}{postfix}"

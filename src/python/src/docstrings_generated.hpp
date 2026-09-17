@@ -2,6 +2,49 @@
 // Source of truth: docstrings/*.txt
 #pragma once
 
+inline constexpr const char* AT_TRANSFORM_DOC = R"rfcnt_doc(
+Amplitude transformation (mean stress correction, Haigh diagram).
+
+    Maps cycle amplitudes ``Sa`` with mean loads ``Sm`` to equivalent
+    amplitudes at a reference load ratio or mean load, using the FKM
+    Haigh diagram (or a user-defined reference curve). Corresponds to
+    ``RFC_at_transform`` / ``Rainflow::at_transform``.
+
+    Parameters
+    ----------
+    Sa : ArrayLike
+        Cycle amplitude(s). Same shape as `Sm`.
+    Sm : ArrayLike
+        Mean load(s). Same number of elements as `Sa`.
+    M : float
+        Mean stress sensitivity (FKM ``M``). Must be >= 0.
+    R_rig : float = -1.0
+        Load ratio on the test rig (used when `R_pinned` is True).
+        Default -1 is fully reversed loading.
+    Sm_rig : float = 0.0
+        Mean load on the test rig (used when `R_pinned` is False).
+    R_pinned : bool = True
+        If True, transform onto the `R_rig` slope; if False, onto
+        constant mean load `Sm_rig`.
+    Sa_ref : Optional[ArrayLike] = None
+        Optional Haigh reference curve, amplitude part. Must be given
+        together with `Sm_ref`. If omitted, the FKM standard curve is
+        built from `M`.
+    Sm_ref : Optional[ArrayLike] = None
+        Optional Haigh reference curve, mean-load part. Same length as
+        `Sa_ref` (at least 2 points, strictly increasing `Sm` / `Sa`).
+    symmetric : bool = False
+        Build a Haigh diagram symmetric about ``R = -1`` (``Sm = 0``).
+        Only valid without a custom reference curve.
+
+    Returns
+    -------
+    Sa_transformed : np.ndarray
+        Transformed amplitudes, same shape as `Sa`.
+
+    
+)rfcnt_doc";
+
 inline constexpr const char* DAMAGE_FROM_RP_DOC = R"rfcnt_doc(
 Calculate damage value from range pair histogram.
 
@@ -93,11 +136,18 @@ Rainflow counting.
         - 6 = Full damage assigned to P3
         - 7 = Damages transient distributed over P2 to P3
         - 8 = Damages transient distributed over P2 to P3c
-    lc_method : Optional[int] = 0
-        How to count level crossings.
-        - 0 = rising slopes only
-        - 1 = falling slopes only
-        - 2 = rising and falling slopes
+    lc_method : Optional[int] = 2
+        How to count level crossings. Simple enumeration (not a flag mask);
+        ``0 | 1`` is falling slopes, not both. Default 2 matches C
+        ``RFC_FLAGS_COUNT_LC`` (rising and falling).
+        - 0 = rising slopes only (``LCMethod.SLOPES_UP``, DIN 45667)
+        - 1 = falling slopes only (``LCMethod.SLOPES_DOWN``, DIN 45667)
+        - 2 = rising and falling slopes (``LCMethod.SLOPES_ALL``, DIN 45667, default)
+        - 3 = FVA Merkblatt (``LCMethod.FVA``): count both internally, convert
+          on read so positive-going crossings apply for ``u >= 0`` and
+          negative-going for ``u < 0``. ``LCMethod.DIN45667`` is a
+          compatibility alias of ``FVA``. Residue methods do not change
+          this histogram.
     wl: Optional[dict] = dict(sx=1000, nx=1e7, sd=0, nd=np.inf, k=5, k2=k)
         Definition of the SN-curve.
 
