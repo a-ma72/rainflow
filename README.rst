@@ -1,7 +1,7 @@
 Rainflow Counting Algorithm (C99 compliant)
 ===========================================
 
-.. |version| replace:: 0.6.1rc0
+.. |version| replace:: 0.6.1
 
 .. image:: https://github.com/a-ma72/rainflow/actions/workflows/tests.yml/badge.svg
    :target: https://github.com/a-ma72/rainflow/actions/workflows/tests.yml
