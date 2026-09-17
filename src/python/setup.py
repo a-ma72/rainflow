@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 import subprocess
 import sys
@@ -31,6 +32,13 @@ class build_ext(_build_ext):
         # pybind11 requires C++14 minimum; C++17 gives cleaner std::optional /
         # structured-binding usage in the wrapper.
         ct = self.compiler.compiler_type
+        # Release wheels drop debug info. CPython's default CFLAGS include
+        # `-g`; `-g0` later on the command line overrides it. Editable and
+        # in-tree installs keep those symbols for development.
+        is_release_wheel = (
+            os.environ.get("CIBUILDWHEEL") == "1"
+            or "bdist_wheel" in sys.argv
+        )
         for ext in self.extensions:
             if ct == "msvc":
                 ext.extra_compile_args.extend([
@@ -48,6 +56,12 @@ class build_ext(_build_ext):
                     "-std=c++17",
                     "-std=c99",
                 ])
+                if is_release_wheel:
+                    ext.extra_compile_args.append("-g0")
+                    if sys.platform.startswith("linux"):
+                        ext.extra_link_args.append("-Wl,--strip-all")
+                    elif sys.platform == "darwin":
+                        ext.extra_link_args.append("-Wl,-S")
                 if sys.platform.startswith("linux"):
                     # Some CPython builds' distutils/setuptools compiler config
                     # doesn't pick the C++ linker for this mixed C/C++ extension

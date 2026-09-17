@@ -209,7 +209,7 @@ If you use this software in your research, please cite:
      title = {Rainflow Counting Algorithm},
      year = {2026},
      url = {https://github.com/a-ma72/rainflow},
-     version = {0.6.1rc0}
+     version = {0.6.1}
    }
 
 Contributing
