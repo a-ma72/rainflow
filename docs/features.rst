@@ -94,8 +94,9 @@ Process data flexibly:
 This allows integration with real-time systems and memory-constrained
 environments.
 
-(Chunked processing is supported only in C and C++ APIs, not in Python or
-MATLAB bindings.)
+Python supports chunked processing via the stateful ``rfcnt.RFC`` class
+(``feed()`` / ``finalize()``). Damage history (``spread_damage``) is one-shot
+``rfc()`` only. MATLAB remains one-shot.
 
 Dynamic Class Management
 ------------------------
@@ -169,7 +170,12 @@ Histograms
    (starting and ending class of each cycle)
 
 **Level Crossing (LC)**
-   1D histogram of stress/strain level crossings
+   1D histogram of stress/strain class-upper-bound crossings.
+   Default ``lc_method=2`` counts both slopes (DIN 45667, like C ``RFC_FLAGS_COUNT_LC``).
+   ``lc_method=3`` (``FVA``) converts that combined histogram to the FVA
+   Merkblatt convention (positive-going for ``u >= 0``, negative-going for
+   ``u < 0``). ``DIN45667`` is a compatibility alias of ``FVA``.
+   See `level_crossing.rst <level_crossing.rst>`_.
 
 **Range Pair (RP)**
    1D histogram of cycle ranges
@@ -189,7 +195,8 @@ Residue Processing
 
 Multiple methods for handling unclosed cycles:
 
-- **DIN 45667** - German standard method
+- **DIN 45667 range-pair residue** - ``RFC_RES_RP_DIN45667`` (not KGÜZ; see
+  `level_crossing.rst <level_crossing.rst>`_)
 - **ASTM halfcycle** - Count as 0.5 cycles
 - **ASTM fullcycle** - Count as full cycles
 - **Second run** - Re-feed residue
@@ -256,7 +263,13 @@ The package provides bindings for multiple environments:
    Full-featured extension module (``rfcnt``)
 
    - NumPy array support
-   - Pythonic API
+   - One-shot ``rfc()`` and stateful ``RFC`` (chunked ``feed()``)
+   - ``rfcnt.at_transform`` / ``RFC.at_init`` + ``RFC.at_transform`` for
+     FKM Haigh mean-stress correction (``RFC_AT_SUPPORT``)
+   - ``RFC.damage_as`` / ``.tp`` / ``.res_raw``; no damage history on ``RFC``
+   - Level crossings default to both slopes (``lc_method=2``), like C ``RFC_FLAGS_COUNT_LC``.
+     ``lc_method=3`` (``FVA``) converts the combined histogram; see
+     `level_crossing.rst <level_crossing.rst>`_.
    - Comprehensive error handling
 
 **MATLAB**
@@ -278,3 +291,5 @@ See Also
 - `installation.rst <installation.rst>`_ - Build configuration
 - `examples.rst <examples.rst>`_ - Usage examples
 - `algorithm.rst <algorithm.rst>`_ - Algorithm details
+- `minimal_build.rst <minimal_build.rst>`_ - ``RFC_MINIMAL`` feature slice
+- `embedded.rst <embedded.rst>`_ - Separate fixed-point ``RF_*`` engine

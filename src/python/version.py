@@ -1,3 +1,3 @@
-_version = (0, 5, 3, "")
+_version = (0, 6, 1, "rc0")
 __version__ = "%d.%d.%d%s" % _version
 __author__ = "Andreas Martin"

@@ -864,6 +864,7 @@ See Also
 - `algorithm.rst <algorithm.rst>`_ - How residue forms during counting
 - `delegates.rst <delegates.rst>`_ - Custom residue processing via finalize delegate
 - `astm_method.rst <astm_method.rst>`_ - ASTM standard residue handling
+- `embedded.rst <embedded.rst>`_ - ``RF_FlushResiduumRepeated`` on the fixed-point engine
 - `references.rst <references.rst>`_ - ASTM E 1049, DIN 45667 citations
 
 References

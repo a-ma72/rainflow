@@ -232,6 +232,10 @@ minimal version:
 
 .. _COAN: http://coan2.sourceforge.net/
 
+For targets **without an FPU**, use the standalone engine in
+``src/embedded/`` instead of ``RFC_MINIMAL``. See
+`embedded.rst <embedded.rst>`_.
+
 Custom Feature Selection
 =========================
 

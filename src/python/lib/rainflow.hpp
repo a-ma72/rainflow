@@ -129,9 +129,9 @@ public:
         RFC_FLAGS_COUNT_DAMAGE                  = RF::RFC_FLAGS_COUNT_DAMAGE,                   /**< Count damage */
         RFC_FLAGS_COUNT_DH                      = RF::RFC_FLAGS_COUNT_DH,                       /**< Spread damage */
         RFC_FLAGS_COUNT_RP                      = RF::RFC_FLAGS_COUNT_RP,                       /**< Count into range pair */
-        RFC_FLAGS_COUNT_LC_UP                   = RF::RFC_FLAGS_COUNT_LC_UP,                    /**< Count into level crossing (only rising slopes) */
-        RFC_FLAGS_COUNT_LC_DN                   = RF::RFC_FLAGS_COUNT_LC_DN,                    /**< Count into level crossing (only falling slopes) */
-        RFC_FLAGS_COUNT_LC                      = RF::RFC_FLAGS_COUNT_LC,                       /**< Count into level crossing (all slopes) */
+        RFC_FLAGS_COUNT_LC_UP                   = RF::RFC_FLAGS_COUNT_LC_UP,                    /**< DIN 45667 LC: rising slopes only (static global direction) */
+        RFC_FLAGS_COUNT_LC_DN                   = RF::RFC_FLAGS_COUNT_LC_DN,                    /**< DIN 45667 LC: falling slopes only (static global direction) */
+        RFC_FLAGS_COUNT_LC                      = RF::RFC_FLAGS_COUNT_LC,                       /**< DIN 45667 LC: both slopes (library default) */
         RFC_FLAGS_COUNT_MK                      = RF::RFC_FLAGS_COUNT_MK,                       /**< Live damage counter (consistent Miner's rule) */
         RFC_FLAGS_ENFORCE_MARGIN                = RF::RFC_FLAGS_ENFORCE_MARGIN,                 /**< Enforce first and last data point are turning points */
         RFC_FLAGS_COUNT_ALL                     = RF::RFC_FLAGS_COUNT_ALL,                      /**< Count all */
@@ -233,9 +233,12 @@ public:
 
     enum rfc_lc_count_method
     {
-        RFC_LC_COUNT_METHOD_SLOPES_UP           = RF::RFC_LC_COUNT_METHOD_SLOPES_UP,            /**< Count on rising slopes only (default) */
-        RFC_LC_COUNT_METHOD_SLOPES_DOWN         = RF::RFC_LC_COUNT_METHOD_SLOPES_DOWN,          /**< Count on falling slopes only */
-        RFC_LC_COUNT_METHOD_SLOPES_ALL          = RF::RFC_LC_COUNT_METHOD_SLOPES_ALL,           /**< Count on rising AND falling slopes */
+        RFC_LC_COUNT_METHOD_SLOPES_UP           = RF::RFC_LC_COUNT_METHOD_SLOPES_UP,            /**< DIN 45667: rising slopes only (static global direction) */
+        RFC_LC_COUNT_METHOD_SLOPES_DOWN         = RF::RFC_LC_COUNT_METHOD_SLOPES_DOWN,          /**< DIN 45667: falling slopes only (static global direction) */
+        RFC_LC_COUNT_METHOD_SLOPES_ALL          = RF::RFC_LC_COUNT_METHOD_SLOPES_ALL,           /**< DIN 45667: rising AND falling slopes (library default) */
+        RFC_LC_COUNT_METHOD_FVA                 = RF::RFC_LC_COUNT_METHOD_FVA,                  /**< FVA Merkblatt: sign-dependent (UP for u>=0, DOWN for u<0) */
+        RFC_LC_COUNT_METHOD_DIN45667            = RF::RFC_LC_COUNT_METHOD_DIN45667,             /**< Compatibility alias of FVA (historical misnomer) */
+        RFC_LC_COUNT_METHOD_COUNT               = RF::RFC_LC_COUNT_METHOD_COUNT,                /**< Number of distinct options */
     };
 
 
@@ -297,8 +300,12 @@ public:
     bool            rfm_check               () const;
     bool            rfm_refeed              ( rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param );
 /* Functions on histograms */
-    bool            lc_get                  ( rfc_counts_t *lc, rfc_value_t *level ) const;
-    bool            lc_from_rfm             ( rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags ) const;
+    bool            lc_get                  ( rfc_counts_t *lc, rfc_value_t *level ) const;     /**< DIN static slope, or FVA conversion if lc_count_method is FVA */
+    bool            lc_convert_fva          ( const rfc_counts_t *n_ges, rfc_counts_t *n_fva,
+                                              rfc_value_t x_start, rfc_value_t x_end ) const;  /**< Combined n_ges → FVA (UP if u>=0, DOWN if u<0) */
+    bool            lc_convert_din45667     ( const rfc_counts_t *n_ges, rfc_counts_t *n_din,
+                                              rfc_value_t x_start, rfc_value_t x_end ) const;  /**< Compatibility alias of lc_convert_fva */
+    bool            lc_from_rfm             ( rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags ) const;  /**< DIN static via flags; no FVA conversion */
     bool            lc_from_residue         ( rfc_counts_t *lc, rfc_value_t *level, const rfc_value_tuple_s* residue, unsigned residue_cnt, rfc_flags_e flags ) const;
     bool            lc_from_residue         ( rfc_counts_t *lc, rfc_value_t *level, const rfc_value_t* residue, unsigned residue_cnt, rfc_flags_e flags ) const;
     bool            rp_get                  ( rfc_counts_t *rp, rfc_value_t *Sa ) const;
@@ -640,6 +647,23 @@ template< class T >
 bool RainflowT<T>::lc_get( rfc_counts_t *lc, rfc_value_t *level ) const
 {
     return RF::RFC_lc_get( &m_ctx, (RF::rfc_counts_t *)lc, (RF::rfc_value_t *)level );
+}
+
+
+template< class T >
+bool RainflowT<T>::lc_convert_fva( const rfc_counts_t *n_ges, rfc_counts_t *n_fva,
+                                   rfc_value_t x_start, rfc_value_t x_end ) const
+{
+    return RF::RFC_lc_convert_fva( &m_ctx, (const RF::rfc_counts_t *)n_ges, (RF::rfc_counts_t *)n_fva,
+                                   (RF::rfc_value_t)x_start, (RF::rfc_value_t)x_end );
+}
+
+
+template< class T >
+bool RainflowT<T>::lc_convert_din45667( const rfc_counts_t *n_ges, rfc_counts_t *n_din,
+                                        rfc_value_t x_start, rfc_value_t x_end ) const
+{
+    return lc_convert_fva( n_ges, n_din, x_start, x_end );
 }
 
 

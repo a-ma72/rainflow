@@ -140,27 +140,61 @@ Calculate damage directly from existing range pair data:
 
    print(f"Total damage: {damage:.6e}")
 
-Streaming/Chunked Processing
------------------------------
+Amplitude Transformation
+------------------------
 
-Process large datasets in chunks to manage memory:
+Correct cycle amplitudes for mean stress using the FKM Haigh diagram
+(``RFC_at_transform``):
 
 .. code-block:: python
 
+   import numpy as np
    import rfcnt
+
+   Sa = np.array([3.0, 2.0, 2.0])
+   Sm = np.array([1.0, 2.0, -2.0])
+
+   # Equivalent amplitude at R = -1, mean-stress sensitivity M = 0.3
+   Sa_eq = rfcnt.at_transform(Sa, Sm, M=0.3, R_rig=-1.0)
+
+   print(Sa_eq)  # [3.3, 2.6, 1.4]
+
+   # Same transform on a stateful counter, before feed()
+   from rfcnt import RFC
+
+   rf = RFC(class_width=1.0, class_count=10)
+   rf.at_init(0.3, R_rig=-1.0)
+   print(rf.at_transform(3.0, 1.0))
+
+Streaming/Chunked Processing
+-----------------------------
+
+Process large datasets in chunks with a persistent ``RFC`` object.
+``damage`` is live closed-cycle damage; ``damage_as(method)`` is that value
+plus residue as if ``finalize(method)`` had been called (object stays open).
+The same split applies to ``rp`` / ``lc`` / ``rfm`` and ``rp_as`` / ``lc_as`` /
+``rfm_as``. ``tp`` is live and may grow when ``finalize()`` promotes the
+interim point. ``res_raw`` is the open residue (same 4-point strip as
+``rfc()["res_raw"]``): live until ``finalize()``, then an isolated read-only
+snapshot. ``wl_miner_consistent`` is live (impaired Wöhler parameters from
+closed cycles so far), like ``damage``, not a ``damage_as`` preview. After
+``finalize()`` it matches ``rfc()["wl_miner_consistent"]``.
+
+Damage history is not supported on ``RFC`` (``spread_damage`` must stay
+``SDMethod.NONE``). Use one-shot ``rfc()`` when you need ``result["dh"]``.
+
+.. code-block:: python
+
+   from rfcnt import RFC, ResidualMethod
    import numpy as np
 
-   # Initialize counting context
-   class_width = 10.0
-   class_count = 100
-
-   # Process first chunk
-   chunk1 = np.loadtxt('data_part1.txt')
-   result = rfcnt.rfc(chunk1, class_width=class_width, class_count=class_count)
-
-   # Continue with more data
-   # Note: For true streaming, you would need to preserve context
-   # This is a simplified example
+   rf = RFC(class_width=10.0, class_count=100)
+   rf.feed(np.loadtxt('data_part1.txt'))
+   rf.feed(np.loadtxt('data_part2.txt'))
+   print(rf.damage_as(ResidualMethod.REPEATED))  # preview; object stays open
+   rf.finalize(ResidualMethod.REPEATED)
+   print(rf.damage, rf.residue, rf.res_raw)
+   print(rf.tp)  # (n, 4): pos, value, damage, adj_pos
 
 C/C++ Examples
 ==============
@@ -445,3 +479,4 @@ See Also
 - `features.rst <features.rst>`_ - Detailed feature descriptions
 - `algorithm.rst <algorithm.rst>`_ - Algorithm explanations
 - `installation.rst <installation.rst>`_ - Setup instructions
+- `embedded.rst <embedded.rst>`_ - Fixed-point ``RF_*`` C example for MCUs

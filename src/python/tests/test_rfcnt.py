@@ -14,7 +14,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .. import ResidualMethod, SDMethod, rfc
+from .. import ResidualMethod, SDMethod, at_transform, rfc
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -395,6 +395,28 @@ class TestRainflowCounting(unittest.TestCase):
             2159, 1894, 2101, 1991, 2061,
         ])
         assert test.sum() < 1e-3
+
+    def test_at_transform(self) -> None:
+        """FKM Haigh transform matches the C RFC_at_test reference values."""
+        Sa = np.array([0.0, 0.1, 1.0, 2.0, 2.0, 3.0, 3.0, 2.0, 3.0, 4.0, 3.0, 2.0, 2.0, 0.2])
+        Sm = np.array([2.0, 9.0, 4.0, 4.0, 2.0, 3.0, 2.0, 1.0, 1.0, 1.0, 0.0, -2.0, -9.0, -9.0])
+        expected = np.array([
+            0.0, 0.153636, 1.536363, 2.836363, 2.6, 3.9, 3.6,
+            2.3, 3.3, 4.3, 3.0, 1.4, 1.4, 0.14,
+        ])
+        got = at_transform(Sa, Sm, M=0.3, R_rig=-1.0, R_pinned=True)
+        np.testing.assert_allclose(got, expected, atol=1e-5, rtol=0)
+
+        # Fully reversed (Sm=0) leaves Sa unchanged.
+        np.testing.assert_allclose(
+            at_transform(3.0, 0.0, M=0.3),
+            np.array(3.0),
+            atol=1e-10,
+        )
+
+        # Symmetric Haigh (R=-1) agrees with the non-symmetric result at R=-0.5.
+        got_sym = at_transform(3.0, 1.0, M=0.3, R_rig=-1.0, symmetric=True)
+        np.testing.assert_allclose(got_sym, np.array(3.3), atol=1e-10)
 
 
 def run() -> None:

@@ -46,11 +46,18 @@ Rainflow counting.
         - 6 = Full damage assigned to P3
         - 7 = Damages transient distributed over P2 to P3
         - 8 = Damages transient distributed over P2 to P3c
-    lc_method : Optional[int] = 0
-        How to count level crossings.
-        - 0 = rising slopes only
-        - 1 = falling slopes only
-        - 2 = rising and falling slopes
+    lc_method : Optional[int] = 2
+        How to count level crossings. Simple enumeration (not a flag mask);
+        ``0 | 1`` is falling slopes, not both. Default 2 matches C
+        ``RFC_FLAGS_COUNT_LC`` (rising and falling).
+        - 0 = rising slopes only (``LCMethod.SLOPES_UP``, DIN 45667)
+        - 1 = falling slopes only (``LCMethod.SLOPES_DOWN``, DIN 45667)
+        - 2 = rising and falling slopes (``LCMethod.SLOPES_ALL``, DIN 45667, default)
+        - 3 = FVA Merkblatt (``LCMethod.FVA``): count both internally, convert
+          on read so positive-going crossings apply for ``u >= 0`` and
+          negative-going for ``u < 0``. ``LCMethod.DIN45667`` is a
+          compatibility alias of ``FVA``. Residue methods do not change
+          this histogram.
     wl: Optional[dict] = dict(sx=1000, nx=1e7, sd=0, nd=np.inf, k=5, k2=k)
         Definition of the SN-curve.
 

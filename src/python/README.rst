@@ -15,6 +15,7 @@ Features
 - Streaming and batch processing
 - Dynamic class management (auto-resize, offset)
 - Compile-time feature selection (minimal, delegates, damage history, etc.)
+- Amplitude transformation (FKM Haigh / ``rfcnt.at_transform``)
 - Unit tests and real-world examples
 
 Algorithm Overview
@@ -66,13 +67,48 @@ Quick Start
     print("Total damage:", result['damage'])
     print("Range pairs:\n", result['rp'])
 
+Stateful counting (chunked feed)
+--------------------------------
+
+``rfc()`` is one-shot. For a persistent counter, construct ``RFC``, call
+``feed()`` one or more times, then ``finalize()``:
+
+    from rfcnt import RFC, ResidualMethod
+
+    rf = RFC(class_width=0.5, class_count=100, wl={"sx": 1e3, "nx": 1e7, "k": 5})
+    rf.feed(chunk1)
+    rf.feed(chunk2)
+    print(rf.damage_as(ResidualMethod.REPEATED))  # preview; object stays open
+    rf.finalize(ResidualMethod.REPEATED)
+    print(rf.damage, rf.residue, rf.res_raw)
+    print(rf.tp)  # (n, 4): pos, value, damage, adj_pos
+
+Damage history is not supported on ``RFC`` (``spread_damage`` must stay
+``SDMethod.NONE``); use one-shot ``rfc()`` when you need a damage history. After
+``finalize()``, further ``feed()`` calls raise. Start a new ``RFC`` for a new series.
+``damage`` is live closed-cycle damage; ``damage_as(method)`` is that value plus
+residue processed as if ``finalize(method)`` had been called. The same split
+applies to ``rp`` / ``lc`` / ``rfm`` and ``rp_as`` / ``lc_as`` / ``rfm_as``.
+``tp`` is live and may grow when ``finalize()`` promotes the interim point.
+``res_raw`` is the open residue (4-point closed-cycle strip, same as
+``rfc()["res_raw"]``): live until ``finalize()``, then an isolated read-only
+snapshot. ``wl_miner_consistent`` is live (impaired Wöhler parameters from
+closed cycles so far), like ``damage``, not a ``damage_as`` preview. After
+``finalize()`` it matches ``rfc()["wl_miner_consistent"]``.
+
 Advanced Usage
 --------------
 
 - Use Wöhler curve parameters for fatigue life prediction
 - Select counting method: `use_HCM`, `use_ASTM`
-- Control residue handling: `residual_method`
-- Enable damage history: `spread_damage`
+- Select level-crossing slopes: `lc_method` (default both, like C ``RFC_FLAGS_COUNT_LC``).
+  ``LCMethod.SLOPES_UP`` / ``SLOPES_DOWN`` / ``SLOPES_ALL`` are DIN 45667
+  (static global direction). ``LCMethod.FVA`` converts the combined histogram
+  to the FVA Merkblatt convention (sign-dependent crossings from a zero-load
+  baseline); residue methods do not change that ``lc``.
+  ``LCMethod.DIN45667`` is a compatibility alias of ``FVA``.
+- Control residue handling: `residual_method` (``rfc()``) or ``finalize()`` / ``damage_as()`` (``RFC``)
+- Enable damage history on one-shot ``rfc()``: `spread_damage` (not supported on ``RFC``)
 - Integrate with real-time or embedded systems (RFC_MINIMAL)
 
 Example:

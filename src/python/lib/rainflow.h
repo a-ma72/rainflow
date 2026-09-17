@@ -48,6 +48,11 @@
  * [3] "Zaehlverfahren zur Bildung von Kollektiven und Matrizen aus Zeitfunktionen"
  *     FVA-Richtlinie, 2010.
  *     [https://fva-net.de/fileadmin/content/Richtlinien/FVA-Richtlinie_Zaehlverfahren_2010.pdf]
+ *     FVA KGÜZ: sign-dependent level crossing from a zero-load baseline
+ *     (UP for class bounds u >= 0, DOWN for u < 0).
+ * []  "Klassierverfahren fuer das Erfassen regelloser Schwingungen"
+ *     DIN 45667.
+ *     DIN KGÜZ: one static global crossing direction for every class bound.
  * [4] Siemens Product Lifecycle Management Software Inc., 2018.
  *     [https://community.plm.automation.siemens.com/t5/Testing-Knowledge-Base/Rainflow-Counting/ta-p/383093]
  * [5] "Review and application of Rainflow residue processing techniques for accurate fatigue damage estimation"
@@ -307,9 +312,9 @@ enum rfc_flags
     RFC_FLAGS_COUNT_DH              =  1 << 2,                      /**< Spread damage */
 #endif /*RFC_DH_SUPPORT*/
     RFC_FLAGS_COUNT_RP              =  1 << 3,                      /**< Count into range pair */
-    RFC_FLAGS_COUNT_LC_UP           =  1 << 4,                      /**< Count into level crossing (only rising slopes) */
-    RFC_FLAGS_COUNT_LC_DN           =  1 << 5,                      /**< Count into level crossing (only falling slopes) */
-    RFC_FLAGS_COUNT_LC              =  RFC_FLAGS_COUNT_LC_UP        /**< Count into level crossing (all slopes) */
+    RFC_FLAGS_COUNT_LC_UP           =  1 << 4,                      /**< DIN 45667 LC: rising slopes only (static global direction) */
+    RFC_FLAGS_COUNT_LC_DN           =  1 << 5,                      /**< DIN 45667 LC: falling slopes only (static global direction) */
+    RFC_FLAGS_COUNT_LC              =  RFC_FLAGS_COUNT_LC_UP        /**< DIN 45667 LC: both slopes (library default) */
                                     |  RFC_FLAGS_COUNT_LC_DN,
     RFC_FLAGS_COUNT_MK              =  1 << 6,                      /**< Live damage counter (consistent Miner's rule) */
     RFC_FLAGS_ENFORCE_MARGIN        =  1 << 7,                      /**< Enforce first and last data point are turning points */
@@ -364,9 +369,12 @@ enum rfc_rp_damage_method
 
 enum rfc_lc_count_method
 {
-    RFC_LC_COUNT_METHOD_SLOPES_UP    = 0,                           /**< Count on rising slopes only (default) */
-    RFC_LC_COUNT_METHOD_SLOPES_DOWN  = 1,                           /**< Count on falling slopes only */
-    RFC_LC_COUNT_METHOD_SLOPES_ALL   = 2,                           /**< Count on rising AND falling slopes */
+    RFC_LC_COUNT_METHOD_SLOPES_UP    = 0,                           /**< DIN 45667: rising slopes only (static global direction) */
+    RFC_LC_COUNT_METHOD_SLOPES_DOWN  = 1,                           /**< DIN 45667: falling slopes only (static global direction) */
+    RFC_LC_COUNT_METHOD_SLOPES_ALL   = 2,                           /**< DIN 45667: rising AND falling slopes (library default) */
+    RFC_LC_COUNT_METHOD_FVA          = 3,                           /**< FVA Merkblatt: sign-dependent (UP for u>=0, DOWN for u<0) */
+    RFC_LC_COUNT_METHOD_DIN45667     = RFC_LC_COUNT_METHOD_FVA,      /**< Compatibility alias of FVA (historical misnomer) */
+    RFC_LC_COUNT_METHOD_COUNT        = 4,                           /**< Number of distinct options */
 };
 #endif /*!RFC_MINIMAL*/
 
@@ -527,8 +535,12 @@ bool        RFC_rfm_sum                 ( const void *ctx, unsigned from_first, 
 bool        RFC_rfm_damage              ( const void *ctx, unsigned from_first, unsigned from_last, unsigned to_first, unsigned to_last, double *damage );
 bool        RFC_rfm_check               ( const void *ctx );
 bool        RFC_rfm_refeed              (       void *ctx, rfc_value_t new_hysteresis, const rfc_class_param_s *new_class_param );
-bool        RFC_lc_get                  ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level );
-bool        RFC_lc_from_rfm             ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags );
+bool        RFC_lc_get                  ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level );  /**< DIN static slope, or FVA conversion if lc_count_method is FVA */
+bool        RFC_lc_convert_fva          ( const void *ctx, const rfc_counts_t *n_ges, rfc_counts_t *n_fva,
+                                                           rfc_value_t x_start, rfc_value_t x_end );  /**< Combined n_ges → FVA (UP if u>=0, DOWN if u<0) */
+bool        RFC_lc_convert_din45667     ( const void *ctx, const rfc_counts_t *n_ges, rfc_counts_t *n_din,
+                                                           rfc_value_t x_start, rfc_value_t x_end );  /**< Compatibility alias of RFC_lc_convert_fva */
+bool        RFC_lc_from_rfm             ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, const rfc_counts_t *rfm, rfc_flags_e flags );  /**< DIN static via flags; no FVA conversion */
 bool        RFC_lc_from_residue_tuples  ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, const rfc_value_tuple_s* residue, unsigned residue_cnt, rfc_flags_e flags );
 bool        RFC_lc_from_residue         ( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, const rfc_value_t* residue, unsigned residue_cnt, rfc_flags_e flags );
 bool        RFC_rp_get                  ( const void *ctx, rfc_counts_t *rp, rfc_value_t *Sa );
@@ -700,6 +712,10 @@ struct rfc_ctx
     /* Methods */
 #if !RFC_MINIMAL
     rfc_counting_method_e               counting_method;            /**< Searching closed cycles method */
+    rfc_lc_count_method_e               lc_count_method;            /**< Level-crossing slope selection / FVA conversion */
+    rfc_value_t                         series_start;               /**< First fed sample (FVA LC conversion) */
+    rfc_value_t                         series_end;                 /**< Last fed sample (FVA LC conversion) */
+    bool                                series_bounds_valid;        /**< True after at least one sample was fed */
 #endif /*!RFC_MINIMAL*/
     rfc_res_method_e                    residual_method;            /**< Used on finalizing */
 #if RFC_DH_SUPPORT

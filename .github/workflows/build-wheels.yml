@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: 1
+  PIP_NO_COMPILE: 1
+
 jobs:
   build_wheels:
     name: wheels • ${{ matrix.os }}
@@ -17,17 +21,24 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.21
+        uses: pypa/cibuildwheel@v4.2.0
         with:
           package-dir: src/python
+          extras: uv
         env:
           CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*"
-          CIBW_SKIP: "*-musllinux* pp*"
+          # `pp*` was a no-op (PyPy is not in `enable`) and made cibuildwheel
+          # 4.x emit an "Invalid skip selector" warning on every run.
+          CIBW_SKIP: "*-musllinux*"
+          # uv resolves and installs the isolated build environment an order
+          # of magnitude faster than venv+pip. extras: uv provides the
+          # external uv binary on Windows/macOS (Linux images already ship it).
+          CIBW_BUILD_FRONTEND: "build[uv]"
           # manylinux2014's GCC 10.2.1 is too old to build numpy>=2.0 from
           # source (needs GCC>=10.3), which pip falls back to on manylinux2014
           # since numpy no longer ships prebuilt wheels for that image.
@@ -46,8 +57,18 @@ jobs:
           CIBW_ARCHS_WINDOWS: "AMD64"
           CIBW_TEST_COMMAND: "python -m rfcnt.run_tests"
           CIBW_TEST_REQUIRES: "pandas"
+          # The wheels differ only in the CPython ABI they link against, and
+          # the test workflow already runs the full suite on every interpreter.
+          # Verifying the packaged artifact on the oldest and newest supported
+          # ABI is what these tests add.
+          CIBW_TEST_SKIP: "cp310-* cp311-* cp312-* cp313-*"
+          # PIP_NO_COMPILE is set globally, but cibuildwheel builds in isolated
+          # environments (and, on Linux, inside a container), so it has to be
+          # handed over explicitly.
+          CIBW_ENVIRONMENT: "PIP_NO_COMPILE=1"
+          CIBW_TEST_ENVIRONMENT: "PIP_NO_COMPILE=1"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: wheels-${{ matrix.os }}
           path: wheelhouse/*.whl
@@ -56,11 +77,11 @@ jobs:
     name: sdist
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
       - run: pipx run build --sdist src/python --outdir dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: sdist
           path: dist/*.tar.gz
@@ -72,7 +93,7 @@ jobs:
     permissions:
       id-token: write        # trusted publishing, no API token needed
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v6
         with:
           path: dist
           merge-multiple: true

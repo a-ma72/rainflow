@@ -193,8 +193,8 @@ The feature must be enabled during compilation:
        spread_damage=rfcnt.SDMethod.TRANSIENT_23c  # Enable DH
    )
 
-   # Access damage history
-   damage_history = result['dh']
+   # ``dh`` is per-sample increments; cumulate for a running total
+   damage_history = np.cumsum(result['dh'])
 
    # Plot
    import matplotlib.pyplot as plt
