@@ -9,7 +9,7 @@ import sys
 import unittest
 from io import StringIO
 
-from .tests import test_rfcnt
+from .tests import test_rfc_class, test_rfcnt
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,14 +26,16 @@ def run() -> unittest.result.TestResult:
     """
     stream = StringIO()
     runner = unittest.TextTestRunner(stream=stream)
-    
+
     # FIX for Python 3.13: unittest.makeSuite was removed.
     # This replacement is backward compatible with Python 3.7+.
     loader = unittest.TestLoader()
-    suite = loader.loadTestsFromTestCase(test_rfcnt.TestRainflowCounting)
-    
+    suite = unittest.TestSuite()
+    suite.addTests(loader.loadTestsFromTestCase(test_rfcnt.TestRainflowCounting))
+    suite.addTests(loader.loadTestsFromTestCase(test_rfc_class.TestRFCClass))
+
     test_result = runner.run(suite)
-    
+
     logger.info("Tests run %d", test_result.testsRun)
     logger.info("Errors %s", test_result.errors)
     logger.info("Failures: %s", test_result.failures)

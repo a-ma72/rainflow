@@ -164,6 +164,8 @@ static void                 cycle_find_astm                 (       rfc_ctx_s *,
 #endif /*RFC_ASTM_SUPPORT*/
 #if !RFC_MINIMAL
 static void                 cycle_process_lc                (       rfc_ctx_s *, rfc_flags_e flags );
+static void                  series_bounds_note              (       rfc_ctx_s *, rfc_value_t value );
+static void                  lc_add_slope_into               ( const rfc_ctx_s *, rfc_counts_t *lc, const rfc_value_tuple_s *from, const rfc_value_tuple_s *to );
 #endif /*!RFC_MINIMAL*/
 static void                 cycle_process_counts            (       rfc_ctx_s *, rfc_value_tuple_s *from, rfc_value_tuple_s *to, rfc_value_tuple_s *next, rfc_flags_e flags );
 /* Methods on residue */
@@ -442,6 +444,25 @@ bool RFC_init( void *ctx, unsigned class_count, rfc_value_t class_width, rfc_val
 #if !RFC_MINIMAL
     /* Rainflow counting method */
     rfc_ctx->counting_method                = RFC_COUNTING_METHOD_4PTM;
+    if( ( flags & RFC_FLAGS_COUNT_LC ) == RFC_FLAGS_COUNT_LC )
+    {
+        rfc_ctx->lc_count_method            = RFC_LC_COUNT_METHOD_SLOPES_ALL;
+    }
+    else if( flags & RFC_FLAGS_COUNT_LC_UP )
+    {
+        rfc_ctx->lc_count_method            = RFC_LC_COUNT_METHOD_SLOPES_UP;
+    }
+    else if( flags & RFC_FLAGS_COUNT_LC_DN )
+    {
+        rfc_ctx->lc_count_method            = RFC_LC_COUNT_METHOD_SLOPES_DOWN;
+    }
+    else
+    {
+        rfc_ctx->lc_count_method            = RFC_LC_COUNT_METHOD_SLOPES_ALL;
+    }
+    rfc_ctx->series_start                   = 0.0;
+    rfc_ctx->series_end                     = 0.0;
+    rfc_ctx->series_bounds_valid            = false;
 #endif /*!RFC_MINIMAL*/
 
     /* Residue */
@@ -1460,6 +1481,12 @@ bool RFC_clear_counts( void *ctx )
     rfc_ctx->internal.hcm.IZ            = 0;
 #endif /*RFC_HCM_SUPPORT*/
 
+#if !RFC_MINIMAL
+    rfc_ctx->series_start               = 0.0;
+    rfc_ctx->series_end                 = 0.0;
+    rfc_ctx->series_bounds_valid        = false;
+#endif /*!RFC_MINIMAL*/
+
 #if RFC_TP_SUPPORT
     /* rfc_ctx->tp_cnt is set to zero, but turning points are still available */
     rfc_ctx->internal.margin[0]         = nil;  /* left margin */
@@ -1656,6 +1683,9 @@ bool RFC_feed( void *ctx, const rfc_value_t * data, size_t data_count )
         /* Assign class and global position (base 1) */
         tp.pos = ++rfc_ctx->internal.pos;
         tp.cls = QUANTIZE( rfc_ctx, tp.value );
+#if !RFC_MINIMAL
+        series_bounds_note( rfc_ctx, tp.value );
+#endif /*!RFC_MINIMAL*/
 
         if( rfc_ctx->class_count && ( tp.cls >= rfc_ctx->class_count || tp.value < rfc_ctx->class_offset ) )
         {
@@ -1744,19 +1774,25 @@ bool RFC_feed_scaled( void *ctx, const rfc_value_t * data, size_t data_count, do
         /* Assign class and global position (base 1) */
         tp.cls = QUANTIZE( rfc_ctx, tp.value );
         tp.pos = ++rfc_ctx->internal.pos;
+#if !RFC_MINIMAL
+        series_bounds_note( rfc_ctx, tp.value );
+#endif /*!RFC_MINIMAL*/
 
         if( rfc_ctx->class_count && ( tp.cls >= rfc_ctx->class_count || tp.value < rfc_ctx->class_offset ) )
         {
-#if RFC_AR_SUPPORT
-            if( RFC_flags_check( ctx, RFC_FLAGS_AUTORESIZE, 0 ) && !autoresize( rfc_ctx, &tp ) )
-            {
-                return false;
-            }
-            else
-#endif /*RFC_AR_SUPPORT*/
+#if !RFC_AR_SUPPORT
+            return error_raise( rfc_ctx, RFC_ERROR_DATA_OUT_OF_RANGE );
+#else
+            if( !RFC_flags_check( ctx, RFC_FLAGS_AUTORESIZE, 0 ) )
             {
                 return error_raise( rfc_ctx, RFC_ERROR_DATA_OUT_OF_RANGE );
             }
+
+            if( !autoresize( rfc_ctx, &tp ) )
+            {
+                return false;
+            }
+#endif /*RFC_AR_SUPPORT*/
         }
 
         if( !feed_once( rfc_ctx, &tp, rfc_ctx->internal.flags ) ) return false;
@@ -1804,6 +1840,10 @@ bool RFC_feed_tuple( void *ctx, rfc_value_tuple_s *data, size_t data_count )
                 return error_raise( rfc_ctx, RFC_ERROR_DATA_OUT_OF_RANGE );
             }
         }
+
+#if !RFC_MINIMAL
+        series_bounds_note( rfc_ctx, data->value );
+#endif /*!RFC_MINIMAL*/
 
         if( !feed_once( rfc_ctx, data++, rfc_ctx->internal.flags ) ) return false;
     }
@@ -2525,6 +2565,18 @@ bool RFC_rfm_refeed( void *ctx, rfc_value_t new_hysteresis, const rfc_class_para
 /**
  * @brief      Get level crossing histogram
  *
+ * SLOPES_UP / SLOPES_DOWN / SLOPES_ALL (DIN 45667) return the internally
+ * stored counts with that static global slope direction, independent of
+ * the sign of the class bound.
+ *
+ * RFC_LC_COUNT_METHOD_FVA converts the combined (both-slope) histogram to
+ * the FVA Merkblatt convention: positive-going crossings for class upper
+ * bounds u >= 0 (including the exact zero threshold), negative-going for
+ * u < 0. RFC_LC_COUNT_METHOD_DIN45667 is a compatibility alias of FVA.
+ *
+ * RFC_lc_from_rfm / RFC_lc_from_residue do not apply this conversion; they
+ * use RFC_FLAGS_COUNT_LC_UP / _DN (DIN static direction) only.
+ *
  * @param      ctx    The rainflow context
  * @param[out] lc     The buffer for LC histogram (counts), .full_inc represents one "count", space for 1..class_count values must be preserved!
  * @param[out] level  The buffer for LC upper class borders (dropped if NULL, otherwise space for 1..class_count values must be preserved!)
@@ -2565,12 +2617,244 @@ bool RFC_lc_get( const void *ctx, rfc_counts_t *lc, rfc_value_t *level )
         }
     }
 
+    if( rfc_ctx->lc_count_method == RFC_LC_COUNT_METHOD_FVA )
+    {
+        rfc_value_t x_start = rfc_ctx->series_bounds_valid ? rfc_ctx->series_start : (rfc_value_t)0.0;
+        rfc_value_t x_end   = rfc_ctx->series_bounds_valid ? rfc_ctx->series_end   : (rfc_value_t)0.0;
+
+        /* Interim TP is not in ctx.lc until finalize; include it so live
+         * FVA histograms match x_start/x_end (same as lc_as / RFC_lc_get after finalize). */
+        if( rfc_ctx->state == RFC_STATE_BUSY_INTERIM && rfc_ctx->residue_cnt >= 1 && rfc_ctx->residue )
+        {
+            const rfc_value_tuple_s *from = &rfc_ctx->residue[rfc_ctx->residue_cnt - 1];
+            const rfc_value_tuple_s *to   = &rfc_ctx->residue[rfc_ctx->residue_cnt];
+            int flags = rfc_ctx->internal.flags;
+
+            if( !( flags & RFC_FLAGS_ENFORCE_MARGIN ) ||
+                value_delta( rfc_ctx, from, to, NULL ) > rfc_ctx->hysteresis )
+            {
+                lc_add_slope_into( rfc_ctx, lc, from, to );
+            }
+        }
+
+        if( !RFC_lc_convert_fva( rfc_ctx, lc, lc, x_start, x_end ) )
+        {
+            return false;
+        }
+    }
+
     return true;
 }
 
 
 /**
+ * @brief      Convert a combined (both-slope) level-crossing histogram to FVA.
+ *
+ * FVA Merkblatt (drivetrain, zero-load baseline): positive-going crossings
+ * for class upper bounds u >= 0, negative-going crossings for u < 0.
+ * u = 0 belongs to the positive branch. Counts stay non-negative.
+ * Division by two must be exact; otherwise RFC_ERROR_DATA_INCONSISTENT
+ * is raised (no rounding).
+ *
+ * This is not DIN 45667 KGÜZ, which uses one static slope direction for
+ * every class. See RFC_LC_COUNT_METHOD_SLOPES_UP / _DOWN / _ALL.
+ *
+ * @param      ctx      The rainflow context (class grid, full_inc, error)
+ * @param[in]  n_ges    Combined counts (both directions), class_count elements
+ * @param[out] n_fva    FVA counts, class_count elements (may alias n_ges)
+ * @param      x_start  First sample of the time series
+ * @param      x_end    Last sample of the time series
+ *
+ * @return     true on success
+ */
+bool RFC_lc_convert_fva( const void *ctx, const rfc_counts_t *n_ges, rfc_counts_t *n_fva,
+                         rfc_value_t x_start, rfc_value_t x_end )
+{
+    unsigned     i;
+    unsigned     class_count;
+    unsigned     split;
+    rfc_value_t  lo, hi;
+    int          delta_sign;
+    long long    n_fva_units[RFC_CLASS_COUNT_MAX];
+    rfc_value_t  u[RFC_CLASS_COUNT_MAX];
+    long long    n_max;
+    rfc_counts_t full_inc;
+
+    RFC_CTX_CHECK_AND_ASSIGN
+
+    if( !n_ges || !n_fva )
+    {
+        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
+    }
+
+    if( rfc_ctx->state < RFC_STATE_INIT || rfc_ctx->state > RFC_STATE_FINISHED )
+    {
+        return false;
+    }
+
+    class_count = rfc_ctx->class_count;
+    full_inc    = rfc_ctx->full_inc;
+
+    if( !class_count || class_count > RFC_CLASS_COUNT_MAX || full_inc <= 0 )
+    {
+        return error_raise( rfc_ctx, RFC_ERROR_INVARG );
+    }
+
+    lo = ( x_start < x_end ) ? x_start : x_end;
+    hi = ( x_start > x_end ) ? x_start : x_end;
+    if( x_end > x_start )
+    {
+        delta_sign = 1;
+    }
+    else if( x_end < x_start )
+    {
+        delta_sign = -1;
+    }
+    else
+    {
+        delta_sign = 0;
+    }
+
+    for( i = 0; i < class_count; i++ )
+    {
+        int        delta;
+        int        affected;
+        int        odd;
+        long long  num;
+        long long  n;
+
+        u[i] = (rfc_value_t)CLASS_UPPER( rfc_ctx, i );
+
+#if RFC_USE_INTEGRAL_COUNTS
+        if( n_ges[i] % full_inc != 0 )
+        {
+            return error_raise( rfc_ctx, RFC_ERROR_DATA_INCONSISTENT );
+        }
+        n = (long long)( n_ges[i] / full_inc );
+#else /*RFC_USE_INTEGRAL_COUNTS*/
+        {
+            double q = (double)n_ges[i] / (double)full_inc;
+
+            n = (long long)floor( q + 0.5 );
+            if( fabs( q - (double)n ) > 1e-9 || n < 0 )
+            {
+                return error_raise( rfc_ctx, RFC_ERROR_DATA_INCONSISTENT );
+            }
+        }
+#endif /*RFC_USE_INTEGRAL_COUNTS*/
+
+        affected   = ( lo < u[i] && u[i] < hi ) ? 1 : 0;
+        odd        = ( n & 1ll ) ? 1 : 0;
+
+        /* P2: n_ges is odd iff the level lies strictly between the endpoints */
+        if( odd != affected )
+        {
+            return error_raise( rfc_ctx, RFC_ERROR_DATA_INCONSISTENT );
+        }
+
+        delta = affected ? delta_sign : 0;
+        if( u[i] >= (rfc_value_t)0.0 )
+        {
+            num = n + (long long)delta;
+        }
+        else
+        {
+            num = n - (long long)delta;
+        }
+
+        /* P1: exact integer, non-negative */
+        if( num < 0 || ( num & 1ll ) )
+        {
+            return error_raise( rfc_ctx, RFC_ERROR_DATA_INCONSISTENT );
+        }
+
+        n_fva_units[i] = num / 2;
+        n_fva[i]       = (rfc_counts_t)n_fva_units[i] * full_inc;
+    }
+
+    split = class_count;
+    for( i = 0; i < class_count; i++ )
+    {
+        if( u[i] >= (rfc_value_t)0.0 )
+        {
+            split = i;
+            break;
+        }
+    }
+
+    /* P3: n_FVA is non-decreasing toward 0 on the negative side */
+    for( i = 1; i < split; i++ )
+    {
+        if( n_fva_units[i] < n_fva_units[i - 1] )
+        {
+            return error_raise( rfc_ctx, RFC_ERROR_DATA_INCONSISTENT );
+        }
+    }
+
+    /* P3: n_FVA is non-increasing away from 0 on the positive side */
+    for( i = split + 1; i < class_count; i++ )
+    {
+        if( n_fva_units[i] > n_fva_units[i - 1] )
+        {
+            return error_raise( rfc_ctx, RFC_ERROR_DATA_INCONSISTENT );
+        }
+    }
+
+    /* P4: maximum at the bin(s) adjacent to u = 0 */
+    n_max = n_fva_units[0];
+    for( i = 1; i < class_count; i++ )
+    {
+        if( n_fva_units[i] > n_max )
+        {
+            n_max = n_fva_units[i];
+        }
+    }
+
+    if( n_max > 0 )
+    {
+        int max_ok;
+
+        if( split == 0 )
+        {
+            max_ok = ( n_fva_units[0] == n_max );
+        }
+        else if( split >= class_count )
+        {
+            max_ok = ( n_fva_units[class_count - 1] == n_max );
+        }
+        else
+        {
+            max_ok = ( n_fva_units[split - 1] == n_max ) || ( n_fva_units[split] == n_max );
+        }
+
+        if( !max_ok )
+        {
+            return error_raise( rfc_ctx, RFC_ERROR_DATA_INCONSISTENT );
+        }
+    }
+
+    return true;
+}
+
+
+/**
+ * @brief      Compatibility wrapper: historical name for RFC_lc_convert_fva.
+ *
+ * The conversion implements FVA Merkblatt sign-dependent counting, not
+ * DIN 45667 (which is SLOPES_UP / SLOPES_DOWN / SLOPES_ALL).
+ */
+bool RFC_lc_convert_din45667( const void *ctx, const rfc_counts_t *n_ges, rfc_counts_t *n_din,
+                              rfc_value_t x_start, rfc_value_t x_end )
+{
+    return RFC_lc_convert_fva( ctx, n_ges, n_din, x_start, x_end );
+}
+
+
+/**
  * @brief      Create level crossing histogram from rainflow matrix
+ *
+ * Uses RFC_FLAGS_COUNT_LC_UP / _DN as a static global DIN 45667 direction.
+ * Does not apply FVA sign-dependent conversion (needs series endpoints).
  *
  * @param      ctx     The rainflow context
  * @param[out] lc      The buffer for LC histogram (counts), .full_inc represents one "count", space for 1..class_count values must be preserved!
@@ -2659,8 +2943,9 @@ bool RFC_lc_from_rfm( const void *ctx, rfc_counts_t *lc, rfc_value_t *level, con
 
 
 /**
- * Calculate level crossing counts from rainflow matrix, write results to lc
- * histogram buffer.
+ * Calculate level crossing counts from a residue, write results to lc
+ * histogram buffer. Uses RFC_FLAGS_COUNT_LC_UP / _DN as a static global
+ * DIN 45667 direction. Does not apply FVA conversion.
  *
  * @param      ctx          The rainflow context
  * @param[out] lc           The buffer for LC histogram (counts), .full_inc represents one "count", space for 1..class_count values must be preserved!
@@ -2708,8 +2993,9 @@ bool RFC_lc_from_residue( const void *ctx, rfc_counts_t *lc, rfc_value_t *level,
 
 
 /**
- * Calculate level crossing counts from rainflow matrix, write results to lc
- * histogram buffer.
+ * Calculate level crossing counts from residue tuples, write results to lc
+ * histogram buffer. Uses RFC_FLAGS_COUNT_LC_UP / _DN as a static global
+ * DIN 45667 direction. Does not apply FVA conversion.
  *
  * @param      ctx          The rainflow context
  * @param[out] lc           The buffer for LC histogram (counts), .full_inc represents one "count", space for 1..class_count values must be preserved!
@@ -4192,7 +4478,15 @@ bool autoresize( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
         void   *rfm;
         void   *lc;
         void   *rp;
-    } new_buffers = { NULL, NULL, NULL, NULL, NULL, NULL };
+#if RFC_HCM_SUPPORT
+        void   *hcm_stack;
+#endif /*RFC_HCM_SUPPORT*/
+    } new_buffers = {0};
+#if RFC_DAMAGE_FAST
+    unsigned     old_class_count  = class_count_old;
+    rfc_value_t  old_class_offset = rfc_ctx->class_offset;
+    unsigned     old_pt_cls       = pt->cls;
+#endif /*RFC_DAMAGE_FAST*/
 
     if( pt->value < rfc_ctx->class_offset )
     {
@@ -4292,6 +4586,20 @@ bool autoresize( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
     }
 #endif /*!RFC_MINIMAL*/
 
+#if RFC_HCM_SUPPORT
+    /* HCM stack grows with class_count (capacity is 2*n+1) */
+    if( rfc_ctx->internal.hcm.stack )
+    {
+        size_t hcm_cap = 2 * (size_t)class_count + 1;
+        new_buffers.hcm_stack = rfc_ctx->mem_alloc( NULL, hcm_cap,
+                                                    sizeof(rfc_value_tuple_s), RFC_MEM_AIM_HCM );
+        if( !new_buffers.hcm_stack )
+        {
+            goto cleanup_and_fail;
+        }
+    }
+#endif /*RFC_HCM_SUPPORT*/
+
     /* ====================================================================
      * PHASE 2: COMMIT - All allocations succeeded, now commit changes
      * Update context and copy data atomically
@@ -4303,45 +4611,74 @@ bool autoresize( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
     pt->cls = QUANTIZE( rfc_ctx, pt->value );
 
 #if RFC_DAMAGE_FAST
-    /* Commit damage LUT */
+    /* Commit LUTs and initialize them before discarding the old buffers.
+       damage_lut_init() frees the current damage_lut on failure, so the
+       new buffer is installed first and the old one is kept until success. */
     if( new_buffers.damage_lut )
     {
-        void *old_ptr = rfc_ctx->damage_lut;
-        rfc_ctx->damage_lut = (double*)new_buffers.damage_lut;
-        rfc_ctx->damage_lut_inapt = 1;
-        rfc_ctx->mem_alloc( old_ptr, 0, 0, RFC_MEM_AIM_DLUT );
-    }
-
+        rfc_state_e old_state         = rfc_ctx->state;
+        double     *old_damage_lut    = rfc_ctx->damage_lut;
 #if RFC_AT_SUPPORT
-    /* Commit amplitude LUT */
-    if( new_buffers.amplitude_lut )
-    {
-        void *old_ptr = rfc_ctx->amplitude_lut;
-        rfc_ctx->amplitude_lut = (double*)new_buffers.amplitude_lut;
-        rfc_ctx->mem_alloc( old_ptr, 0, 0, RFC_MEM_AIM_ALUT );
-    }
+        double     *old_amplitude_lut = rfc_ctx->amplitude_lut;
 #endif /*RFC_AT_SUPPORT*/
 
-    /* Reinitialize LUTs */
-    {
-        rfc_state_e old_state = rfc_ctx->state;
+        rfc_ctx->damage_lut       = (double*)new_buffers.damage_lut;
+        rfc_ctx->damage_lut_inapt = 1;
+#if RFC_AT_SUPPORT
+        if( new_buffers.amplitude_lut )
+        {
+            rfc_ctx->amplitude_lut = (double*)new_buffers.amplitude_lut;
+        }
+#endif /*RFC_AT_SUPPORT*/
+
         rfc_ctx->state = RFC_STATE_INIT;
-        damage_lut_init( rfc_ctx );
+        if( !damage_lut_init( rfc_ctx ) )
+        {
+            rfc_ctx->state        = old_state;
+            rfc_ctx->class_count  = old_class_count;
+            rfc_ctx->class_offset = old_class_offset;
+            rfc_ctx->damage_lut   = old_damage_lut;
+            pt->cls               = old_pt_cls;
+#if RFC_AT_SUPPORT
+            rfc_ctx->amplitude_lut = old_amplitude_lut;
+#endif /*RFC_AT_SUPPORT*/
+            /* damage_lut_init() already freed the new damage LUT */
+            new_buffers.damage_lut = NULL;
+            goto cleanup_and_fail;
+        }
         rfc_ctx->state = old_state;
+
+        rfc_ctx->mem_alloc( old_damage_lut, 0, 0, RFC_MEM_AIM_DLUT );
+#if RFC_AT_SUPPORT
+        if( old_amplitude_lut )
+        {
+            rfc_ctx->mem_alloc( old_amplitude_lut, 0, 0, RFC_MEM_AIM_ALUT );
+        }
+#endif /*RFC_AT_SUPPORT*/
     }
 #endif /*RFC_DAMAGE_FAST*/
 
-    /* Commit residue */
+    /* Commit residue (include the interim slot when state is BUSY_INTERIM) */
     if( new_buffers.residue )
     {
         void *old_ptr = rfc_ctx->residue;
-        size_t residue_cap = 2 * class_count + 1;
+        size_t residue_cap = 2 * (size_t)class_count + 1;
+        size_t old_res_cap = rfc_ctx->residue_cap;
+        size_t copy_cnt = rfc_ctx->residue_cnt;
+
+        if( rfc_ctx->state == RFC_STATE_BUSY_INTERIM )
+        {
+            copy_cnt++;
+        }
+        if( copy_cnt > old_res_cap )
+        {
+            copy_cnt = old_res_cap;
+        }
 
         rfc_ctx->residue = (rfc_value_tuple_s*)new_buffers.residue;
         rfc_ctx->residue_cap = residue_cap;
 
-        /* Copy old residue data to new buffer */
-        for( i = 0; i < rfc_ctx->residue_cnt; i++ )
+        for( i = 0; i < copy_cnt; i++ )
         {
             rfc_ctx->residue[i] = ((rfc_value_tuple_s*)old_ptr)[i];
             rfc_ctx->residue[i].cls = QUANTIZE( rfc_ctx, rfc_ctx->residue[i].value );
@@ -4439,10 +4776,23 @@ bool autoresize( rfc_ctx_s *rfc_ctx, rfc_value_tuple_s* pt )
 #endif /*RFC_GLOBAL_EXTREMA*/
 
 #if RFC_HCM_SUPPORT
-    /* Update HCM stack classes */
-    for( i = 0; i < rfc_ctx->internal.hcm.stack_cap; i++ )
+    /* Grow HCM stack with class_count and requantize copied entries */
+    if( new_buffers.hcm_stack )
     {
-        rfc_ctx->internal.hcm.stack[i].cls = QUANTIZE( rfc_ctx, rfc_ctx->internal.hcm.stack[i].value );
+        void   *old_ptr      = rfc_ctx->internal.hcm.stack;
+        size_t  old_cap      = rfc_ctx->internal.hcm.stack_cap;
+        size_t  hcm_cap      = 2 * (size_t)class_count + 1;
+        rfc_value_tuple_s *hcm = (rfc_value_tuple_s*)new_buffers.hcm_stack;
+
+        for( i = 0; i < old_cap; i++ )
+        {
+            hcm[i] = ((rfc_value_tuple_s*)old_ptr)[i];
+            hcm[i].cls = QUANTIZE( rfc_ctx, hcm[i].value );
+        }
+
+        rfc_ctx->internal.hcm.stack     = hcm;
+        rfc_ctx->internal.hcm.stack_cap = hcm_cap;
+        rfc_ctx->mem_alloc( old_ptr, 0, 0, RFC_MEM_AIM_HCM );
     }
 #endif /*RFC_HCM_SUPPORT*/
 
@@ -4489,6 +4839,13 @@ cleanup_and_fail:
         rfc_ctx->mem_alloc( new_buffers.rp, 0, 0, RFC_MEM_AIM_RP );
     }
 #endif /*!RFC_MINIMAL*/
+
+#if RFC_HCM_SUPPORT
+    if( new_buffers.hcm_stack )
+    {
+        rfc_ctx->mem_alloc( new_buffers.hcm_stack, 0, 0, RFC_MEM_AIM_HCM );
+    }
+#endif /*RFC_HCM_SUPPORT*/
 
     /* Context remains unchanged - atomic failure */
     return error_raise( rfc_ctx, RFC_ERROR_MEMORY );
@@ -6252,6 +6609,66 @@ void cycle_find_astm( rfc_ctx_s *rfc_ctx, rfc_flags_e flags )
 
 
 #if !RFC_MINIMAL
+/**
+ * @brief      Record first and last fed samples for FVA LC conversion.
+ *
+ * @param      rfc_ctx  The rainflow context
+ * @param      value    The sample value
+ */
+static
+void series_bounds_note( rfc_ctx_s *rfc_ctx, rfc_value_t value )
+{
+    assert( rfc_ctx );
+
+    if( !rfc_ctx->series_bounds_valid )
+    {
+        rfc_ctx->series_start        = value;
+        rfc_ctx->series_end          = value;
+        rfc_ctx->series_bounds_valid = true;
+    }
+    else
+    {
+        rfc_ctx->series_end = value;
+    }
+}
+
+
+/**
+ * @brief      Add one residue slope's class-upper-bound crossings into an LC buffer.
+ *
+ * Does not mutate ctx.lc. Used by RFC_lc_get to include the interim turning
+ * point before FVA conversion.
+ */
+static
+void lc_add_slope_into( const rfc_ctx_s *rfc_ctx, rfc_counts_t *lc,
+                        const rfc_value_tuple_s *from, const rfc_value_tuple_s *to )
+{
+    unsigned class_from, class_to, idx, idx_from, idx_to;
+
+    assert( rfc_ctx && lc && from && to );
+    assert( rfc_ctx->class_count );
+
+    class_from = from->cls;
+    class_to   = to->cls;
+
+    if( class_from >= rfc_ctx->class_count ) class_from = rfc_ctx->class_count - 1;
+    if( class_to   >= rfc_ctx->class_count ) class_to   = rfc_ctx->class_count - 1;
+
+    if( class_from == class_to )
+    {
+        return;
+    }
+
+    idx_from = ( class_from < class_to ) ? class_from : class_to;
+    idx_to   = ( class_from > class_to ) ? class_from : class_to;
+
+    for( idx = idx_from; idx < idx_to; idx++ )
+    {
+        lc[idx] += rfc_ctx->full_inc;
+    }
+}
+
+
 /**
  * @brief      Processes LC count (level crossing) for the last slope in residue
  *

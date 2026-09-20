@@ -2531,6 +2531,248 @@ TEST RFC_lc_functions_test( void )
     PASS();
 }
 
+TEST RFC_lc_convert_fva_t1( void )
+{
+    rfc_ctx_s my_ctx = { sizeof(rfc_ctx_s) };
+    rfc_counts_t n_ges[] = { 1, 1, 2, 2, 2 };
+    rfc_counts_t n_din[5];
+    rfc_counts_t expect[] = { 0, 0, 1, 1, 1 };
+    unsigned i;
+
+    /* CLASS_UPPER = -2.5, -1.5, -0.5, +0.5, +1.5 */
+    if( !RFC_init( &my_ctx, 5, 1.0, -3.5, 1.0, RFC_FLAGS_DEFAULT ) )
+    {
+        FAIL();
+    }
+    ASSERT( RFC_lc_convert_fva( &my_ctx, n_ges, n_din, /*x_start*/ -3.0, /*x_end*/ -1.0 ) );
+    for( i = 0; i < 5; i++ )
+    {
+        ASSERT_EQ( n_din[i], expect[i] );
+    }
+    ASSERT( RFC_deinit( &my_ctx ) );
+    PASS();
+}
+
+TEST RFC_lc_convert_din45667_wrapper_t2( void )
+{
+    rfc_ctx_s my_ctx = { sizeof(rfc_ctx_s) };
+    rfc_counts_t n_ges[] = { 2, 2, 2, 1, 1 };
+    rfc_counts_t n_din[5];
+    rfc_counts_t expect[] = { 1, 1, 1, 1, 1 };
+    unsigned i;
+
+    /* CLASS_UPPER = -1.5, -0.5, +0.5, +1.5, +2.5 */
+    if( !RFC_init( &my_ctx, 5, 1.0, -2.5, 1.0, RFC_FLAGS_DEFAULT ) )
+    {
+        FAIL();
+    }
+    ASSERT( RFC_lc_convert_din45667( &my_ctx, n_ges, n_din, /*x_start*/ 1.0, /*x_end*/ 3.0 ) );
+    for( i = 0; i < 5; i++ )
+    {
+        ASSERT_EQ( n_din[i], expect[i] );
+    }
+    ASSERT( RFC_deinit( &my_ctx ) );
+    PASS();
+}
+
+TEST RFC_lc_convert_fva_p2_fails( void )
+{
+    rfc_ctx_s my_ctx = { sizeof(rfc_ctx_s) };
+    rfc_counts_t n_ges[] = { 1, 1, 3, 2, 2 };  /* odd n_ges at u=-0.5, outside (lo,hi) */
+    rfc_counts_t n_din[5];
+
+    if( !RFC_init( &my_ctx, 5, 1.0, -3.5, 1.0, RFC_FLAGS_DEFAULT ) )
+    {
+        FAIL();
+    }
+    ASSERT( !RFC_lc_convert_din45667( &my_ctx, n_ges, n_din, -3.0, -1.0 ) );
+    ASSERT_EQ( RFC_error_get( &my_ctx ), RFC_ERROR_DATA_INCONSISTENT );
+    ASSERT( RFC_deinit( &my_ctx ) );
+    PASS();
+}
+
+TEST RFC_lc_fva_feed_t1( void )
+{
+    rfc_ctx_s my_ctx = { sizeof(rfc_ctx_s) };
+    RFC_VALUE_TYPE data[] = { -3.0, 2.0, -1.0 };
+    rfc_counts_t lc[6];
+    rfc_counts_t expect[] = { 0, 0, 1, 1, 1, 0 };
+    unsigned i;
+
+    /* Extra class so +2 is in range; CLASS_UPPER[0..4] match T1 */
+    if( !RFC_init( &my_ctx, 6, 1.0, -3.5, 0.5, RFC_FLAGS_DEFAULT ) )
+    {
+        FAIL();
+    }
+    my_ctx.lc_count_method = RFC_LC_COUNT_METHOD_FVA;
+    ASSERT( RFC_feed( &my_ctx, data, 3 ) );
+    ASSERT( RFC_lc_get( &my_ctx, lc, NULL ) );
+    for( i = 0; i < 6; i++ )
+    {
+        ASSERT_EQ( lc[i], expect[i] );
+    }
+    ASSERT( RFC_finalize( &my_ctx, RFC_RES_REPEATED ) );
+    ASSERT( RFC_lc_get( &my_ctx, lc, NULL ) );
+    for( i = 0; i < 6; i++ )
+    {
+        ASSERT_EQ( lc[i], expect[i] );
+    }
+    ASSERT( RFC_deinit( &my_ctx ) );
+    PASS();
+}
+
+TEST RFC_lc_fva_feed_t2( void )
+{
+    rfc_ctx_s my_ctx = { sizeof(rfc_ctx_s) };
+    RFC_VALUE_TYPE data[] = { 1.0, -2.0, 3.0 };
+    rfc_counts_t lc[6];
+    rfc_counts_t expect[] = { 1, 1, 1, 1, 1, 0 };
+    unsigned i;
+
+    if( !RFC_init( &my_ctx, 6, 1.0, -2.5, 0.5, RFC_FLAGS_DEFAULT ) )
+    {
+        FAIL();
+    }
+    my_ctx.lc_count_method = RFC_LC_COUNT_METHOD_FVA;
+    ASSERT( RFC_feed( &my_ctx, data, 3 ) );
+    ASSERT( RFC_lc_get( &my_ctx, lc, NULL ) );
+    for( i = 0; i < 6; i++ )
+    {
+        ASSERT_EQ( lc[i], expect[i] );
+    }
+    ASSERT( RFC_finalize( &my_ctx, RFC_RES_REPEATED ) );
+    ASSERT( RFC_lc_get( &my_ctx, lc, NULL ) );
+    for( i = 0; i < 6; i++ )
+    {
+        ASSERT_EQ( lc[i], expect[i] );
+    }
+    ASSERT( RFC_deinit( &my_ctx ) );
+    PASS();
+}
+
+TEST RFC_lc_din45667_alias_is_fva( void )
+{
+    ASSERT_EQ( RFC_LC_COUNT_METHOD_DIN45667, RFC_LC_COUNT_METHOD_FVA );
+    PASS();
+}
+
+TEST RFC_lc_fva_stitches_up_down( void )
+{
+    rfc_ctx_s up = { sizeof(rfc_ctx_s) };
+    rfc_ctx_s dn = { sizeof(rfc_ctx_s) };
+    rfc_ctx_s fva = { sizeof(rfc_ctx_s) };
+    RFC_VALUE_TYPE data[] = { -3.0, 2.0, -1.0, 2.5, -2.0 };
+    rfc_counts_t lc_up[7], lc_dn[7], lc_fva[7];
+    rfc_value_t level[7];
+    unsigned i;
+    int differ = 0;
+
+    /* Extra class so +2.5 is in range. CLASS_UPPER = -2.5..+3.5 — bipolar, crosses zero */
+    if( !RFC_init( &up, 7, 1.0, -3.5, 0.5, RFC_FLAGS_DEFAULT ) ||
+        !RFC_init( &dn, 7, 1.0, -3.5, 0.5, RFC_FLAGS_DEFAULT ) ||
+        !RFC_init( &fva, 7, 1.0, -3.5, 0.5, RFC_FLAGS_DEFAULT ) )
+    {
+        FAIL();
+    }
+
+    up.internal.flags  = ( up.internal.flags  & ~(int)RFC_FLAGS_COUNT_LC ) | (int)RFC_FLAGS_COUNT_LC_UP;
+    dn.internal.flags  = ( dn.internal.flags  & ~(int)RFC_FLAGS_COUNT_LC ) | (int)RFC_FLAGS_COUNT_LC_DN;
+    up.lc_count_method  = RFC_LC_COUNT_METHOD_SLOPES_UP;
+    dn.lc_count_method  = RFC_LC_COUNT_METHOD_SLOPES_DOWN;
+    fva.lc_count_method = RFC_LC_COUNT_METHOD_FVA;
+
+    ASSERT( RFC_feed( &up, data, 5 ) );
+    ASSERT( RFC_feed( &dn, data, 5 ) );
+    ASSERT( RFC_feed( &fva, data, 5 ) );
+    ASSERT( RFC_finalize( &up, RFC_RES_NONE ) );
+    ASSERT( RFC_finalize( &dn, RFC_RES_NONE ) );
+    ASSERT( RFC_finalize( &fva, RFC_RES_NONE ) );
+    ASSERT( RFC_lc_get( &up, lc_up, NULL ) );
+    ASSERT( RFC_lc_get( &dn, lc_dn, NULL ) );
+    ASSERT( RFC_lc_get( &fva, lc_fva, level ) );
+
+    for( i = 0; i < 7; i++ )
+    {
+        if( level[i] >= (rfc_value_t)0.0 )
+        {
+            ASSERT_EQ( lc_fva[i], lc_up[i] );
+        }
+        else
+        {
+            ASSERT_EQ( lc_fva[i], lc_dn[i] );
+        }
+        if( lc_up[i] != lc_fva[i] )
+        {
+            differ = 1;
+        }
+    }
+    ASSERT( differ );  /* DIN global UP is not FVA on a bipolar series */
+
+    ASSERT( RFC_deinit( &up ) );
+    ASSERT( RFC_deinit( &dn ) );
+    ASSERT( RFC_deinit( &fva ) );
+    PASS();
+}
+
+TEST RFC_lc_fva_zero_threshold( void )
+{
+    rfc_ctx_s up = { sizeof(rfc_ctx_s) };
+    rfc_ctx_s dn = { sizeof(rfc_ctx_s) };
+    rfc_ctx_s fva = { sizeof(rfc_ctx_s) };
+    RFC_VALUE_TYPE data[] = { -2.0, 2.0, -2.0 };
+    rfc_counts_t lc_up[5], lc_dn[5], lc_fva[5];
+    rfc_value_t level[5];
+    unsigned i;
+    int found_zero = 0;
+
+    /* CLASS_UPPER = -1, 0, 1, 2, 3 — exact zero bound uses the positive (UP) branch */
+    if( !RFC_init( &up, 5, 1.0, -2.0, 0.5, RFC_FLAGS_DEFAULT ) ||
+        !RFC_init( &dn, 5, 1.0, -2.0, 0.5, RFC_FLAGS_DEFAULT ) ||
+        !RFC_init( &fva, 5, 1.0, -2.0, 0.5, RFC_FLAGS_DEFAULT ) )
+    {
+        FAIL();
+    }
+
+    up.internal.flags  = ( up.internal.flags  & ~(int)RFC_FLAGS_COUNT_LC ) | (int)RFC_FLAGS_COUNT_LC_UP;
+    dn.internal.flags  = ( dn.internal.flags  & ~(int)RFC_FLAGS_COUNT_LC ) | (int)RFC_FLAGS_COUNT_LC_DN;
+    up.lc_count_method  = RFC_LC_COUNT_METHOD_SLOPES_UP;
+    dn.lc_count_method  = RFC_LC_COUNT_METHOD_SLOPES_DOWN;
+    fva.lc_count_method = RFC_LC_COUNT_METHOD_FVA;
+
+    ASSERT( RFC_feed( &up, data, 3 ) );
+    ASSERT( RFC_feed( &dn, data, 3 ) );
+    ASSERT( RFC_feed( &fva, data, 3 ) );
+    ASSERT( RFC_finalize( &up, RFC_RES_NONE ) );
+    ASSERT( RFC_finalize( &dn, RFC_RES_NONE ) );
+    ASSERT( RFC_finalize( &fva, RFC_RES_NONE ) );
+    ASSERT( RFC_lc_get( &up, lc_up, NULL ) );
+    ASSERT( RFC_lc_get( &dn, lc_dn, NULL ) );
+    ASSERT( RFC_lc_get( &fva, lc_fva, level ) );
+
+    for( i = 0; i < 5; i++ )
+    {
+        if( level[i] >= (rfc_value_t)0.0 )
+        {
+            ASSERT_EQ( lc_fva[i], lc_up[i] );
+        }
+        else
+        {
+            ASSERT_EQ( lc_fva[i], lc_dn[i] );
+        }
+        if( level[i] == (rfc_value_t)0.0 )
+        {
+            found_zero = 1;
+            ASSERT_EQ( lc_fva[i], lc_up[i] );
+        }
+    }
+    ASSERT( found_zero );
+
+    ASSERT( RFC_deinit( &up ) );
+    ASSERT( RFC_deinit( &dn ) );
+    ASSERT( RFC_deinit( &fva ) );
+    PASS();
+}
+
 TEST RFC_rp_functions_test( void )
 {
     rfc_ctx_s my_ctx = {0};
@@ -2547,6 +2789,121 @@ TEST RFC_rp_functions_test( void )
     PASS();
 }
 #endif
+
+#if RFC_AR_SUPPORT
+#if !RFC_MINIMAL
+TEST RFC_feed_scaled_autoresize( void )
+{
+    rfc_ctx_s narrow = { sizeof(rfc_ctx_s) };
+    rfc_ctx_s wide   = { sizeof(rfc_ctx_s) };
+    RFC_VALUE_TYPE data[] = { 1.0, 3.0, 0.5, 10.0 };
+    double d_n = 0.0, d_w = 0.0;
+
+    if( !RFC_init( &wide, 12, 1.0, 0.0, 0.5, RFC_FLAGS_DEFAULT ) ) FAIL();
+    ASSERT( RFC_feed_scaled( &wide, data, NUMEL(data), /* factor */ 1.0 ) );
+    ASSERT( RFC_finalize( &wide, RFC_RES_REPEATED ) );
+    ASSERT( RFC_damage( &wide, &d_w, NULL ) );
+
+    if( !RFC_init( &narrow, 4, 1.0, 0.0, 0.5, RFC_FLAGS_DEFAULT ) )
+    {
+        RFC_deinit( &wide );
+        FAIL();
+    }
+    ASSERT( RFC_flags_set( &narrow, RFC_FLAGS_AUTORESIZE, /* stack */ 0, /* overwrite */ false ) );
+    ASSERT( RFC_feed_scaled( &narrow, data, NUMEL(data), /* factor */ 1.0 ) );
+    ASSERT( narrow.class_count > 4 );
+    ASSERT( RFC_finalize( &narrow, RFC_RES_REPEATED ) );
+    ASSERT( RFC_damage( &narrow, &d_n, NULL ) );
+    ASSERT_IN_RANGE( d_n, d_w, 1e-12 );
+
+    ASSERT( RFC_deinit( &narrow ) );
+    ASSERT( RFC_deinit( &wide ) );
+    PASS();
+}
+
+TEST RFC_feed_scaled_no_autoresize( void )
+{
+    rfc_ctx_s my_ctx = { sizeof(rfc_ctx_s) };
+    RFC_VALUE_TYPE data[] = { 1.0, 3.0, 0.5, 10.0 };
+
+    if( !RFC_init( &my_ctx, 4, 1.0, 0.0, 0.5, RFC_FLAGS_DEFAULT ) ) FAIL();
+
+    ASSERT( !RFC_feed_scaled( &my_ctx, data, NUMEL(data), /* factor */ 1.0 ) );
+    ASSERT_EQ( RFC_error_get( &my_ctx ), RFC_ERROR_DATA_OUT_OF_RANGE );
+    ASSERT( RFC_deinit( &my_ctx ) );
+    PASS();
+}
+#endif /*!RFC_MINIMAL*/
+
+TEST RFC_autoresize_interim_matches_wide( void )
+{
+    rfc_ctx_s narrow = { sizeof(rfc_ctx_s) };
+    rfc_ctx_s wide   = { sizeof(rfc_ctx_s) };
+    RFC_VALUE_TYPE data[] = { 2.0, 5.0, 3.0, 10.0 };
+    size_t i, n;
+
+    if( !RFC_init( &wide, 12, 1.0, -0.5, 1.0, RFC_FLAGS_DEFAULT ) ) FAIL();
+    ASSERT( RFC_feed( &wide, data, NUMEL(data) ) );
+
+    if( !RFC_init( &narrow, 6, 1.0, -0.5, 1.0, RFC_FLAGS_DEFAULT ) )
+    {
+        RFC_deinit( &wide );
+        FAIL();
+    }
+    ASSERT( RFC_flags_set( &narrow, RFC_FLAGS_AUTORESIZE, /* stack */ 0, /* overwrite */ false ) );
+    ASSERT( RFC_feed( &narrow, data, NUMEL(data) ) );
+
+    ASSERT( narrow.class_count > 6 );
+    ASSERT_EQ( narrow.residue_cnt, wide.residue_cnt );
+    ASSERT_EQ( narrow.state, wide.state );
+
+    n = narrow.residue_cnt + (size_t)( narrow.state == RFC_STATE_BUSY_INTERIM );
+    for( i = 0; i < n; i++ )
+    {
+        ASSERT_EQ( narrow.residue[i].value, wide.residue[i].value );
+    }
+
+    ASSERT( RFC_deinit( &narrow ) );
+    ASSERT( RFC_deinit( &wide ) );
+    PASS();
+}
+
+#if RFC_HCM_SUPPORT
+TEST RFC_autoresize_grows_hcm_stack( void )
+{
+    rfc_ctx_s narrow = { sizeof(rfc_ctx_s) };
+    rfc_ctx_s wide   = { sizeof(rfc_ctx_s) };
+    RFC_VALUE_TYPE data[] = { 1.0, 3.0, 0.5, 10.0 };
+    double d_n = 0.0, d_w = 0.0;
+
+    if( !RFC_init( &wide, 12, 1.0, 0.0, 0.5, RFC_FLAGS_DEFAULT ) ) FAIL();
+    wide.counting_method = RFC_COUNTING_METHOD_HCM;
+    ASSERT( RFC_feed( &wide, data, NUMEL(data) ) );
+    ASSERT( RFC_finalize( &wide, RFC_RES_CLORMANN_SEEGER ) );
+    ASSERT( RFC_damage( &wide, &d_w, NULL ) );
+
+    if( !RFC_init( &narrow, 4, 1.0, 0.0, 0.5, RFC_FLAGS_DEFAULT ) )
+    {
+        RFC_deinit( &wide );
+        FAIL();
+    }
+    narrow.counting_method = RFC_COUNTING_METHOD_HCM;
+    ASSERT( RFC_flags_set( &narrow, RFC_FLAGS_AUTORESIZE, /* stack */ 0, /* overwrite */ false ) );
+    ASSERT_EQ( narrow.internal.hcm.stack_cap, (size_t)( 2 * 4 + 1 ) );
+    ASSERT( RFC_feed( &narrow, data, NUMEL(data) ) );
+    ASSERT( narrow.class_count > 4 );
+    ASSERT_EQ( narrow.internal.hcm.stack_cap, (size_t)( 2 * narrow.class_count + 1 ) );
+    ASSERT( narrow.internal.hcm.stack != NULL );
+    ASSERT( RFC_finalize( &narrow, RFC_RES_CLORMANN_SEEGER ) );
+    ASSERT( RFC_damage( &narrow, &d_n, NULL ) );
+    ASSERT_IN_RANGE( d_n, d_w, 1e-12 );
+
+    ASSERT( RFC_deinit( &narrow ) );
+    ASSERT( RFC_deinit( &wide ) );
+    PASS();
+}
+#endif /*RFC_HCM_SUPPORT*/
+#endif /*RFC_AR_SUPPORT*/
 
 #if RFC_TP_SUPPORT
 TEST RFC_tp_init_clear_test( void )
@@ -2910,6 +3267,14 @@ SUITE( RFC_TEST_SUITE )
     RUN_TESTp( RFC_long_series, 1, 0 );   /* Using default class count */
 #if RFC_AR_SUPPORT
     RUN_TESTp( RFC_long_series, 1, 50 );  /* Using reduced class_count to test auto resizing */
+    RUN_TEST( RFC_autoresize_interim_matches_wide );
+#if RFC_HCM_SUPPORT
+    RUN_TEST( RFC_autoresize_grows_hcm_stack );
+#endif /*RFC_HCM_SUPPORT*/
+#if !RFC_MINIMAL
+    RUN_TEST( RFC_feed_scaled_autoresize );
+    RUN_TEST( RFC_feed_scaled_no_autoresize );
+#endif /*!RFC_MINIMAL*/
 #endif /*RFC_AR_SUPPORT*/
 #if !RFC_MINIMAL
     /* Residual methods */
@@ -2928,6 +3293,14 @@ SUITE( RFC_TEST_SUITE )
     RUN_TEST( RFC_rfm_check_refeed_test );
     /* Level Crossing */
     RUN_TEST( RFC_lc_functions_test );
+    RUN_TEST( RFC_lc_convert_fva_t1 );
+    RUN_TEST( RFC_lc_convert_din45667_wrapper_t2 );
+    RUN_TEST( RFC_lc_convert_fva_p2_fails );
+    RUN_TEST( RFC_lc_fva_feed_t1 );
+    RUN_TEST( RFC_lc_fva_feed_t2 );
+    RUN_TEST( RFC_lc_din45667_alias_is_fva );
+    RUN_TEST( RFC_lc_fva_stitches_up_down );
+    RUN_TEST( RFC_lc_fva_zero_threshold );
     /* Range Pair */
     RUN_TEST( RFC_rp_functions_test );
 #endif /*!RFC_MINIMAL*/

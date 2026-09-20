@@ -138,6 +138,31 @@ message(STATUS "[Python] NumPy version: ${Python3_NumPy_VERSION}")
 # Output status messages with details about the Python3 and NumPy setup.
 
 
+# =================================================== Find pybind11 ===================================================
+# rfcnt.cpp is a pybind11 extension module (not raw CPython C-API), so pybind11's
+# headers must be resolvable regardless of which branch above located Python3/NumPy
+# (freshly created venv vs. an already-active one) -- unlike NumPy, pybind11 has no
+# per-prebuild version matrix, so this only needs to happen once, here.
+execute_process(
+        COMMAND "${Python3_EXECUTABLE}" -mpip install "pybind11>=2.12"
+        COMMAND_ECHO STDOUT
+)
+# Ensure pybind11 is installed in the Python environment used for building.
+
+execute_process(
+        COMMAND "${Python3_EXECUTABLE}" -c "import pybind11; print(pybind11.get_include(), end='')"
+        OUTPUT_VARIABLE PYBIND11_INCLUDE_DIR
+        RESULT_VARIABLE PYBIND11_NOTFOUND
+)
+# Retrieve pybind11's header include directory.
+
+if (PYBIND11_NOTFOUND)
+    message(FATAL_ERROR "[Python] pybind11 headers not found")
+else ()
+    message(STATUS "[Python] pybind11 include dir: ${PYBIND11_INCLUDE_DIR}")
+endif ()
+
+
 # ============================================= Copy core sources and build ============================================
 
 execute_process(

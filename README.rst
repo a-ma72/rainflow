@@ -1,10 +1,10 @@
 Rainflow Counting Algorithm (C99 compliant)
 ===========================================
 
-.. |version| replace:: 0.5.2
+.. |version| replace:: 0.6.1
 
-.. image:: https://github.com/a-ma72/rainflow/actions/workflows/run_test.yml/badge.svg
-   :target: https://github.com/a-ma72/rainflow/actions/workflows/run_test.yml
+.. image:: https://github.com/a-ma72/rainflow/actions/workflows/tests.yml/badge.svg
+   :target: https://github.com/a-ma72/rainflow/actions/workflows/tests.yml
    :alt: tests
 
 A robust, modular implementation of the Rainflow Counting Algorithm using
@@ -125,7 +125,10 @@ Advanced Topics:
    Transient damage distribution methods explained
 
 `Minimal Build <docs/minimal_build.rst>`_
-   RFC_MINIMAL for embedded systems and microcontrollers
+   RFC_MINIMAL slice of the full ``RFC_*`` library
+
+`Embedded Engine <docs/embedded.rst>`_
+   Standalone fixed-point ``RF_*`` rainflow engine for MCUs without an FPU
 
 `TP Prune <docs/tp_prune.rst>`_
    RFC_tp_prune() logic for memory management
@@ -247,8 +250,8 @@ Current Status
 - **Languages**: C, C++, Python, MATLAB
 - **Platforms**: Windows, Linux, macOS
 
-.. |tests| image:: https://github.com/a-ma72/rainflow/actions/workflows/run_test.yml/badge.svg
-   :target: https://github.com/a-ma72/rainflow/actions/workflows/run_test.yml
+.. |tests| image:: https://github.com/a-ma72/rainflow/actions/workflows/tests.yml/badge.svg
+   :target: https://github.com/a-ma72/rainflow/actions/workflows/tests.yml
 
 Applications
 ------------
@@ -284,8 +287,11 @@ The package uses a two-layer architecture:
 
 **Core C Library** (``src/lib/rainflow.c``)
    Pure C99 implementation with optional feature flags for customization.
-   Suitable for embedded systems and microcontrollers when built with
-   ``RFC_MINIMAL``.
+   Suitable for resource-constrained hosts when built with ``RFC_MINIMAL``.
+
+**Embedded engine** (``src/embedded/``)
+   Separate fixed-point ``RF_*`` port for MCUs without an FPU. Not a
+   compile-flag slice of ``src/lib``. See `docs/embedded.rst <docs/embedded.rst>`_.
 
 **C++ Wrapper** (``src/lib/rainflow.hpp``)
    Modern C++ interface with templates, containers, and RAII patterns.
@@ -339,7 +345,7 @@ If you use this software in your research, please cite:
      title = {Rainflow Counting Algorithm},
      year = {2026},
      url = {https://github.com/a-ma72/rainflow},
-     version = {|version|}
+     version = {0.6.1}
    }
 
 Acknowledgments

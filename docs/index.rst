@@ -37,11 +37,18 @@ Implementation Guides
 `minimal_build.rst <minimal_build.rst>`_
    Building minimal version for embedded systems (RFC_MINIMAL)
 
+`embedded.rst <embedded.rst>`_
+   Standalone fixed-point ``RF_*`` engine for MCUs without an FPU
+   (not ``RFC_MINIMAL``)
+
 `delegates.rst <delegates.rst>`_
    Custom behavior via delegate functions
 
 `turning_points.rst <turning_points.rst>`_
    External turning point storage and management
+
+`level_crossing.rst <level_crossing.rst>`_
+   Level-crossing histograms: DIN 45667 (static slope) vs FVA (sign-dependent)
 
 Advanced Features
 -----------------
@@ -89,6 +96,9 @@ Compile-Time Options
    # Minimal build (embedded systems)
    cmake -S. -Bbuild -DRFC_MINIMAL=1
 
+   # Fixed-point RF_* engine: cmake --build build --target rf_embedded_test
+   # See embedded.rst
+
 Common Tasks
 ------------
 
@@ -101,11 +111,17 @@ Common Tasks
 **Handle residue:**
    See `residue_methods.rst <residue_methods.rst>`_
 
+**Level crossing / DIN 45667 vs FVA LC:**
+   See `level_crossing.rst <level_crossing.rst>`_
+
 **Custom memory allocation:**
    See `delegates.rst <delegates.rst>`_
 
 **Prune turning points:**
    See `tp_prune.rst <tp_prune.rst>`_
+
+**MCU without an FPU:**
+   See `embedded.rst <embedded.rst>`_
 
 Documentation by Topic
 ======================
@@ -114,7 +130,8 @@ By Use Case
 -----------
 
 **Embedded Systems**
-   - `minimal_build.rst <minimal_build.rst>`_ - Minimal configuration
+   - `embedded.rst <embedded.rst>`_ - Fixed-point ``RF_*`` engine (no FPU, no heap)
+   - `minimal_build.rst <minimal_build.rst>`_ - Minimal ``RFC_*`` configuration
    - `delegates.rst <delegates.rst>`_ - Custom memory management
    - `turning_points.rst <turning_points.rst>`_ - External storage
 
@@ -139,7 +156,8 @@ By Programming Language
 **C**
    - `algorithm.rst <algorithm.rst>`_ - Core concepts
    - `delegates.rst <delegates.rst>`_ - Function pointers
-   - `minimal_build.rst <minimal_build.rst>`_ - Minimal API
+   - `minimal_build.rst <minimal_build.rst>`_ - Minimal ``RFC_*`` API
+   - `embedded.rst <embedded.rst>`_ - Fixed-point ``RF_*`` API
 
 **C++**
    - `cpp_wrapper.rst <cpp_wrapper.rst>`_ - Complete C++ guide
@@ -156,6 +174,9 @@ By Feature
 
 **RFC_MINIMAL**
    `minimal_build.rst <minimal_build.rst>`_
+
+**Embedded ``RF_*`` engine**
+   `embedded.rst <embedded.rst>`_
 
 **RFC_TP_SUPPORT**
    `turning_points.rst <turning_points.rst>`_
@@ -218,5 +239,5 @@ See the main repository for license information.
 
 ---
 
-**Last Updated:** 2026-03-22
-**Documentation Version:** 0.5.2
+**Last Updated:** 2026-09-15
+**Documentation Version:** 0.6.1

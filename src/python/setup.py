@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
+import subprocess
+import sys
 from pathlib import Path
 
+import pybind11
 from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext as _build_ext
 
@@ -25,11 +29,20 @@ class build_ext(_build_ext):
 
     def build_extensions(self) -> None:
         # 1. Define the flags globally for the extension
+        # pybind11 requires C++14 minimum; C++17 gives cleaner std::optional /
+        # structured-binding usage in the wrapper.
         ct = self.compiler.compiler_type
+        # Release wheels drop debug info. CPython's default CFLAGS include
+        # `-g`; `-g0` later on the command line overrides it. Editable and
+        # in-tree installs keep those symbols for development.
+        is_release_wheel = (
+            os.environ.get("CIBUILDWHEEL") == "1"
+            or "bdist_wheel" in sys.argv
+        )
         for ext in self.extensions:
             if ct == "msvc":
                 ext.extra_compile_args.extend([
-                    "/std:c++14", "/wd4100", "/wd4101", "/wd4189", "/wd4505"
+                    "/std:c++17", "/wd4100", "/wd4101", "/wd4189", "/wd4505"
                 ])
             elif ct in ("unix", "mingw32"):
                 ext.extra_compile_args.extend([
@@ -38,10 +51,24 @@ class build_ext(_build_ext):
                     "-Wno-unused-but-set-variable",
                     "-Wno-switch",
                     "-Wno-unused-value",
+                    "-DNDEBUG",
                     # We add BOTH here; our monkey patch below will strip the wrong one
-                    "-std=c++11",
+                    "-std=c++17",
                     "-std=c99",
                 ])
+                if is_release_wheel:
+                    ext.extra_compile_args.append("-g0")
+                    if sys.platform.startswith("linux"):
+                        ext.extra_link_args.append("-Wl,--strip-all")
+                    elif sys.platform == "darwin":
+                        ext.extra_link_args.append("-Wl,-S")
+                if sys.platform.startswith("linux"):
+                    # Some CPython builds' distutils/setuptools compiler config
+                    # doesn't pick the C++ linker for this mixed C/C++ extension
+                    # (ext.language="c++" isn't always honored at link time),
+                    # leaving libstdc++ symbols (e.g. __cxxabiv1 vtables)
+                    # undefined at import time. Link it explicitly.
+                    ext.extra_link_args.append("-lstdc++")
 
         # 2. Monkey-patch the compiler to filter flags based on the source file
         original_compile = self.compiler._compile
@@ -58,10 +85,10 @@ class build_ext(_build_ext):
                     postargs.remove("-std=c99")
             else:
                 # Remove C++-only flags from C compilation
-                if "-std=c++11" in postargs:
-                    postargs.remove("-std=c++11")
-                if "/std:c++14" in postargs:
-                    postargs.remove("/std:c++14")
+                if "-std=c++17" in postargs:
+                    postargs.remove("-std=c++17")
+                if "/std:c++17" in postargs:
+                    postargs.remove("/std:c++17")
 
             return original_compile(obj, src, ext, cc_args, postargs, pp_opts)
 
@@ -82,9 +109,24 @@ def parse_version_file(version_file_path: Path) -> tuple[str, str, str]:
     return _version, __version__, __author__
 
 
+def sync_docstrings(this_directory: Path) -> None:
+    """Regenerate src/docstrings_generated.hpp and rfcnt.pyi from docstrings/*.txt.
+
+    Runs unconditionally before every build so a fresh clone (and CI) never
+    compiles against a stale generated header. See tools/sync_docstrings.py.
+    """
+    script = this_directory / "tools" / "sync_docstrings.py"
+    if not script.exists():
+        return
+    subprocess.check_call([sys.executable, str(script)])  # noqa: S603
+
+
 def main() -> None:
     """Set up the rfcnt package by reading metadata, version info, and configuring the build process."""
     this_directory = Path(__file__).parent.resolve()
+
+    sync_docstrings(this_directory)
+
     long_description = ""
     with (this_directory / "README.rst").open(encoding="utf-8") as f:
         long_description = f.read()
@@ -138,19 +180,22 @@ def main() -> None:
         author=__author__,
         license="BSD-2-Clause",
         url="http://github.com/a-ma72/rainflow",
-        install_requires=["numpy"],
+        python_requires=">=3.9",
+        install_requires=["numpy>=1.19"],
         packages=["rfcnt", "rfcnt.tests"],
         package_dir={"rfcnt": "", "rfcnt.tests": "tests"},
         package_data={
-            "rfcnt": ["*.py*", "requirements.txt", "README.rst", "LICENSE"],
+            "rfcnt": ["*.py", "*.pyi", "requirements.txt", "README.rst", "LICENSE"],
             "rfcnt.tests": ["*.py", "long_series.csv"],
         },
+        exclude_package_data={"rfcnt": ["version.py.in"]},
         cmdclass={"build_ext": build_ext},
         ext_modules=[
             Extension(
                 "rfcnt.rfcnt", ["src/rfcnt.cpp", "lib/rainflow.c"],
                 define_macros=define_macros,
-                include_dirs=["src", "lib", np_get_include()],
+                include_dirs=["src", "lib", np_get_include(), pybind11.get_include()],
+                language="c++",
             ),
         ],
         classifiers=[

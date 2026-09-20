@@ -5,9 +5,12 @@ __pycache__/
 build/
 src/python/_ext
 src/python/venv/
+/venv/
 src/python/dist/
 src/python/numpy/
 src/python/MANIFEST
+src/python/prebuilds.json
+src/python/src/numpy_arrayobject.h
 cmake-build*
 rfcnt.egg-info
 .idea/
