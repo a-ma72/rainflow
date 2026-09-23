@@ -28,11 +28,11 @@
  * (ctx->running_extreme). The very first raw sample is always
  * confirmed immediately as the sequence start (required anchor for
  * stage 2). After that a new turning point is confirmed only when
- * the value moves by at least ctx->hysteresis against the current
- * candidate direction.
+ * the value moves by more than ctx->hysteresis against the current
+ * candidate direction (strict, like rfcnt `delta > hysteresis`).
  *
  * Important invariant for stage 2 (see RF_FlushResiduumRepeated()):
- * because a new point is confirmed only after a move >= ctx->hysteresis
+ * because a new point is confirmed only after a move > ctx->hysteresis
  * against the candidate direction, two consecutive confirmed raw
  * values always differ strictly (no plateau in the raw domain). After
  * classification (rf_classify(), monotonically non-decreasing) rank
@@ -70,7 +70,8 @@ static bool rf_hysteresis_filter(RF_Ctx_t *ctx, RF_Value_t sample,
     {
         /* Direction not yet established: wait until the hysteresis
            threshold is exceeded in either direction. */
-        if ((delta < hysteresis) && (delta > -hysteresis))
+        /* rfcnt: delta > hysteresis (strict). Equality stays noise. */
+        if ((delta <= hysteresis) && (delta >= -hysteresis))
         {
             return false;
         }
@@ -88,12 +89,12 @@ static bool rf_hysteresis_filter(RF_Ctx_t *ctx, RF_Value_t sample,
             return false;
         }
 
-        if (-delta < hysteresis)
+        if (-delta <= hysteresis)
         {
             return false; /* reversal still inside the hysteresis band */
         }
 
-        /* Reversal >= hysteresis: peak is confirmed. */
+        /* Reversal > hysteresis: peak is confirmed (like rfcnt). */
         *out_confirmed_pt = ctx->running_extreme;
         ctx->slope = RF_SLOPE_FALLING;
         ctx->running_extreme = sample;
@@ -107,12 +108,12 @@ static bool rf_hysteresis_filter(RF_Ctx_t *ctx, RF_Value_t sample,
         return false;
     }
 
-    if (delta < hysteresis)
+    if (delta <= hysteresis)
     {
         return false; /* reversal still inside the hysteresis band */
     }
 
-    /* Reversal >= hysteresis: valley is confirmed. */
+    /* Reversal > hysteresis: valley is confirmed (like rfcnt). */
     *out_confirmed_pt = ctx->running_extreme;
     ctx->slope = RF_SLOPE_RISING;
     ctx->running_extreme = sample;
@@ -127,21 +128,19 @@ static bool rf_hysteresis_filter(RF_Ctx_t *ctx, RF_Value_t sample,
  * @brief Classify a confirmed turning point (Q28.4) into a class
  *        index 0 .. RF_NUM_CLASSES-1.
  *
- * Classification by integer division rounding to the nearest class
- * ((offset + RF_CLASS_WIDTH_FIXED/2) / RF_CLASS_WIDTH_FIXED) —
- * RF_CLASS_WIDTH_FIXED is no longer a power of two in the current
- * rainflow_config.h, so no right shift (as originally intended for
- * targets without a hardware divider) but a division. Values outside
- * [RF_CLASS_MIN_FIXED, RF_CLASS_MAX_FIXED] are clamped to the edge
- * class (sensor outliers/overshoot then do not cause undefined
- * behaviour, but a conservatively large amplitude in that edge class).
+ * Floor binning like rfcnt `QUANTIZE`:
+ *   class = (unsigned)((value - class_offset) / class_width)
+ * in Q28.4: integer division without +width/2. Values below
+ * RF_CLASS_MIN_FIXED fall into class 0, values at or above
+ * RF_CLASS_MAX_FIXED into the last class (rfcnt would abort when
+ * value >= offset + count*width).
  *
  * @param[in] value Raw value in Q28.4.
  * @return Class index 0 .. RF_NUM_CLASSES-1.
  */
 static RF_Class_t rf_classify(RF_Value_t value)
 {
-    if (value <= RF_CLASS_MIN_FIXED)
+    if (value < RF_CLASS_MIN_FIXED)
     {
         return 0U;
     }
@@ -150,22 +149,16 @@ static RF_Class_t rf_classify(RF_Value_t value)
         return (RF_Class_t)(RF_NUM_CLASSES - 1U);
     }
 
-    /* Classification by rounded integer division, see function
-       comment — RF_CLASS_WIDTH_FIXED is no longer a power of two,
-       so no shift. */
     int32_t offset = (int32_t)value - (int32_t)RF_CLASS_MIN_FIXED;
     if (offset < 0)
     {
-        /* Should not happen given the lower-bound clause above,
-         * but defensively clamp to 0. */
         offset = 0;
     }
-
-    uint32_t cls = (uint32_t)(offset + (RF_CLASS_WIDTH_FIXED / 2)) / RF_CLASS_WIDTH_FIXED;
+    uint32_t cls = offset / (uint32_t)RF_CLASS_WIDTH_FIXED;
 
     if (cls >= RF_NUM_CLASSES)
     {
-        cls = RF_NUM_CLASSES - 1U; /* defensive, e.g. value == RF_CLASS_MAX_FIXED - 1 at the upper rounding edge */
+        cls = RF_NUM_CLASSES - 1U;
     }
 
     return (RF_Class_t)cls;
@@ -215,8 +208,8 @@ static inline int32_t rf_sign_diff(RF_Class_t hi, RF_Class_t lo)
  * plateau carries no new direction information). Regularly this case
  * should never occur — the hysteresis filter categorically excludes
  * identical consecutive class values in the real residue, and
- * RF_FlushResiduumRepeated() appends running_extreme only when it
- * differs from residuum[count-1]. The check is therefore redundant,
+ * RF_FlushResiduumRepeated() 4-point-pushes running_extreme only when
+ * it differs from residuum[count-1]. The check is therefore redundant,
  * but extra insurance against future callers or subtle call-order
  * bugs, without weakening the alternation precondition for true
  * turning points above.
@@ -381,6 +374,10 @@ RF_Status_t RF_ProcessSample(RF_Ctx_t *ctx, RF_Value_t sample,
         return RF_ERR_NULL_PTR;
     }
 
+    /* A new sample reopens the stream: a previous repeated flush
+     * must no longer count as already applied. */
+    ctx->repeated_applied = false;
+
     /* Local working variable instead of writing *out_damage_increment
      * directly, because out_damage_increment is optional (NULL allowed)
      * — ctx->accumulated_damage must still be updated in every case. */
@@ -470,28 +467,27 @@ double RF_GetAccumulatedDamageDouble(const RF_Ctx_t *ctx)
  * represents a new point different from residuum[count-1] (i.e. a
  * direction has already been established, ctx->slope !=
  * RF_SLOPE_UNKNOWN, and its class differs from the last confirmed
- * point) — appended as an extra virtual (count+1)-th point to the
- * residue BEFORE the repeated-residue technique is applied. Because
- * the direction INTO running_extreme is forced by the state machine
- * to be opposite the direction INTO residuum[count-1] (otherwise
- * residuum[count-1] would not yet have been confirmed), this virtual
- * point slots into the guaranteed internal alternation — the full
- * wrap-around proof below remains valid, just on the sequence
- * extended by running_extreme.
+ * point) — 4-point-pushed onto the stack (rfcnt feed_finalize /
+ * interim). Only then is the sequence closure-free again; merely
+ * appending without 4-point would leave inner cycles open whose
+ * outer arm is the interim point, and would make the residue length
+ * differ from rfcnt res_raw. Because the direction INTO
+ * running_extreme is forced by the state machine to be opposite the
+ * direction INTO residuum[count-1] (otherwise residuum[count-1]
+ * would not yet have been confirmed), this point slots into the
+ * alternation.
  *
  * Implementation: O(n) with constant extra work at the wrap (no
  * second pass, no buffer for an actually doubled sequence). Core
- * observation: ctx->residuum is already itself a closure-free
- * 4-point stack (otherwise it would already have been reduced) AND
- * internally guaranteed strictly alternating (the hysteresis filter
- * confirms a point only after a move >= hysteresis against the
- * current direction — so a plateau can never occur internally in the
- * real residue; the same holds for the sequence extended by
- * running_extreme, see above). Therefore no push of the middle
+ * observation: after the interim 4-point, eff is a closure-free
+ * stack AND internally guaranteed strictly alternating (the
+ * hysteresis filter confirms a point only after a move > hysteresis
+ * against the current direction — so a plateau can never occur
+ * internally in the real residue). Therefore no push of the middle
  * points can trigger a closure (direct copy instead of individual
  * push calls), and a plateau can arise only at the single wrap where
- * the last point of the (possibly extended) sequence meets the
- * (notional) copy of its first point.
+ * the last point of the sequence meets the (notional) copy of its
+ * first point.
  *
  * At that wrap three signs are compared (eff/eff_n denotes the
  * sequence possibly extended by running_extreme):
@@ -529,16 +525,13 @@ double RF_GetAccumulatedDamageDouble(const RF_Ctx_t *ctx)
  * The commit parameter decides whether the result is applied:
  *   commit == false (Predict): compute only, ctx remains completely
  *     unchanged in EVERY case (including running_extreme/slope).
- *   commit == true: residue is reduced to the last point of the
- *     (possibly extended) sequence (residuum_count = 1). If
- *     running_extreme was included as a virtual point, it is treated
- *     as synthetically confirmed: stage-1 state is reset exactly as
- *     after confirming a real turning point with no known following
- *     direction (ctx->slope = RF_SLOPE_UNKNOWN, same as the first-
- *     sample anchor case) — running_extreme itself is unchanged
- *     because its value already matches that new anchor. If
- *     running_extreme was NOT included (because it was not a new
- *     point), stage-1 state is already consistent and left alone.
+ *   commit == true: the residue stays the 4-point-reduced sequence
+ *     including the (possibly) adopted running_extreme — same as
+ *     rfcnt res_raw after feed_finalize. Doubling only counts extra
+ *     damage; it does not empty the stack. If running_extreme was
+ *     included, it is treated as synthetically confirmed
+ *     (ctx->slope = RF_SLOPE_UNKNOWN). A second flush without a new
+ *     sample is a no-op (ctx->repeated_applied).
  *
  * @param[in,out] ctx                Rainflow context.
  * @param[in]     commit             true: update residue (and possibly
@@ -564,6 +557,14 @@ RF_Status_t RF_FlushResiduumRepeated(RF_Ctx_t *ctx, bool commit,
         return RF_ERR_NULL_PTR;
     }
 
+    if (commit && ctx->repeated_applied)
+    {
+        if (out_damage_increment != NULL)
+        {
+            *out_damage_increment = 0U;
+        }
+        return RF_OK;
+    }
     /* Local working variable instead of writing *out_damage_increment
      * directly, because out_damage_increment is optional (NULL allowed)
      * — ctx->accumulated_damage (when commit == true) must still be
@@ -576,12 +577,17 @@ RF_Status_t RF_FlushResiduumRepeated(RF_Ctx_t *ctx, bool commit,
     uint32_t local_counts[RF_NUM_CLASSES];
     memset(local_counts, 0, sizeof(local_counts));
 
-    /* Working copy: residue, possibly extended by the stage-1
-     * candidate running_extreme as a virtual last point (see function
-     * comment). From here on, only eff/eff_n is used instead of
-     * ctx->residuum/ctx->residuum_count. */
+    /* Working copy: residue plus one slot for the interim. The
+     * stage-1 candidate is 4-point-pushed onto the stack like the
+     * rfcnt interim (not merely appended): otherwise inner cycles
+     * stay open whose outer arm is the last candidate, and the
+     * residue length differs from rfcnt res_raw. Before the push,
+     * ctx->residuum may already hold RF_MAX_RESIDUUM confirmed
+     * points; the extra slot takes the interim, then 4-point
+     * reduces back to <= RF_MAX_RESIDUUM. */
     RF_Class_t eff[RF_MAX_RESIDUUM + 1U];
     uint16_t   eff_n = ctx->residuum_count;
+    RF_Status_t st;
 
     if (eff_n > RF_MAX_RESIDUUM)
     {
@@ -601,16 +607,50 @@ RF_Status_t RF_FlushResiduumRepeated(RF_Ctx_t *ctx, bool commit,
 
         if ((eff_n == 0U) || (re_class != eff[eff_n - 1U]))
         {
-            eff[eff_n] = re_class;
-            eff_n++;
+            st = rf_stack_push_and_close_buf(eff, &eff_n,
+                    (uint16_t)(RF_MAX_RESIDUUM + 1U),
+                    re_class, &damage_increment, local_counts);
+            if (st != RF_OK)
+            {
+                if (out_damage_increment != NULL)
+                {
+                    *out_damage_increment = damage_increment;
+                }
+                return st;
+            }
             appended_running_extreme = true;
         }
     }
 
+    if (eff_n > RF_MAX_RESIDUUM)
+    {
+        /* 4-point did not bring the interim back to 2*RF_NUM_CLASSES
+         * (including interim). */
+        if (out_damage_increment != NULL)
+        {
+            *out_damage_increment = damage_increment;
+        }
+        return RF_ERR_RESIDUUM_FULL;
+    }
     if (eff_n < 2U)
     {
-        /* 0 or 1 points (even after a possible extension): nothing
-         * to close. */
+        /* 0 or 1 point: nothing to double. Still carry over the
+         * remainder if the interim point is the only new one. */
+        if (commit)
+        {
+            memcpy(ctx->residuum, eff, (size_t)eff_n * sizeof(RF_Class_t));
+            ctx->residuum_count = eff_n;
+            rf_damage96_add(&ctx->accumulated_damage, damage_increment);
+            for (size_t i = 0U; i < (size_t)RF_NUM_CLASSES; i++)
+            {
+                ctx->rp_counts[i] += local_counts[i];
+            }
+            if (appended_running_extreme)
+            {
+                ctx->slope = RF_SLOPE_UNKNOWN;
+            }
+            ctx->repeated_applied = true;
+        }
         if (out_damage_increment != NULL)
         {
             *out_damage_increment = damage_increment;
@@ -621,11 +661,10 @@ RF_Status_t RF_FlushResiduumRepeated(RF_Ctx_t *ctx, bool commit,
     const uint16_t n = eff_n;
     RF_Class_t local_stack[2U * (RF_MAX_RESIDUUM + 1U)];
     uint16_t local_count = n;
-    RF_Status_t st;
 
     /* Direct copy instead of a push loop: no push can trigger a
-     * closure here, because eff is already a closure-free stack
-     * (see function comment). */
+     * closure here, because after the interim 4-point, eff is already
+     * a closure-free stack (see function comment). */
     memcpy(local_stack, eff, (size_t)n * sizeof(RF_Class_t));
 
     const int32_t d_prev = rf_sign_diff(eff[n - 1U], eff[n - 2U]);
@@ -668,15 +707,13 @@ RF_Status_t RF_FlushResiduumRepeated(RF_Ctx_t *ctx, bool commit,
         }
     }
 
-    /* State for the continuing stream: only the last actual point of
-     * the (possibly extended) sequence remains as the base — the
-     * repeated-residue technique is solely for more accurate damage,
-     * not for continuing the count. When commit == false (prediction
-     * only) ctx is left completely untouched. */
+    /* Residuum = 4-point-reduced sequence including interim (rfcnt
+     * res_raw). The doubling only counts additional damage.
+     * If commit == false, ctx remains completely untouched. */
     if (commit)
     {
-        ctx->residuum[0] = eff[n - 1U];
-        ctx->residuum_count = 1U;
+        memcpy(ctx->residuum, eff, (size_t)eff_n * sizeof(RF_Class_t));
+        ctx->residuum_count = eff_n;
         rf_damage96_add(&ctx->accumulated_damage, damage_increment);
 
         for (size_t i = 0U; i < (size_t)RF_NUM_CLASSES; i++)
@@ -686,14 +723,17 @@ RF_Status_t RF_FlushResiduumRepeated(RF_Ctx_t *ctx, bool commit,
 
         if (appended_running_extreme)
         {
-            /* running_extreme was treated as a synthetically confirmed
-             * turning point: reset stage-1 state as if it had just been
-             * freshly confirmed with no known following direction —
-             * same as the first-sample anchor case (see
-             * rf_hysteresis_filter()). running_extreme itself is
-             * unchanged; its value already matches this new anchor. */
+            /* running_extreme was treated synthetically as a confirmed
+             * reversal point: reset the Level 1 state accordingly
+             * as if it had just been confirmed,
+             * with no known direction of movement—analogous to the
+             * anchor case of the very first sample (see
+             * rf_hysteresis_filter()). running_extreme itself remains
+             * unchanged; its value already corresponds exactly to this
+             * new anchor. */
             ctx->slope = RF_SLOPE_UNKNOWN;
         }
+        ctx->repeated_applied = true;
     }
 
     if (out_damage_increment != NULL)

@@ -62,12 +62,18 @@ typedef uint8_t RF_Class_t;
 
 /**
  * Algorithmic upper bound on residue depth from the 4-point condition
- * on classified values. No safety margin needed: each class can appear
- * in the residue at most twice as an "open flank".
+ * on classified values, including the not-yet-confirmed stage-1
+ * candidate (running_extreme / rfcnt interim). Each class can appear
+ * at most twice as an open flank; the interim occupies one of those
+ * slots, not an extra element in ctx->residuum.
  *
  * HOLDS ONLY under the precondition hysteresis >= RF_CLASS_WIDTH
  * (see there and RF_Init()) — otherwise the residue alternation
  * invariant can be broken and this bound is no longer reliable.
+ *
+ * At finalize the interim is first pushed onto a working copy one
+ * slot larger, then 4-point reduces it back onto this bound (see
+ * RF_FlushResiduumRepeated() in rainflow.c).
  */
 #define RF_MAX_RESIDUUM (2U * RF_NUM_CLASSES)
 
@@ -169,6 +175,13 @@ typedef struct
      * omitted to save RAM.
      */
     uint32_t rp_counts[RF_NUM_CLASSES];  /*optional*/
+
+    /* After commit==true of RF_FlushResiduumRepeated(): the repeated-
+     * residue technique has already been applied to the current
+     * residue. A second flush without an intervening RF_ProcessSample()
+     * is then a no-op (otherwise the same residue would be doubled
+     * again). RF_ProcessSample() clears the flag. */
+    bool repeated_applied;
 } RF_Ctx_t;
 
 /* ------------------------------------------------------------------ */
@@ -268,15 +281,21 @@ RF_Status_t RF_ProcessSample(RF_Ctx_t *ctx, RF_Value_t sample,
  * Otherwise the last, possibly already long, branch would be ignored
  * systematically. Details and proof: see the comment in rainflow.c.
  *
+ * Flow (as rfcnt feed_finalize + ResidualMethod.REPEATED):
+ *   1. running_extreme is classified and 4-point-pushed onto the
+ *      residue stack (rfcnt interim becomes a real turning point).
+ *      That can close inner cycles that would stay open without the
+ *      last branch.
+ *   2. Repeated residue runs on that 4-point-free residue.
+ *
  * @p commit controls whether the result is actually applied:
- *   - commit == true:  a "real" flush — afterwards the residue is
- *     reduced to the last point of the (possibly running_extreme-
- *     extended) sequence, kept as the base for continuing the stream.
- *     If running_extreme was included, it is treated as synthetically
- *     confirmed: stage-1 state is reset to "no candidate, no known
- *     direction" (same as the first-sample anchor case) —
- *     running_extreme itself is unchanged because its value already
- *     matches that new anchor.
+ *   - commit == true:  the residue stays the 4-point-reduced stack
+ *     including the (possibly) adopted running_extreme — the same
+ *     sequence rfcnt reports as res_raw after feed_finalize. Doubling
+ *     only counts extra damage; it does not empty the stack. If
+ *     running_extreme was included, it is treated as synthetically
+ *     confirmed: slope = RF_SLOPE_UNKNOWN (same as the anchor case).
+ *     A second flush without a new sample is a no-op.
  *   - commit == false: prediction only ("Predict") — the context is
  *     left completely unchanged, including residue, residuum_count,
  *     stage-1 state (running_extreme, slope) AND
@@ -330,7 +349,10 @@ RF_Status_t RF_FlushResiduumRepeated(RF_Ctx_t *ctx, bool commit,
 
 /**
  * @brief Return the current number of open points in the residue.
- *        Useful for diagnostics/monitoring.
+ *
+ * After RF_FlushResiduumRepeated(commit=true) this is the length after
+ * adopting the stage-1 candidate and running 4-point again (rfcnt
+ * res_raw), not the wrap seam collapsed to 1.
  *
  * @param[in] ctx Rainflow context.
  * @return Number of open points, 0 if ctx is NULL.
