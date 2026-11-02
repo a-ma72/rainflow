@@ -239,5 +239,5 @@ See the main repository for license information.
 
 ---
 
-**Last Updated:** 2026-09-15
+**Last Updated:** 2026-03-22
 **Documentation Version:** 0.6.1
