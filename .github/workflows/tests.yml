@@ -75,7 +75,15 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         # setup.py declares python_requires>=3.9, so 3.7/3.8 are excluded.
+        # CPython 3.9 is not published for ubuntu-latest (26.04). Keep that
+        # cell on 24.04, where the setup-python toolcache still has it.
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+        exclude:
+          - os: ubuntu-latest
+            python-version: "3.9"
+        include:
+          - os: ubuntu-24.04
+            python-version: "3.9"
     steps:
       - uses: actions/checkout@v5
         with:
