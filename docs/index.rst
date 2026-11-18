@@ -240,4 +240,4 @@ See the main repository for license information.
 ---
 
 **Last Updated:** 2026-09-15
-**Documentation Version:** 0.6.1rc0
+**Documentation Version:** 0.6.1
