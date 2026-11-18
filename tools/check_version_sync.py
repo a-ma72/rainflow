@@ -88,6 +88,14 @@ def main() -> int:
     errors += check_literal(ROOT / "docs/references.rst", r"version = \{([^}]+)\}", full)
     errors += check_literal(ROOT / "docs/installation.rst", r"rfcnt-([^/]+)/rfcnt-\1\.tar\.gz", full)
 
+    cargo = ROOT / "src/rust/Cargo.toml"
+    cargo_text = cargo.read_text(encoding="utf-8")
+    m = re.search(r'(?m)^version = "([^"]+)"', cargo_text)
+    if not m:
+        errors.append(f"{cargo}: could not parse package version")
+    elif m.group(1) != full:
+        errors.append(f"{cargo}: version is {m.group(1)!r}, expected {full!r}")
+
     if errors:
         print("Version mismatch between CMakeLists.txt and generated files:\n", file=sys.stderr)
         for e in errors:

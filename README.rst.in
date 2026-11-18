@@ -9,7 +9,7 @@ Rainflow Counting Algorithm (C99 compliant)
 
 A robust, modular implementation of the Rainflow Counting Algorithm using
 the 4-point method for fatigue analysis. This library is C99 compliant
-and provides bindings for Python and MATLAB.
+and provides bindings for Python, MATLAB, and Rust.
 
 Quick Start
 -----------
@@ -57,6 +57,23 @@ C/C++
    RFC_damage(&ctx, &damage, NULL);
    RFC_deinit(&ctx);
 
+Rust
+~~~~
+
+The crate in ``src/rust`` compiles the C core itself. A C compiler must be on ``PATH``.
+
+.. code-block:: bash
+
+   cargo test --manifest-path src/rust/Cargo.toml
+
+.. code-block:: rust
+
+   use rfcnt::{rfc, Options};
+
+   let data = [0.0, 1.0, 0.0, 2.0, 0.0, 3.0, 0.0];
+   let result = rfc(&data, 0.5, &Options::default()).unwrap();
+   println!("Damage: {}", result.damage);
+
 Key Features
 ------------
 
@@ -65,7 +82,7 @@ Key Features
 - **Streaming capability** - Process data sample-by-sample or in chunks
 - **Fatigue analysis** - Wöhler curves, Miner's rule (4 variants), damage history
 - **Flexible histograms** - Rainflow matrix, level crossing, range pairs
-- **Language bindings** - Python (NumPy), MATLAB, C/C++
+- **Language bindings** - Python (NumPy), MATLAB, Rust, C/C++
 - **Standards compliant** - ASTM E 1049, DIN 45667, FKM guidelines
 
 Documentation
@@ -98,10 +115,10 @@ Core Documentation:
 
 `Installation <docs/installation.rst>`_
    Build instructions for all platforms (Windows, Linux, macOS) with
-   Python, MATLAB, and C/C++ configurations.
+   Python, MATLAB, Rust, and C/C++ configurations.
 
 `Examples <docs/examples.rst>`_
-   Practical code examples in Python, C/C++, and MATLAB demonstrating
+   Practical code examples in Python, C/C++, MATLAB, and Rust demonstrating
    various use cases and workflows.
 
 Advanced Topics:

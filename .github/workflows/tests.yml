@@ -101,3 +101,20 @@ jobs:
         run: |
           pip install pefile
           python tools/check_static_crt.py
+
+  rust:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.skip_checks_tests }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Test Rust crate
+        run: cargo test --manifest-path src/rust/Cargo.toml

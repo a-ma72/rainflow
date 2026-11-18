@@ -16,7 +16,7 @@ endif ()
 
 
 # Project name and version
-project(rainflow VERSION 0.6.1 LANGUAGES C CXX)
+project(rainflow VERSION 0.7.0 LANGUAGES C CXX)
 # PEP 440 postfix, no leading dot: "rc1" -> 0.6.1rc1. Empty for a final release.
 set(RFC_VERSION_POSTFIX_PRESET "")
 

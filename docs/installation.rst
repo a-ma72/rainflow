@@ -31,6 +31,11 @@ For MATLAB support:
 
 - **MATLAB** R2017b or higher
 
+For Rust support:
+
+- **Rust** stable (``rustc`` and ``cargo``)
+- A C compiler (``gcc``, ``clang``, or MSVC). The crate compiles the C core itself
+
 Building from Sources
 =====================
 
@@ -137,7 +142,7 @@ Installing from GitHub
 
 Install directly from a GitHub release::
 
-   pip install https://github.com/a-ma72/rainflow/releases/download/rfcnt-0.6.1/rfcnt-0.6.1.tar.gz
+   pip install https://github.com/a-ma72/rainflow/releases/download/rfcnt-0.7.0/rfcnt-0.7.0.tar.gz
 
 Or from the repository:
 
@@ -150,7 +155,7 @@ Google Colaboratory
 
 To use in Google Colab notebooks::
 
-   !pip install --no-build-isolation --no-deps https://github.com/a-ma72/rainflow/releases/download/rfcnt-0.6.1/rfcnt-0.6.1.tar.gz
+   !pip install --no-build-isolation --no-deps https://github.com/a-ma72/rainflow/releases/download/rfcnt-0.7.0/rfcnt-0.7.0.tar.gz
 
    import rfcnt
    rfcnt.tests.examples.example_1()
@@ -252,6 +257,20 @@ configuration:
        -DRFC_DAMAGE_FAST=1
 
 See `features.rst <features.rst>`_ for a complete list of available feature flags.
+
+Rust
+====
+
+The crate in ``src/rust`` and the Python extension both link ``rainflow.c`` through ``src/lib/rainflow_ffi.h``.
+Cargo builds the crate; CMake is not required for it.
+
+.. code-block:: bash
+
+   cargo test --manifest-path src/rust/Cargo.toml
+
+``rfc()`` follows the Python one-shot function. ``Rfc`` is the stateful counter.
+``spread_damage`` other than ``SdMethod::None`` is rejected on ``Rfc``; use ``rfc()``
+for a damage history.
 
 Platform-Specific Notes
 =======================

@@ -272,6 +272,14 @@ The package provides bindings for multiple environments:
      `level_crossing.rst <level_crossing.rst>`_.
    - Comprehensive error handling
 
+**Rust**
+   Crate ``rfcnt`` in ``src/rust``
+
+   - One-shot ``rfc()`` and stateful ``Rfc`` with chunked ``feed()``
+   - Calls ``rainflow_ffi.h``. The packed context stays inside the C library
+   - Same defaults and result fields as the Python ``rfc()`` dictionary
+   - Damage history is one-shot only, as on the Python ``RFC`` class
+
 **MATLAB**
    MEX interface for MATLAB integration
 

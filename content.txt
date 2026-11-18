@@ -1,4 +1,5 @@
 RAINFLOW
+|   .gitlab-ci.yml                GitLab CI pipeline, transcoded from .github/workflows
 |   CMakeLists.txt                Makefile (CMake)
 |   coan-args-minimal.in          Input arguments file for coan invocation (minimal build)
 |   coan_invoke-minimal.bat       Invoke coan (cmd shell)
@@ -6,6 +7,7 @@ RAINFLOW
 |   content.txt                   This file
 |   LICENSE                       License information
 |   README.rst                    Readme
+|   README.rst.in                 Template for README.rst (CMake configure_file, |version| substitution)
 |
 +---.github
 |   \---workflows
@@ -21,6 +23,7 @@ RAINFLOW
 |   |   cpp_wrapper.rst          C++ wrapper guide
 |   |   damage_history.rst       Damage tracking over time
 |   |   delegates.rst            Custom callbacks and extensibility
+|   |   embedded.rst             Standalone fixed-point RF_* engine (no FPU, no heap)
 |   |   examples.rst             Practical code examples
 |   |   features.rst             Feature descriptions and compile-time options
 |   |   installation.rst         Build instructions for all platforms (generated from installation.rst.in)
@@ -42,6 +45,20 @@ RAINFLOW
 |   |   +---greatest              A testing system for C, contained in 1 header file.
 |   |   \---unifdef               A tool to remove preprocessor conditionals from code.
 |   |
+|   +---embedded
+|   |   |   CMakeLists.txt                 Host tests rf_embedded_test and rf_embedded_flush_test
+|   |   |   README.rst                     Layout of the fixed-point RF_* engine
+|   |   |   generate_rainflow_config.py    Regenerates rainflow_config.c
+|   |   |   rainflow.c                     Fixed-point rainflow engine (RF_* API)
+|   |   |   rainflow.h                     Header for rainflow.c
+|   |   |   rainflow_config.c              Example class grid and damage LUT
+|   |   |   rainflow_config.h              Header for rainflow_config.c
+|   |   |   rainflow_damage_lut_meta.h     Wöhler exponent used for the LUT
+|   |   |
+|   |   \---test
+|   |       |   test_RF_FlushResiduumRepeated.c   Host test for RF_FlushResiduumRepeated
+|   |       \   test_rainflow.c                   Host test for the RF_* engine
+|   |
 |   +---lib
 |   |   |   CMakeLists.txt        Makefile (CMake)
 |   |   |   config.h              Configuration file (Rainflow)
@@ -49,6 +66,8 @@ RAINFLOW
 |   |   |   rainflow.h            Header file for rainflow.c
 |   |   |   rainflow.hpp          Header file for C++ interface
 |   |   |   rainflow.c            Rainflow main routines
+|   |   |   rainflow_ffi.h        Opaque FFI header (callers do not include rainflow.h)
+|   |   |   rainflow_ffi.c        FFI implementation used by Python and Rust
 |   |   |
 |   |   \---minimal
 |   |       |   create_minimal_sources.bat    Batch generating `rainflow.c`and `rainflow.h`
@@ -61,67 +80,84 @@ RAINFLOW
 |   |
 |   +---matlab
 |   |   |   CMakeLists.txt        Makefile (CMake)
-|   |   |   rfc.c                 MATLAB(R) wrapper module `rfc`
-|   |   |   make.m                Build rfc.m
-|   |   \   validate.m            Examples an checks
+|   |   \---rfc.c                 MATLAB(R) wrapper module `rfc`
 |   |
-|   \---python
-|       |   __init__.py               Init
-|       |   CMakeLists.txt            Makefile (CMake)
-|       |   LICENSE                   License information
-|       |   MANIFEST.in               Manifest file (input file)
-|       |   pyproject.toml            TOML file for build requirements
-|       |   README.rst                Readme (Sphinx-facing)
-|       |   requirements.txt          Requirements of the rfcnt module
-|       |   rfcnt.pyi                 rfcnt interface file (kept in sync with docstrings/ via tools/sync_docstrings.py)
-|       |   run_examples.py           Python script executes examples from .tests.examples
-|       |   run_tests.py              Python script for unit testing
-|       |   setup.py                  Setup (build, install, deploy); runs sync_docstrings() before every build
-|       |   utils.py                  Utility module
-|       |   version.py                Version file (generated from version.py.in)
-|       |   version.py.in             Template for version.py (CMake configure_file / generate_version.cmake)
-|       |
-|       +---_ext
-|       |                             (currently empty; the old multi-NumPy-ABI prebuilds matrix
-|       |                              that used to populate this was removed upstream)
-|       |
-|       +---cmake
-|       |   |   generate_version.cmake          Regenerates version.py from version.py.in at build time
-|       |   |   numpy_get_include.py            Python script returning NumPy include directories
-|       |   \   rfcnt_target_functions.cmake    Helper functions to create the rfcnt build target (incl. pybind11 wiring)
-|       |
-|       +---docstrings
-|       |   |   rfc.txt                       Docstring source for rfc(), single source of truth
-|       |   \   damage_from_rp.txt            Docstring source for damage_from_rp()
-|       |
-|       +---lib
-|       |   |   rainflow.h            (Generated) copies of /src/lib
-|       |   |   rainflow.hpp          ...
-|       |   |   config.h              ...
-|       |   \   rainflow.c            ...
-|       |
-|       +---notebooks
-|       |   |   example.xcf                            GIMP source image for the notebook screenshots
-|       |   |   example_damage_history.ipynb           Example showing damage growth over time
-|       |   |   example_damage_history.png             Output from example_damage_history.ipynb
-|       |   |   example_miner_verifications.ipynb      Example verifying Miner's rule / SN-curve consistency
-|       |   \   jupyter_screenshot.png                 Output from .tests.examples.example_1()
+|   +---python
+|   |   |   __init__.py               Init
+|   |   |   CMakeLists.txt            Makefile (CMake)
+|   |   |   LICENSE                   License information
+|   |   |   MANIFEST.in               Manifest file (input file)
+|   |   |   pyproject.toml            TOML file for build requirements
+|   |   |   README.rst                Readme (Sphinx-facing)
+|   |   |   requirements.txt          Requirements of the rfcnt module
+|   |   |   rfcnt.pyi                 rfcnt interface file (kept in sync with docstrings/ via tools/sync_docstrings.py)
+|   |   |   run_examples.py           Python script executes examples from .tests.examples
+|   |   |   run_tests.py              Python script for unit testing
+|   |   |   setup.py                  Setup (build, install, deploy); runs sync_docstrings() before every build
+|   |   |   utils.py                  Utility module
+|   |   |   version.py                Version file (generated from version.py.in)
+|   |   |   version.py.in             Template for version.py (CMake configure_file / generate_version.cmake)
+|   |   |
+|   |   +---cmake
+|   |   |   |   generate_version.cmake          Regenerates version.py from version.py.in at build time
+|   |   |   |   numpy_get_include.py            Python script returning NumPy include directories
+|   |   |   \   rfcnt_target_functions.cmake    Helper functions to create the rfcnt build target (incl. pybind11 wiring)
+|   |   |
+|   |   +---docstrings
+|   |   |   |   at_transform.txt              Docstring source for at_transform()
+|   |   |   |   rfc.txt                       Docstring source for rfc(), single source of truth
+|   |   |   \   damage_from_rp.txt            Docstring source for damage_from_rp()
+|   |   |
+|   |   +---lib
+|   |   |   |   rainflow.h            (Generated) copies of /src/lib
+|   |   |   |   rainflow_ffi.h        ...
+|   |   |   |   rainflow_ffi.c        ...
+|   |   |   |   config.h              ...
+|   |   |   \   rainflow.c            ...
+|   |   |
+|   |   +---notebooks
+|   |   |   |   example.xcf                            GIMP source image for the notebook screenshots
+|   |   |   |   example_continuous_counting.ipynb      Feed a series in slices through the stateful RFC class
+|   |   |   |   example_damage_history.ipynb           Example showing damage growth over time
+|   |   |   |   example_damage_history.png             Output from example_damage_history.ipynb
+|   |   |   |   example_miner_verifications.ipynb      Example verifying Miner's rule / SN-curve consistency
+|   |   |   \   jupyter_screenshot.png                 Output from .tests.examples.example_1()
+|   |   |
+|   |   +---src
+|   |   |   |   docstrings_generated.hpp     Generated from docstrings/*.txt by tools/sync_docstrings.py -- do not hand-edit
+|   |   |   |   numpy_arrayobject.h          (Generated by numpy_get_include.py at build time; gitignored, not tracked)
+|   |   |   \   rfcnt.cpp                    Python wrapper module `rfcnt` (pybind11)
+|   |   |
+|   |   +---tests
+|   |   |   |   __init__.py           Init
+|   |   |   |   test_rfc_class.py     Unit tests for the stateful RFC class
+|   |   |   |   test_rfcnt.py         Unit Test
+|   |   |   |   test_rfcnt_npz.py     Unit test for the .npz-based fixture below
+|   |   |   |   examples.py           Examples
+|   |   |   |   long_series.csv       Time series for unit test and examples
+|   |   |   \   rfcnt_example.npz     Example data fixture (NumPy .npz)
+|   |   |
+|   |   \---tools
+|   |       \   sync_docstrings.py    Regenerates src/docstrings_generated.hpp and rfcnt.pyi from docstrings/*.txt
+|
+|   \---rust
+|       |   Cargo.toml                Crate rfcnt 0.7.0, calls the C core through rainflow_ffi
+|       |   Cargo.lock                Locked dependency versions
+|       |   build.rs                  Compiles rainflow.c and rainflow_ffi.c
 |       |
 |       +---src
-|       |   |   docstrings_generated.hpp     Generated from docstrings/*.txt by tools/sync_docstrings.py -- do not hand-edit
-|       |   |   numpy_arrayobject.h          (Generated by numpy_get_include.py at build time; gitignored, not tracked)
-|       |   \   rfcnt.cpp                    Python wrapper module `rfcnt` (pybind11)
+|       |   |   lib.rs                Safe Rust API (rfc / Rfc)
+|       |   \   ffi.rs                Bindings to rainflow_ffi.h
 |       |
-|       +---tests
-|       |   |   __init__.py           Init
-|       |   |   test_rfcnt.py         Unit Test
-|       |   |   test_rfcnt_npz.py     Unit test for the .npz-based fixture below
-|       |   |   examples.py           Examples
-|       |   |   long_series.csv       Time series for unit test and examples
-|       |   \   rfcnt_example.npz     Example data fixture (NumPy .npz)
-|       |
-|       \---tools
-|           \   sync_docstrings.py    Regenerates src/docstrings_generated.hpp and rfcnt.pyi from docstrings/*.txt
+|       \---tests
+|           |   errors.rs
+|           |   history.rs
+|           |   parity.rs
+|           |   residue.rs
+|           |   woehler.rs
+|           |
+|           \---common
+|               \   mod.rs
 |
 +---test
 |   |   CMakeLists.txt            Makefile (CMake)
@@ -132,5 +168,14 @@ RAINFLOW
 |   |   rfc_wrapper_advanced.cpp  Example using rainflow in CPP context applying an advanced wrapper
 |   \   rfc_wrapper_simple.cpp    Example using rainflow in CPP context applying a simple wrapper
 |
-+---tools
-    \   where_to_get_coan.txt      Link
+\---tools
+    |   check_version_sync.py    Verify checked-in version files match project(VERSION ...) in CMakeLists.txt
+    |   where_to_get_coan.txt    Link
+    |
+    +---coan2
+    |   \   where_to_get_coan.txt    Where to get the extern coan build
+    |
+    \---unifdef
+        |   unifdef.exe                unifdef binary
+        |   unifdef.txt                unifdef notes
+        \   where_to_get_unifdef.txt   Where to get unifdef

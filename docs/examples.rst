@@ -460,6 +460,32 @@ End-to-end example of fatigue analysis workflow:
    plt.savefig('fatigue_analysis.png', dpi=150)
    plt.show()
 
+Rust
+====
+
+Same series as the Python example. ``rfc()`` is one-shot; ``Rfc`` accepts the signal in chunks.
+
+.. code-block:: rust
+
+   use rfcnt::{rfc, Options, ResidualMethod, Rfc};
+
+   let data = [0.0, 1.0, 0.0, 2.0, 0.0, 3.0, 0.0];
+   let result = rfc(&data, 0.5, &Options::default()).unwrap();
+   println!("damage {}", result.damage);
+
+   let mut opt = Options::for_counter();
+   opt.residual_method = ResidualMethod::Repeated;
+   let mut counter = Rfc::new(0.5, &opt).unwrap();
+   counter.feed(&data[..3]).unwrap();
+   counter.feed(&data[3..]).unwrap();
+   counter.finalize(ResidualMethod::Repeated).unwrap();
+
+Build and run the crate tests with:
+
+.. code-block:: bash
+
+   cargo test --manifest-path src/rust/Cargo.toml
+
 Running Built-in Examples
 ==========================
 

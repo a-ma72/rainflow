@@ -72,7 +72,7 @@ Reference Documentation
    Platform-specific build instructions
 
 `examples.rst <examples.rst>`_
-   Code examples in Python, C/C++, and MATLAB
+   Code examples in Python, C/C++, MATLAB, and Rust
 
 `references.rst <references.rst>`_
    Bibliography and standards citations
@@ -147,7 +147,7 @@ By Use Case
 
 **Integration**
    - `cpp_wrapper.rst <cpp_wrapper.rst>`_ - C++ projects
-   - `examples.rst <examples.rst>`_ - Python, MATLAB
+   - `examples.rst <examples.rst>`_ - Python, MATLAB, Rust
    - `delegates.rst <delegates.rst>`_ - Custom callbacks
 
 By Programming Language
@@ -240,4 +240,4 @@ See the main repository for license information.
 ---
 
 **Last Updated:** 2026-03-22
-**Documentation Version:** 0.6.1
+**Documentation Version:** 0.7.0

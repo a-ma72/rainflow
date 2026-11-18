@@ -1,0 +1,12 @@
+[package]
+name = "rfcnt"
+version = "0.7.0"
+edition = "2021"
+description = "Rainflow counting for fatigue analysis"
+license = "BSD-2-Clause"
+authors = ["Andreas Martin"]
+build = "build.rs"
+links = "rainflow"
+
+[build-dependencies]
+cc = "1"

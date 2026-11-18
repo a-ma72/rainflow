@@ -196,7 +196,7 @@ def main() -> None:
         cmdclass={"build_ext": build_ext},
         ext_modules=[
             Extension(
-                "rfcnt.rfcnt", ["src/rfcnt.cpp", "lib/rainflow.c"],
+                "rfcnt.rfcnt", ["src/rfcnt.cpp", "lib/rainflow.c", "lib/rainflow_ffi.c"],
                 define_macros=define_macros,
                 include_dirs=["src", "lib", np_get_include(), pybind11.get_include()],
                 language="c++",

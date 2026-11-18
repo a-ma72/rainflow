@@ -27,8 +27,9 @@ function (rfcnt_library  OUTPUT_NAME  OUTPUT_DIRECTORY  rfcnt_target)
                 RFCNT_SOURCES
                 src/rfcnt.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/lib/rainflow.c
+                ${CMAKE_CURRENT_SOURCE_DIR}/lib/rainflow_ffi.c
                 ${CMAKE_CURRENT_SOURCE_DIR}/lib/rainflow.h
-                ${CMAKE_CURRENT_SOURCE_DIR}/lib/rainflow.hpp
+                ${CMAKE_CURRENT_SOURCE_DIR}/lib/rainflow_ffi.h
                 ${CMAKE_CURRENT_SOURCE_DIR}/lib/config.h
         )
         # Set the source files for the target, including rfcnt.cpp and various rainflow library files.

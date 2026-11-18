@@ -1,3 +1,28 @@
+# Function wrapper for MATLAB(R)
+
+# Regular build:
+# ===============
+#[[
+    cmake -S. -Bbuild -DRFC_EXPORT_PY=0 -DRFC_EXPORT_MEX=1
+    cmake --build build/src/matlab --target rfc_mex --config Release
+#]]
+
+# Build using special MATLAB(R) installation:
+# ===========================================
+#[[
+    cmake -S. -Bbuild -DRFC_EXPORT_PY=0 -DRFC_EXPORT_MEX=1 -DMatlab_ROOT_DIR=/appl/matlab/2017b
+    cmake --build build/src/matlab --target rfc_mex --config Release
+#]]
+
+# Build packages
+# ==============
+#[[
+    cd build
+    cpack --config CPackConfig.cmake
+    cpack --config CPackSourceConfig.cmake
+#]]
+
+
 cmake_minimum_required(VERSION 3.16)
 cmake_policy(SET CMP0048 NEW)  # The project() command manages VERSION variables.
 if (POLICY CMP0076)

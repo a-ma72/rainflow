@@ -7,6 +7,7 @@ src/python/_ext
 src/python/venv/
 /venv/
 src/python/dist/
+src/rust/target/
 src/python/numpy/
 src/python/MANIFEST
 src/python/prebuilds.json
@@ -19,3 +20,13 @@ rfcnt.egg-info
 .so
 .sublime-workspace
 /src/python/Debug
+/src/matlab/make.m
+/src/matlab/test
+/src/matlab/validate.m
+/.gitlab-ci.yml
+/CLAUDE.md
+/SN-Curve-formula.png
+/coan-args-extern.in
+/coan_invoke-extern.bat
+/tools/unifdef/unifdef.exe
+/tools/unifdef/unifdef.txt

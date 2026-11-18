@@ -169,11 +169,12 @@ execute_process(
     COMMAND "${CMAKE_COMMAND}" -E copy
         "${CMAKE_CURRENT_SOURCE_DIR}/../lib/rainflow.c"
         "${CMAKE_CURRENT_SOURCE_DIR}/../lib/rainflow.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../lib/rainflow.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../lib/rainflow_ffi.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../lib/rainflow_ffi.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/../lib/config.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/lib"
 )
-# Copy rainflow core sources
+# Copy rainflow core sources. The extension talks to rainflow_ffi, not rainflow.hpp.
 
 # Set rfc_core_SOURCE_DIR so rfcnt_target_functions.cmake can find the headers
 set(rfc_core_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib")

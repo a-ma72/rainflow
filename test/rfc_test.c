@@ -51,6 +51,7 @@
 #define RFC_VALUE_TYPE   double
 
 #include "rainflow.h"
+#include "rainflow_ffi.h"
 #include "greatest.h"
 #include <locale.h>
 #include <math.h>
@@ -3243,6 +3244,57 @@ TEST RFC_ctx_inspect( void )
 }
 
 
+#if !RFC_MINIMAL
+TEST RFC_ffi_matches_direct(void)
+{
+    double data[] = { 0.0, 1.0, 0.0, 2.0, 0.0, 3.0, 0.0 };
+    rfc_ctx_s ctx = { 0 };
+    rfc_ffi *ffi;
+    rfc_ffi *preview;
+    rfc_ffi *live;
+    double damage = 0.0;
+    double damage_ffi = 0.0;
+    double damage_preview = 0.0;
+    double damage_live = 0.0;
+    double live_before = 0.0;
+
+    ctx.version = sizeof(ctx);
+    ASSERT(RFC_init(&ctx, 100, 0.5, 0.0, 0.5, RFC_FLAGS_DEFAULT));
+    ASSERT(RFC_feed(&ctx, data, 7));
+    ASSERT(RFC_finalize(&ctx, RFC_RES_REPEATED));
+    ASSERT(RFC_damage(&ctx, &damage, NULL));
+
+    ffi = rfc_ffi_create();
+    ASSERT(ffi);
+    ASSERT_EQ(RFC_FFI_OK, rfc_ffi_init(ffi, 100, 0.5, 0.0, 0.5, RFC_FFI_FLAGS_DEFAULT));
+    ASSERT_EQ(RFC_FFI_OK, rfc_ffi_feed(ffi, data, 7));
+    ASSERT_EQ(RFC_FFI_OK, rfc_ffi_finalize(ffi, RFC_FFI_RES_REPEATED));
+    ASSERT_EQ(RFC_FFI_OK, rfc_ffi_damage(ffi, &damage_ffi, NULL));
+    ASSERT_IN_RANGE(damage, damage_ffi, 1e-12);
+    rfc_ffi_destroy(ffi);
+
+    live = rfc_ffi_create();
+    ASSERT(live);
+    ASSERT_EQ(RFC_FFI_OK, rfc_ffi_init(live, 100, 0.5, 0.0, 0.5, RFC_FFI_FLAGS_DEFAULT));
+    ASSERT_EQ(RFC_FFI_OK, rfc_ffi_feed(live, data, 7));
+    ASSERT_EQ(RFC_FFI_OK, rfc_ffi_damage(live, &live_before, NULL));
+    ASSERT_EQ(RFC_FFI_OK, rfc_ffi_clone(live, &preview));
+    ASSERT_EQ(RFC_FFI_OK, rfc_ffi_finalize(preview, RFC_FFI_RES_REPEATED));
+    ASSERT_EQ(RFC_FFI_OK, rfc_ffi_damage(preview, &damage_preview, NULL));
+    ASSERT_EQ(RFC_FFI_OK, rfc_ffi_damage(live, &damage_live, NULL));
+    ASSERT_IN_RANGE(live_before, damage_live, 1e-12);
+    ASSERT_EQ(RFC_FFI_OK, rfc_ffi_finalize(live, RFC_FFI_RES_REPEATED));
+    ASSERT_EQ(RFC_FFI_OK, rfc_ffi_damage(live, &damage_live, NULL));
+    ASSERT_IN_RANGE(damage, damage_preview, 1e-12);
+    ASSERT_IN_RANGE(damage, damage_live, 1e-12);
+    rfc_ffi_destroy(preview);
+    rfc_ffi_destroy(live);
+
+    RFC_deinit(&ctx);
+    PASS();
+}
+#endif /* !RFC_MINIMAL */
+
 /* local suite (greatest) */
 SUITE( RFC_TEST_SUITE )
 {
@@ -3251,6 +3303,9 @@ SUITE( RFC_TEST_SUITE )
     /* Inspect rainflow ctx */
     RUN_TEST( RFC_ctx_inspect );
     RUN_TEST( RFC_res_get_test );
+#if !RFC_MINIMAL
+    RUN_TEST( RFC_ffi_matches_direct );
+#endif /* !RFC_MINIMAL */
 
     /* Test rainflow counting */
     RUN_TEST1( RFC_empty, 0 );

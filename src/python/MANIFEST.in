@@ -1,7 +1,8 @@
 include lib/config.h
 include lib/rainflow.c
 include lib/rainflow.h
-include lib/rainflow.hpp
+include lib/rainflow_ffi.c
+include lib/rainflow_ffi.h
 include src/rfcnt.cpp
 include src/docstrings_generated.hpp
 include LICENSE
