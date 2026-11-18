@@ -38,6 +38,14 @@ def parse_expected_version() -> tuple[str, str, str, str, str]:
     return major, minor, patch, postfix, full
 
 
+def cargo_semver(major: str, minor: str, patch: str, postfix: str) -> str:
+    """Cargo versions are SemVer. PEP 440 ``0.7.0rc1`` is ``0.7.0-rc1`` there."""
+    base = f"{major}.{minor}.{patch}"
+    if not postfix:
+        return base
+    return f"{base}-{postfix.lstrip('.')}"
+
+
 def check_config_h(path: Path, major: str, minor: str, patch: str, postfix: str) -> list[str]:
     errors = []
     text = path.read_text(encoding="utf-8")
@@ -93,8 +101,10 @@ def main() -> int:
     m = re.search(r'(?m)^version = "([^"]+)"', cargo_text)
     if not m:
         errors.append(f"{cargo}: could not parse package version")
-    elif m.group(1) != full:
-        errors.append(f"{cargo}: version is {m.group(1)!r}, expected {full!r}")
+    else:
+        expected_cargo = cargo_semver(major, minor, patch, postfix)
+        if m.group(1) != expected_cargo:
+            errors.append(f"{cargo}: version is {m.group(1)!r}, expected {expected_cargo!r}")
 
     if errors:
         print("Version mismatch between CMakeLists.txt and generated files:\n", file=sys.stderr)

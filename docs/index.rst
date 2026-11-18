@@ -244,4 +244,4 @@ See the main repository for license information.
 ---
 
 **Last Updated:** 2026-03-22
-**Documentation Version:** 0.7.0
+**Documentation Version:** 0.7.0rc1

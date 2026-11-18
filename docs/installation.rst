@@ -143,7 +143,7 @@ Installing from GitHub
 
 Install directly from a GitHub release::
 
-   pip install https://github.com/a-ma72/rainflow/releases/download/rfcnt-0.7.0/rfcnt-0.7.0.tar.gz
+   pip install https://github.com/a-ma72/rainflow/releases/download/rfcnt-0.7.0rc1/rfcnt-0.7.0rc1.tar.gz
 
 Or from the repository:
 
@@ -156,7 +156,7 @@ Google Colaboratory
 
 To use in Google Colab notebooks::
 
-   !pip install --no-build-isolation --no-deps https://github.com/a-ma72/rainflow/releases/download/rfcnt-0.7.0/rfcnt-0.7.0.tar.gz
+   !pip install --no-build-isolation --no-deps https://github.com/a-ma72/rainflow/releases/download/rfcnt-0.7.0rc1/rfcnt-0.7.0rc1.tar.gz
 
    import rfcnt
    rfcnt.tests.examples.example_1()

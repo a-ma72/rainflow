@@ -141,7 +141,7 @@ RAINFLOW
 |   |       \   sync_docstrings.py    Regenerates src/docstrings_generated.hpp and rfcnt.pyi from docstrings/*.txt
 |
 |   \---rust
-|       |   Cargo.toml                Crate rfcnt 0.7.0, calls the C core through rainflow_ffi
+|       |   Cargo.toml                Crate rfcnt 0.7.0-rc1, calls the C core through rainflow_ffi
 |       |   Cargo.lock                Locked dependency versions
 |       |   build.rs                  Compiles rainflow.c and rainflow_ffi.c
 |       |

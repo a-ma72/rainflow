@@ -1,6 +1,6 @@
 [package]
 name = "rfcnt"
-version = "0.7.0"
+version = "0.7.0-rc1"
 edition = "2021"
 description = "Rainflow counting for fatigue analysis"
 license = "BSD-2-Clause"
