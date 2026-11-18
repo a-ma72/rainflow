@@ -169,6 +169,10 @@ By Programming Language
    - `damage_history.rst <damage_history.rst>`_ - Visualization
    - `installation.rst <installation.rst>`_ - pip install
 
+**Rust**
+   - `examples.rst <examples.rst>`_ - ``rfc`` and stateful ``Rfc``
+   - `installation.rst <installation.rst>`_ - ``cargo test``
+
 By Feature
 ----------
 

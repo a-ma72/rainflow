@@ -10,26 +10,32 @@ features available.
 
    A key design goal of this project is **API consistency across languages**.
    The same concepts, parameter names, and workflow — initialize, feed, finalize,
-   extract results — work identically in C, C++, MATLAB, and Python. Code
+   extract results — work identically in C, C++, MATLAB, Python, and Rust. Code
    written for one interface transfers directly to another, minimising
    re-learning and reducing integration errors in mixed-language projects.
 
 Modular Architecture
 ====================
 
-Two-Layer Design
-----------------
+Core and Language Fronts
+------------------------
 
-The package uses a modular two-layer architecture:
+Counting lives in one C core. Three fronts sit on top of it:
 
-**Layer 1: Core C Module** (``rainflow.c`` / ``rainflow.h``)
-   Contains all necessary functions for rainflow counting and histogram
-   extraction. Features can be selectively enabled at compile time.
+**C API** (``rainflow.c`` / ``rainflow.h``)
+   Functions for rainflow counting and histogram extraction. Features can
+   be selectively enabled at compile time.
 
-**Layer 2: C++ Wrapper** (``rainflow.hpp``)
-   Encapsulates C functions in a namespace and provides a template class
-   ``Rainflow`` for object-oriented access and inheritance. Includes
-   container-based turning point storage.
+**C++ wrapper** (``rainflow.hpp``)
+   C++ only. Encapsulates the C functions in a namespace and provides a
+   template class ``Rainflow`` for object-oriented access and inheritance,
+   including container-based turning point storage. Python and Rust do not
+   include this header.
+
+**Opaque FFI** (``src/lib/rainflow_ffi.h``)
+   Stable C boundary with an opaque handle. The packed context stays inside
+   the library. The Python extension (``src/python/src/rfcnt.cpp``) and the
+   Rust crate (``src/rust``) both call this header.
 
 Compile-Time Feature Selection
 -------------------------------
@@ -262,6 +268,7 @@ The package provides bindings for multiple environments:
 **Python**
    Full-featured extension module (``rfcnt``)
 
+   - Calls ``rainflow_ffi.h``. The packed context stays inside the C library
    - NumPy array support
    - One-shot ``rfc()`` and stateful ``RFC`` (chunked ``feed()``)
    - ``rfcnt.at_transform`` / ``RFC.at_init`` + ``RFC.at_transform`` for

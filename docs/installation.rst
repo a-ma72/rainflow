@@ -42,8 +42,9 @@ Building from Sources
 Full Build (All Components)
 ----------------------------
 
-Build all components including C library, Python extension, MATLAB MEX,
-and unit tests:
+CMake builds the C library, the Python extension, the MATLAB MEX wrapper,
+and the unit tests. The Rust crate is not part of that build; see
+`Rust`_ below (``cargo test --manifest-path src/rust/Cargo.toml``).
 
 .. code-block:: bash
 

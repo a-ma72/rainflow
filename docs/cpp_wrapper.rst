@@ -34,6 +34,9 @@ The library uses a two-layer architecture:
 The C++ wrapper is **header-only** and adds minimal overhead - it's a thin
 wrapper that delegates to the C functions.
 
+This page is the C++ API. Python and Rust call ``rainflow_ffi.h`` and do
+not include ``rainflow.hpp``.
+
 Namespace Structure
 -------------------
 
